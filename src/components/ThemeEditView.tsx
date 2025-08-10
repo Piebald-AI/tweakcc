@@ -5,6 +5,7 @@ import { ColoredColorName } from './ColoredColorName.js';
 import { ColorPicker } from './ColorPicker.js';
 import { Theme } from '../utils/types.js';
 import { SettingsContext } from '../App.js';
+import { isValidColorFormat, normalizeColorToRgb } from '../utils/misc.js';
 
 interface ThemeEditViewProps {
   onBack: () => void;
@@ -47,8 +48,26 @@ export function ThemeEditView({ onBack, themeId }: ThemeEditViewProps) {
     [currentThemeId, updateSettings]
   );
 
+  const handlePastedColor = (pastedText: string) => {
+    if (selectedIndex >= 2 && isValidColorFormat(pastedText)) {
+      const normalizedColor = normalizeColorToRgb(pastedText);
+      const colorIndex = selectedIndex - 2;
+      const colorKey = colorKeys[colorIndex];
+
+      updateTheme(theme => {
+        theme.colors[colorKey] = normalizedColor;
+      });
+    }
+  };
+
   useInput((input, key) => {
     if (editingColorIndex === null && editingNameId === null) {
+      // Handle pasted text (multi-character input indicates paste)
+      if (input.length > 1 && !key.ctrl && !key.meta) {
+        handlePastedColor(input);
+        return;
+      }
+
       // Handle navigation when not editing
       if (key.escape) {
         onBack();
@@ -243,6 +262,7 @@ export function ThemeEditView({ onBack, themeId }: ThemeEditViewProps) {
             <Box marginBottom={1} flexDirection="column">
               <Text dimColor>enter to edit theme name, id, or color</Text>
               <Text dimColor>ctrl+a to toggle rgb, hex, hsl</Text>
+              <Text dimColor>paste color from clipboard (when on color)</Text>
               <Text dimColor>esc to go back</Text>
             </Box>
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, Fragment } from 'react';
 import { Box, Text, useInput } from 'ink';
+import { isValidColorFormat, normalizeColorToRgb } from '../utils/misc.js';
 
 interface ColorPickerProps {
   initialValue: string;
@@ -66,7 +67,28 @@ export function ColorPicker({
     }
   }, [hsl, rgb, updating]);
 
+  const handlePastedColor = (pastedText: string) => {
+    if (isValidColorFormat(pastedText)) {
+      const normalizedColor = normalizeColorToRgb(pastedText);
+      const parsedHsl = parseColorToHSL(normalizedColor);
+      const parsedRgb = parseColorToRGB(normalizedColor);
+
+      if (parsedHsl && parsedRgb) {
+        setUpdating(true);
+        setHsl(parsedHsl);
+        setRgb(parsedRgb);
+        setUpdating(false);
+      }
+    }
+  };
+
   useInput((input, key) => {
+    // Handle pasted text (multi-character input indicates paste)
+    if (input.length > 1 && !key.ctrl && !key.meta) {
+      handlePastedColor(input);
+      return;
+    }
+
     if (key.return) {
       onExit();
     } else if (key.escape) {
@@ -393,6 +415,9 @@ export function ColorPicker({
           </Text>
           <Text color="gray" dimColor>
             ctrl+a to switch rgb/hsl
+          </Text>
+          <Text color="gray" dimColor>
+            paste color from clipboard
           </Text>
           <Text color="gray" dimColor>
             enter to exit (auto-saved)
