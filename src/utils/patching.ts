@@ -405,7 +405,9 @@ const getThinkerFormatLocation = (
   oldFile: string
 ): {
   fmtLocation: LocationResult;
-  curVerb: string;
+  cond: string;
+  curVerb1: string;
+  curVerb2: string;
 } | null => {
   const approxAreaPattern =
     /spinnerTip:\w+,(?:\w+:\w+,)*overrideMessage:\w+,.{300}/;
@@ -416,12 +418,17 @@ const getThinkerFormatLocation = (
     return null;
   }
 
-  // Search within a range of 300 characters
+  // Search within a range of 400 characters
   const searchSection = oldFile.slice(
     approxAreaMatch.index,
-    approxAreaMatch.index + 300
+    approxAreaMatch.index + 400
   );
-  const formatPattern = /[$\w]+=([^=]+?)\+"…"/;
+
+  // Example: =L?L.activeForm+"…":(Z||R)+"…"
+  //           ^   ^^^^^^^^^^     ^^^^^^
+  // We extract the above three highlighted fields and then rewrite the conditional using backticks;
+  // see below in `writeThinkerFormat()`.
+  const formatPattern = /=(\w+)\?([^={}?]+?)\+"…":(.+?)\+"…"/;
   const formatMatch = searchSection.match(formatPattern);
 
   if (!formatMatch || formatMatch.index == undefined) {
@@ -429,15 +436,15 @@ const getThinkerFormatLocation = (
     return null;
   }
 
-  const startIndex = searchSection.indexOf('=', formatMatch.index) + 1;
-
   return {
     fmtLocation: {
-      startIndex: approxAreaMatch.index + startIndex,
+      startIndex: approxAreaMatch.index + formatMatch.index,
       endIndex:
         approxAreaMatch.index + formatMatch.index + formatMatch[0].length,
     },
-    curVerb: formatMatch[1],
+    cond: formatMatch[1],
+    curVerb1: formatMatch[2],
+    curVerb2: formatMatch[3],
   };
 };
 
@@ -449,24 +456,25 @@ export const writeThinkerFormat = (
   if (!location) {
     return null;
   }
-  const { fmtLocation, curVerb } = location;
+  const { fmtLocation, cond, curVerb1, curVerb2 } = location;
 
-  const formatJson =
-    '`' +
-    format
-      .replace(/\\/g, '\\\\')
-      .replace(/`/g, '\\`')
-      .replace(/\{\}/g, '${' + curVerb + '}') +
-    '`';
+  // See `getThinkerFormatLocation` for an explanation of this.
+  let serializedFormat = format.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
+  let curVerb1Fmt =
+    '`' + serializedFormat.replace(/\{\}/g, '${' + curVerb1 + '}') + '`';
+  let curVerb2Fmt =
+    '`' + serializedFormat.replace(/\{\}/g, '${' + curVerb2 + '}') + '`';
+  const formatDecl = `=${cond}?${curVerb1Fmt}:${curVerb2Fmt}`;
+
   const newFile =
     oldFile.slice(0, fmtLocation.startIndex) +
-    formatJson +
+    formatDecl +
     oldFile.slice(fmtLocation.endIndex);
 
   showDiff(
     oldFile,
     newFile,
-    formatJson,
+    formatDecl,
     fmtLocation.startIndex,
     fmtLocation.endIndex
   );
