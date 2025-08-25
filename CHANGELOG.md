@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - New `--apply` CLI option to apply stored customizations without interactive UI
 
+### Changed
+- Updated patching logic to work with Claude Code 1.0.89 (#34) - @bl-ue
+
 ## [1.1.3] - Previous Release
 
 ### Changed
