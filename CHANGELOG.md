@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.2.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.2.0) - 2025-08-25
+
+- **New:** Bring back the token counter and elapsed time metric (#37) - @bl-ue
+
 ## [v1.1.4](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.1.4) - 2025-08-25
 
 - **New:** `--apply` CLI option to apply stored customizations without interactive UI (#33) - @patrickjaja
