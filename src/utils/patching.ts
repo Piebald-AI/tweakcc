@@ -74,60 +74,20 @@ export function getWelcomeMessageClaudeCodeLocation(
   oldFile: string
 ): LocationResult[] {
   const results: LocationResult[] = [];
-  
-  // Pattern to find "Claude Code" in various contexts
-  // Looking for patterns like: "Claude Code", 'Claude Code', `Claude Code`
-  // Also checking for escaped versions in strings
-  const patterns = [
-    /["']Claude Code["']/g,
-    /`Claude Code`/g,
-    /\\x1b\[1mClaude Code\\x1b\[22m/g, // Bold text pattern
-    /\bClaude Code\b/g // Word boundary pattern for general text
-  ];
-  
-  for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.exec(oldFile)) !== null) {
-      // Extract just "Claude Code" from the match
-      const fullMatch = match[0];
-      let startOffset = 0;
-      let endOffset = 0;
-      
-      // Determine the actual "Claude Code" position within the match
-      if (fullMatch.includes('\\x1b[1m')) {
-        // For ANSI escape sequences
-        startOffset = fullMatch.indexOf('Claude Code');
-        endOffset = startOffset + 'Claude Code'.length;
-      } else if (fullMatch.startsWith('"') || fullMatch.startsWith("'") || fullMatch.startsWith('`')) {
-        // For quoted strings
-        startOffset = 1;
-        endOffset = fullMatch.length - 1;
-      } else {
-        // For plain text
-        startOffset = 0;
-        endOffset = fullMatch.length;
-      }
-      
-      const actualStart = match.index + startOffset;
-      const actualEnd = match.index + endOffset;
-      
-      // Check if this location is not already in results (avoid duplicates)
-      const isDuplicate = results.some(r => 
-        (actualStart >= r.startIndex && actualStart < r.endIndex) ||
-        (actualEnd > r.startIndex && actualEnd <= r.endIndex)
-      );
-      
-      if (!isDuplicate) {
-        results.push({
-          startIndex: actualStart,
-          endIndex: actualEnd
-        });
-      }
-    }
+
+  // Single pattern to match "Claude Code" anywhere in the file
+  // The /g flag ensures we find all occurrences
+  const pattern = /Claude Code/g;
+
+  let match;
+  while ((match = pattern.exec(oldFile)) !== null) {
+    results.push({
+      startIndex: match.index,
+      endIndex: match.index + match[0].length,
+    });
   }
-  
-  // Sort results by position
-  return results.sort((a, b) => a.startIndex - b.startIndex);
+
+  return results;
 }
 
 // Function to replace "Claude Code" with the user's text in the welcome message
@@ -136,44 +96,46 @@ export function writeWelcomeMessageClaudeCode(
   replacementText: string
 ): string {
   const locations = getWelcomeMessageClaudeCodeLocation(oldFile);
-  
+
   if (locations.length === 0) {
     if (isDebug()) {
-      console.log('patch: welcome message: no "Claude Code" text found to replace');
+      console.log(
+        'patch: welcome message: no "Claude Code" text found to replace'
+      );
     }
     return oldFile;
   }
-  
+
   // Process replacements from end to beginning to avoid index shifting
-  const sortedLocations = locations.sort((a, b) => b.startIndex - a.startIndex);
-  
+  // Since getWelcomeMessageClaudeCodeLocation already returns sorted results,
+  // we just need to reverse them
+  const sortedLocations = locations.reverse();
+
   let newFile = oldFile;
   for (const location of sortedLocations) {
-    const currentText = newFile.slice(location.startIndex, location.endIndex);
-    
-    // Only replace if it's actually "Claude Code"
-    if (currentText === 'Claude Code') {
-      const updatedFile =
-        newFile.slice(0, location.startIndex) +
-        replacementText +
-        newFile.slice(location.endIndex);
-      
-      showDiff(
-        newFile,
-        updatedFile,
-        replacementText,
-        location.startIndex,
-        location.endIndex
+    // No need to verify the text since our regex only matches "Claude Code"
+    const updatedFile =
+      newFile.slice(0, location.startIndex) +
+      replacementText +
+      newFile.slice(location.endIndex);
+
+    showDiff(
+      newFile,
+      updatedFile,
+      replacementText,
+      location.startIndex,
+      location.endIndex
+    );
+
+    newFile = updatedFile;
+
+    if (isDebug()) {
+      console.log(
+        `patch: welcome message: replaced "Claude Code" at position ${location.startIndex}`
       );
-      
-      newFile = updatedFile;
-      
-      if (isDebug()) {
-        console.log(`patch: welcome message: replaced "Claude Code" at position ${location.startIndex}`);
-      }
     }
   }
-  
+
   return newFile;
 }
 
@@ -726,7 +688,7 @@ export const applyCustomization = async (
     const c = config.settings.launchText;
     let textToApply = '';
     let nameToReplace = ''; // The plain text name to replace "Claude Code" with
-    
+
     if (c.method === 'custom' && c.customText) {
       textToApply = c.customText;
       // Extract the first line or reasonable portion for the name replacement
@@ -740,7 +702,7 @@ export const applyCustomization = async (
     } else if (c.method === 'figlet' && c.figletText) {
       // Store the original text used for figlet generation
       nameToReplace = c.figletText.replace('\n', ' ').trim();
-      
+
       textToApply = await new Promise<string>(resolve =>
         figlet.text(
           c.figletText.replace('\n', ' '),
@@ -756,11 +718,11 @@ export const applyCustomization = async (
         )
       );
     }
-    
+
     // Apply the banner replacement
     if ((result = writeSigninBannerText(content, textToApply)))
       content = result;
-    
+
     // Apply the welcome message "Claude Code" replacement
     if (nameToReplace) {
       if ((result = writeWelcomeMessageClaudeCode(content, nameToReplace)))
