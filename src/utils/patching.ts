@@ -459,10 +459,10 @@ export const writeThinkerFormat = (
   const { fmtLocation, cond, curVerb1, curVerb2 } = location;
 
   // See `getThinkerFormatLocation` for an explanation of this.
-  let serializedFormat = format.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
-  let curVerb1Fmt =
+  const serializedFormat = format.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
+  const curVerb1Fmt =
     '`' + serializedFormat.replace(/\{\}/g, '${' + curVerb1 + '}') + '`';
-  let curVerb2Fmt =
+  const curVerb2Fmt =
     '`' + serializedFormat.replace(/\{\}/g, '${' + curVerb2 + '}') + '`';
   const formatDecl = `=${cond}?${curVerb1Fmt}:${curVerb2Fmt}`;
 
@@ -560,7 +560,6 @@ export const writeThinkerSymbolWidthLocation = (
 };
 
 // Debug function for showing diffs (currently disabled)
-/* eslint-disable @typescript-eslint/no-unused-vars */
 function showDiff(
   oldFileContents: string,
   newFileContents: string,
@@ -596,7 +595,6 @@ function showDiff(
     console.log('--- End Diff ---\n');
   }
 }
-/* eslint-enable @typescript-eslint/no-unused-vars */
 
 export const applyCustomization = async (
   config: TweakccConfig,
