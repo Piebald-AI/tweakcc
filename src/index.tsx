@@ -16,7 +16,7 @@ const main = async () => {
     .description(
       'Command-line tool to customize your Claude Code theme colors, thinking verbs and more.'
     )
-    .version('1.2.1')
+    .version('1.2.2')
     .option('-d, --debug', 'enable debug mode')
     .option('-a, --apply', 'apply saved customizations without interactive UI');
 
