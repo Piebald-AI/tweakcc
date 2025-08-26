@@ -609,6 +609,10 @@ const getClijsSearchPaths = (): string[] => {
       : os.homedir();
   const mod = 'node_modules/@anthropic-ai/claude-code';
 
+  // Local Claude Code installation (#42)
+  paths.push(`${os.homedir()}/.claude/local/${mod}`);
+
+
   // Search in custom paths for popular tools.  These are cross-platform paths.
   // prettier-ignore
   {
@@ -658,9 +662,10 @@ const getClijsSearchPaths = (): string[] => {
     // Various user paths
     paths.push(`${home}/.local/lib/${mod}`)
     paths.push(`${home}/.local/share/${mod}`)
-    paths.push(`${home}/.npm-global/${mod}`)
-    paths.push(`${home}/.npm/${mod}`)
-    paths.push(`${home}/npm/${mod}`)
+    paths.push(`${home}/.npm-global/lib/${mod}`)
+    paths.push(`${home}/.npm-packages/lib/${mod}`)
+    paths.push(`${home}/.npm/lib/${mod}`)
+    paths.push(`${home}/npm/lib/${mod}`)
 
     // Various system paths
     paths.push(`/etc/${mod}`)
