@@ -5,9 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## Unreleased
 
-- **New:** Add welcome message customization - replaces "Claude Code" with custom text in the welcome message when customText is defined
+## [v1.2.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.2.1) - 2025-08-26
+
+- **New:** feat: add welcome message customization to replace 'Claude Code' with custom text (#39) - @patrickjaja
 - fix(patching): include $ in matched identifier names (#43) - @bl-ue
 - feat(search): support local installation, fix ~/.npm* paths (#44) - @bl-ue
 
