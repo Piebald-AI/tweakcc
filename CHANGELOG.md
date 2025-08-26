@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **New:** Add welcome message customization - replaces "Claude Code" with custom text in the welcome message when customText is defined
 - fix(patching): include $ in matched identifier names (#43) - @bl-ue
+- feat(search): support local installation, fix ~/.npm* paths (#44) - @bl-ue
 
 ## [v1.2.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.2.0) - 2025-08-25
 
