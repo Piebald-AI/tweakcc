@@ -361,7 +361,7 @@ const getThinkerVerbsLocation = (
   // ```
   // To write, we just do `{varname} = {JSON.stringify({words: verbs})}`.
   const verbsPattern =
-    /\b([$\w]+)=\{words:\[(?:"[^"{}()]+ing",)+"[^"{}()]+ing"\]\}/s;
+    /([$\w]+)=\{words:\[(?:"[^"{}()]+ing",)+"[^"{}()]+ing"\]\}/s;
 
   const verbsMatch = oldFile.match(verbsPattern);
   if (!verbsMatch || verbsMatch.index == undefined) {
