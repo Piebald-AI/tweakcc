@@ -74,7 +74,7 @@ export function getWelcomeMessageLocation(
 ): LocationResult | null {
   // Pattern: " Welcome to ",q9.createElement(T,{bold:!0},"Claude Code"),"!"
   const pattern =
-    /" Welcome to ",\w+\.createElement\([^,]+,\{bold:!0\},"Claude Code"\),"!"/;
+    /" Welcome to ",[$\w]+\.createElement\([^,]+,\{bold:!0\},"Claude Code"\),"!"/;
   const match = oldFile.match(pattern);
 
   if (match && match.index !== undefined) {
@@ -385,7 +385,7 @@ const getThinkerVerbsUseLocation = (
   // It's a function that returns either new verbs from Statsig (a/b testing) or the default verbs.
   // When we write the file we'll just write a new function.
   const pattern =
-    /function (\w+)\(\)\{return \w+\("tengu_spinner_words",\w+\)\.words\}/;
+    /function ([$\w]+)\(\)\{return [$\w]+\("tengu_spinner_words",[$\w]+\)\.words\}/;
   const match = oldFile.match(pattern);
 
   if (!match || match.index == undefined) {
@@ -460,7 +460,7 @@ const getThinkerFormatLocation = (
   curVerb2: string;
 } | null => {
   const approxAreaPattern =
-    /spinnerTip:\w+,(?:\w+:\w+,)*overrideMessage:\w+,.{300}/;
+    /spinnerTip:[$\w]+,(?:[$\w]+:[$\w]+,)*overrideMessage:[$\w]+,.{300}/;
   const approxAreaMatch = oldFile.match(approxAreaPattern);
 
   if (!approxAreaMatch || approxAreaMatch.index == undefined) {
@@ -478,7 +478,7 @@ const getThinkerFormatLocation = (
   //           ^   ^^^^^^^^^^     ^^^^^^
   // We extract the above three highlighted fields and then rewrite the conditional using backticks;
   // see below in `writeThinkerFormat()`.
-  const formatPattern = /=(\w+)\?([^={}?]+?)\+"…":(.+?)\+"…"/;
+  const formatPattern = /=([$\w]+)\?([^={}?]+?)\+"…":(.+?)\+"…"/;
   const formatMatch = searchSection.match(formatPattern);
 
   if (!formatMatch || formatMatch.index == undefined) {
@@ -535,7 +535,7 @@ const getThinkerSymbolMirrorOptionLocation = (
   oldFile: string
 ): LocationResult | null => {
   const mirrorPattern =
-    /=\s*\[\.\.\.(\w+),\s*\.\.\.?\[\.\.\.\1\]\.reverse\(\)\]/;
+    /=\s*\[\.\.\.([$\w]+),\s*\.\.\.?\[\.\.\.\1\]\.reverse\(\)\]/;
   const match = oldFile.match(mirrorPattern);
 
   if (!match || match.index == undefined) {
