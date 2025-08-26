@@ -52,15 +52,26 @@ export default function App({
   // Function to update the settings, automatically updated changesApplied.
   const updateSettings = useCallback(
     (updateFn: (settings: Settings) => void) => {
-      updateFn(config.settings);
+      // Create a deep copy of the settings to avoid mutation
+      const newSettings = JSON.parse(
+        JSON.stringify(config.settings)
+      ) as Settings;
+      updateFn(newSettings);
+
+      // Update the config with the new settings
+      setConfig(prevConfig => ({
+        ...prevConfig,
+        settings: newSettings,
+        changesApplied: false,
+      }));
+
+      // Also update the config file
       updateConfigFile(cfg => {
-        cfg.settings = config.settings;
+        cfg.settings = newSettings;
         cfg.changesApplied = false;
-      }).then(newConfig => {
-        setConfig(newConfig);
       });
     },
-    [config]
+    [config.settings]
   );
 
   const [currentView, setCurrentView] = useState<MainMenuItem | null>(null);
