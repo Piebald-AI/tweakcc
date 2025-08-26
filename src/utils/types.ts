@@ -612,7 +612,6 @@ const getClijsSearchPaths = (): string[] => {
   // Local Claude Code installation (#42)
   paths.push(`${os.homedir()}/.claude/local/${mod}`);
 
-
   // Search in custom paths for popular tools.  These are cross-platform paths.
   // prettier-ignore
   {
