@@ -29,13 +29,16 @@ $ pnpm dlx tweakcc
 
 Demo:
 
-<img alt="Animated GIF demonstrating launching tweakcc, creating a new theme, changing its colors, applying the customimations, launching Claude Code, and selecting and trying out the new theme" src="./assets/themes-demo.gif" width="600">
+<video width="600" controls autplay muted loop>
+  <source src="./assets/demo.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
 
 ## How it works
 
 `tweakcc` works by patching the Claude Code's minified `cli.js` file.  When you update your Claude Code installation, your customizations will be overwritten, but they're remembered in your `~/.tweakcc/config.js` configuration file, so they can be reapplied by just rerunning the tool.
 
-Works with Claude Code 1.0.88
+Works with Claude Code 1.0.92
 
 ## Running
 
