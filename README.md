@@ -27,12 +27,9 @@ $ npx tweakcc
 $ pnpm dlx tweakcc
 ```
 
-Demo:
+Demo video:
 
-<video width="600" controls autplay muted loop>
-  <source src="./assets/demo.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
+https://github.com/user-attachments/assets/5800342e-3adc-4914-ab6f-44a73294a872
 
 ## How it works
 
