@@ -6,6 +6,8 @@
 
 `tweakcc` is a lightweight, interactive CLI tool that lets you personalize your Claude Code interface.
 
+<img src="./assets/demo.gif" alt="Animated GIF demonstrating running `npx tweakcc`, creating a new theme, changing all of Claude Code's UI colors to purple, chaning the thinking format from 'verb + ellipsis' to 'Claude is 'verb', chaning the generating spinner style to a 50m glow animation, applying the changes, running Claude, and using '/config' to switch to the new theme, and sending a message to see the new thinking verb format" width="800">
+
 - Create **custom themes** with a graphical HSL/RGB color picker
 - Add custom **thinking verbs** that will show while Claude's working
 - Create custom **thinking spinner animations** with different speeds and phases
@@ -26,10 +28,6 @@ $ npx tweakcc
 # Or use pnpm:
 $ pnpm dlx tweakcc
 ```
-
-Demo video:
-
-https://github.com/user-attachments/assets/5800342e-3adc-4914-ab6f-44a73294a872
 
 ## How it works
 
