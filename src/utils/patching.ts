@@ -7,7 +7,7 @@ import { isDebug } from './misc.js';
 export interface LocationResult {
   startIndex: number;
   endIndex: number;
-  variableName?: string;
+  identifiers?: string[];
 }
 
 export interface ModificationEdit {
@@ -153,7 +153,7 @@ export function getThemesLocation(oldFile: string): {
     switchStatement: {
       startIndex: switchMatch.index,
       endIndex: switchMatch.index + switchMatch[0].length,
-      variableName: switchMatch[1].trim(),
+      identifiers: [switchMatch[1].trim()],
     },
     objArr: {
       startIndex: objArrMatch.index,
@@ -220,7 +220,7 @@ export const writeThemes = (
   oldFile = newFile;
 
   // Update switch statement
-  let switchStatement = `switch(${locations.switchStatement.variableName}){\n`;
+  let switchStatement = `switch(${locations.switchStatement.identifiers?.[0]}){\n`;
   themes.forEach(theme => {
     switchStatement += `case"${theme.id}":return${JSON.stringify(
       theme.colors
@@ -347,9 +347,7 @@ export const writeThinkerSymbolSpeed = (
   return newContent;
 };
 
-const getThinkerVerbsLocation = (
-  oldFile: string
-): { verbsLocation: LocationResult; varName: string } | null => {
+const getThinkerVerbsLocation = (oldFile: string): LocationResult | null => {
   // This finds the folowing pattern:
   // ```js
   // kW8 = {
@@ -370,17 +368,13 @@ const getThinkerVerbsLocation = (
   }
 
   return {
-    verbsLocation: {
-      startIndex: verbsMatch.index,
-      endIndex: verbsMatch.index + verbsMatch[0].length,
-    },
-    varName: verbsMatch[1],
+    startIndex: verbsMatch.index,
+    endIndex: verbsMatch.index + verbsMatch[0].length,
+    identifiers: [verbsMatch[1]],
   };
 };
 
-const getThinkerVerbsUseLocation = (
-  oldFile: string
-): { useLocation: LocationResult; funcName: string } | null => {
+const getThinkerVerbsUseLocation = (oldFile: string): LocationResult | null => {
   // This is brittle but it's easy.
   // It's a function that returns either new verbs from Statsig (a/b testing) or the default verbs.
   // When we write the file we'll just write a new function.
@@ -394,11 +388,9 @@ const getThinkerVerbsUseLocation = (
   }
 
   return {
-    useLocation: {
-      startIndex: match.index,
-      endIndex: match.index + match[0].length,
-    },
-    funcName: match[1],
+    startIndex: match.index,
+    endIndex: match.index + match[0].length,
+    identifiers: [match[1]],
   };
 };
 
@@ -410,7 +402,8 @@ export const writeThinkerVerbs = (
   if (!location1) {
     return null;
   }
-  const { verbsLocation, varName } = location1;
+  const verbsLocation = location1;
+  const varName = verbsLocation.identifiers?.[0];
 
   const verbsJson = `${varName}=${JSON.stringify({ words: verbs })}`;
   const newFile1 =
@@ -432,7 +425,8 @@ export const writeThinkerVerbs = (
   if (!location2) {
     return null;
   }
-  const { useLocation, funcName } = location2;
+  const useLocation = location2;
+  const funcName = useLocation.identifiers?.[0];
 
   const newFn = `function ${funcName}(){return ${varName}.words}`;
   const newFile2 =
@@ -451,14 +445,7 @@ export const writeThinkerVerbs = (
   return newFile2;
 };
 
-const getThinkerFormatLocation = (
-  oldFile: string
-): {
-  fmtLocation: LocationResult;
-  cond: string;
-  curVerb1: string;
-  curVerb2: string;
-} | null => {
+const getThinkerFormatLocation = (oldFile: string): LocationResult | null => {
   const approxAreaPattern =
     /spinnerTip:[$\w]+,(?:[$\w]+:[$\w]+,)*overrideMessage:[$\w]+,.{300}/;
   const approxAreaMatch = oldFile.match(approxAreaPattern);
@@ -468,17 +455,14 @@ const getThinkerFormatLocation = (
     return null;
   }
 
-  // Search within a range of 400 characters
+  // Search within a range of 600 characters
   const searchSection = oldFile.slice(
     approxAreaMatch.index,
-    approxAreaMatch.index + 400
+    approxAreaMatch.index + 600
   );
 
-  // Example: =L?L.activeForm+"…":(Z||R)+"…"
-  //           ^   ^^^^^^^^^^     ^^^^^^
-  // We extract the above three highlighted fields and then rewrite the conditional using backticks;
-  // see below in `writeThinkerFormat()`.
-  const formatPattern = /=([$\w]+)\?([^={}?]+?)\+"…":(.+?)\+"…"/;
+  // New nullish format: N=(Y??C?.activeForm??L)+"…"
+  const formatPattern = /([$\w]+)(=\(([^;]{1,200}?)\)\+"…")/;
   const formatMatch = searchSection.match(formatPattern);
 
   if (!formatMatch || formatMatch.index == undefined) {
@@ -487,14 +471,14 @@ const getThinkerFormatLocation = (
   }
 
   return {
-    fmtLocation: {
-      startIndex: approxAreaMatch.index + formatMatch.index,
-      endIndex:
-        approxAreaMatch.index + formatMatch.index + formatMatch[0].length,
-    },
-    cond: formatMatch[1],
-    curVerb1: formatMatch[2],
-    curVerb2: formatMatch[3],
+    startIndex:
+      approxAreaMatch.index + formatMatch.index + formatMatch[1].length,
+    endIndex:
+      approxAreaMatch.index +
+      formatMatch.index +
+      formatMatch[1].length +
+      formatMatch[2].length,
+    identifiers: [formatMatch[3]],
   };
 };
 
@@ -506,15 +490,14 @@ export const writeThinkerFormat = (
   if (!location) {
     return null;
   }
-  const { fmtLocation, cond, curVerb1, curVerb2 } = location;
+  const fmtLocation = location;
 
   // See `getThinkerFormatLocation` for an explanation of this.
   const serializedFormat = format.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
-  const curVerb1Fmt =
-    '`' + serializedFormat.replace(/\{\}/g, '${' + curVerb1 + '}') + '`';
-  const curVerb2Fmt =
-    '`' + serializedFormat.replace(/\{\}/g, '${' + curVerb2 + '}') + '`';
-  const formatDecl = `=${cond}?${curVerb1Fmt}:${curVerb2Fmt}`;
+  const curExpr = fmtLocation.identifiers?.[0];
+  const curFmt =
+    '`' + serializedFormat.replace(/\{\}/g, '${' + curExpr + '}') + '`';
+  const formatDecl = `=${curFmt}`;
 
   const newFile =
     oldFile.slice(0, fmtLocation.startIndex) +
@@ -546,7 +529,7 @@ const getThinkerSymbolMirrorOptionLocation = (
   return {
     startIndex: match.index,
     endIndex: match.index + match[0].length,
-    variableName: match[1],
+    identifiers: [match[1]],
   };
 };
 
@@ -559,7 +542,7 @@ export const writeThinkerSymbolMirrorOption = (
     return null;
   }
 
-  const varName = location.variableName;
+  const varName = location.identifiers?.[0];
   const newArray = enableMirror
     ? `=[...${varName},...[...${varName}].reverse()]`
     : `=[...${varName}]`;
