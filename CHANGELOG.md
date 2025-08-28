@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v1.2.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.2.3) - 2025-08-28
+
+- **New:** Add a patch to fix the generating spinner freezing when CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC is set (#54) - @heromantf
+- Update the thinking verb patching to work with CC 1.0.96 (#55) - @heromantf
+
 ## [v1.2.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.2.2) - 2025-08-26
 
 - Continuation of #43
