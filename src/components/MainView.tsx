@@ -1,4 +1,5 @@
 import { Box, Text } from 'ink';
+import Link from 'ink-link';
 import { SelectInput, SelectItem } from './SelectInput.js';
 import { useContext, useState } from 'react';
 import { SettingsContext } from '../App.js';
@@ -81,6 +82,18 @@ export function MainView({ onSubmit, notification }: MainViewProps) {
         <Text color="gray">
           <Text bold>Customize your Claude Code installation.</Text>{' '}
           <Text dimColor>Settings will be saved to a JSON file.</Text>
+        </Text>
+      </Box>
+
+      <Box marginBottom={1}>
+        <Text color="yellow">
+          ⭐ <Text bold>Star the repo at </Text>
+          <Link url="https://github.com/Piebald-AI/tweakcc" fallback={false}>
+            <Text bold color="cyan">
+              https://github.com/Piebald-AI/tweakcc
+            </Text>
+          </Link>
+          <Text bold> if you find this useful!</Text> ⭐
         </Text>
       </Box>
 

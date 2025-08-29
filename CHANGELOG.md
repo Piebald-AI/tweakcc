@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v1.2.4](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.2.4) - 2025-08-29
+
+- Add star recommendation to the UI home screen
+
 ## [v1.2.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.2.3) - 2025-08-28
 
 - **New:** Add a patch to fix the generating spinner freezing when CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC is set (#54) - @heromantf
