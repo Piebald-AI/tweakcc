@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v1.2.5](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.2.5) - 2025-09-01
+
+- Fix n search path (#60) - @bl-ue
+
 ## [v1.2.4](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.2.4) - 2025-08-29
 
 - Add star recommendation to the UI home screen
