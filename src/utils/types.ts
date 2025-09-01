@@ -689,14 +689,15 @@ const getClijsSearchPaths = (): string[] => {
     paths.push(`${home}/pnpm-global/${mod}`);
     paths.push(...globbySync(`${home}/pnpm-global/*/${mod}`));
     paths.push(`${home}/.local/share/pnpm/global/${mod}`);
-    paths.push(`${home}/.local/share/pnpm/global/*/${mod}`);
+    paths.push(...globbySync(`${home}/.local/share/pnpm/global/*/${mod}`));
 
     // Bun
     paths.push(`${home}/.bun/install/global/${mod}`);
 
     // n (https://github.com/tj/n) - system & user
     paths.push(...globbySync(`/usr/local/n/versions/node/*/lib/${mod}`));
-    paths.push(`${home}/n/versions/node/{version}/lib/${mod}`);
+    paths.push(...globbySync(`${home}/n/versions/node/*/lib/${mod}`));
+    paths.push(`${home}/n/lib/${mod}`);
 
     // volta (https://github.com/volta-cli/volta)
     paths.push(...globbySync(`${home}/.volta/tools/image/node/*/lib/${mod}`));
