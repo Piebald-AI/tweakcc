@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v1.3.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.3.0) - 2025-09-02
+
 - **New:** Add support for customizing the context limit with `CLAUDE_CODE_CONTEXT_LIMIT` (#63) - @bl-ue
 
 ## [v1.2.5](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.2.5) - 2025-09-01
