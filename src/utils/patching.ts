@@ -720,7 +720,8 @@ export const writeVerboseProperty = (oldFile: string): string | null => {
 const getContextLimitLocation = (oldFile: string): LocationResult | null => {
   // Pattern: function funcName(paramName){if(paramName.includes("[1m]"))return 1e6;return 200000}
   // Or: function funcName(paramName){return 200000}
-  const pattern = /function ([$\w]+)\(([$\w]*)\)\{((?:if\([$\w]+\.includes\("\[1m\]"\)\)return 1e6;)?return 200000)\}/;
+  const pattern =
+    /function ([$\w]+)\(([$\w]*)\)\{((?:if\([$\w]+\.includes\("\[1m\]"\)\)return 1e6;)?return 200000)\}/;
   const match = oldFile.match(pattern);
 
   if (!match || match.index === undefined) {
