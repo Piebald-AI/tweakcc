@@ -9,7 +9,9 @@
 > [!note]
 > ⭐ **If you find tweakcc useful, please consider [starring the repository](https://github.com/Piebald-AI/tweakcc) to show your support!** ⭐
 
-<img src="./assets/demo.gif" alt="Animated GIF demonstrating running `npx tweakcc`, creating a new theme, changing all of Claude Code's UI colors to purple, chaning the thinking format from 'verb + ellipsis' to 'Claude is 'verb', chaning the generating spinner style to a 50m glow animation, applying the changes, running Claude, and using '/config' to switch to the new theme, and sending a message to see the new thinking verb format" width="800">
+<img src="./assets/demo.gif" alt="Animated GIF demonstrating running `npx tweakcc`, creating a new theme, changing all of Claude Code's UI colors to purple, changing the thinking format from '<verb>ing...' to 'Claude is <verb>ing', changing the generating spinner style to a 50m glow animation, applying the changes, running Claude, and using '/config' to switch to the new theme, and sending a message to see the new thinking verb format." width="800">
+
+With tweakcc, you can
 
 - Create **custom themes** with a graphical HSL/RGB color picker
 - Add custom **thinking verbs** that will show while Claude's working
@@ -17,11 +19,17 @@
 - Change the "CLAUDE CODE" banner text to your own text with your own [figlet](http://www.figlet.org/) fonts
 - Supports Claude Code installed on **Windows, macOS, and Linux**, using npm, yarn, pnpm, bun, Homebrew, nvm, fnm, n, volta, nvs, and nodenv, or a custom location
 
-Planned / in progress:
+tweakcc also
+- Restores the **token counter** and **elapsed time metric** that were shown during generation before Claude Code 1.0.83
+- Fixes a bug where the **spinner animation** is frozen if you have the `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` environment variable set ([#46](https://github.com/Piebald-AI/tweakcc/issues/46))
+- Allows you to **change the context limit** used with models from custom Anthropic-compatible APIs with a new environment variable, `CLAUDE_CODE_CONTEXT_LIMIT`
+
+Additionally, we're working on features that will allow you to
 - Pick from over **70+ spinning/thinking animations** from [`cli-spinners`](https://github.com/sindresorhus/cli-spinners)
 - Apply **custom styling** to the markdown elements in Claude's responses like code, bold, headers, etc
 - Customize the **shimmering effect** on the thinking verb: disable it; change its speed, width, and colors
 - Style the **user messages in the chat history** beyond the default plain gray text
+- Remove the **ASCII border** from the input box
 
 Run without installation:
 
@@ -36,7 +44,7 @@ $ pnpm dlx tweakcc
 
 `tweakcc` works by patching the Claude Code's minified `cli.js` file.  When you update your Claude Code installation, your customizations will be overwritten, but they're remembered in your `~/.tweakcc/config.js` configuration file, so they can be reapplied by just rerunning the tool.
 
-Works with Claude Code 1.0.96
+`tweakcc` is verified to work with Claude Code **1.0.100.**
 
 ## Running
 
