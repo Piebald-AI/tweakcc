@@ -615,6 +615,7 @@ const getClijsSearchPaths = (): string[] => {
   // Search in custom paths for popular tools.  These are cross-platform paths.
   // prettier-ignore
   {
+    if (process.env.NPM_PREFIX)  paths.push(`${process.env.NPM_PREFIX}/lib/${mod}`);
     if (process.env.N_PREFIX)    paths.push(`${process.env.N_PREFIX}/lib/${mod}`);
     if (process.env.VOLTA_HOME)  paths.push(`${process.env.VOLTA_HOME}/lib/${mod}`);
     if (process.env.FNM_DIR)     paths.push(`${process.env.FNM_DIR}/lib/${mod}`);
