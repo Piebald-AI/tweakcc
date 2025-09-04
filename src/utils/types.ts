@@ -621,6 +621,7 @@ const getClijsSearchPaths = (): string[] => {
     if (process.env.NVM_DIR)     paths.push(`${process.env.NVM_DIR}/lib/${mod}`);
     if (process.env.NODENV_ROOT) paths.push(...globbySync(`${process.env.NODENV_ROOT}/versions/*/lib/${mod}`));
     if (process.env.NVS_HOME)    paths.push(...globbySync(`${process.env.NVS_HOME}/node/*/*/lib/${mod}`));
+    if (process.env.ASDF_DATA_DIR) paths.push(...globbySync(`${process.env.ASDF_DATA_DIR}/installs/nodejs/*/lib/${mod}`));
   }
 
   // Platform-specific paths.
@@ -714,6 +715,9 @@ const getClijsSearchPaths = (): string[] => {
 
     // nvs (https://github.com/jasongin/nvs)
     paths.push(...globbySync(`${home}/.nvs/*/lib/${mod}`));
+
+    // asdf (https://github.com/asdf-vm/asdf)
+    paths.push(...globbySync(`${home}/.asdf/installs/nodejs/*/lib/${mod}`));
   }
 
   // After we're done with globby, which required / even on Windows, convert / back to \\ for
