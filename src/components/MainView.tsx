@@ -33,8 +33,8 @@ const baseMenuItems: SelectItem[] = [
     desc: 'Choose custom spinners',
   },
   {
-    name: MainMenuItem.PAST_USER_INPUTS,
-    desc: 'Customize how past user inputs are displayed (prefix and colors)',
+    name: MainMenuItem.USER_MESSAGE_DISPLAY,
+    desc: 'Customize how user messages are displayed',
   },
 ];
 

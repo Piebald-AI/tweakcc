@@ -112,7 +112,7 @@ Please reapply your changes below.`,
       case MainMenuItem.LAUNCH_TEXT:
       case MainMenuItem.THINKING_VERBS:
       case MainMenuItem.THINKING_STYLE:
-      case MainMenuItem.PAST_USER_INPUTS:
+      case MainMenuItem.USER_MESSAGE_DISPLAY:
         setCurrentView(item);
         break;
       case MainMenuItem.APPLY_CHANGES:
@@ -179,7 +179,7 @@ Please reapply your changes below.`,
           <ThinkingVerbsView onBack={handleBack} />
         ) : currentView === MainMenuItem.THINKING_STYLE ? (
           <ThinkingStyleView onBack={handleBack} />
-        ) : currentView === MainMenuItem.PAST_USER_INPUTS ? (
+        ) : currentView === MainMenuItem.USER_MESSAGE_DISPLAY ? (
           <UserMessageDisplayView onBack={handleBack} />
         ) : null}
       </Box>

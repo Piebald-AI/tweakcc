@@ -3,7 +3,7 @@ import { Box, Text, useInput } from 'ink';
 import { ColorPicker } from './ColorPicker.js';
 import { SettingsContext } from '../App.js';
 import {
-  PastUserInputElementConfig,
+  UserMessageDisplayElementConfig,
   DEFAULT_SETTINGS,
 } from '../utils/types.js';
 import { getCurrentClaudeCodeTheme } from '../utils/misc.js';
@@ -88,7 +88,7 @@ export function UserMessageDisplayView({
   // Update element config and save to settings
   const updateElementConfig = (
     elementType: 'prefix' | 'message',
-    updater: (config: PastUserInputElementConfig) => void
+    updater: (config: UserMessageDisplayElementConfig) => void
   ) => {
     updateSettings(settings => {
       const config =
@@ -564,7 +564,7 @@ export function UserMessageDisplayView({
 
   return (
     <Box flexDirection="column">
-      <Header>Customize past user inputs</Header>
+      <Header>Customize how user messages are displayed</Header>
 
       <Box flexDirection="column" marginBottom={1}>
         <Text dimColor>

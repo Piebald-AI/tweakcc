@@ -1048,7 +1048,7 @@ export const applyCustomization = async (
   if ((result = writeThinkerSymbolMirrorOption(content, config.settings.thinkingStyle.reverseMirror)))
     content = result;
 
-  // Apply past user inputs customization
+  // Apply user message display customization
   if (config.settings.userMessageDisplay) {
     if (
       (result = writeUserMessageDisplay(

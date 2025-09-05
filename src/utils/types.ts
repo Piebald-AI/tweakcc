@@ -59,7 +59,7 @@ export interface ThinkingStyleConfig {
   phases: string[];
 }
 
-export interface PastUserInputElementConfig {
+export interface UserMessageDisplayElementConfig {
   format: string;
   styling: string[];
   foreground_color: string;
@@ -67,8 +67,8 @@ export interface PastUserInputElementConfig {
 }
 
 export interface UserMessageDisplayConfig {
-  prefix: PastUserInputElementConfig;
-  message: PastUserInputElementConfig;
+  prefix: UserMessageDisplayElementConfig;
+  message: UserMessageDisplayElementConfig;
 }
 
 export interface Settings {
@@ -105,7 +105,7 @@ export enum MainMenuItem {
   LAUNCH_TEXT = 'Launch text',
   THINKING_VERBS = 'Thinking verbs',
   THINKING_STYLE = 'Thinking style',
-  PAST_USER_INPUTS = 'Customize past user inputs',
+  USER_MESSAGE_DISPLAY = 'Customize user message display',
   APPLY_CHANGES = '*Apply customizations to cli.js',
   RESTORE_ORIGINAL = 'Restore original Claude Code (preserves tweakcc.json)',
   OPEN_CONFIG = 'Open tweakcc.json',
