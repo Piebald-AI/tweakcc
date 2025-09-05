@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as child_process from 'child_process';
 import * as crypto from 'crypto';
+import { Theme } from './types.js';
 
 let isDebugModeOn = false;
 export const isDebug = (): boolean => {
@@ -22,6 +23,10 @@ export function getCurrentClaudeCodeTheme(): string {
   }
 
   return 'dark';
+}
+
+export function getColorKeys(theme: Theme): string[] {
+  return Object.keys(theme.colors);
 }
 
 export function revealFileInExplorer(filePath: string) {
@@ -170,3 +175,29 @@ export async function hashFileInChunks(
     });
   });
 }
+
+// Helper function to build chalk formatting chain
+export const buildChalkChain = (
+  chalkVar: string,
+  rgbValues: string,
+  backgroundRgbValues: string | null,
+  bold: boolean,
+  italic: boolean,
+  underline: boolean,
+  strikethrough: boolean,
+  inverse: boolean
+): string => {
+  let chain = `${chalkVar}.rgb(${rgbValues})`;
+
+  if (backgroundRgbValues && backgroundRgbValues !== 'transparent') {
+    chain += `.bgRgb(${backgroundRgbValues})`;
+  }
+
+  if (bold) chain += '.bold';
+  if (italic) chain += '.italic';
+  if (underline) chain += '.underline';
+  if (strikethrough) chain += '.strikethrough';
+  if (inverse) chain += '.inverse';
+
+  return chain;
+};

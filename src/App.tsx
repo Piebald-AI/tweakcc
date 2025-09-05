@@ -5,6 +5,7 @@ import { ThemesView } from './components/ThemesView.js';
 import { LaunchTextView } from './components/LaunchTextView.js';
 import { ThinkingVerbsView } from './components/ThinkingVerbsView.js';
 import { ThinkingStyleView } from './components/ThinkingStyleView.js';
+import { UserMessageDisplayView } from './components/UserMessageDisplayView.js';
 import {
   CONFIG_FILE,
   DEFAULT_SETTINGS,
@@ -111,6 +112,7 @@ Please reapply your changes below.`,
       case MainMenuItem.LAUNCH_TEXT:
       case MainMenuItem.THINKING_VERBS:
       case MainMenuItem.THINKING_STYLE:
+      case MainMenuItem.PAST_USER_INPUTS:
         setCurrentView(item);
         break;
       case MainMenuItem.APPLY_CHANGES:
@@ -177,6 +179,8 @@ Please reapply your changes below.`,
           <ThinkingVerbsView onBack={handleBack} />
         ) : currentView === MainMenuItem.THINKING_STYLE ? (
           <ThinkingStyleView onBack={handleBack} />
+        ) : currentView === MainMenuItem.PAST_USER_INPUTS ? (
+          <UserMessageDisplayView onBack={handleBack} />
         ) : null}
       </Box>
     </SettingsContext.Provider>

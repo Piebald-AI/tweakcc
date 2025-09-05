@@ -32,6 +32,10 @@ const baseMenuItems: SelectItem[] = [
     name: MainMenuItem.THINKING_STYLE,
     desc: 'Choose custom spinners',
   },
+  {
+    name: MainMenuItem.PAST_USER_INPUTS,
+    desc: 'Customize how past user inputs are displayed (prefix and colors)',
+  },
 ];
 
 // prettier-ignore

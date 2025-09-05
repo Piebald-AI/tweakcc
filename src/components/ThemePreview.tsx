@@ -184,7 +184,10 @@ export function ThemePreview({ theme }: ThemePreviewProps) {
             <Text color={theme.colors.secondaryText}>●</Text>
             <Text> The directory </Text>
             <Text color={theme.colors.permission}>C:\Users\user</Text>
-            <Text> contains **123** files.</Text>
+            <Text>
+              {' '}
+              contains <Text bold>123</Text> files.
+            </Text>
           </Text>
           <Text>
             <Text color={theme.colors.claude}>

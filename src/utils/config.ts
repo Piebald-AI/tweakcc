@@ -69,6 +69,13 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
       }
     }
 
+    // Add userMessageDisplay if it doesn't exist in the config; it was added in v1.4.0.
+    if (!readConfig?.settings?.userMessageDisplay) {
+      readConfig.settings = readConfig.settings || DEFAULT_SETTINGS;
+      readConfig.settings.userMessageDisplay =
+        DEFAULT_SETTINGS.userMessageDisplay;
+    }
+
     lastConfig = readConfig;
     return readConfig;
   } catch (error) {

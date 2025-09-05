@@ -46,6 +46,7 @@ export function ColorPicker({
     'h' | 's' | 'l' | 'r' | 'g' | 'b'
   >('h');
   const [updating, setUpdating] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Update values when initialValue changes (for prop changes)
   useEffect(() => {
@@ -61,11 +62,16 @@ export function ColorPicker({
 
   // Update parent when either HSL or RGB changes
   useEffect(() => {
-    if (!updating) {
+    if (!updating && isInitialized) {
       const rgbString = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
       onColorChange(rgbString);
     }
-  }, [hsl, rgb, updating]);
+  }, [hsl, rgb, updating, isInitialized]);
+
+  // Mark as initialized after first render
+  useEffect(() => {
+    setIsInitialized(true);
+  }, []);
 
   const handlePastedColor = (pastedText: string) => {
     if (isValidColorFormat(pastedText)) {

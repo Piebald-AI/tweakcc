@@ -59,11 +59,24 @@ export interface ThinkingStyleConfig {
   phases: string[];
 }
 
+export interface PastUserInputElementConfig {
+  format: string;
+  styling: string[];
+  foreground_color: string;
+  background_color: string;
+}
+
+export interface UserMessageDisplayConfig {
+  prefix: PastUserInputElementConfig;
+  message: PastUserInputElementConfig;
+}
+
 export interface Settings {
   themes: Theme[];
   launchText: LaunchTextConfig;
   thinkingVerbs: ThinkingVerbsConfig;
   thinkingStyle: ThinkingStyleConfig;
+  userMessageDisplay: UserMessageDisplayConfig;
 }
 
 export interface TweakccConfig {
@@ -92,6 +105,7 @@ export enum MainMenuItem {
   LAUNCH_TEXT = 'Launch text',
   THINKING_VERBS = 'Thinking verbs',
   THINKING_STYLE = 'Thinking style',
+  PAST_USER_INPUTS = 'Customize past user inputs',
   APPLY_CHANGES = '*Apply customizations to cli.js',
   RESTORE_ORIGINAL = 'Restore original Claude Code (preserves tweakcc.json)',
   OPEN_CONFIG = 'Open tweakcc.json',
@@ -593,6 +607,20 @@ export const DEFAULT_SETTINGS: Settings = {
           ? ['·', '✢', '✳', '✶', '✻', '✽']
           : ['·', '✢', '*', '✶', '✻', '✽'],
     reverseMirror: true,
+  },
+  userMessageDisplay: {
+    prefix: {
+      format: '>',
+      styling: [],
+      foreground_color: 'rgb(0,0,0)',
+      background_color: 'rgb(0,0,0)',
+    },
+    message: {
+      format: '{}',
+      styling: [],
+      foreground_color: 'rgb(0,0,0)',
+      background_color: 'rgb(0,0,0)',
+    },
   },
 };
 
