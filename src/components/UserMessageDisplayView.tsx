@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { ColorPicker } from './ColorPicker.js';
 import { SettingsContext } from '../App.js';
@@ -115,7 +115,6 @@ export function UserMessageDisplayView({
 
     // Update UI state
     if (elementType === 'prefix') {
-      const config = settings.userMessageDisplay.prefix;
       setPrefixFormatInput(DEFAULT_SETTINGS.userMessageDisplay.prefix.format);
       setPrefixActiveStylings([
         ...DEFAULT_SETTINGS.userMessageDisplay.prefix.styling,
@@ -299,21 +298,22 @@ export function UserMessageDisplayView({
         : messageBackgroundColor
       : 'rgb(0,0,0)';
 
-    let props: any = {};
-
-    if (styling.includes('bold')) props.bold = true;
-    if (styling.includes('italic')) props.italic = true;
-    if (styling.includes('underline')) props.underline = true;
-    if (styling.includes('strikethrough')) props.strikethrough = true;
-    if (styling.includes('inverse')) props.inverse = true;
-
     const hasForeground = fgColor !== 'rgb(0,0,0)';
     const hasBackground = bgColor !== 'rgb(0,0,0)';
 
-    if (hasForeground) props.color = fgColor;
-    if (hasBackground) props.backgroundColor = bgColor;
-
-    return <Text {...props}>{text}</Text>;
+    return (
+      <Text
+        bold={styling.includes('bold')}
+        italic={styling.includes('italic')}
+        underline={styling.includes('underline')}
+        strikethrough={styling.includes('strikethrough')}
+        inverse={styling.includes('inverse')}
+        color={hasForeground ? fgColor : undefined}
+        backgroundColor={hasBackground ? bgColor : undefined}
+      >
+        {text}
+      </Text>
+    );
   };
 
   // Create preview showing prefix followed by message
