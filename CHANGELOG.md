@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v1.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.4.0) - 2025-09-06
+
 - **New:** Add a feature to remove the border from Claude Code's input box (#72) - @bl-ue
 - **New:** User message display customization (#71) - @bl-ue
 
