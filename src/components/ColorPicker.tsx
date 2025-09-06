@@ -6,7 +6,6 @@ interface ColorPickerProps {
   initialValue: string;
   onColorChange: (color: string) => void;
   onExit: () => void;
-  onCancel: () => void;
   colorKey?: string; // Add colorKey to identify diff colors
   theme?: { colors?: { text?: string; permission?: string } }; // Add theme for text color
 }
@@ -27,7 +26,6 @@ export function ColorPicker({
   initialValue,
   onColorChange,
   onExit,
-  onCancel,
   colorKey,
   theme,
 }: ColorPickerProps) {
@@ -98,7 +96,7 @@ export function ColorPicker({
     if (key.return) {
       onExit();
     } else if (key.escape) {
-      onCancel();
+      onExit();
     } else if (key.ctrl && input === 'a') {
       // Switch between HSL and RGB sliders
       setSliderMode(prev => (prev === 'hsl' ? 'rgb' : 'hsl'));
@@ -429,7 +427,7 @@ export function ColorPicker({
             enter to exit (auto-saved)
           </Text>
           <Text color="gray" dimColor>
-            esc to cancel changes
+            esc to save and exit
           </Text>
         </Box>
       </Box>

@@ -53,6 +53,11 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
       delete tmpThinkingVerbs.punctuation;
     }
 
+    // Add any missing top-level settings properties from defaults
+    if (!readConfig.settings.inputBox) {
+      readConfig.settings.inputBox = DEFAULT_SETTINGS.inputBox;
+    }
+
     // Add any colors that the user doesn't have to any built-in themes.
     for (const defaultTheme of DEFAULT_SETTINGS.themes) {
       // Find this theme in the user's settings.

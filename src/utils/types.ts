@@ -71,12 +71,17 @@ export interface UserMessageDisplayConfig {
   message: UserMessageDisplayElementConfig;
 }
 
+export interface InputBoxConfig {
+  removeBorder: boolean;
+}
+
 export interface Settings {
   themes: Theme[];
   launchText: LaunchTextConfig;
   thinkingVerbs: ThinkingVerbsConfig;
   thinkingStyle: ThinkingStyleConfig;
   userMessageDisplay: UserMessageDisplayConfig;
+  inputBox: InputBoxConfig;
 }
 
 export interface TweakccConfig {
@@ -105,7 +110,8 @@ export enum MainMenuItem {
   LAUNCH_TEXT = 'Launch text',
   THINKING_VERBS = 'Thinking verbs',
   THINKING_STYLE = 'Thinking style',
-  USER_MESSAGE_DISPLAY = 'Customize user message display',
+  USER_MESSAGE_DISPLAY = 'User message display',
+  INPUT_BOX = 'Input box',
   APPLY_CHANGES = '*Apply customizations to cli.js',
   RESTORE_ORIGINAL = 'Restore original Claude Code (preserves tweakcc.json)',
   OPEN_CONFIG = 'Open tweakcc.json',
@@ -621,6 +627,9 @@ export const DEFAULT_SETTINGS: Settings = {
       foreground_color: 'rgb(0,0,0)',
       background_color: 'rgb(0,0,0)',
     },
+  },
+  inputBox: {
+    removeBorder: false,
   },
 };
 

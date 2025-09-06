@@ -391,15 +391,6 @@ export function ThemeEditView({ onBack, themeId }: ThemeEditViewProps) {
               setEditingValue('');
               setOriginalValue('');
             }}
-            onCancel={() => {
-              // Restore original value and exit
-              updateTheme(theme => {
-                theme.colors[colorKeys[editingColorIndex!]] = originalValue;
-              });
-              setEditingColorIndex(null);
-              setEditingValue('');
-              setOriginalValue('');
-            }}
           />
         )}
       </Box>

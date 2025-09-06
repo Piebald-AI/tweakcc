@@ -36,6 +36,10 @@ const baseMenuItems: SelectItem[] = [
     name: MainMenuItem.USER_MESSAGE_DISPLAY,
     desc: 'Customize how user messages are displayed',
   },
+  {
+    name: MainMenuItem.INPUT_BOX,
+    desc: 'Customize the input box appearance (e.g., remove border)',
+  },
 ];
 
 // prettier-ignore
