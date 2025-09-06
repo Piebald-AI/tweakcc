@@ -528,36 +528,6 @@ export function UserMessageDisplayView({
           setColorPickerMode(null);
           setOriginalColor('');
         }}
-        onCancel={() => {
-          const { column, type } = colorPickerMode;
-          if (column === 'prefix') {
-            if (type === 'foreground') {
-              setPrefixForegroundColor(originalColor);
-              updateElementConfig('prefix', config => {
-                config.foreground_color = originalColor;
-              });
-            } else {
-              setPrefixBackgroundColor(originalColor);
-              updateElementConfig('prefix', config => {
-                config.background_color = originalColor;
-              });
-            }
-          } else {
-            if (type === 'foreground') {
-              setMessageForegroundColor(originalColor);
-              updateElementConfig('message', config => {
-                config.foreground_color = originalColor;
-              });
-            } else {
-              setMessageBackgroundColor(originalColor);
-              updateElementConfig('message', config => {
-                config.background_color = originalColor;
-              });
-            }
-          }
-          setColorPickerMode(null);
-          setOriginalColor('');
-        }}
       />
     );
   }

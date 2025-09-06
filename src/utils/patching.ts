@@ -1144,7 +1144,7 @@ export const applyCustomization = async (
   }
 
   // Apply input box border customization
-  console.log(config.settings.inputBox)
+  console.log(config.settings.inputBox);
   if (
     config.settings.inputBox &&
     typeof config.settings.inputBox.removeBorder === 'boolean'

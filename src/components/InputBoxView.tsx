@@ -1,5 +1,5 @@
 import { Box, Text, useInput } from 'ink';
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useState } from 'react';
 import { SettingsContext } from '../App.js';
 import Header from './Header.js';
 
@@ -9,6 +9,8 @@ interface InputBoxViewProps {
 
 export function InputBoxView({ onSubmit }: InputBoxViewProps) {
   const { settings, updateSettings } = useContext(SettingsContext);
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const handleRemoveBorderToggle = () => {
@@ -18,7 +20,7 @@ export function InputBoxView({ onSubmit }: InputBoxViewProps) {
       }
       settings.inputBox.removeBorder = !settings.inputBox.removeBorder;
     });
-};
+  };
 
   useInput((input, key) => {
     if (key.return || key.escape) {
