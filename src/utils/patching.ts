@@ -901,13 +901,25 @@ export const writeUserMessageDisplay = (
   });
 
   // Check if we should apply customization for prefix
-  const isPrefixBlack = prefixColor === 'rgb(0,0,0)' && prefixBackgroundColor === 'rgb(0,0,0)';
-  const hasPrefixStyling = prefixBold || prefixItalic || prefixUnderline || prefixStrikethrough || prefixInverse;
+  const isPrefixBlack =
+    prefixColor === 'rgb(0,0,0)' && prefixBackgroundColor === 'rgb(0,0,0)';
+  const hasPrefixStyling =
+    prefixBold ||
+    prefixItalic ||
+    prefixUnderline ||
+    prefixStrikethrough ||
+    prefixInverse;
   const shouldCustomizePrefix = !isPrefixBlack || hasPrefixStyling;
 
   // Check if we should apply customization for message
-  const isMessageBlack = messageColor === 'rgb(0,0,0)' && messageBackgroundColor === 'rgb(0,0,0)';
-  const hasMessageStyling = messageBold || messageItalic || messageUnderline || messageStrikethrough || messageInverse;
+  const isMessageBlack =
+    messageColor === 'rgb(0,0,0)' && messageBackgroundColor === 'rgb(0,0,0)';
+  const hasMessageStyling =
+    messageBold ||
+    messageItalic ||
+    messageUnderline ||
+    messageStrikethrough ||
+    messageInverse;
   const shouldCustomizeMessage = !isMessageBlack || hasMessageStyling;
 
   // 2. Update prefix
@@ -916,14 +928,16 @@ export const writeUserMessageDisplay = (
     const prefixChalkChain = buildChalkChain(
       chalkVar,
       isPrefixBlack ? null : prefixColor.match(/\d+/g)?.join(',') || null,
-      isPrefixBlack ? null : prefixBackgroundColor.match(/\d+/g)?.join(',') || null,
+      isPrefixBlack
+        ? null
+        : prefixBackgroundColor.match(/\d+/g)?.join(',') || null,
       prefixBold,
       prefixItalic,
       prefixUnderline,
       prefixStrikethrough,
       prefixInverse
     );
-    
+
     modifications.push({
       startIndex: location.prefixLocation.startIndex,
       endIndex: location.prefixLocation.endIndex,
@@ -954,14 +968,16 @@ export const writeUserMessageDisplay = (
     const messageChalkChain = buildChalkChain(
       chalkVar,
       isMessageBlack ? null : messageColor.match(/\d+/g)?.join(',') || null,
-      isMessageBlack ? null : messageBackgroundColor.match(/\d+/g)?.join(',') || null,
+      isMessageBlack
+        ? null
+        : messageBackgroundColor.match(/\d+/g)?.join(',') || null,
       messageBold,
       messageItalic,
       messageUnderline,
       messageStrikethrough,
       messageInverse
     );
-    
+
     modifications.push({
       startIndex: location.messageLocation.startIndex,
       endIndex: location.messageLocation.endIndex,
