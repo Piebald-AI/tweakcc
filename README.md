@@ -18,6 +18,8 @@ With tweakcc, you can
 - Create custom **thinking spinner animations** with different speeds and phases
 - Change the "CLAUDE CODE" banner text to your own text with your own [figlet](http://www.figlet.org/) fonts
 - Supports Claude Code installed on **Windows, macOS, and Linux**, using npm, yarn, pnpm, bun, Homebrew, nvm, fnm, n, volta, nvs, and nodenv, or a custom location
+- Style the **user messages in the chat history** beyond the default plain gray text
+- Remove the **ASCII border** from the input box
 
 tweakcc also
 - Restores the **token counter** and **elapsed time metric** that were shown during generation before Claude Code 1.0.83
@@ -28,8 +30,6 @@ Additionally, we're working on features that will allow you to
 - Pick from over **70+ spinning/thinking animations** from [`cli-spinners`](https://github.com/sindresorhus/cli-spinners)
 - Apply **custom styling** to the markdown elements in Claude's responses like code, bold, headers, etc
 - Customize the **shimmering effect** on the thinking verb: disable it; change its speed, width, and colors
-- Style the **user messages in the chat history** beyond the default plain gray text
-- Remove the **ASCII border** from the input box
 
 Run without installation:
 

@@ -900,62 +900,80 @@ export const writeUserMessageDisplay = (
     newContent: `{minWidth:${prefix.length + 1},width:${prefix.length + 1}}`,
   });
 
-  // Build chalk chains with formatting
-  const prefixChalkChain = buildChalkChain(
-    chalkVar,
-    prefixColor.match(/\d+/g)?.join(',') || '153,153,153', // default gray
-    prefixBackgroundColor === 'transparent'
-      ? null
-      : prefixBackgroundColor.match(/\d+/g)?.join(',') || null,
-    prefixBold,
-    prefixItalic,
-    prefixUnderline,
-    prefixStrikethrough,
-    prefixInverse
-  );
-  const messageChalkChain = buildChalkChain(
-    chalkVar,
-    messageColor.match(/\d+/g)?.join(',') || '153,153,153', // default gray
-    messageBackgroundColor === 'transparent'
-      ? null
-      : messageBackgroundColor.match(/\d+/g)?.join(',') || null,
-    messageBold,
-    messageItalic,
-    messageUnderline,
-    messageStrikethrough,
-    messageInverse
-  );
+  // Check if we should apply customization for prefix
+  const isPrefixBlack = prefixColor === 'rgb(0,0,0)' && prefixBackgroundColor === 'rgb(0,0,0)';
+  const hasPrefixStyling = prefixBold || prefixItalic || prefixUnderline || prefixStrikethrough || prefixInverse;
+  const shouldCustomizePrefix = !isPrefixBlack || hasPrefixStyling;
 
-  // 2. Update prefix with chalk wrapping (preserve original structure)
-  // Reconstruct the prefix replacement based on the original pattern found
-  // For createElement patterns: createElement(O,{color:"secondaryText"},">"
-  // Replace with: createElement(O,{color:"secondaryText"},chalkVar("prefix"))
-  modifications.push({
-    startIndex: location.prefixLocation.startIndex,
-    endIndex: location.prefixLocation.endIndex,
-    // Replace the old prefix with the new.
-    newContent: oldFile
-      .slice(
-        location.prefixLocation.startIndex,
-        location.prefixLocation.endIndex
-      )
-      .replace(/"([^"]+)"\)$/, `${prefixChalkChain}("${prefix}"))`),
-  });
+  // Check if we should apply customization for message
+  const isMessageBlack = messageColor === 'rgb(0,0,0)' && messageBackgroundColor === 'rgb(0,0,0)';
+  const hasMessageStyling = messageBold || messageItalic || messageUnderline || messageStrikethrough || messageInverse;
+  const shouldCustomizeMessage = !isMessageBlack || hasMessageStyling;
 
-  // 3. Update message with chalk wrapping (preserve original structure)
-  // For createElement patterns: createElement(O,{color:"secondaryText",wrap:"wrap"},B.trim())
-  // Replace with: createElement(O,{color:"secondaryText",wrap:"wrap"},chalkVar(B.trim()))
-  modifications.push({
-    startIndex: location.messageLocation.startIndex,
-    endIndex: location.messageLocation.endIndex,
-    // Replace the old message format with the new.
-    newContent: oldFile
-      .slice(
-        location.messageLocation.startIndex,
-        location.messageLocation.endIndex
-      )
-      .replace(/(\w+\.trim\(\))/, `${messageChalkChain}($1)`),
-  });
+  // 2. Update prefix
+  if (shouldCustomizePrefix) {
+    // Build chalk chain for prefix
+    const prefixChalkChain = buildChalkChain(
+      chalkVar,
+      isPrefixBlack ? null : prefixColor.match(/\d+/g)?.join(',') || null,
+      isPrefixBlack ? null : prefixBackgroundColor.match(/\d+/g)?.join(',') || null,
+      prefixBold,
+      prefixItalic,
+      prefixUnderline,
+      prefixStrikethrough,
+      prefixInverse
+    );
+    
+    modifications.push({
+      startIndex: location.prefixLocation.startIndex,
+      endIndex: location.prefixLocation.endIndex,
+      newContent: oldFile
+        .slice(
+          location.prefixLocation.startIndex,
+          location.prefixLocation.endIndex
+        )
+        .replace(/"([^"]+)"\)$/, `${prefixChalkChain}("${prefix}"))`),
+    });
+  } else {
+    // Just update the prefix text without chalk
+    modifications.push({
+      startIndex: location.prefixLocation.startIndex,
+      endIndex: location.prefixLocation.endIndex,
+      newContent: oldFile
+        .slice(
+          location.prefixLocation.startIndex,
+          location.prefixLocation.endIndex
+        )
+        .replace(/"([^"]+)"\)$/, `"${prefix}")`),
+    });
+  }
+
+  // 3. Update message
+  if (shouldCustomizeMessage) {
+    // Build chalk chain for message
+    const messageChalkChain = buildChalkChain(
+      chalkVar,
+      isMessageBlack ? null : messageColor.match(/\d+/g)?.join(',') || null,
+      isMessageBlack ? null : messageBackgroundColor.match(/\d+/g)?.join(',') || null,
+      messageBold,
+      messageItalic,
+      messageUnderline,
+      messageStrikethrough,
+      messageInverse
+    );
+    
+    modifications.push({
+      startIndex: location.messageLocation.startIndex,
+      endIndex: location.messageLocation.endIndex,
+      newContent: oldFile
+        .slice(
+          location.messageLocation.startIndex,
+          location.messageLocation.endIndex
+        )
+        .replace(/(\w+\.trim\(\))/, `${messageChalkChain}($1)`),
+    });
+  }
+  // If not customizing message, we don't need to modify it at all since we're not changing the text
 
   // Sort modifications by startIndex in descending order to avoid index shifting issues
   modifications.sort((a, b) => b.startIndex - a.startIndex);
@@ -1144,7 +1162,6 @@ export const applyCustomization = async (
   }
 
   // Apply input box border customization
-  console.log(config.settings.inputBox);
   if (
     config.settings.inputBox &&
     typeof config.settings.inputBox.removeBorder === 'boolean'

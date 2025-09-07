@@ -298,9 +298,6 @@ export function UserMessageDisplayView({
         : messageBackgroundColor
       : 'rgb(0,0,0)';
 
-    const hasForeground = fgColor !== 'rgb(0,0,0)';
-    const hasBackground = bgColor !== 'rgb(0,0,0)';
-
     return (
       <Text
         bold={styling.includes('bold')}
@@ -308,8 +305,8 @@ export function UserMessageDisplayView({
         underline={styling.includes('underline')}
         strikethrough={styling.includes('strikethrough')}
         inverse={styling.includes('inverse')}
-        color={hasForeground ? fgColor : undefined}
-        backgroundColor={hasBackground ? bgColor : undefined}
+        color={fgColor}
+        backgroundColor={bgColor}
       >
         {text}
       </Text>
@@ -325,7 +322,7 @@ export function UserMessageDisplayView({
         {prefixFormatInput && (
           <>{applyStylesToText(prefixFormatInput, 'prefix', useConfig)} </>
         )}
-        {applyStylesToText(' ' + messageSampleText, 'message', useConfig)}
+        {applyStylesToText(messageSampleText, 'message', useConfig)}
       </Text>
     );
   };

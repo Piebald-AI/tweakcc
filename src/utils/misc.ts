@@ -179,7 +179,7 @@ export async function hashFileInChunks(
 // Helper function to build chalk formatting chain
 export const buildChalkChain = (
   chalkVar: string,
-  rgbValues: string,
+  rgbValues: string | null,
   backgroundRgbValues: string | null,
   bold: boolean,
   italic: boolean,
@@ -187,7 +187,11 @@ export const buildChalkChain = (
   strikethrough: boolean,
   inverse: boolean
 ): string => {
-  let chain = `${chalkVar}.rgb(${rgbValues})`;
+  let chain = chalkVar;
+
+  if (rgbValues) {
+    chain += `.rgb(${rgbValues})`;
+  }
 
   if (backgroundRgbValues && backgroundRgbValues !== 'transparent') {
     chain += `.bgRgb(${backgroundRgbValues})`;
