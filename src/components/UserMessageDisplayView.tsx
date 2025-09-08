@@ -298,6 +298,15 @@ export function UserMessageDisplayView({
         : messageBackgroundColor
       : 'rgb(0,0,0)';
 
+    // Check if both colors are black (which means "no color" in the patching logic)
+    const isBlackOnBlack = fgColor === 'rgb(0,0,0)' && bgColor === 'rgb(0,0,0)';
+    const hasStyling = styling.length > 0;
+
+    // If black on black with no styling, don't apply any colors (use defaults)
+    if (isBlackOnBlack && !hasStyling) {
+      return <Text>{text}</Text>;
+    }
+
     return (
       <Text
         bold={styling.includes('bold')}
@@ -305,8 +314,8 @@ export function UserMessageDisplayView({
         underline={styling.includes('underline')}
         strikethrough={styling.includes('strikethrough')}
         inverse={styling.includes('inverse')}
-        color={fgColor}
-        backgroundColor={bgColor}
+        color={isBlackOnBlack ? undefined : fgColor}
+        backgroundColor={isBlackOnBlack ? undefined : bgColor}
       >
         {text}
       </Text>
