@@ -1138,7 +1138,7 @@ const writeModelSelectorOptions = (oldFile: string): string | null => {
 
 // 2) Extend the known model names list (sB2=[...]) to include our lowercased friendly names
 const writeKnownModelNames = (oldFile: string): string | null => {
-  const m = oldFile.match(/\"sonnet\[1m\]\"/);
+  const m = oldFile.match(/"sonnet\[1m\]"/);
   if (!m || m.index === undefined) {
     return null;
   }
