@@ -1200,6 +1200,21 @@ export const applyCustomization = async (
   // Apply context limit patch (always enabled)
   if ((result = writeContextLimit(content))) content = result;
 
+  // Unlink the file first to break any hard links (e.g., from Bun's linking system)
+  try {
+    await fs.unlink(ccInstInfo.cliPath);
+    if (isDebug()) {
+      console.log(
+        `Unlinked ${ccInstInfo.cliPath} to break hard links before writing patched content`
+      );
+    }
+  } catch (error) {
+    // File might not exist (though it should since we just read it)
+    if (isDebug()) {
+      console.log(`Could not unlink ${ccInstInfo.cliPath}: ${error}`);
+    }
+  }
+
   await fs.writeFile(ccInstInfo.cliPath, content);
   return await updateConfigFile(config => {
     config.changesApplied = true;

@@ -122,6 +122,7 @@ const saveConfig = async (config: TweakccConfig): Promise<void> => {
 
 /**
  * Restores the original cli.js file from the backup.
+ * Unlinks the file first to break any hard links (e.g., from Bun's linking system).
  */
 export const restoreClijsFromBackup = async (
   ccInstInfo: ClaudeCodeInstallationInfo
@@ -129,6 +130,21 @@ export const restoreClijsFromBackup = async (
   if (isDebug()) {
     console.log(`Restoring cli.js from backup to ${ccInstInfo.cliPath}`);
   }
+
+  // Unlink the file first to break any hard links
+  try {
+    await fs.unlink(ccInstInfo.cliPath);
+    if (isDebug()) {
+      console.log(`Unlinked ${ccInstInfo.cliPath} to break hard links`);
+    }
+  } catch (error) {
+    // File might not exist, which is fine
+    if (isDebug()) {
+      console.log(`Could not unlink ${ccInstInfo.cliPath}: ${error}`);
+    }
+  }
+
+  // Now copy the backup file
   await fs.copyFile(CLIJS_BACKUP_FILE, ccInstInfo.cliPath);
   await updateConfigFile(config => {
     config.changesApplied = false;
