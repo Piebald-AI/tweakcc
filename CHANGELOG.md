@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v1.5.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.5.0) - 2025-09-08
+
+- **New:** Add all the Anthropic models to Claude Code's /model command (#82) - @bl-ue
+- Restore cli.js permissions before deleting it and recreating it to break link networks (#81) - @bl-ue
+
 ## [v1.4.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.4.2) - 2025-09-08
 
 - Delete cli.js before overwriting it to avoid any link networks (#78) - @bl-ue
