@@ -23,15 +23,15 @@ export interface ModificationEdit {
 // Models to inject/make available.
 // prettier-ignore
 const CUSTOM_MODELS: { label: string; slug: string; internal: string }[] = [
-  { label: 'Opus 3',              slug: 'opus-3',              internal: 'claude-3-opus-20240229' },
-  { label: 'Haiku 3',             slug: 'haiku-3',             internal: 'claude-3-haiku-20240307' },
+  { label: 'Opus 4.1',            slug: 'opus-4.1',            internal: 'claude-opus-4-1-20250805' },
+  { label: 'Opus 4',              slug: 'opus-4',              internal: 'claude-opus-4-20250514' },
+  { label: 'Sonnet 4',            slug: 'sonnet-4',            internal: 'claude-sonnet-4-20250514' },
+  { label: 'Sonnet 3.7',          slug: 'sonnet-3.7',          internal: 'claude-3-7-sonnet-20250219' },
+  { label: 'Sonnet 3.5 (October)',slug: 'sonnet-3.5-october',  internal: 'claude-3-5-sonnet-20241022' },
   { label: 'Sonnet 3.5 (June)',   slug: 'sonnet-3.5-june',     internal: 'claude-3-5-sonnet-20240620' },
   { label: 'Haiku 3.5',           slug: 'haiku-3.5',           internal: 'claude-3-5-haiku-20241022' },
-  { label: 'Sonnet 3.5 (October)',slug: 'sonnet-3.5-october',  internal: 'claude-3-5-sonnet-20241022' },
-  { label: 'Sonnet 3.7',          slug: 'sonnet-3.7',          internal: 'claude-3-7-sonnet-20250219' },
-  { label: 'Sonnet 4',            slug: 'sonnet-4',            internal: 'claude-sonnet-4-20250514' },
-  { label: 'Opus 4',              slug: 'opus-4',              internal: 'claude-opus-4-20250514' },
-  { label: 'Opus 4.1',            slug: 'opus-4.1',            internal: 'claude-opus-4-1-20250805' },
+  { label: 'Haiku 3',             slug: 'haiku-3',             internal: 'claude-3-haiku-20240307' },
+  { label: 'Opus 3',              slug: 'opus-3',              internal: 'claude-3-opus-20240229' },
 ];
 
 // Heuristic functions for finding elements in cli.js
