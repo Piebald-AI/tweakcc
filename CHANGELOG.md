@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v1.4.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.4.2) - 2025-09-08
+
+- Delete cli.js before overwriting it to avoid any link networks (#78) - @bl-ue
+- Fix the black on black preview in the user message display section (#77) - @bl-ue
+
 ## [v1.4.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.4.1) - 2025-09-07
 
 - Fix a bug where resetting the past user message's prefix and content background/foreground would set them both to black, making them unreadable in Claude Code (see https://github.com/Piebald-AI/tweakcc/issues/69#issuecomment-3263942674) (#75) - @bl-ue
