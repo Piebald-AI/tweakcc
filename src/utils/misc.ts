@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as fsPromises from 'node:fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import * as child_process from 'child_process';
@@ -205,3 +206,60 @@ export const buildChalkChain = (
 
   return chain;
 };
+
+/**
+ * Replaces a file's content while breaking hard links and preserving permissions.
+ * This is essential when modifying files that may be hard-linked (e.g., by Bun).
+ *
+ * @param filePath - The path to the file to replace
+ * @param newContent - The new content to write to the file
+ * @param operation - Optional description for debug logging (e.g., "restore", "patch")
+ */
+export async function replaceFileBreakingHardLinks(
+  filePath: string,
+  newContent: string | Buffer,
+  operation: string = 'replace'
+): Promise<void> {
+  // Get the original file's permissions before unlinking
+  let originalMode = 0o755; // Default fallback
+  try {
+    const stats = await fsPromises.stat(filePath);
+    originalMode = stats.mode;
+    if (isDebug()) {
+      console.log(
+        `[${operation}] Original file mode for ${filePath}: ${(originalMode & parseInt('777', 8)).toString(8)}`
+      );
+    }
+  } catch (error) {
+    // File might not exist, use default
+    if (isDebug()) {
+      console.log(
+        `[${operation}] Could not stat ${filePath} (error: ${error}), using default mode 755`
+      );
+    }
+  }
+
+  // Unlink the file first to break any hard links
+  try {
+    await fsPromises.unlink(filePath);
+    if (isDebug()) {
+      console.log(`[${operation}] Unlinked ${filePath} to break hard links`);
+    }
+  } catch (error) {
+    // File might not exist, which is fine
+    if (isDebug()) {
+      console.log(`[${operation}] Could not unlink ${filePath}: ${error}`);
+    }
+  }
+
+  // Write the new content
+  await fsPromises.writeFile(filePath, newContent);
+
+  // Restore the original permissions
+  await fsPromises.chmod(filePath, originalMode);
+  if (isDebug()) {
+    console.log(
+      `[${operation}] Restored permissions to ${(originalMode & parseInt('777', 8)).toString(8)}`
+    );
+  }
+}

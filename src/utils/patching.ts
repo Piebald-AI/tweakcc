@@ -2,8 +2,11 @@ import figlet from 'figlet';
 import * as fs from 'node:fs/promises';
 import { restoreClijsFromBackup, updateConfigFile } from './config.js';
 import { ClaudeCodeInstallationInfo, Theme, TweakccConfig } from './types.js';
-import { isDebug } from './misc.js';
-import { buildChalkChain } from './misc.js';
+import {
+  isDebug,
+  buildChalkChain,
+  replaceFileBreakingHardLinks,
+} from './misc.js';
 
 export interface LocationResult {
   startIndex: number;
@@ -1200,22 +1203,9 @@ export const applyCustomization = async (
   // Apply context limit patch (always enabled)
   if ((result = writeContextLimit(content))) content = result;
 
-  // Unlink the file first to break any hard links (e.g., from Bun's linking system)
-  try {
-    await fs.unlink(ccInstInfo.cliPath);
-    if (isDebug()) {
-      console.log(
-        `Unlinked ${ccInstInfo.cliPath} to break hard links before writing patched content`
-      );
-    }
-  } catch (error) {
-    // File might not exist (though it should since we just read it)
-    if (isDebug()) {
-      console.log(`Could not unlink ${ccInstInfo.cliPath}: ${error}`);
-    }
-  }
+  // Replace the file, breaking hard links and preserving permissions
+  await replaceFileBreakingHardLinks(ccInstInfo.cliPath, content, 'patch');
 
-  await fs.writeFile(ccInstInfo.cliPath, content);
   return await updateConfigFile(config => {
     config.changesApplied = true;
   });

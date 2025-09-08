@@ -10,8 +10,17 @@ import {
 import fs from 'node:fs/promises';
 import type { Stats } from 'node:fs';
 import path from 'node:path';
+import * as misc from './misc.js';
 
 vi.mock('node:fs/promises');
+
+// Mock the replaceFileBreakingHardLinks function
+vi.spyOn(misc, 'replaceFileBreakingHardLinks').mockImplementation(
+  async (filePath, content) => {
+    // Simulate the function by calling the mocked fs.writeFile
+    await fs.writeFile(filePath, content);
+  }
+);
 
 const createEnoent = () => {
   const error: NodeJS.ErrnoException = new Error(
@@ -78,18 +87,41 @@ describe('config.ts', () => {
 
   describe('restoreClijsFromBackup', () => {
     it('should copy the backup file and update the config', async () => {
-      const copyFileSpy = vi.spyOn(fs, 'copyFile').mockResolvedValue(undefined);
-      vi.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
-      vi.spyOn(fs, 'readFile').mockRejectedValue(createEnoent());
+      // Mock reading the backup file
+      const readFileSpy = vi
+        .spyOn(fs, 'readFile')
+        .mockResolvedValueOnce(Buffer.from('backup content')) // Reading backup file
+        .mockRejectedValue(createEnoent()); // Reading config file
+
+      // Mock file operations for the helper function
+      vi.spyOn(fs, 'stat').mockRejectedValue(createEnoent()); // File doesn't exist
+      vi.spyOn(fs, 'unlink').mockResolvedValue(undefined);
+      const writeFileSpy = vi
+        .spyOn(fs, 'writeFile')
+        .mockResolvedValue(undefined);
+      vi.spyOn(fs, 'chmod').mockResolvedValue(undefined);
+
       const ccInstInfo = {
         cliPath: '/fake/path/cli.js',
       } as ClaudeCodeInstallationInfo;
+
       await config.restoreClijsFromBackup(ccInstInfo);
-      expect(copyFileSpy).toHaveBeenCalledWith(
-        expect.any(String),
-        ccInstInfo.cliPath
+
+      // Verify the backup was read
+      expect(readFileSpy).toHaveBeenCalledWith(
+        expect.stringContaining('cli.js.backup')
       );
-      expect(fs.writeFile).toHaveBeenCalled();
+
+      // Verify writeFile was called (at least twice - once for cli.js, once for config)
+      expect(writeFileSpy).toHaveBeenCalled();
+
+      // Find the call that wrote to cli.js (not config.json)
+      const cliWriteCall = writeFileSpy.mock.calls.find(
+        call => call[0] === ccInstInfo.cliPath
+      );
+
+      expect(cliWriteCall).toBeDefined();
+      expect(cliWriteCall![1]).toEqual(Buffer.from('backup content'));
     });
   });
 

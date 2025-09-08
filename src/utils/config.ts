@@ -11,7 +11,11 @@ import {
   ThinkingVerbsConfig,
   TweakccConfig,
 } from './types.js';
-import { hashFileInChunks, isDebug } from './misc.js';
+import {
+  hashFileInChunks,
+  isDebug,
+  replaceFileBreakingHardLinks,
+} from './misc.js';
 
 export const ensureConfigDir = async (): Promise<void> => {
   await fs.mkdir(CONFIG_DIR, { recursive: true });
@@ -131,21 +135,16 @@ export const restoreClijsFromBackup = async (
     console.log(`Restoring cli.js from backup to ${ccInstInfo.cliPath}`);
   }
 
-  // Unlink the file first to break any hard links
-  try {
-    await fs.unlink(ccInstInfo.cliPath);
-    if (isDebug()) {
-      console.log(`Unlinked ${ccInstInfo.cliPath} to break hard links`);
-    }
-  } catch (error) {
-    // File might not exist, which is fine
-    if (isDebug()) {
-      console.log(`Could not unlink ${ccInstInfo.cliPath}: ${error}`);
-    }
-  }
+  // Read the backup content
+  const backupContent = await fs.readFile(CLIJS_BACKUP_FILE);
 
-  // Now copy the backup file
-  await fs.copyFile(CLIJS_BACKUP_FILE, ccInstInfo.cliPath);
+  // Replace the file, breaking hard links and preserving permissions
+  await replaceFileBreakingHardLinks(
+    ccInstInfo.cliPath,
+    backupContent,
+    'restore'
+  );
+
   await updateConfigFile(config => {
     config.changesApplied = false;
   });
