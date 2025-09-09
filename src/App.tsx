@@ -21,7 +21,7 @@ import {
   updateConfigFile,
 } from './utils/config.js';
 import { revealFileInExplorer } from './utils/misc.js';
-import { applyCustomization } from './utils/patching.js';
+import { applyCustomization } from './utils/patches/index.js';
 
 export const SettingsContext = createContext({
   settings: DEFAULT_SETTINGS,

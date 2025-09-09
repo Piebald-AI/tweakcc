@@ -1,5 +1,6 @@
-import { LocationResult } from '../patching.js';
-import { showDiff } from '../misc.js';
+// Please see the note about writing patches in ./index.js.
+
+import { LocationResult, showDiff } from './index.js';
 
 const getShowMoreItemsInSelectMenusLocation = (
   oldFile: string

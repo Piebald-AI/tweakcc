@@ -5,7 +5,7 @@ import App from './App.js';
 import { CLIJS_SEARCH_PATHS, CONFIG_FILE } from './utils/types.js';
 import { startupCheck, readConfigFile } from './utils/config.js';
 import { enableDebug } from './utils/misc.js';
-import { applyCustomization } from './utils/patching.js';
+import { applyCustomization } from './utils/patches/index.js';
 import chalk from 'chalk';
 
 const main = async () => {
