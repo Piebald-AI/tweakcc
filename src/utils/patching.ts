@@ -154,7 +154,7 @@ export function getThemesLocation(oldFile: string): {
   }
 
   const objArrPat = /\[(?:\{label:"(?:Dark|Light).+?",value:".+?"\},?)+\]/;
-  const objPat = /return\{(?:[\w$]+?:"(?:Dark|Light).+?",?)+\}/;
+  const objPat = /return\{(?:[$\w]+?:"(?:Dark|Light).+?",?)+\}/;
   const objArrMatch = oldFile.match(objArrPat);
   const objMatch = oldFile.match(objPat);
 
@@ -317,7 +317,8 @@ const getThinkerSymbolSpeedLocation = (
 ): LocationResult | null => {
   // Use the original full regex to find the exact pattern
   const speedPattern =
-    /[\w$]+\(\(\)=>\{if\(![\w$]+\)\{[\w$]+\(\d+\);return\}[\w$]+\(\([^)]+\)=>[^)]+\+1\)\},(\d+)\)/;
+    /([, ])[$\w]+\(\(\)=>\{if\(![$\w]+\)\{[$\w]+\(\d+\);return\}[$\w]+\(\([^)]+\)=>[^)]+\+1\)\},(\d+)\)/;
+
   const match = oldFile.match(speedPattern);
 
   if (!match || match.index == undefined) {
@@ -327,7 +328,8 @@ const getThinkerSymbolSpeedLocation = (
 
   // Find where the captured number starts and ends within the full match
   const fullMatchText = match[0];
-  const capturedNumber = match[1];
+  const prefixChar = match[1];
+  const capturedNumber = match[2];
 
   // Find the number within the full match
   const numberIndex = fullMatchText.lastIndexOf(capturedNumber);
@@ -368,7 +370,7 @@ export const writeThinkerSymbolSpeed = (
 
 const getSpinnerNoFreezeLocation = (oldFile: string): LocationResult | null => {
   const wholePattern =
-    /[\w$]+\(\(\)=>\{if\(![\w$]+\)\{[\w$]+\(\d+\);return\}[\w$]+\(\([^)]+\)=>[^)]+\+1\)\},\d+\)/;
+    /\b[$\w]+\(\(\)=>\{if\(![$\w]+\)\{[$\w]+\(\d+\);return\}[$\w]+\(\([^)]+\)=>[^)]+\+1\)\},\d+\)/;
   const wholeMatch = oldFile.match(wholePattern);
 
   if (!wholeMatch || wholeMatch.index === undefined) {
@@ -376,7 +378,7 @@ const getSpinnerNoFreezeLocation = (oldFile: string): LocationResult | null => {
     return null;
   }
 
-  const freezeBranchPattern = /if\(![\w$]+\)\{[\w$]+\(\d+\);return\}/;
+  const freezeBranchPattern = /if\(![$\w]+\)\{[$\w]+\(\d+\);return\}/;
   const condMatch = wholeMatch[0].match(freezeBranchPattern);
 
   if (!condMatch || condMatch.index === undefined) {
@@ -417,8 +419,11 @@ const getThinkerVerbsLocation = (oldFile: string): LocationResult | null => {
   // }
   // ```
   // To write, we just do `{varname} = {JSON.stringify({words: verbs})}`.
+
+  // Performance note: putting \b at the beginning, before the variable name speeds it up
+  // from ~1.5s to ~80ms.  Explicitly search for ',' or ' ' brings it down .
   const verbsPattern =
-    /([$\w]+)=\{words:\[(?:"[^"{}()]+ing",)+"[^"{}()]+ing"\]\}/s;
+    /([, ])([$\w]+)=\{words:\[(?:"[^"{}()]+ing",)+"[^"{}()]+ing"\]\}/s;
 
   const verbsMatch = oldFile.match(verbsPattern);
   if (!verbsMatch || verbsMatch.index == undefined) {
@@ -427,9 +432,9 @@ const getThinkerVerbsLocation = (oldFile: string): LocationResult | null => {
   }
 
   return {
-    startIndex: verbsMatch.index,
-    endIndex: verbsMatch.index + verbsMatch[0].length,
-    identifiers: [verbsMatch[1]],
+    startIndex: verbsMatch.index + 1,
+    endIndex: verbsMatch.index + 1 + verbsMatch[0].length,
+    identifiers: [verbsMatch[1], verbsMatch[2]],
   };
 };
 
@@ -462,9 +467,10 @@ export const writeThinkerVerbs = (
     return null;
   }
   const verbsLocation = location1;
-  const varName = verbsLocation.identifiers?.[0];
+  const prefixChar = verbsLocation.identifiers?.[0]; // ',' or ' ' -- see getThinkerVerbsLocation()
+  const varName = verbsLocation.identifiers?.[1];
 
-  const verbsJson = `${varName}=${JSON.stringify({ words: verbs })}`;
+  const verbsJson = `${prefixChar}${varName}=${JSON.stringify({ words: verbs })}`;
   const newFile1 =
     oldFile.slice(0, verbsLocation.startIndex) +
     verbsJson +
@@ -742,7 +748,7 @@ export const writeContextLimit = (oldFile: string): string | null => {
 export const findChalkVar = (fileContents: string): string | undefined => {
   // Find chalk variable using the counting method
   const chalkPattern =
-    /([$\w]+)(?:\.(?:cyan|gray|green|red|yellow|ansi256|bgAnsi256|bgHex|bgRgb|hex|rgb|bold|dim|inverse|italic|strikethrough|underline)\b)+\(/g;
+    /\b([$\w]+)(?:\.(?:cyan|gray|green|red|yellow|ansi256|bgAnsi256|bgHex|bgRgb|hex|rgb|bold|dim|inverse|italic|strikethrough|underline)\b)+\(/g;
   const chalkMatches = Array.from(fileContents.matchAll(chalkPattern));
 
   // Count occurrences of each variable
@@ -772,16 +778,15 @@ const getUserMessageDisplayLocation = (
   messageLocation: LocationResult | null;
 } | null => {
   // Search for the exact error message to find the component
-  const errorPattern = /No content found in user prompt message/;
-  const errorMatch = oldFile.match(errorPattern);
-
-  if (!errorMatch || errorMatch.index === undefined) {
+  const searchStart = oldFile.indexOf(
+    'No content found in user prompt message'
+  );
+  if (searchStart === -1) {
     console.error('patch: userMessageDisplay: failed to find error message');
     return null;
   }
 
   // Get 400 characters after the error message as instructed
-  const searchStart = errorMatch.index;
   const searchEnd = Math.min(oldFile.length, searchStart + 400);
   const searchSection = oldFile.slice(searchStart, searchEnd);
 
@@ -1066,7 +1071,7 @@ const getModelSelectorInsertionPoint = (
   const chunk = oldFile.slice(searchStart, searchEnd);
 
   const m = chunk.match(
-    /\[[\w$]+,\s*[\w$]+\]\s*=\s*[\w$]+\.useState\([^)]*\)\s*,\s*([\w$]+)=/
+    /\[[$\w]+,\s*[$\w]+\]\s*=\s*[$\w]+\.useState\([^)]*\)\s*,\s*([$\w]+)=/
   );
   if (!m || m.index === undefined) {
     return null;
