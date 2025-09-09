@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-- **New:** Make all the select menus (like the /model and /theme lists) show 25 items by default instead of 5 - @bl-ue
+## [v1.5.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.5.1) - 2025-09-09
+
+- **New:** Make all the select menus (like the /model and /theme lists) show 25 items by default instead of 5 (#85) - @bl-ue
+- Sort the models added to /models in descending order of release date (#84) - @bl-ue
+- Speed up patching from 8s+ to <=1s (#86) - @bl-ue
+- Simplify the diff shown for the context limit patch in debug mode (#89) - @bl-ue
 
 ## [v1.5.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.5.0) - 2025-09-08
 
