@@ -317,7 +317,7 @@ const getThinkerSymbolSpeedLocation = (
 ): LocationResult | null => {
   // Use the original full regex to find the exact pattern
   const speedPattern =
-    /([, ])[$\w]+\(\(\)=>\{if\(![$\w]+\)\{[$\w]+\(\d+\);return\}[$\w]+\(\([^)]+\)=>[^)]+\+1\)\},(\d+)\)/;
+    /[, ][$\w]+\(\(\)=>\{if\(![$\w]+\)\{[$\w]+\(\d+\);return\}[$\w]+\(\([^)]+\)=>[^)]+\+1\)\},(\d+)\)/;
 
   const match = oldFile.match(speedPattern);
 
@@ -328,7 +328,6 @@ const getThinkerSymbolSpeedLocation = (
 
   // Find where the captured number starts and ends within the full match
   const fullMatchText = match[0];
-  const prefixChar = match[1];
   const capturedNumber = match[2];
 
   // Find the number within the full match
