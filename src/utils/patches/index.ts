@@ -76,7 +76,7 @@ export const showDiff = (
     contextEndNew
   );
 
-  if (isDebug()) {
+  if (isDebug() && oldChanged !== newChanged) {
     console.log('\n--- Diff ---');
     console.log('OLD:', oldBefore + `\x1b[31m${oldChanged}\x1b[0m` + oldAfter);
     console.log('NEW:', newBefore + `\x1b[32m${newChanged}\x1b[0m` + newAfter);
