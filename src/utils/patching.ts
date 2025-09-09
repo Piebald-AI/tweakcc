@@ -3,10 +3,11 @@ import * as fs from 'node:fs/promises';
 import { restoreClijsFromBackup, updateConfigFile } from './config.js';
 import { ClaudeCodeInstallationInfo, Theme, TweakccConfig } from './types.js';
 import {
-  isDebug,
   buildChalkChain,
   replaceFileBreakingHardLinks,
+  showDiff,
 } from './misc.js';
+import { writeShowMoreItemsInSelectMenus } from './patches/showMoreItemsInSelectMenus.js';
 
 export interface LocationResult {
   startIndex: number;
@@ -649,43 +650,6 @@ export const writeThinkerSymbolWidthLocation = (
   showDiff(oldFile, newFile, newCss, location.startIndex, location.endIndex);
   return newFile;
 };
-
-// Debug function for showing diffs (currently disabled)
-function showDiff(
-  oldFileContents: string,
-  newFileContents: string,
-  injectedText: string,
-  startIndex: number,
-  endIndex: number
-): void {
-  const contextStart = Math.max(0, startIndex - 20);
-  const contextEndOld = Math.min(oldFileContents.length, endIndex + 20);
-  const contextEndNew = Math.min(
-    newFileContents.length,
-    startIndex + injectedText.length + 20
-  );
-
-  const oldBefore = oldFileContents.slice(contextStart, startIndex);
-  const oldChanged = oldFileContents.slice(startIndex, endIndex);
-  const oldAfter = oldFileContents.slice(endIndex, contextEndOld);
-
-  const newBefore = newFileContents.slice(contextStart, startIndex);
-  const newChanged = newFileContents.slice(
-    startIndex,
-    startIndex + injectedText.length
-  );
-  const newAfter = newFileContents.slice(
-    startIndex + injectedText.length,
-    contextEndNew
-  );
-
-  if (isDebug()) {
-    console.log('\n--- Diff ---');
-    console.log('OLD:', oldBefore + `\x1b[31m${oldChanged}\x1b[0m` + oldAfter);
-    console.log('NEW:', newBefore + `\x1b[32m${newChanged}\x1b[0m` + newAfter);
-    console.log('--- End Diff ---\n');
-  }
-}
 
 const getVerbosePropertyLocation = (oldFile: string): LocationResult | null => {
   const createElementPattern =
@@ -1392,6 +1356,9 @@ export const applyCustomization = async (
 
   // Apply model customizations (known names, mapping, selector options) (always enabled)
   if ((result = writeModelCustomizations(content))) content = result;
+
+  // Apply show more items in select menus patch (always enabled)
+  if ((result = writeShowMoreItemsInSelectMenus(content, 25))) content = result;
 
   // Replace the file, breaking hard links and preserving permissions
   await replaceFileBreakingHardLinks(ccInstInfo.cliPath, content, 'patch');

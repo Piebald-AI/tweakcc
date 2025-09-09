@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- **New:** Make all the select menus (like the /model and /theme lists) show 25 items by default instead of 5 - @bl-ue
+
 ## [v1.5.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.5.0) - 2025-09-08
 
 - **New:** Add all the Anthropic models to Claude Code's /model command (#82) - @bl-ue
@@ -96,7 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [v1.0.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.0.2) - 2025-08-02
 
-- **New:** Homebrew path support for macOS (#11) - @Peter Souter
+- **New:** Homebrew path support for macOS (#11) - @petems
 - **New:** NVM search directories - @signadou
 - Check for cli.js only once at startup (#9) - @signadou
 - Remove support for Haiku-generated words

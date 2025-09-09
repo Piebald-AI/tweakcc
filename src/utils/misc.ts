@@ -263,3 +263,40 @@ export async function replaceFileBreakingHardLinks(
     );
   }
 }
+
+// Debug function for showing diffs (currently disabled)
+export const showDiff = (
+  oldFileContents: string,
+  newFileContents: string,
+  injectedText: string,
+  startIndex: number,
+  endIndex: number
+): void => {
+  const contextStart = Math.max(0, startIndex - 20);
+  const contextEndOld = Math.min(oldFileContents.length, endIndex + 20);
+  const contextEndNew = Math.min(
+    newFileContents.length,
+    startIndex + injectedText.length + 20
+  );
+
+  const oldBefore = oldFileContents.slice(contextStart, startIndex);
+  const oldChanged = oldFileContents.slice(startIndex, endIndex);
+  const oldAfter = oldFileContents.slice(endIndex, contextEndOld);
+
+  const newBefore = newFileContents.slice(contextStart, startIndex);
+  const newChanged = newFileContents.slice(
+    startIndex,
+    startIndex + injectedText.length
+  );
+  const newAfter = newFileContents.slice(
+    startIndex + injectedText.length,
+    contextEndNew
+  );
+
+  if (isDebug()) {
+    console.log('\n--- Diff ---');
+    console.log('OLD:', oldBefore + `\x1b[31m${oldChanged}\x1b[0m` + oldAfter);
+    console.log('NEW:', newBefore + `\x1b[32m${newChanged}\x1b[0m` + newAfter);
+    console.log('--- End Diff ---\n');
+  }
+};
