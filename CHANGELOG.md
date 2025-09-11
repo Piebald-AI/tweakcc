@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v1.5.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.5.2) - 2025-09-11
+
+- **New:** Make /cost work with Pro/Max subscriptions (See Claude Code issue [#1109](https://github.com/anthropics/claude-code/issues/1109)) (#91) - @bl-ue
+- Remove colors and emoji from --apply output (#92) - @bl-ue
+
 ## [v1.5.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.5.1) - 2025-09-09
 
 - **New:** Make all the select menus (like the /model and /theme lists) show 25 items by default instead of 5 (#85) - @bl-ue
