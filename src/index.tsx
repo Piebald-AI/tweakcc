@@ -6,11 +6,9 @@ import { CLIJS_SEARCH_PATHS, CONFIG_FILE } from './utils/types.js';
 import { startupCheck, readConfigFile } from './utils/config.js';
 import { enableDebug } from './utils/misc.js';
 import { applyCustomization } from './utils/patches/index.js';
-import chalk from 'chalk';
 
 const main = async () => {
   const program = new Command();
-
   program
     .name('tweakcc')
     .description(
@@ -19,9 +17,7 @@ const main = async () => {
     .version('1.5.1')
     .option('-d, --debug', 'enable debug mode')
     .option('-a, --apply', 'apply saved customizations without interactive UI');
-
   program.parse();
-
   const options = program.opts();
 
   if (options.debug) {
@@ -30,18 +26,15 @@ const main = async () => {
 
   // Handle --apply flag for non-interactive mode
   if (options.apply) {
-    console.log(
-      chalk.cyan('🔧 Applying saved customizations to Claude Code...')
-    );
+    console.log('Applying saved customizations to Claude Code...');
+    console.log(`Configuration saved at: ${CONFIG_FILE}`);
 
     try {
       // Read the saved configuration
       const config = await readConfigFile();
 
       if (!config.settings || Object.keys(config.settings).length === 0) {
-        console.error(
-          chalk.red('❌ No saved customizations found in ' + CONFIG_FILE)
-        );
+        console.error('No saved customizations found in ' + CONFIG_FILE);
         process.exit(1);
       }
 
@@ -49,67 +42,25 @@ const main = async () => {
       const startupCheckInfo = await startupCheck();
 
       if (!startupCheckInfo || !startupCheckInfo.ccInstInfo) {
-        console.error(chalk.red(`❌ Cannot find Claude Code's cli.js`));
-        console.error(chalk.yellow('Searched at the following locations:'));
-        CLIJS_SEARCH_PATHS.forEach(p => console.error(chalk.gray('  - ' + p)));
+        console.error(`Cannot find Claude Code's cli.js`);
+        console.error('Searched at the following locations:');
+        CLIJS_SEARCH_PATHS.forEach(p => console.error('  - ' + p));
         process.exit(1);
       }
 
       console.log(
-        chalk.gray(
-          `📁 Found Claude Code at: ${startupCheckInfo.ccInstInfo.cliPath}`
-        )
+        `Found Claude Code at: ${startupCheckInfo.ccInstInfo.cliPath}`
       );
-      console.log(
-        chalk.gray(`📦 Version: ${startupCheckInfo.ccInstInfo.version}`)
-      );
-
-      // Note: startupCheck() already creates/updates backup as needed
-      console.log(chalk.gray('✓ Backup handled by startup check'));
+      console.log(`Version: ${startupCheckInfo.ccInstInfo.version}`);
 
       // Apply the customizations
-      console.log(chalk.cyan('🎨 Applying customizations...'));
-      try {
-        await applyCustomization(config, startupCheckInfo.ccInstInfo);
-        console.log(chalk.green('✅ Customizations applied successfully!'));
-        console.log(chalk.gray(`💾 Configuration saved at: ${CONFIG_FILE}`));
-      } catch (patchError) {
-        console.error(chalk.red('❌ Failed to apply patches:'));
-        console.error(
-          chalk.red(
-            patchError instanceof Error
-              ? patchError.message
-              : String(patchError)
-          )
-        );
-
-        // Check if patching errors were non-critical (warnings)
-        if (
-          patchError instanceof Error &&
-          patchError.message.includes('patch:')
-        ) {
-          console.log(
-            chalk.yellow(
-              '⚠️  Some patches failed to apply, but the file was updated.'
-            )
-          );
-          console.log(
-            chalk.yellow('    This may happen if Claude Code was updated.')
-          );
-          console.log(
-            chalk.gray(
-              '    Run tweakcc interactively to review and update your customizations.'
-            )
-          );
-        }
-      }
-
+      console.log('Applying customizations...');
+      await applyCustomization(config, startupCheckInfo.ccInstInfo);
+      console.log('Customizations applied successfully!');
       process.exit(0);
     } catch (error) {
-      console.error(chalk.red('❌ Unexpected error:'));
-      console.error(
-        chalk.red(error instanceof Error ? error.message : String(error))
-      );
+      console.error('Unexpected error:');
+      console.error(error instanceof Error ? error.message : String(error));
       process.exit(1);
     }
   }
@@ -119,7 +70,7 @@ const main = async () => {
   if (startupCheckInfo) {
     render(<App startupCheckInfo={startupCheckInfo} />);
   } else {
-    console.error(`\x1b[31mCannot find Claude Code's cli.js -- do you have Claude Code installed?
+    console.error(`Cannot find Claude Code's cli.js -- do you have Claude Code installed?
 
 Searched at the following locations:
 ${CLIJS_SEARCH_PATHS.map(p => '- ' + p).join('\n')}
@@ -133,7 +84,7 @@ location to our search list and release an update today!  Or you can specify the
   "ccInstallationDir": "${
     process.platform == 'win32'
       ? 'C:\\\\absolute\\\\path\\\\to\\\\node_modules\\\\@anthropic-ai\\\\claude-code'
-      : '/absolute/path/to/node_modules/+@anthropic-ai/claude-code'
+      : '/absolute/path/to/node_modules/@anthropic-ai/claude-code'
   }"
 }
 
@@ -141,8 +92,7 @@ Notes:
 - Don't include cli.js in the path.
 
 - Don't specify the path to your Claude Code executable's directory.  It needs to be the path
-  to the folder that contains **cli.js**.
-\x1b[0m`);
+  to the folder that contains **cli.js**.`);
     process.exit(1);
   }
 };
