@@ -34,6 +34,7 @@ import { writeUserMessageDisplay } from './userMessageDisplay.js';
 import { writeVerboseProperty } from './verboseProperty.js';
 import { writeWelcomeMessage } from './welcomeMessage.js';
 import { writeModelCustomizations } from './modelSelector.js';
+import { writeIgnoreMaxSubscription } from './ignoreMaxSubscription.js';
 
 export interface LocationResult {
   startIndex: number;
@@ -242,6 +243,9 @@ export const applyCustomization = async (
 
   // Apply show more items in select menus patch (always enabled)
   if ((result = writeShowMoreItemsInSelectMenus(content, 25))) content = result;
+
+  // Disable Max subscription gating for cost tool (always enabled)
+  if ((result = writeIgnoreMaxSubscription(content))) content = result;
 
   // Replace the file, breaking hard links and preserving permissions
   await replaceFileBreakingHardLinks(ccInstInfo.cliPath, content, 'patch');
