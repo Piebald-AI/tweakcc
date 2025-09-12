@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Properly glob directories and show the glob paths to the user in the error message when cli.js can't be found--#93 (#94) - @bl-ue
+
 ## [v1.5.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.5.2) - 2025-09-11
 
 - **New:** Make /cost work with Pro/Max subscriptions (See Claude Code issue [#1109](https://github.com/anthropics/claude-code/issues/1109)) (#91) - @bl-ue
