@@ -167,25 +167,52 @@ export const findClaudeCodeInstallation = async (
       if (isDebug()) {
         console.log(`Searching for Claude Code cli.js file at ${searchPath}`);
       }
+
+      // Check for cli.js
       const cliPath = path.join(searchPath, 'cli.js');
-      const packageJsonPath = path.join(searchPath, 'package.json');
-      const packageJson = JSON.parse(
-        await fs.readFile(packageJsonPath, 'utf8')
-      );
+      if (!(await doesFileExist(cliPath))) {
+        continue;
+      }
       if (isDebug()) {
         console.log(
           `Found Claude Code cli.js file at ${searchPath}; checking hash...`
         );
         console.log(`SHA256 hash: ${await hashFileInChunks(cliPath)}`);
       }
+
+      // Try package.json.  It's alright if it doesn't exist.
+      const packageJsonPath = path.join(searchPath, 'package.json');
+      let packageJson;
+      try {
+        packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf8'));
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          'code' in error &&
+          error.code === 'ENOENT'
+        ) {
+          // Do nothing.
+        } else {
+          throw error;
+        }
+      }
+
       return {
         cliPath: cliPath,
         packageJsonPath,
-        version: packageJson.version,
+        version: packageJson?.version,
       };
-    } catch {
-      // Continue searching if this path fails.
-      continue;
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ) {
+        // Continue searching if this path fails.
+        continue;
+      } else {
+        throw error;
+      }
     }
   }
 
