@@ -2,7 +2,7 @@
 import { render } from 'ink';
 import { Command } from 'commander';
 import App from './App.js';
-import { CLIJS_SEARCH_PATHS, CONFIG_FILE } from './utils/types.js';
+import { CLIJS_SEARCH_PATH_INFO, CONFIG_FILE } from './utils/types.js';
 import { startupCheck, readConfigFile } from './utils/config.js';
 import { enableDebug } from './utils/misc.js';
 import { applyCustomization } from './utils/patches/index.js';
@@ -108,9 +108,9 @@ Searched at the following locations:
 ${formatSearchPaths()}
 
 If you have it installed but it's in a location not listed above, please open an issue at
-https://github.com/piebald-ai/tweakcc/issues and tell us where you have it--we'll add that
-location to our search list and release an update today!  Or you can specify the path to its
-\`cli.js\` file in ${CONFIG_FILE}:
+https://github.com/piebald-ai/tweakcc/issues and tell us where you have it--we'll add that location
+to our search list and release an update today!  And in the meantime, you can get tweakcc working
+by manually specifying that location in ${CONFIG_FILE} with the "ccInstallationDir" property:
 
 {
   "ccInstallationDir": "${
@@ -122,9 +122,10 @@ location to our search list and release an update today!  Or you can specify the
 
 Notes:
 - Don't include cli.js in the path.
-
 - Don't specify the path to your Claude Code executable's directory.  It needs to be the path
-  to the folder that contains **cli.js**.`);
+  to the folder that contains **cli.js**.
+- Please also open an issue so that we can add your path to the search list for all users!
+`);
     process.exit(1);
   }
 };
