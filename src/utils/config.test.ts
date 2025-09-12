@@ -157,6 +157,14 @@ describe('config.ts', () => {
       );
       const mockPackageJson = JSON.stringify({ version: '1.2.3' });
 
+      // Mock fs.stat to simulate that cli.js exists
+      vi.spyOn(fs, 'stat').mockImplementation(async p => {
+        if (p === mockCliPath) {
+          return {} as Stats; // File exists
+        }
+        throw createEnoent(); // File not found
+      });
+
       vi.spyOn(fs, 'readFile').mockImplementation(async p => {
         if (p === mockPackageJsonPath) {
           return mockPackageJson;
@@ -182,6 +190,8 @@ describe('config.ts', () => {
         settings: DEFAULT_SETTINGS,
       };
 
+      // Mock fs.stat to simulate that no cli.js files exist
+      vi.spyOn(fs, 'stat').mockRejectedValue(createEnoent());
       vi.spyOn(fs, 'readFile').mockRejectedValue(new Error('File not found'));
 
       const result = await config.findClaudeCodeInstallation(mockConfig);
@@ -197,7 +207,15 @@ describe('config.ts', () => {
         version: '1.0.0',
         packageJsonPath: '/fake/path/package.json',
       };
-      vi.spyOn(fs, 'stat').mockRejectedValue(createEnoent()); // Backup doesn't exist
+
+      // Mock fs.stat to reject only for the backup file
+      vi.spyOn(fs, 'stat').mockImplementation(async filePath => {
+        if (filePath.toString().includes('cli.js.backup')) {
+          throw createEnoent(); // Backup doesn't exist
+        }
+        return {} as Stats; // Other files exist
+      });
+
       const copyFileSpy = vi.spyOn(fs, 'copyFile').mockResolvedValue(undefined);
       vi.spyOn(fs, 'readFile').mockResolvedValue(
         JSON.stringify({ ccVersion: '1.0.0' })
