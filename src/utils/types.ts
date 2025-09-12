@@ -637,8 +637,14 @@ export const CONFIG_DIR = path.join(os.homedir(), '.tweakcc');
 export const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 export const CLIJS_BACKUP_FILE = path.join(CONFIG_DIR, 'cli.js.backup');
 
-const getClijsSearchPaths = (): string[] => {
-  const paths: string[] = [];
+export interface SearchPathInfo {
+  pattern: string;
+  isGlob: boolean;
+  expandedPaths: string[];
+}
+
+const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
+  const pathInfos: SearchPathInfo[] = [];
 
   const home =
     process.platform == 'win32'
@@ -646,123 +652,142 @@ const getClijsSearchPaths = (): string[] => {
       : os.homedir();
   const mod = 'node_modules/@anthropic-ai/claude-code';
 
+  // Helper function to add a path or glob pattern
+  const addPath = (pattern: string, isGlob: boolean = false) => {
+    if (isGlob) {
+      const expanded = globbySync(pattern, { onlyFiles: false });
+      pathInfos.push({ pattern, isGlob: true, expandedPaths: expanded });
+    } else {
+      pathInfos.push({ pattern, isGlob: false, expandedPaths: [pattern] });
+    }
+  };
+
   // Local Claude Code installation (#42)
-  paths.push(`${os.homedir()}/.claude/local/${mod}`);
+  addPath(`${os.homedir()}/.claude/local/${mod}`);
 
   // Search in custom paths for popular tools.  These are cross-platform paths.
   // prettier-ignore
   {
-    if (process.env.NPM_PREFIX)  paths.push(`${process.env.NPM_PREFIX}/lib/${mod}`);
-    if (process.env.N_PREFIX)    paths.push(`${process.env.N_PREFIX}/lib/${mod}`);
-    if (process.env.VOLTA_HOME)  paths.push(`${process.env.VOLTA_HOME}/lib/${mod}`);
-    if (process.env.FNM_DIR)     paths.push(`${process.env.FNM_DIR}/lib/${mod}`);
-    if (process.env.NVM_DIR)     paths.push(`${process.env.NVM_DIR}/lib/${mod}`);
-    if (process.env.NODENV_ROOT) paths.push(...globbySync(`${process.env.NODENV_ROOT}/versions/*/lib/${mod}`));
-    if (process.env.NVS_HOME)    paths.push(...globbySync(`${process.env.NVS_HOME}/node/*/*/lib/${mod}`));
-    if (process.env.ASDF_DATA_DIR) paths.push(...globbySync(`${process.env.ASDF_DATA_DIR}/installs/nodejs/*/lib/${mod}`));
+    if (process.env.NPM_PREFIX)    addPath(`${process.env.NPM_PREFIX}/lib/${mod}`);
+    if (process.env.N_PREFIX)      addPath(`${process.env.N_PREFIX}/lib/${mod}`);
+    if (process.env.VOLTA_HOME)    addPath(`${process.env.VOLTA_HOME}/lib/${mod}`);
+    if (process.env.FNM_DIR)       addPath(`${process.env.FNM_DIR}/lib/${mod}`);
+    if (process.env.NVM_DIR)       addPath(`${process.env.NVM_DIR}/lib/${mod}`);
+    if (process.env.NODENV_ROOT)   addPath(`${process.env.NODENV_ROOT}/versions/*/lib/${mod}`, true);
+    if (process.env.NVS_HOME)      addPath(`${process.env.NVS_HOME}/node/*/*/lib/${mod}`, true);
+    if (process.env.ASDF_DATA_DIR) addPath(`${process.env.ASDF_DATA_DIR}/installs/nodejs/*/lib/${mod}`, true);
   }
 
   // Platform-specific paths.
   // prettier-ignore
   if (process.platform == "win32") {
     // volta, npm, yarn, pnpm
-    paths.push(`${home}/AppData/Local/Volta/tools/image/packages/@anthropic-ai/claude-code/${mod}`);
-    paths.push(`${home}/AppData/Roaming/npm/${mod}`);
-    paths.push(...globbySync(`${home}/AppData/Roaming/nvm/*/${mod}}`));
-    paths.push(`${home}/AppData/Local/Yarn/config/global/${mod}`);
-    paths.push(...globbySync(`${home}/AppData/Local/pnpm/global/*/${mod}`));
+    addPath(`${home}/AppData/Local/Volta/tools/image/packages/@anthropic-ai/claude-code/${mod}`);
+    addPath(`${home}/AppData/Roaming/npm/${mod}`);
+    addPath(`${home}/AppData/Roaming/nvm/*/${mod}`, true);
+    addPath(`${home}/AppData/Local/Yarn/config/global/${mod}`);
+    addPath(`${home}/AppData/Local/pnpm/global/*/${mod}`, true);
 
     // n (https://github.com/tj/n)
-    paths.push(...globbySync(`${home}/n/versions/node/*/lib/${mod}`));
+    addPath(`${home}/n/versions/node/*/lib/${mod}`, true);
 
     // Yarn
-    paths.push(`${home}/AppData/Roaming/Yarn/config/global/${mod}`);
+    addPath(`${home}/AppData/Roaming/Yarn/config/global/${mod}`);
 
     // pnpm
-    paths.push(`${home}/AppData/Roaming/pnpm-global/${mod}`);
-    paths.push(...globbySync(`${home}/AppData/Roaming/pnpm-global/*/${mod}`));
+    addPath(`${home}/AppData/Roaming/pnpm-global/${mod}`);
+    addPath(`${home}/AppData/Roaming/pnpm-global/*/${mod}`, true);
 
     // Bun
-    paths.push(`${home}/.bun/install/global/${mod}`);
+    addPath(`${home}/.bun/install/global/${mod}`);
 
     // fnm
-    paths.push(...globbySync(`${home}/AppData/Local/fnm_multishells/*/node_modules/${mod}`));
+    addPath(`${home}/AppData/Local/fnm_multishells/*/node_modules/${mod}`, true);
 
   } else {
     // macOS-specific paths
     if (process.platform == 'darwin') {
       // macOS-specific potential user path
-      paths.push(`${home}/Library/${mod}`);
+      addPath(`${home}/Library/${mod}`);
       // MacPorts
-      paths.push(`/opt/local/lib/${mod}`);
+      addPath(`/opt/local/lib/${mod}`);
     }
 
     // Various user paths
-    paths.push(`${home}/.local/lib/${mod}`)
-    paths.push(`${home}/.local/share/${mod}`)
-    paths.push(`${home}/.npm-global/lib/${mod}`)
-    paths.push(`${home}/.npm-packages/lib/${mod}`)
-    paths.push(`${home}/.npm/lib/${mod}`)
-    paths.push(`${home}/npm/lib/${mod}`)
+    addPath(`${home}/.local/lib/${mod}`);
+    addPath(`${home}/.local/share/${mod}`);
+    addPath(`${home}/.npm-global/lib/${mod}`);
+    addPath(`${home}/.npm-packages/lib/${mod}`);
+    addPath(`${home}/.npm/lib/${mod}`);
+    addPath(`${home}/npm/lib/${mod}`);
 
     // Various system paths
-    paths.push(`/etc/${mod}`)
-    paths.push(`/lib/${mod}`)
-    paths.push(`/opt/node/lib/${mod}`)
-    paths.push(`/usr/lib/${mod}`)
-    paths.push(`/usr/local/lib/${mod}`)
-    paths.push(`/usr/share/${mod}`)
-    paths.push(`/var/lib/${mod}`)
+    addPath(`/etc/${mod}`);
+    addPath(`/lib/${mod}`);
+    addPath(`/opt/node/lib/${mod}`);
+    addPath(`/usr/lib/${mod}`);
+    addPath(`/usr/local/lib/${mod}`);
+    addPath(`/usr/share/${mod}`);
+    addPath(`/var/lib/${mod}`);
 
     // Homebrew
-    paths.push(`/opt/homebrew/lib/${mod}`);
+    addPath(`/opt/homebrew/lib/${mod}`);
 
     // Yarn
-    paths.push(`${home}/.config/yarn/global/${mod}`);
-    paths.push(`${home}/.yarn/global/${mod}`);
-    paths.push(`${home}/.bun/install/global/${mod}`);
+    addPath(`${home}/.config/yarn/global/${mod}`);
+    addPath(`${home}/.yarn/global/${mod}`);
+    addPath(`${home}/.bun/install/global/${mod}`);
 
     // pnpm
-    paths.push(`${home}/.pnpm-global/${mod}`);
-    paths.push(...globbySync(`${home}/.pnpm-global/*/${mod}`));
-    paths.push(`${home}/pnpm-global/${mod}`);
-    paths.push(...globbySync(`${home}/pnpm-global/*/${mod}`));
-    paths.push(`${home}/.local/share/pnpm/global/${mod}`);
-    paths.push(...globbySync(`${home}/.local/share/pnpm/global/*/${mod}`));
+    addPath(`${home}/.pnpm-global/${mod}`);
+    addPath(`${home}/.pnpm-global/*/${mod}`, true);
+    addPath(`${home}/pnpm-global/${mod}`);
+    addPath(`${home}/pnpm-global/*/${mod}`, true);
+    addPath(`${home}/.local/share/pnpm/global/${mod}`);
+    addPath(`${home}/.local/share/pnpm/global/*/${mod}`, true);
 
     // Bun
-    paths.push(`${home}/.bun/install/global/${mod}`);
+    addPath(`${home}/.bun/install/global/${mod}`);
 
     // n (https://github.com/tj/n) - system & user
-    paths.push(...globbySync(`/usr/local/n/versions/node/*/lib/${mod}`));
-    paths.push(...globbySync(`${home}/n/versions/node/*/lib/${mod}`));
-    paths.push(`${home}/n/lib/${mod}`);
+    addPath(`/usr/local/n/versions/node/*/lib/${mod}`, true);
+    addPath(`${home}/n/versions/node/*/lib/${mod}`, true);
+    addPath(`${home}/n/lib/${mod}`);
 
     // volta (https://github.com/volta-cli/volta)
-    paths.push(...globbySync(`${home}/.volta/tools/image/node/*/lib/${mod}`));
+    addPath(`${home}/.volta/tools/image/node/*/lib/${mod}`, true);
 
     // fnm (https://github.com/Schniz/fnm)
-    paths.push(...globbySync(`${home}/.fnm/node-versions/*/installation/lib/${mod}`));
+    addPath(`${home}/.fnm/node-versions/*/installation/lib/${mod}`, true);
 
     // nvm (https://github.com/nvm-sh/nvm) - system & user
-    paths.push(...globbySync(`/usr/local/nvm/versions/node/*/lib/${mod}`));
-    paths.push(...globbySync(`${home}/.nvm/versions/node/*/lib/${mod}`));
+    addPath(`/usr/local/nvm/versions/node/*/lib/${mod}`, true);
+    addPath(`${home}/.nvm/versions/node/*/lib/${mod}`, true);
 
     // nodenv (https://github.com/nodenv/nodenv)
-    paths.push(...globbySync(`${home}/.nodenv/versions/*/lib/${mod}`));
+    addPath(`${home}/.nodenv/versions/*/lib/${mod}`, true);
 
     // nvs (https://github.com/jasongin/nvs)
-    paths.push(...globbySync(`${home}/.nvs/*/lib/${mod}`));
+    addPath(`${home}/.nvs/*/lib/${mod}`, true);
 
     // asdf (https://github.com/asdf-vm/asdf)
-    paths.push(...globbySync(`${home}/.asdf/installs/nodejs/*/lib/${mod}`));
+    addPath(`${home}/.asdf/installs/nodejs/*/lib/${mod}`, true);
   }
 
   // After we're done with globby, which required / even on Windows, convert / back to \\ for
   // Windows.
-  return process.platform == 'win32'
-    ? paths.map(p => p.replace(/\//g, '\\'))
-    : paths;
+  if (process.platform == 'win32') {
+    pathInfos.forEach(info => {
+      info.pattern = info.pattern.replace(/\//g, '\\');
+      info.expandedPaths = info.expandedPaths.map(p => p.replace(/\//g, '\\'));
+    });
+  }
+
+  return pathInfos;
 };
 
-export const CLIJS_SEARCH_PATHS: string[] = getClijsSearchPaths();
+export const CLIJS_SEARCH_PATH_INFO: SearchPathInfo[] =
+  getClijsSearchPathsWithInfo();
+export const CLIJS_SEARCH_PATHS: string[] = CLIJS_SEARCH_PATH_INFO.flatMap(
+  info => info.expandedPaths
+);

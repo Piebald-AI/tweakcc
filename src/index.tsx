@@ -44,7 +44,20 @@ const main = async () => {
       if (!startupCheckInfo || !startupCheckInfo.ccInstInfo) {
         console.error(`Cannot find Claude Code's cli.js`);
         console.error('Searched at the following locations:');
-        CLIJS_SEARCH_PATHS.forEach(p => console.error('  - ' + p));
+        CLIJS_SEARCH_PATH_INFO.forEach(info => {
+          if (info.isGlob) {
+            if (info.expandedPaths.length === 0) {
+              console.error(`  - ${info.pattern} (no matches)`);
+            } else {
+              console.error(`  - ${info.pattern}`);
+              info.expandedPaths.forEach(path => {
+                console.error(`    - ${path}`);
+              });
+            }
+          } else {
+            console.error(`  - ${info.pattern}`);
+          }
+        });
         process.exit(1);
       }
 
@@ -70,10 +83,29 @@ const main = async () => {
   if (startupCheckInfo) {
     render(<App startupCheckInfo={startupCheckInfo} />);
   } else {
+    // Format the search paths to show glob patterns with their expansions
+    const formatSearchPaths = () => {
+      return CLIJS_SEARCH_PATH_INFO.map(info => {
+        if (info.isGlob) {
+          if (info.expandedPaths.length === 0) {
+            return `- ${info.pattern} (no matches)`;
+          } else {
+            const result = [`- ${info.pattern}`];
+            info.expandedPaths.forEach(path => {
+              result.push(`  - ${path}`);
+            });
+            return result.join('\n');
+          }
+        } else {
+          return `- ${info.pattern}`;
+        }
+      }).join('\n');
+    };
+
     console.error(`Cannot find Claude Code's cli.js -- do you have Claude Code installed?
 
 Searched at the following locations:
-${CLIJS_SEARCH_PATHS.map(p => '- ' + p).join('\n')}
+${formatSearchPaths()}
 
 If you have it installed but it's in a location not listed above, please open an issue at
 https://github.com/piebald-ai/tweakcc/issues and tell us where you have it--we'll add that
