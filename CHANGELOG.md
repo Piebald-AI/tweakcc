@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fix input box border customization for CC 1.0.115 (#98) - @bl-ue
+- Fix user message styling for CC 1.0.115 (#98) - @bl-ue
+
 ## [v1.5.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.5.3) - 2025-09-12
 
 - Properly glob directories and show the glob paths to the user in the error message when cli.js can't be found--#93 (#94) - @bl-ue

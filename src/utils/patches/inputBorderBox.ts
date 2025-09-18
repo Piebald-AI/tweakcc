@@ -1,37 +1,23 @@
 // Please see the note about writing patches in ./index.js.
 
-import { LocationResult, showDiff } from './index.js';
+import { LocationResult } from './index.js';
 
 const getInputBoxBorderLocation = (oldFile: string): LocationResult | null => {
-  // First find the approximate area with the input box characteristics
-  const approxAreaPattern = /borderColor:[$\w]+==="bash"/;
-  const approxAreaMatch = oldFile.match(approxAreaPattern);
+  // Find the SPECIFIC main input box border pattern
+  // Must have alignItems, justifyContent, and borderColor function call - this uniquely identifies the main input
+  const mainInputPattern =
+    /createElement\([$\w]+,\{alignItems:"flex-start",justifyContent:"flex-start",borderColor:[$\w]+\(\),borderDimColor:[$\w]+!=="memory",borderStyle:"round",borderLeft:!1,borderRight:!1,marginTop:1,width:"100%"\}/;
+  const mainInputMatch = oldFile.match(mainInputPattern);
 
-  if (!approxAreaMatch || approxAreaMatch.index === undefined) {
-    console.error('patch: input border: failed to find approxAreaMatch');
+  if (!mainInputMatch || mainInputMatch.index === undefined) {
+    console.error('patch: input border: failed to find main input pattern');
     return null;
   }
 
-  // Search within a range of characters around the match for borderStyle:"round"
-  const searchStart = approxAreaMatch.index;
-  const searchEnd = Math.min(oldFile.length, searchStart + 200);
-  const searchSection = oldFile.slice(searchStart, searchEnd);
-
-  const borderStylePattern = /borderStyle:"round"/;
-  const borderStyleMatch = searchSection.match(borderStylePattern);
-
-  if (!borderStyleMatch || borderStyleMatch.index === undefined) {
-    console.error('patch: input border: failed to find borderStyle in section');
-    return null;
-  }
-
-  // Calculate absolute position in the original file
-  const absoluteStart = searchStart + borderStyleMatch.index;
-  const absoluteEnd = absoluteStart + borderStyleMatch[0].length;
-
+  // Return the location of the entire main input element for comprehensive modification
   return {
-    startIndex: absoluteStart,
-    endIndex: absoluteEnd,
+    startIndex: mainInputMatch.index,
+    endIndex: mainInputMatch.index + mainInputMatch[0].length,
   };
 };
 
@@ -44,23 +30,27 @@ export const writeInputBoxBorder = (
     return null;
   }
 
-  // If removeBorder is true, change to "none" and add marginBottom, otherwise keep "round"
-  const newBorderStyle = removeBorder
-    ? 'borderStyle:undefined,marginBottom:1'
-    : 'borderStyle:"round"';
+  // Get the original main input element
+  const originalElement = oldFile.slice(location.startIndex, location.endIndex);
 
-  const newFile =
-    oldFile.slice(0, location.startIndex) +
-    newBorderStyle +
-    oldFile.slice(location.endIndex);
+  let newElement;
+  if (removeBorder) {
+    // Completely remove ALL border-related properties to avoid undefined errors
+    // Remove: borderColor, borderDimColor, borderStyle, borderLeft, borderRight
+    newElement = originalElement
+      .replace(/borderColor:[$\w+]\(\),?/, '') // Remove borderColor function call
+      .replace(/borderDimColor:[^,}]+,?/, '') // Remove borderDimColor
+      .replace(/borderStyle:"[^"]*",?/, '') // Remove borderStyle
+      .replace(/borderLeft:![0-1],?/, '') // Remove borderLeft
+      .replace(/borderRight:![0-1],?/, ''); // Remove borderRight
 
-  showDiff(
-    oldFile,
-    newFile,
-    newBorderStyle,
-    location.startIndex,
-    location.endIndex
-  );
+    const newFile =
+      oldFile.slice(0, location.startIndex) +
+      newElement +
+      oldFile.slice(location.endIndex);
 
-  return newFile;
+    return newFile;
+  } else {
+    return oldFile;
+  }
 };

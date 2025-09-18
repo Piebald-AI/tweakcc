@@ -37,13 +37,15 @@ const getUserMessageDisplayLocation = (
     return null;
   }
 
-  // Find the prefix pattern - try multiple variations based on minified code patterns
-  const prefixPattern = /createElement\(\w+,\{color:"[^"]*"\},"([^"]+)"\)/;
+  // Updated prefix pattern to match current CLI structure:
+  // Real pattern found: Mc.default.createElement(M,{dimColor:!0},">")
+  const prefixPattern =
+    /\.default\.createElement\([$\w]+,\{dimColor:!0\},"([^"]+)"\)/;
   const prefixMatch = searchSection.match(prefixPattern);
 
-  // Find the message pattern: T,{color:"...",wrap:"wrap"},B.trim()) (captures the entire T component)
-  const messagePattern =
-    /(createElement\(\w+,\{[^}]*color:"[^"]*"[^}]*\},(\w+)\.trim\(\))/;
+  // Find the message pattern: Updated for current structure
+  // Real pattern: Mc.default.createElement(BDB,{text:G,thinkingMetadata:...
+  const messagePattern = /createElement\(([$\w]+),\{text:([$\w]+)/;
   const messageMatch = searchSection.match(messagePattern);
 
   return {
@@ -210,7 +212,7 @@ export const writeUserMessageDisplay = (
           location.messageLocation.startIndex,
           location.messageLocation.endIndex
         )
-        .replace(/(\w+\.trim\(\))/, `${messageChalkChain}($1)`),
+        .replace(/text:([$\w]+)/, `text:${messageChalkChain}($1)`),
     });
   }
   // If not customizing message, we don't need to modify it at all since we're not changing the text
