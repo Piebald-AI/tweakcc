@@ -1,23 +1,29 @@
 // Please see the note about writing patches in ./index.js.
 
-import { LocationResult } from './index.js';
+import { LocationResult, showDiff } from './index.js';
 
 const getInputBoxBorderLocation = (oldFile: string): LocationResult | null => {
   // Find the SPECIFIC main input box border pattern
   // Must have alignItems, justifyContent, and borderColor function call - this uniquely identifies the main input
-  const mainInputPattern =
-    /createElement\([$\w]+,\{alignItems:"flex-start",justifyContent:"flex-start",borderColor:[$\w]+\(\),borderDimColor:[$\w]+!=="memory",borderStyle:"round",borderLeft:!1,borderRight:!1,marginTop:1,width:"100%"\}/;
-  const mainInputMatch = oldFile.match(mainInputPattern);
+  const bashIndex = oldFile.indexOf('bash:"bashBorder"');
+  if (bashIndex === -1) {
+    console.error('patch: input border: failed to find bash pattern');
+    return null;
+  }
 
-  if (!mainInputMatch || mainInputMatch.index === undefined) {
-    console.error('patch: input border: failed to find main input pattern');
+  const searchSection = oldFile.slice(bashIndex, bashIndex + 500);
+  const borderStylePattern = /borderStyle:"[^"]*"/;
+  const borderStyleMatch = searchSection.match(borderStylePattern);
+
+  if (!borderStyleMatch || borderStyleMatch.index === undefined) {
+    console.error('patch: input border: failed to find border style pattern');
     return null;
   }
 
   // Return the location of the entire main input element for comprehensive modification
   return {
-    startIndex: mainInputMatch.index,
-    endIndex: mainInputMatch.index + mainInputMatch[0].length,
+    startIndex: bashIndex + borderStyleMatch.index,
+    endIndex: bashIndex + borderStyleMatch.index + borderStyleMatch[0].length,
   };
 };
 
@@ -30,24 +36,15 @@ export const writeInputBoxBorder = (
     return null;
   }
 
-  // Get the original main input element
-  const originalElement = oldFile.slice(location.startIndex, location.endIndex);
-
-  let newElement;
   if (removeBorder) {
-    // Completely remove ALL border-related properties to avoid undefined errors
-    // Remove: borderColor, borderDimColor, borderStyle, borderLeft, borderRight
-    newElement = originalElement
-      .replace(/borderColor:[$\w+]\(\),?/, '') // Remove borderColor function call
-      .replace(/borderDimColor:[^,}]+,?/, '') // Remove borderDimColor
-      .replace(/borderStyle:"[^"]*",?/, '') // Remove borderStyle
-      .replace(/borderLeft:![0-1],?/, '') // Remove borderLeft
-      .replace(/borderRight:![0-1],?/, ''); // Remove borderRight
+    let newProp = 'borderColor:undefined';
 
     const newFile =
       oldFile.slice(0, location.startIndex) +
-      newElement +
+      newProp +
       oldFile.slice(location.endIndex);
+
+    showDiff(oldFile, newFile, newProp, location.startIndex, location.endIndex);
 
     return newFile;
   } else {
