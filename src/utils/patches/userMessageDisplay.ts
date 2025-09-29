@@ -11,62 +11,47 @@ import {
 const getUserMessageDisplayLocation = (
   oldFile: string
 ): {
-  minWidthLocation: LocationResult | null;
   prefixLocation: LocationResult | null;
   messageLocation: LocationResult | null;
 } | null => {
   // Search for the exact error message to find the component
-  const searchStart = oldFile.indexOf(
-    'No content found in user prompt message'
-  );
+  const searchStart =
+    oldFile.indexOf('No content found in user prompt message') - 700;
   if (searchStart === -1) {
     console.error('patch: userMessageDisplay: failed to find error message');
     return null;
   }
 
-  // Get 400 characters after the error message as instructed
-  const searchEnd = Math.min(oldFile.length, searchStart + 400);
+  const searchEnd = Math.min(oldFile.length, searchStart + 700);
   const searchSection = oldFile.slice(searchStart, searchEnd);
 
-  // Find the minWidth pattern: {minWidth:2,width:2} (no spaces in minified code)
-  const minWidthPattern = /\{minWidth:(\d+),width:\d+\}/;
-  const minWidthMatch = searchSection.match(minWidthPattern);
+  // `return cD.createElement(M,{dimColor:!0,backgroundColor:void 0},"> ",A);`
+  //                                                                 ^^^^ ^
+  //                                                                 1    2
+  const prefixAndTextPattern = /("> "),([$\w]+)/;
+  const prefixAndTextMatch = searchSection.match(prefixAndTextPattern);
 
-  if (!minWidthMatch || minWidthMatch.index === undefined) {
-    console.error('patch: userMessageDisplay: failed to find minWidth pattern');
-    return null;
+  if (!prefixAndTextMatch) {
+    return {
+      prefixLocation: null,
+      messageLocation: null,
+    };
   }
-
-  // Updated prefix pattern to match current CLI structure:
-  // Real pattern found: Mc.default.createElement(M,{dimColor:!0},">")
-  const prefixPattern =
-    /\.default\.createElement\([$\w]+,\{dimColor:!0\},"([^"]+)"\)/;
-  const prefixMatch = searchSection.match(prefixPattern);
-
-  // Find the message pattern: Updated for current structure
-  // Real pattern: Mc.default.createElement(BDB,{text:G,thinkingMetadata:...
-  const messagePattern = /createElement\(([$\w]+),\{text:([$\w]+)/;
-  const messageMatch = searchSection.match(messagePattern);
+  const prefixStart =
+    searchStart + searchSection.indexOf(prefixAndTextMatch[1]);
+  const prefixEnd = prefixStart + prefixAndTextMatch[1].length;
+  const messageStart = prefixEnd + 1; // +1 for the comma
+  const messageEnd = messageStart + prefixAndTextMatch[2].length;
 
   return {
-    minWidthLocation: minWidthMatch
-      ? {
-          startIndex: searchStart + minWidthMatch.index,
-          endIndex: searchStart + minWidthMatch.index + minWidthMatch[0].length,
-        }
-      : minWidthMatch,
-    prefixLocation: prefixMatch
-      ? {
-          startIndex: searchStart + prefixMatch.index!,
-          endIndex: searchStart + prefixMatch.index! + prefixMatch[0].length,
-        }
-      : null,
-    messageLocation: messageMatch
-      ? {
-          startIndex: searchStart + messageMatch.index!,
-          endIndex: searchStart + messageMatch.index! + messageMatch[0].length,
-        }
-      : messageMatch,
+    prefixLocation: {
+      startIndex: prefixStart,
+      endIndex: prefixEnd,
+    },
+    messageLocation: {
+      startIndex: messageStart,
+      endIndex: messageEnd,
+    },
   };
 };
 
@@ -96,12 +81,6 @@ export const writeUserMessageDisplay = (
     return null;
   }
 
-  if (!location.minWidthLocation) {
-    console.error(
-      'patch: userMessageDisplay: failed to find minWidth location'
-    );
-    return null;
-  }
   if (!location.prefixLocation) {
     console.error('patch: userMessageDisplay: failed to find prefix location');
     return null;
@@ -118,13 +97,6 @@ export const writeUserMessageDisplay = (
   }
 
   const modifications: ModificationEdit[] = [];
-
-  // 1. Update minWidth and width (minified format)
-  modifications.push({
-    startIndex: location.minWidthLocation.startIndex,
-    endIndex: location.minWidthLocation.endIndex,
-    newContent: `{minWidth:${prefix.length + 1},width:${prefix.length + 1}}`,
-  });
 
   // Check if we should apply customization for prefix
   const isPrefixBlack =
@@ -148,7 +120,7 @@ export const writeUserMessageDisplay = (
     messageInverse;
   const shouldCustomizeMessage = !isMessageBlack || hasMessageStyling;
 
-  // 2. Update prefix
+  // 1. Update prefix
   if (shouldCustomizePrefix) {
     // Build chalk chain for prefix
     const prefixChalkChain = buildChalkChain(
@@ -167,28 +139,11 @@ export const writeUserMessageDisplay = (
     modifications.push({
       startIndex: location.prefixLocation.startIndex,
       endIndex: location.prefixLocation.endIndex,
-      newContent: oldFile
-        .slice(
-          location.prefixLocation.startIndex,
-          location.prefixLocation.endIndex
-        )
-        .replace(/"([^"]+)"\)$/, `${prefixChalkChain}("${prefix}"))`),
-    });
-  } else {
-    // Just update the prefix text without chalk
-    modifications.push({
-      startIndex: location.prefixLocation.startIndex,
-      endIndex: location.prefixLocation.endIndex,
-      newContent: oldFile
-        .slice(
-          location.prefixLocation.startIndex,
-          location.prefixLocation.endIndex
-        )
-        .replace(/"([^"]+)"\)$/, `"${prefix}")`),
+      newContent: `${prefixChalkChain}("${prefix}")+" "`,
     });
   }
 
-  // 3. Update message
+  // 2. Update message
   if (shouldCustomizeMessage) {
     // Build chalk chain for message
     const messageChalkChain = buildChalkChain(
@@ -212,7 +167,7 @@ export const writeUserMessageDisplay = (
           location.messageLocation.startIndex,
           location.messageLocation.endIndex
         )
-        .replace(/text:([$\w]+)/, `text:${messageChalkChain}($1)`),
+        .replace(/([$\w]+)/, `${messageChalkChain}($1)`),
     });
   }
   // If not customizing message, we don't need to modify it at all since we're not changing the text
