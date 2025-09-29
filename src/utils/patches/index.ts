@@ -35,6 +35,7 @@ import { writeVerboseProperty } from './verboseProperty.js';
 import { writeWelcomeMessage } from './welcomeMessage.js';
 import { writeModelCustomizations } from './modelSelector.js';
 import { writeIgnoreMaxSubscription } from './ignoreMaxSubscription.js';
+import { writeVersionOutput } from './versionOutput.js';
 
 export interface LocationResult {
   startIndex: number;
@@ -246,6 +247,9 @@ export const applyCustomization = async (
 
   // Disable Max subscription gating for cost tool (always enabled)
   if ((result = writeIgnoreMaxSubscription(content))) content = result;
+
+  // Apply version output modification (always enabled)
+  if ((result = writeVersionOutput(content, '1.5.4'))) content = result;
 
   // Replace the file, breaking hard links and preserving permissions
   await replaceFileBreakingHardLinks(ccInstInfo.cliPath, content, 'patch');
