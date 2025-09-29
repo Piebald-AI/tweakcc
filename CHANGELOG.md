@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v1.5.5](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.5.5) - 2025-09-29
+
+- Fix input box border customization for CC 1.0.128 (#105) - @bl-ue
+- Fix user message styling for CC 1.0.128 (#105) - @bl-ue
+- Add the tweakcc version to `claude --version` and `/status` (#106) - @bl-ue
+
 ## [v1.5.4](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.5.4) - 2025-09-18
 
 - Fix input box border customization for CC 1.0.115 (#98) - @bl-ue
