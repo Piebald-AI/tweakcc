@@ -37,7 +37,7 @@ export const writeInputBoxBorder = (
   }
 
   if (removeBorder) {
-    let newProp = 'borderColor:undefined';
+    const newProp = 'borderColor:undefined';
 
     const newFile =
       oldFile.slice(0, location.startIndex) +
