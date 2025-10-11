@@ -31,7 +31,11 @@ export function ColoredColorName({
   // Special case: diff* colors get their own color as background, unstyled text
   if (colorKey.startsWith('diff')) {
     return (
-      <ColoredText backgroundColor={colorValue} bold={bold} color={theme.colors.text}>
+      <ColoredText
+        backgroundColor={colorValue}
+        bold={bold}
+        color={theme.colors.text}
+      >
         {colorKey}
       </ColoredText>
     );

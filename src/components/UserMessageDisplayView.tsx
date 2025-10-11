@@ -574,9 +574,7 @@ export function UserMessageDisplayView({
               </Box>
               <Box marginLeft={1} marginTop={1}>
                 <Text>
-                  <Text
-                    color={currentTheme?.colors?.inactive || '#888888'}
-                  >
+                  <Text color={currentTheme?.colors?.inactive || '#888888'}>
                     ●
                   </Text>
                   <Text> The directory </Text>
@@ -598,9 +596,7 @@ export function UserMessageDisplayView({
               <Box marginLeft={1}>{createMixedStylePreview(true)}</Box>
               <Box marginLeft={1} marginTop={1}>
                 <Text>
-                  <Text
-                    color={currentTheme?.colors?.inactive || '#888888'}
-                  >
+                  <Text color={currentTheme?.colors?.inactive || '#888888'}>
                     ●
                   </Text>
                   <Text> The directory </Text>

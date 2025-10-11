@@ -80,7 +80,9 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
         if (!readTheme.colors) {
           readTheme.colors = {} as any;
         }
-        for (const [colorKey, colorValue] of Object.entries(defaultTheme.colors)) {
+        for (const [colorKey, colorValue] of Object.entries(
+          defaultTheme.colors
+        )) {
           if (!Object.hasOwn(readTheme.colors, colorKey)) {
             (readTheme.colors as Record<string, string>)[colorKey] = colorValue;
           }
@@ -101,7 +103,9 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
       if (!readTheme.colors) {
         readTheme.colors = {} as any;
       }
-      for (const [colorKey, colorValue] of Object.entries(defaultTemplate.colors)) {
+      for (const [colorKey, colorValue] of Object.entries(
+        defaultTemplate.colors
+      )) {
         if (!Object.hasOwn(readTheme.colors, colorKey)) {
           // Use the template's color as a fallback
           (readTheme.colors as Record<string, string>)[colorKey] = colorValue;
