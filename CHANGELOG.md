@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Update the builtin themes' colors and IDs to account for all the changes in CC over time (#110) - @bl-ue
+- Update the theme preview to match the modern CC UI (#110) - @bl-ue
+- Properly incorporate new colors in existing config files (#110) - @bl-ue
+- Dynamically fetch Claude subscription and current model for live display in the theme preview (#110) - @bl-ue
+
 ## [v1.5.5](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.5.5) - 2025-09-29
 
 - Fix input box border customization for CC 1.0.128 (#105) - @bl-ue
