@@ -65,6 +65,12 @@ node dist/index.js
 - [**CCometixLine**](https://github.com/Haleclipse/CCometixLine) - A high-performance Claude Code statusline tool written in Rust with Git integration, usage tracking, interactive TUI configuration, and Claude Code enhancement utilities.
 - [**cc-statuslines**](https://github.com/chongdashu/cc-statusline) - Transform your Claude Code experience with a beautiful, informative statusline.  One command.  Three questions.  Custom statusline.
 
+## Troubleshooting
+
+tweakcc maintains a backup of your Claude Code `cli.js` file for when you want to revert your customimzations, and also to reapply patches.  Before it applies your customizations, it restores the original `cli.js` so that it can start from a clean slate.  Sometimes things can get confused and your `cli.js` can be corrupted.  In particular, you may run into a situation where you have a modified `cli.js`, and then tweakcc takes makes a backup of that modified `cli.js`.  If you then try to reinstall Claude Code and apply your customizations, tweakcc will restore its backup of the old _modified_ `cli.js`.
+
+To break out of this loop you can install a different version of Claude Code, which will cause tweakcc to make a new backup of the new `cli.js` file.  Or you can simply delete tweakcc's `~/.tweakcc/cli.backup.js`.  If you do delete `cli.backup.js`, make sure you reinstall Claude Code before you run tweakcc again, or else if `cli.js` is the modified version it, will again get into the loop described above.
+
 ## FAQ
 
 #### How can I customize my Claude Code theme?
