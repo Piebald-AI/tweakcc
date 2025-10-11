@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v1.6.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.6.0) - 2025-10-11
+
 - Update the builtin themes' colors and IDs to account for all the changes in CC over time (#110) - @bl-ue
 - Update the theme preview to match the modern CC UI (#110) - @bl-ue
 - Properly incorporate new colors in existing config files (#110) - @bl-ue
