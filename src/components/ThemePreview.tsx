@@ -45,11 +45,13 @@ export function ColoredText({
     }
 
     // Build chalk styling for simple text children
-    let styled: any = chalk;
+    let styled: typeof chalk = chalk;
 
     if (needsChalkColor) {
       const chalkColorName = color!.slice(5);
-      styled = styled[chalkColorName] || styled;
+      styled =
+        (styled as unknown as Record<string, typeof chalk>)[chalkColorName] ||
+        styled;
     }
 
     if (needsChalkBg) {
@@ -59,7 +61,9 @@ export function ColoredText({
       const bgMethodName = chalkBgName.startsWith('bg')
         ? chalkBgName
         : `bg${chalkBgName.charAt(0).toUpperCase()}${chalkBgName.slice(1)}`;
-      styled = styled[bgMethodName] || styled;
+      styled =
+        (styled as unknown as Record<string, typeof chalk>)[bgMethodName] ||
+        styled;
     }
 
     if (bold) styled = styled.bold;

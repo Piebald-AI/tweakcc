@@ -8,6 +8,7 @@ import {
   CONFIG_FILE,
   DEFAULT_SETTINGS,
   StartupCheckInfo,
+  Theme,
   ThinkingVerbsConfig,
   TweakccConfig,
 } from './types.js';
@@ -78,7 +79,7 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
 
         // Add any missing colors
         if (!readTheme.colors) {
-          readTheme.colors = {} as any;
+          readTheme.colors = {} as Theme['colors'];
         }
         for (const [colorKey, colorValue] of Object.entries(
           defaultTheme.colors
@@ -101,7 +102,7 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
       // For custom themes, use the first default theme as a template for missing colors
       const defaultTemplate = DEFAULT_SETTINGS.themes[0];
       if (!readTheme.colors) {
-        readTheme.colors = {} as any;
+        readTheme.colors = {} as Theme['colors'];
       }
       for (const [colorKey, colorValue] of Object.entries(
         defaultTemplate.colors

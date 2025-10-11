@@ -48,7 +48,9 @@ export function getClaudeSubscriptionType(): string {
       case 'pro':
         return 'Claude Pro';
     }
-  } catch {}
+  } catch {
+    // File not found or invalid JSON, use default
+  }
   return 'Claude API';
 }
 
@@ -67,7 +69,9 @@ export function getSelectedModel(): string {
     if (customModel) {
       return customModel.label;
     }
-  } catch {}
+  } catch {
+    // File not found or invalid JSON, use default
+  }
 
   return 'Sonnet 4.5';
 }
