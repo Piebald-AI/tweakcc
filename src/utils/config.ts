@@ -69,11 +69,42 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
         t => t.id === defaultTheme.id || t.name === defaultTheme.name
       );
       if (readTheme) {
-        // Add any missing colors.
+        // Add any missing top-level properties (like name, id)
         for (const [key, value] of Object.entries(defaultTheme)) {
-          if (!Object.hasOwn(readTheme, key)) {
-            (readTheme as unknown as Record<string, string>)[key] = value;
+          if (key !== 'colors' && !Object.hasOwn(readTheme, key)) {
+            (readTheme as unknown as Record<string, unknown>)[key] = value;
           }
+        }
+
+        // Add any missing colors
+        if (!readTheme.colors) {
+          readTheme.colors = {} as any;
+        }
+        for (const [colorKey, colorValue] of Object.entries(defaultTheme.colors)) {
+          if (!Object.hasOwn(readTheme.colors, colorKey)) {
+            (readTheme.colors as Record<string, string>)[colorKey] = colorValue;
+          }
+        }
+      }
+    }
+
+    // Also add missing colors to custom themes (non-built-in themes)
+    for (const readTheme of readConfig?.settings?.themes || []) {
+      // Skip built-in themes (already handled above)
+      const isBuiltIn = DEFAULT_SETTINGS.themes.some(
+        dt => dt.id === readTheme.id || dt.name === readTheme.name
+      );
+      if (isBuiltIn) continue;
+
+      // For custom themes, use the first default theme as a template for missing colors
+      const defaultTemplate = DEFAULT_SETTINGS.themes[0];
+      if (!readTheme.colors) {
+        readTheme.colors = {} as any;
+      }
+      for (const [colorKey, colorValue] of Object.entries(defaultTemplate.colors)) {
+        if (!Object.hasOwn(readTheme.colors, colorKey)) {
+          // Use the template's color as a fallback
+          (readTheme.colors as Record<string, string>)[colorKey] = colorValue;
         }
       }
     }

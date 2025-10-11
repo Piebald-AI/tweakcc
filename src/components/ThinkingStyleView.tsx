@@ -328,9 +328,7 @@ export function ThinkingStyleView({ onBack }: ThinkingStyleViewProps) {
               </Box>
               <Text>
                 <Text color={claudeColor}>Thinking… </Text>
-                <Text color={currentTheme?.colors.secondaryText}>
-                  (esc to interrupt)
-                </Text>
+                <Text>(esc to interrupt)</Text>
               </Text>
             </Box>
           </Box>

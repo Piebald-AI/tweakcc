@@ -28,6 +28,7 @@ export const SettingsContext = createContext({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   updateSettings: (_updateFn: (settings: Settings) => void) => {},
   changesApplied: false,
+  ccVersion: '',
 });
 
 export default function App({
@@ -97,14 +98,17 @@ Please reapply your changes below.`,
   }, []);
 
   // Ctrl+C/Escape/Q to exit.
-  useInput((input, key) => {
-    if (
-      (key.ctrl && input === 'c') ||
-      ((input === 'q' || key.escape) && !currentView)
-    ) {
-      process.exit(0);
-    }
-  });
+  useInput(
+    (input, key) => {
+      if (
+        (key.ctrl && input === 'c') ||
+        ((input === 'q' || key.escape) && !currentView)
+      ) {
+        process.exit(0);
+      }
+    },
+    { isActive: !currentView }
+  );
 
   const handleMainSubmit = (item: MainMenuItem) => {
     setNotification(null);
@@ -168,6 +172,7 @@ Please reapply your changes below.`,
         settings: config.settings,
         updateSettings,
         changesApplied: config.changesApplied,
+        ccVersion: startupCheckInfo.ccInstInfo?.version || '',
       }}
     >
       <Box flexDirection="column">

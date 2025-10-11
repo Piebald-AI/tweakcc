@@ -1,6 +1,6 @@
 import React from 'react';
-import { Text } from 'ink';
 import { Theme } from '../utils/types.js';
+import { ColoredText } from './ThemePreview.js';
 
 interface ColoredColorNameProps {
   colorKey: keyof Theme['colors'];
@@ -18,29 +18,29 @@ export function ColoredColorName({
   // Special case: inverseText gets permission background
   if (colorKey === 'inverseText') {
     return (
-      <Text
+      <ColoredText
         color={colorValue}
         backgroundColor={theme.colors.permission}
         bold={bold}
       >
         {colorKey}
-      </Text>
+      </ColoredText>
     );
   }
 
   // Special case: diff* colors get their own color as background, unstyled text
   if (colorKey.startsWith('diff')) {
     return (
-      <Text backgroundColor={colorValue} bold={bold} color={theme.colors.text}>
+      <ColoredText backgroundColor={colorValue} bold={bold} color={theme.colors.text}>
         {colorKey}
-      </Text>
+      </ColoredText>
     );
   }
 
   // Normal case: just the color
   return (
-    <Text color={colorValue} bold={bold}>
+    <ColoredText color={colorValue} bold={bold}>
       {colorKey}
-    </Text>
+    </ColoredText>
   );
 }

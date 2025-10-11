@@ -1,11 +1,170 @@
 import { Box, Text } from 'ink';
 import { Theme } from '../utils/types.js';
+import process from 'process';
+import React, { useState, useEffect, useContext } from 'react';
+import { SettingsContext } from '../App.js';
+import { getClaudeSubscriptionType, getSelectedModel } from '../utils/misc.js';
+import chalk from 'chalk';
 
 interface ThemePreviewProps {
   theme: Theme;
 }
 
+/**
+ * Helper component that handles ansi: prefixed colors by using chalk directly.
+ * For normal colors, passes them through to Ink's Text component.
+ */
+export interface ColoredTextProps {
+  color?: string;
+  backgroundColor?: string;
+  bold?: boolean;
+  dimColor?: boolean;
+  children: React.ReactNode;
+}
+
+export function ColoredText({
+  color,
+  backgroundColor,
+  bold,
+  dimColor,
+  children,
+}: ColoredTextProps) {
+  // Check if we need chalk processing
+  const needsChalkColor = color?.startsWith('ansi:');
+  const needsChalkBg = backgroundColor?.startsWith('ansi:');
+
+  if (needsChalkColor || needsChalkBg) {
+    // Check if children are simple (string/number) or complex (React elements)
+    const hasComplexChildren = React.Children.toArray(children).some(child =>
+      React.isValidElement(child)
+    );
+
+    // If children contain React elements, we can't use chalk - render normally
+    if (hasComplexChildren) {
+      return <Text>{children}</Text>;
+    }
+
+    // Build chalk styling for simple text children
+    let styled: any = chalk;
+
+    if (needsChalkColor) {
+      const chalkColorName = color!.slice(5);
+      styled = styled[chalkColorName] || styled;
+    }
+
+    if (needsChalkBg) {
+      const chalkBgName = backgroundColor!.slice(5);
+      // Background colors in chalk are like 'bgRed', but ansi might just be 'red'
+      // Try with 'bg' prefix first
+      const bgMethodName = chalkBgName.startsWith('bg')
+        ? chalkBgName
+        : `bg${chalkBgName.charAt(0).toUpperCase()}${chalkBgName.slice(1)}`;
+      styled = styled[bgMethodName] || styled;
+    }
+
+    if (bold) styled = styled.bold;
+    if (dimColor) styled = styled.dim;
+
+    // Convert children to text, filtering out whitespace-only text nodes from JSX formatting
+    const childrenArray = React.Children.toArray(children);
+    const textContent = childrenArray
+      .map(child => {
+        if (typeof child === 'string' || typeof child === 'number') {
+          return String(child);
+        }
+        return '';
+      })
+      .join('');
+
+    // Apply chalk styling to text content
+    return <Text>{styled(textContent)}</Text>;
+  }
+
+  // No ansi: prefix, use Ink's native props
+  return (
+    <Text
+      color={color}
+      backgroundColor={backgroundColor}
+      bold={bold}
+      dimColor={dimColor}
+    >
+      {children}
+    </Text>
+  );
+}
+
+interface UltrathinkRainbowShimmerProps {
+  text: string;
+  nonShimmerColors: string[];
+  shimmerColors: string[];
+  shimmerWidth?: number;
+  updateDuration?: number;
+  restartPoint?: number;
+}
+
+function UltrathinkRainbowShimmer({
+  text,
+  nonShimmerColors,
+  shimmerColors,
+  shimmerWidth = 3,
+  updateDuration = 50,
+  restartPoint = 10,
+}: UltrathinkRainbowShimmerProps) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentIndex(prev => {
+        const next = prev + 1;
+        // Wrap around after the string ends + restart point delay
+        if (next >= text.length + restartPoint) {
+          return -shimmerWidth;
+        }
+        return next;
+      });
+    }, updateDuration);
+
+    return () => clearInterval(interval);
+  }, [text.length, restartPoint, updateDuration]);
+
+  // Ensure colors arrays are the same length
+  if (nonShimmerColors.length !== shimmerColors.length) {
+    console.error(
+      'UltrathinkRainbowShimmer: nonShimmerColors and shimmerColors must have the same length'
+    );
+    return <Text>{text}</Text>;
+  }
+
+  return (
+    <Text>
+      {text.split('').map((char, i) => {
+        // Determine if this character is in the shimmer zone
+        const isInShimmer =
+          i >= currentIndex &&
+          i < currentIndex + shimmerWidth &&
+          currentIndex < text.length;
+
+        // Calculate which color to use based on position
+        const colorIndex = i % nonShimmerColors.length;
+        const color = isInShimmer
+          ? shimmerColors[colorIndex]
+          : nonShimmerColors[colorIndex];
+
+        return (
+          <Text key={i} color={color}>
+            {char}
+          </Text>
+        );
+      })}
+    </Text>
+  );
+}
+
+const processCwd = process.cwd();
+
 export function ThemePreview({ theme }: ThemePreviewProps) {
+  const { ccVersion } = useContext(SettingsContext);
+
   return (
     <Box flexDirection="column" paddingLeft={1}>
       <Box marginBottom={1}>
@@ -13,290 +172,306 @@ export function ThemePreview({ theme }: ThemePreviewProps) {
       </Box>
       <Box borderStyle="single" borderColor="gray" paddingX={1}>
         <Box flexDirection="column">
+          <Box flexDirection="column">
+            <Text>
+              <ColoredText color={theme.colors.clawd_body}> ▐</ColoredText>
+              <Text
+                color={theme.colors.clawd_body}
+                backgroundColor={theme.colors.clawd_background}
+              >
+                ▛███▜
+              </Text>
+              <Text>
+                <ColoredText color={theme.colors.clawd_body}>▌ </ColoredText>{' '}
+                <Text bold>Claude Code</Text>{' '}
+                {ccVersion ? `v${ccVersion}` : 'v2.0.14'}
+              </Text>
+            </Text>
+            <Text>
+              <ColoredText color={theme.colors.clawd_body}>▝▜</ColoredText>
+              <Text
+                color={theme.colors.clawd_body}
+                backgroundColor={theme.colors.clawd_background}
+              >
+                █████
+              </Text>
+              <ColoredText color={theme.colors.clawd_body}>▛▘</ColoredText>{' '}
+              {getSelectedModel()} · {getClaudeSubscriptionType()}
+            </Text>
+            <ColoredText color={theme.colors.clawd_body}>
+              {'  '}▘▘ ▝▝{'   '}
+              {processCwd}
+            </ColoredText>
+            <Text>
+              <ColoredText color={theme.colors.success}>
+                Login successful. Press{' '}
+              </ColoredText>
+              <ColoredText bold color={theme.colors.success}>
+                Enter
+              </ColoredText>
+              <ColoredText color={theme.colors.success}>
+                {' '}
+                to continue…
+              </ColoredText>
+            </Text>
+          </Box>
+
           <Text>╭─────────────────────────────────────────────╮</Text>
           <Text>
-            │ <Text color={theme.colors.secondaryText}>1</Text>{' '}
-            <Text color={theme.colors.text}>function greet() {'{'}</Text>
+            │ 1 function greet() {'{'}
             {'                        '}│
           </Text>
           <Text>
-            │ <Text color={theme.colors.secondaryText}>2</Text>{' '}
-            <Text
+            │ 2{' '}
+            <ColoredText
               backgroundColor={theme.colors.diffRemoved}
               color={theme.colors.text}
             >
               - console.log(&quot;
-              <Text backgroundColor={theme.colors.diffRemovedWord}>
-                Hello, World!
-              </Text>
+            </ColoredText>
+            <ColoredText backgroundColor={theme.colors.diffRemovedWord}>
+              Hello, World!
+            </ColoredText>
+            <ColoredText backgroundColor={theme.colors.diffRemoved}>
               &quot;);
-            </Text>
+            </ColoredText>
             {'           '}│
           </Text>
           <Text>
-            │ <Text color={theme.colors.secondaryText}>2</Text>{' '}
-            <Text
+            │ 2{' '}
+            <ColoredText
               backgroundColor={theme.colors.diffAdded}
               color={theme.colors.text}
             >
               + console.log(&quot;
-              <Text backgroundColor={theme.colors.diffAddedWord}>
-                Hello, Claude!
-              </Text>
+            </ColoredText>
+            <ColoredText backgroundColor={theme.colors.diffAddedWord}>
+              Hello, Claude!
+            </ColoredText>
+            <ColoredText backgroundColor={theme.colors.diffAdded}>
               &quot;);
-            </Text>
+            </ColoredText>
             {'          '}│
           </Text>
-          <Text color={theme.colors.warning}>
+          <ColoredText color={theme.colors.warning}>
             ╭─────────────────────────────────────────────╮
-          </Text>
-          <Text color={theme.colors.warning}>
+          </ColoredText>
+          <ColoredText color={theme.colors.warning}>
             │ Do you trust the files in this folder?{'      '}│
-          </Text>
+          </ColoredText>
           <Text>
-            <Text color={theme.colors.warning}>│ </Text>
+            <ColoredText color={theme.colors.warning}>│ </ColoredText>
             <Text dimColor>Enter to confirm · Esc to exit</Text>
-            <Text color={theme.colors.warning}>{'              '}│</Text>
+            <ColoredText color={theme.colors.warning}>
+              {'              '}│
+            </ColoredText>
           </Text>
-          <Text color={theme.colors.claude}>
-            ╭─────────────────────────────────────────────╮
-          </Text>
+          <ColoredText color={theme.colors.bashBorder}>
+            ───────────────────────────────────────────────
+          </ColoredText>
           <Text>
-            <Text color={theme.colors.claude}>│ </Text>
-            <Text color={theme.colors.claude}>✻</Text>
-            <Text> Welcome to Tweak Claude Code!</Text>
-            <Text color={theme.colors.claude}>{'             '}│</Text>
+            <ColoredText color={theme.colors.bashBorder}>!</ColoredText>
+            <Text> ls</Text>
           </Text>
+          <ColoredText color={theme.colors.promptBorder}>
+            ───────────────────────────────────────────────
+          </ColoredText>
           <Text>
-            <Text color={theme.colors.claude}>│</Text>
-            <Text color={theme.colors.secondaryText} italic>
-              {' '}
-              /help for help, /status for your current set
+            <Text>
+              &gt; list the dir{' '}
+              <UltrathinkRainbowShimmer
+                text="ultrathink"
+                nonShimmerColors={[
+                  theme.colors.rainbow_red,
+                  theme.colors.rainbow_orange,
+                  theme.colors.rainbow_yellow,
+                  theme.colors.rainbow_green,
+                  theme.colors.rainbow_blue,
+                  theme.colors.rainbow_indigo,
+                  theme.colors.rainbow_violet,
+                ]}
+                shimmerColors={[
+                  theme.colors.rainbow_red_shimmer,
+                  theme.colors.rainbow_orange_shimmer,
+                  theme.colors.rainbow_yellow_shimmer,
+                  theme.colors.rainbow_green_shimmer,
+                  theme.colors.rainbow_blue_shimmer,
+                  theme.colors.rainbow_indigo_shimmer,
+                  theme.colors.rainbow_violet_shimmer,
+                ]}
+                shimmerWidth={3}
+                updateDuration={50}
+                restartPoint={10}
+              />
             </Text>
-            <Text color={theme.colors.claude}>│</Text>
           </Text>
-          <Text color={theme.colors.success}>
-            Login successful. Press <Text bold>Enter</Text> to continue…
-          </Text>
-          <Text color={theme.colors.bashBorder}>
+          <ColoredText color={theme.colors.planMode}>
             ╭─────────────────────────────────────────────╮
-          </Text>
+          </ColoredText>
           <Text>
-            <Text color={theme.colors.bashBorder}>│ !</Text>
-            <Text> ls{'                                        '}</Text>
-            <Text color={theme.colors.bashBorder}>│</Text>
-          </Text>
-          <Text color={theme.colors.planMode}>
-            ╭─────────────────────────────────────────────╮
-          </Text>
-          <Text>
-            <Text color={theme.colors.planMode}>│ </Text>
-            <Text color={theme.colors.permission}>Ready to code?</Text>
-            <Text color={theme.colors.planMode}>
-              {'                              '}│
-            </Text>
-          </Text>
-          <Text>
-            <Text color={theme.colors.planMode}>│ </Text>
+            <ColoredText color={theme.colors.planMode}>│ </ColoredText>
+            <ColoredText color={theme.colors.permission}>
+              Ready to code?{'  '}
+            </ColoredText>
             <Text>Here is Claude&apos;s plan:</Text>
-            <Text color={theme.colors.planMode}>
-              {'                      '}│
-            </Text>
+            <ColoredText color={theme.colors.planMode}>{'      '}│</ColoredText>
           </Text>
-          <Text color={theme.colors.secondaryBorder}>
+          <ColoredText color={theme.colors.permission}>
             ╭─────────────────────────────────────────────╮
-          </Text>
+          </ColoredText>
           <Text>
-            <Text color={theme.colors.secondaryBorder}>│</Text>{' '}
-            <Text color={theme.colors.secondaryText}>
-              &gt; Try &ldquo;refactor &lt;filepath&gt;&rdquo;
-              {'                 '}│
-            </Text>
-          </Text>
-          <Text color={theme.colors.permission}>
-            ╭─────────────────────────────────────────────╮
-          </Text>
-          <Text>
-            <Text color={theme.colors.permission}>
-              │ <Text bold>Permissions:</Text>
-            </Text>{' '}
-            <Text
+            <ColoredText color={theme.colors.permission}>│ </ColoredText>
+            <Text bold>Permissions:</Text>{' '}
+            <ColoredText
               backgroundColor={theme.colors.permission}
               color={theme.colors.inverseText}
               bold
             >
               {' '}
               Allow{' '}
-            </Text>
+            </ColoredText>
             {'  '}
             Deny{'   '}Workspace{'      '}
-            <Text color={theme.colors.permission}>│</Text>
+            <ColoredText color={theme.colors.permission}>│</ColoredText>
           </Text>
-          <Text color={theme.colors.secondaryText}>&gt; list the dir</Text>
+          <Text>&gt; list the dir</Text>
           <Text>
-            <Text color={theme.colors.error}>●</Text>
+            <ColoredText color={theme.colors.error}>●</ColoredText>
             <Text> Update(__init__.py)</Text>
           </Text>
           <Text>
             <Text> ⎿ </Text>
-            <Text color={theme.colors.error}>
+            <ColoredText color={theme.colors.error}>
               User rejected update to __init__.py
-            </Text>
+            </ColoredText>
           </Text>
           <Text>
             {' '}
-            <Text color={theme.colors.secondaryText}>1</Text>{' '}
-            <Text
-              backgroundColor={theme.colors.diffRemovedDimmed}
-              color={theme.colors.text}
-            >
+            1{' '}
+            <ColoredText backgroundColor={theme.colors.diffRemovedDimmed}>
               - import{' '}
-              <Text
-                backgroundColor={theme.colors.diffRemovedWordDimmed}
-                color={theme.colors.text}
-              >
-                os
-              </Text>
-            </Text>
+            </ColoredText>
+            <ColoredText backgroundColor={theme.colors.diffRemovedWordDimmed}>
+              os
+            </ColoredText>
           </Text>
           <Text>
             {' '}
-            <Text color={theme.colors.secondaryText}>2</Text>{' '}
-            <Text
-              backgroundColor={theme.colors.diffAddedDimmed}
-              color={theme.colors.text}
-            >
+            2{' '}
+            <ColoredText backgroundColor={theme.colors.diffAddedDimmed}>
               + import{' '}
-              <Text
-                backgroundColor={theme.colors.diffAddedWordDimmed}
-                color={theme.colors.text}
-              >
-                random
-              </Text>
-            </Text>
+            </ColoredText>
+            <ColoredText backgroundColor={theme.colors.diffAddedWordDimmed}>
+              random
+            </ColoredText>
           </Text>
           <Text>
-            <Text color={theme.colors.success}>●</Text>
+            <ColoredText color={theme.colors.success}>●</ColoredText>
             <Text> List(.)</Text>
           </Text>
-          <Text> ⎿ Listed 123 paths (ctrl+r to expand)</Text>
           <Text>
-            <Text color={theme.colors.secondaryText}>●</Text>
+            <Text>●</Text>
             <Text> The directory </Text>
-            <Text color={theme.colors.permission}>C:\Users\user</Text>
+            <ColoredText color={theme.colors.permission}>
+              C:\Users\user
+            </ColoredText>
             <Text>
               {' '}
               contains <Text bold>123</Text> files.
             </Text>
           </Text>
           <Text>
-            <Text color={theme.colors.claude}>
-              ✻ Th<Text color={theme.colors.claudeShimmer}>ink</Text>ing…{' '}
-            </Text>
-            <Text color={theme.colors.secondaryText}>
-              (10s · ↑ 456 tokens · esc to interrupt)
-            </Text>
+            <ColoredText color={theme.colors.claude}>✻ Th</ColoredText>
+            <ColoredText color={theme.colors.claudeShimmer}>ink</ColoredText>
+            <ColoredText color={theme.colors.claude}>ing… </ColoredText>
+            <Text>(esc to interrupt)</Text>
           </Text>
           <Text>
-            <Text color={theme.colors.autoAccept}>
-              ⏵⏵ auto-accept edits on{' '}
-            </Text>
-            <Text color={theme.colors.secondaryText} dimColor>
-              (shift+tab to cycle)
-            </Text>
+            <ColoredText color={theme.colors.autoAccept}>
+              ⏵⏵ auto-accept edits on (shift+tab to cycle)
+            </ColoredText>
           </Text>
           <Text>
-            <Text color={theme.colors.planMode}>⏸ plan mode on </Text>
-            <Text color={theme.colors.secondaryText} dimColor>
-              (shift+tab to cycle)
-            </Text>
+            <ColoredText color={theme.colors.planMode}>
+              ⏸ plan mode on (shift+tab to cycle)
+            </ColoredText>
           </Text>
           <Text>
-            <Text color={theme.colors.ide}>
+            <ColoredText color={theme.colors.ide}>
               ◯ IDE connected ⧉ 44 lines selected
-            </Text>
+            </ColoredText>
           </Text>
-          {/* <Text>
-            <Text bold color={theme.colors.secondaryText}>
-              ●
-            </Text>{' '}
-            <Text backgroundColor={theme.colors.red_FOR_SUBAGENTS_ONLY}>
+          {/*<Text>
+            <Text bold>●</Text>{' '}
+            <ColoredText backgroundColor={theme.colors.red_FOR_SUBAGENTS_ONLY}>
               code-reviewer
-            </Text>
+            </ColoredText>
             <Text>(Reviewing unstaged changes)</Text>
           </Text>
           <Text>
-            <Text bold color={theme.colors.secondaryText}>
-              ●
-            </Text>{' '}
-            <Text backgroundColor={theme.colors.orange_FOR_SUBAGENTS_ONLY}>
+            <Text bold>●</Text>{' '}
+            <ColoredText
+              backgroundColor={theme.colors.orange_FOR_SUBAGENTS_ONLY}
+            >
               performance
-            </Text>
+            </ColoredText>
             <Text>(Optimizing hot loop performance)</Text>
           </Text>
           <Text>
-            <Text bold color={theme.colors.secondaryText}>
-              ●
-            </Text>{' '}
-            <Text backgroundColor={theme.colors.yellow_FOR_SUBAGENTS_ONLY}>
+            <Text bold>●</Text>{' '}
+            <ColoredText
+              backgroundColor={theme.colors.yellow_FOR_SUBAGENTS_ONLY}
+            >
               security-auditor
-            </Text>
+            </ColoredText>
             <Text>(Auditing codebase)</Text>
           </Text>
           <Text>
-            <Text bold color={theme.colors.secondaryText}>
-              ●
-            </Text>{' '}
-            <Text backgroundColor={theme.colors.green_FOR_SUBAGENTS_ONLY}>
+            <Text bold>●</Text>{' '}
+            <ColoredText
+              backgroundColor={theme.colors.green_FOR_SUBAGENTS_ONLY}
+            >
               test-runner
-            </Text>
+            </ColoredText>
             <Text>(Running integration tests)</Text>
           </Text>
           <Text>
-            <Text bold color={theme.colors.secondaryText}>
-              ●
-            </Text>{' '}
-            <Text backgroundColor={theme.colors.blue_FOR_SUBAGENTS_ONLY}>
+            <Text bold>●</Text>{' '}
+            <ColoredText backgroundColor={theme.colors.blue_FOR_SUBAGENTS_ONLY}>
               tech-lead
-            </Text>
+            </ColoredText>
             <Text>(Planning next steps)</Text>
           </Text>
           <Text>
-            <Text bold color={theme.colors.secondaryText}>
-              ●
-            </Text>{' '}
-            <Text backgroundColor={theme.colors.cyan_FOR_SUBAGENTS_ONLY}>
+            <Text bold>●</Text>{' '}
+            <ColoredText backgroundColor={theme.colors.cyan_FOR_SUBAGENTS_ONLY}>
               database-admin
-            </Text>
+            </ColoredText>
             <Text>(Running DB migrations)</Text>
           </Text>
           <Text>
-            <Text bold color={theme.colors.secondaryText}>
-              ●
-            </Text>{' '}
-            <Text backgroundColor={theme.colors.purple_FOR_SUBAGENTS_ONLY}>
+            <Text bold>●</Text>{' '}
+            <ColoredText
+              backgroundColor={theme.colors.purple_FOR_SUBAGENTS_ONLY}
+            >
               documentation
-            </Text>
+            </ColoredText>
             <Text>(Generating docs)</Text>
           </Text>
           <Text>
-            <Text bold color={theme.colors.secondaryText}>
-              ●
-            </Text>{' '}
+            <Text bold>●</Text>{' '}
             <Text backgroundColor={theme.colors.pink_FOR_SUBAGENTS_ONLY}>
               ui-designer
             </Text>
             <Text>(Designing new preview panel)</Text>
           </Text>
           <Text>
-            <Text bold color={theme.colors.secondaryText}>
-              ●
-            </Text>{' '}
+            <Text bold>●</Text>{' '}
             <Text bold inverse>
               general
             </Text>
             <Text>(Reviewing architecture)</Text>
-          </Text> */}
+          </Text>*/}
         </Box>
       </Box>
     </Box>

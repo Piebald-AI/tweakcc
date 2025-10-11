@@ -4,7 +4,7 @@ import { showDiff } from './index.js';
 
 // Models to inject/make available.
 // prettier-ignore
-const CUSTOM_MODELS: { label: string; slug: string; internal: string }[] = [
+export const CUSTOM_MODELS: { label: string; slug: string; internal: string }[] = [
   { label: 'Opus 4.1',            slug: 'opus-4.1',            internal: 'claude-opus-4-1-20250805' },
   { label: 'Opus 4',              slug: 'opus-4',              internal: 'claude-opus-4-20250514' },
   { label: 'Sonnet 4',            slug: 'sonnet-4',            internal: 'claude-sonnet-4-20250514' },

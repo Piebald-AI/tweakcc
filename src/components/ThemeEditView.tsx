@@ -1,6 +1,6 @@
 import { useState, useContext, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { ThemePreview } from './ThemePreview.js';
+import { ThemePreview, ColoredText } from './ThemePreview.js';
 import { ColoredColorName } from './ColoredColorName.js';
 import { ColorPicker } from './ColorPicker.js';
 import { Theme } from '../utils/types.js';
@@ -213,29 +213,37 @@ export function ThemeEditView({ onBack, themeId }: ThemeEditViewProps) {
     key: keyof typeof currentTheme.colors
   ): string => {
     const descriptions: Record<keyof typeof currentTheme.colors, string> = {
+      autoAccept: 'Auto-accept mode indicator',
+      bashBorder: 'Bash command border',
       claude:
         'Claude branding color.  Used for the Claude logo, the welcome message, and the thinking text.',
       claudeShimmer:
         'Color used for the shimmering effect on the thinking verb.',
+      claudeBlue_FOR_SYSTEM_SPINNER: 'System spinner color (blue variant)',
+      claudeBlueShimmer_FOR_SYSTEM_SPINNER:
+        'System spinner shimmer color (blue variant)',
+      permission: 'Permission prompt color',
+      permissionShimmer: 'Permission prompt shimmer color',
+      planMode: 'Plan mode indicator',
+      ide: 'Color used for IDE-related messages.',
+      promptBorder: 'Input prompt border color',
+      promptBorderShimmer: 'Input prompt border shimmer color',
       text: 'Code color.  Used in diffs.',
       inverseText:
         'Inverse text color.  Used for the text of tabs, where the background is filled in.',
-      secondaryText:
-        'Secondary/dimmed text.  Used for keyboard shortcuts and other help text.',
-      secondaryBorder: 'Secondary border color.  Used for various boxes.',
+      inactive:
+        'Inactive/dimmed text.  Used for line numbers and less prominent text.',
+      subtle: 'Subtle text.  Used for help text and secondary information.',
       suggestion:
         'Suggestion text color.  Used for suggestions for theme names and various other things.',
       remember:
         'Remember/note color.  Used for various text relating to memories.',
+      background: 'Background color for certain UI elements',
       success:
         'Success indicator.  Used for the bullet on successful tool calls, and various success messages (such as sign in successful).',
       error: 'Error indicator',
       warning: 'Warning indicator',
-      autoAccept: 'Auto-accept mode indicator',
-      bashBorder: 'Bash command border',
-      permission: 'Permission prompt color',
-      planMode: 'Plan mode indicator',
-      ide: 'Color used for IDE-related messages.',
+      warningShimmer: 'Warning shimmer color',
       diffAdded: 'Added diff background',
       diffRemoved: 'Removed diff background',
       diffAddedDimmed: 'Added diff background (dimmed)',
@@ -252,6 +260,28 @@ export function ThemeEditView({ onBack, themeId }: ThemeEditViewProps) {
       orange_FOR_SUBAGENTS_ONLY: 'Orange color for sub agents',
       pink_FOR_SUBAGENTS_ONLY: 'Pink color for sub agents',
       cyan_FOR_SUBAGENTS_ONLY: 'Cyan color for sub agents',
+      professionalBlue: 'Professional blue color for business contexts?',
+      rainbow_red: '"ultrathink" rainbow - red',
+      rainbow_orange: '"ultrathink" rainbow - orange',
+      rainbow_yellow: '"ultrathink" rainbow - yellow',
+      rainbow_green: '"ultrathink" rainbow - green',
+      rainbow_blue: '"ultrathink" rainbow - blue',
+      rainbow_indigo: '"ultrathink" rainbow - indigo',
+      rainbow_violet: '"ultrathink" rainbow - violet',
+      rainbow_red_shimmer: '"ultrathink" rainbow (shimmer) - red',
+      rainbow_orange_shimmer: '"ultrathink" rainbow (shimmer) - orange',
+      rainbow_yellow_shimmer: '"ultrathink" rainbow (shimmer) - yellow',
+      rainbow_green_shimmer: '"ultrathink" rainbow (shimmer) - green',
+      rainbow_blue_shimmer: '"ultrathink" rainbow (shimmer) - blue',
+      rainbow_indigo_shimmer: '"ultrathink" rainbow (shimmer) - indigo',
+      rainbow_violet_shimmer: '"ultrathink" rainbow (shimmer) - violet',
+      clawd_body: '"Clawd" character body color',
+      clawd_background: '"Clawd" character background color',
+      userMessageBackground: 'Background color for user messages',
+      bashMessageBackgroundColor: 'Background color for bash command output',
+      memoryBackgroundColor: 'Background color for memory/context information',
+      rate_limit_fill: 'Rate limit indicator fill color',
+      rate_limit_empty: 'Rate limit indicator empty/background color',
     };
     return descriptions[key] || '';
   };
@@ -332,32 +362,118 @@ export function ThemeEditView({ onBack, themeId }: ThemeEditViewProps) {
                 <Text>{currentTheme.id}</Text>
               </Box>
 
-              {colorKeys.map((key, index) => {
-                const adjustedIndex = index + 2;
-                return (
-                  <Box key={key}>
-                    <Text
-                      color={
-                        selectedIndex === adjustedIndex ? 'yellow' : 'white'
-                      }
-                    >
-                      {selectedIndex === adjustedIndex ? '❯ ' : '  '}
-                    </Text>
-                    <Box width={maxKeyLength + 2}>
-                      <Text>
-                        <ColoredColorName
-                          colorKey={key}
-                          theme={currentTheme}
-                          bold
-                        />
-                      </Text>
-                    </Box>
-                    <Text color={currentTheme.colors[key]}>
-                      {formatColor(currentTheme.colors[key], colorFormat)}
-                    </Text>
-                  </Box>
+              {(() => {
+                const maxVisible = 20; // Show 10 colors at a time
+                // Only apply scrolling when we're on a color (selectedIndex >= 2)
+                if (selectedIndex < 2) {
+                  // Show first maxVisible colors when focused on name/id
+                  const visibleColors = colorKeys.slice(0, maxVisible);
+                  return (
+                    <>
+                      {visibleColors.map((key, index) => {
+                        const adjustedIndex = index + 2;
+                        return (
+                          <Box key={key}>
+                            <Text
+                              color={
+                                selectedIndex === adjustedIndex
+                                  ? 'yellow'
+                                  : 'white'
+                              }
+                            >
+                              {selectedIndex === adjustedIndex ? '❯ ' : '  '}
+                            </Text>
+                            <Box width={maxKeyLength + 2}>
+                              <Text>
+                                <ColoredColorName
+                                  colorKey={key}
+                                  theme={currentTheme}
+                                  bold
+                                />
+                              </Text>
+                            </Box>
+                            <ColoredText color={currentTheme.colors[key]}>
+                              {formatColor(
+                                currentTheme.colors[key],
+                                colorFormat
+                              )}
+                            </ColoredText>
+                          </Box>
+                        );
+                      })}
+                      {colorKeys.length > maxVisible && (
+                        <Text color="gray" dimColor>
+                          {' '}
+                          ↓ {colorKeys.length - maxVisible} more below
+                        </Text>
+                      )}
+                    </>
+                  );
+                }
+
+                // Calculate viewport for colors when a color is selected
+                const selectedColorIndex = selectedIndex - 2;
+                const startIndex = Math.max(
+                  0,
+                  selectedColorIndex - Math.floor(maxVisible / 2)
                 );
-              })}
+                const endIndex = Math.min(
+                  colorKeys.length,
+                  startIndex + maxVisible
+                );
+                const adjustedStartIndex = Math.max(0, endIndex - maxVisible);
+
+                const visibleColors = colorKeys.slice(
+                  adjustedStartIndex,
+                  endIndex
+                );
+
+                return (
+                  <>
+                    {adjustedStartIndex > 0 && (
+                      <Text color="gray" dimColor>
+                        {' '}
+                        ↑ {adjustedStartIndex} more above
+                      </Text>
+                    )}
+                    {visibleColors.map((key, visibleIndex) => {
+                      const actualIndex = adjustedStartIndex + visibleIndex;
+                      const adjustedIndex = actualIndex + 2;
+                      return (
+                        <Box key={key}>
+                          <Text
+                            color={
+                              selectedIndex === adjustedIndex
+                                ? 'yellow'
+                                : 'white'
+                            }
+                          >
+                            {selectedIndex === adjustedIndex ? '❯ ' : '  '}
+                          </Text>
+                          <Box width={maxKeyLength + 2}>
+                            <Text>
+                              <ColoredColorName
+                                colorKey={key}
+                                theme={currentTheme}
+                                bold
+                              />
+                            </Text>
+                          </Box>
+                          <ColoredText color={currentTheme.colors[key]}>
+                            {formatColor(currentTheme.colors[key], colorFormat)}
+                          </ColoredText>
+                        </Box>
+                      );
+                    })}
+                    {endIndex < colorKeys.length && (
+                      <Text color="gray" dimColor>
+                        {' '}
+                        ↓ {colorKeys.length - endIndex} more below
+                      </Text>
+                    )}
+                  </>
+                );
+              })()}
             </Box>
           </>
         ) : editingNameId ? (

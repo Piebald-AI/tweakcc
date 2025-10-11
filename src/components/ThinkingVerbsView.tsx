@@ -297,9 +297,7 @@ export function ThinkingVerbsView({ onBack }: ThinkingVerbsViewProps) {
             <Text color={claudeColor}>
               ✻ {format.replace(/\{\}/g, verbs[selectedVerbIndex])}{' '}
             </Text>
-            <Text color={currentTheme?.colors.secondaryText}>
-              (10s · ↑ 456 tokens · esc to interrupt)
-            </Text>
+            <Text>(esc to interrupt)</Text>
           </Text>
         </Box>
       </Box>

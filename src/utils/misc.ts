@@ -5,6 +5,7 @@ import * as os from 'os';
 import * as child_process from 'child_process';
 import * as crypto from 'crypto';
 import { Theme } from './types.js';
+import { CUSTOM_MODELS } from './patches/modelSelector.js';
 
 let isDebugModeOn = false;
 export const isDebug = (): boolean => {
@@ -24,6 +25,51 @@ export function getCurrentClaudeCodeTheme(): string {
   }
 
   return 'dark';
+}
+
+export function getClaudeSubscriptionType(): string {
+  try {
+    const credentialsPath = path.join(
+      os.homedir(),
+      '.claude',
+      '.credentials.json'
+    );
+    const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
+    const subscriptionType =
+      credentials?.claudeAiOauth?.subscriptionType || 'unknown';
+
+    switch (subscriptionType) {
+      case 'enterprise':
+        return 'Claude Enterprise';
+      case 'team':
+        return 'Claude Team';
+      case 'max':
+        return 'Claude Max';
+      case 'pro':
+        return 'Claude Pro';
+    }
+  } catch {}
+  return 'Claude API';
+}
+
+export function getSelectedModel(): string {
+  try {
+    const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    const model = settings?.model || 'default';
+
+    if (model === 'opus') {
+      return 'Opus 4.1';
+    }
+
+    // Check against CUSTOM_MODELS list
+    const customModel = CUSTOM_MODELS.find(m => m.slug === model);
+    if (customModel) {
+      return customModel.label;
+    }
+  } catch {}
+
+  return 'Sonnet 4.5';
 }
 
 export function getColorKeys(theme: Theme): string[] {

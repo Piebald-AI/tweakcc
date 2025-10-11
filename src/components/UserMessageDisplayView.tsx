@@ -572,15 +572,10 @@ export function UserMessageDisplayView({
               <Box marginBottom={1}>
                 <Text underline>Before (Claude Code default):</Text>
               </Box>
-              <Box marginLeft={1}>
-                <Text color={currentTheme?.colors?.secondaryText || '#888888'}>
-                  &gt; list the dir
-                </Text>
-              </Box>
               <Box marginLeft={1} marginTop={1}>
                 <Text>
                   <Text
-                    color={currentTheme?.colors?.secondaryText || '#888888'}
+                    color={currentTheme?.colors?.inactive || '#888888'}
                   >
                     ●
                   </Text>
@@ -604,7 +599,7 @@ export function UserMessageDisplayView({
               <Box marginLeft={1} marginTop={1}>
                 <Text>
                   <Text
-                    color={currentTheme?.colors?.secondaryText || '#888888'}
+                    color={currentTheme?.colors?.inactive || '#888888'}
                   >
                     ●
                   </Text>
