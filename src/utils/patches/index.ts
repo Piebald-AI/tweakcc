@@ -36,6 +36,7 @@ import { writeWelcomeMessage } from './welcomeMessage.js';
 import { writeModelCustomizations } from './modelSelector.js';
 import { writeIgnoreMaxSubscription } from './ignoreMaxSubscription.js';
 import { writeVersionOutput } from './versionOutput.js';
+import { applySystemPrompts } from './systemPrompts.js';
 
 export interface LocationResult {
   startIndex: number;
@@ -120,6 +121,9 @@ export const applyCustomization = async (
   await restoreClijsFromBackup(ccInstInfo);
 
   let content = await fs.readFile(ccInstInfo.cliPath, { encoding: 'utf8' });
+
+  // Apply system prompt customizations
+  content = await applySystemPrompts(content, ccInstInfo.version);
 
   // Apply themes
   let result: string | null = null;

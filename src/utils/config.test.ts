@@ -11,6 +11,7 @@ import fs from 'node:fs/promises';
 import type { Stats } from 'node:fs';
 import path from 'node:path';
 import * as misc from './misc.js';
+import * as systemPromptHashIndex from './systemPromptHashIndex.js';
 
 vi.mock('node:fs/promises');
 
@@ -35,6 +36,11 @@ describe('config.ts', () => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'clear').mockImplementation(() => {});
+    // Mock hasUnappliedSystemPromptChanges to always return false by default
+    vi.spyOn(
+      systemPromptHashIndex,
+      'hasUnappliedSystemPromptChanges'
+    ).mockResolvedValue(false);
   });
 
   describe('ensureConfigDir', () => {
@@ -87,11 +93,17 @@ describe('config.ts', () => {
 
   describe('restoreClijsFromBackup', () => {
     it('should copy the backup file and update the config', async () => {
+      // Mock the clearAllAppliedHashes function to avoid file system operations
+      vi.spyOn(
+        systemPromptHashIndex,
+        'clearAllAppliedHashes'
+      ).mockResolvedValue(undefined);
+
       // Mock reading the backup file
       const readFileSpy = vi
         .spyOn(fs, 'readFile')
         .mockResolvedValueOnce(Buffer.from('backup content')) // Reading backup file
-        .mockRejectedValue(createEnoent()); // Reading config file
+        .mockRejectedValue(createEnoent()); // Reading config file and others
 
       // Mock file operations for the helper function
       vi.spyOn(fs, 'stat').mockRejectedValue(createEnoent()); // File doesn't exist

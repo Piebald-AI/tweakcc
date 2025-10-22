@@ -80,6 +80,31 @@ export function getColorKeys(theme: Theme): string[] {
   return Object.keys(theme.colors);
 }
 
+export function openInExplorer(filePath: string) {
+  if (process.platform === 'win32') {
+    child_process
+      .spawn('explorer', [filePath], {
+        detached: true,
+        stdio: 'ignore',
+      })
+      .unref();
+  } else if (process.platform === 'darwin') {
+    child_process
+      .spawn('open', [filePath], {
+        detached: true,
+        stdio: 'ignore',
+      })
+      .unref();
+  } else {
+    child_process
+      .spawn('xdg-open', [filePath], {
+        detached: true,
+        stdio: 'ignore',
+      })
+      .unref();
+  }
+}
+
 export function revealFileInExplorer(filePath: string) {
   if (process.platform === 'win32') {
     child_process

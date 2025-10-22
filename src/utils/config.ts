@@ -8,6 +8,7 @@ import {
   CONFIG_FILE,
   DEFAULT_SETTINGS,
   StartupCheckInfo,
+  SYSTEM_PROMPTS_DIR,
   Theme,
   ThinkingVerbsConfig,
   TweakccConfig,
@@ -17,9 +18,15 @@ import {
   isDebug,
   replaceFileBreakingHardLinks,
 } from './misc.js';
+import { syncSystemPrompts, displaySyncResults } from './promptSync.js';
+import {
+  hasUnappliedSystemPromptChanges,
+  clearAllAppliedHashes,
+} from './systemPromptHashIndex.js';
 
 export const ensureConfigDir = async (): Promise<void> => {
   await fs.mkdir(CONFIG_DIR, { recursive: true });
+  await fs.mkdir(SYSTEM_PROMPTS_DIR, { recursive: true });
 };
 
 let lastConfig: TweakccConfig = {
@@ -121,6 +128,14 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
         DEFAULT_SETTINGS.userMessageDisplay;
     }
 
+    // Check if system prompts have been modified since they were last applied
+    // If so, mark changesApplied as false to show the "*Apply customizations" indicator
+    const hasSystemPromptChanges =
+      await hasUnappliedSystemPromptChanges(SYSTEM_PROMPTS_DIR);
+    if (hasSystemPromptChanges) {
+      readConfig.changesApplied = false;
+    }
+
     lastConfig = readConfig;
     return readConfig;
   } catch (error) {
@@ -180,6 +195,9 @@ export const restoreClijsFromBackup = async (
     backupContent,
     'restore'
   );
+
+  // Clear all applied hashes since we're restoring to defaults
+  await clearAllAppliedHashes();
 
   await updateConfigFile(config => {
     config.changesApplied = false;
@@ -289,6 +307,12 @@ export async function startupCheck(): Promise<StartupCheckInfo | null> {
   const ccInstInfo = await findClaudeCodeInstallation(config);
   if (!ccInstInfo) {
     return null;
+  }
+
+  // Sync system prompts with the current CC version
+  if (ccInstInfo.version) {
+    const syncSummary = await syncSystemPrompts(ccInstInfo.version);
+    displaySyncResults(syncSummary);
   }
 
   const realVersion = ccInstInfo.version;

@@ -29,53 +29,45 @@ const main = async () => {
     console.log('Applying saved customizations to Claude Code...');
     console.log(`Configuration saved at: ${CONFIG_FILE}`);
 
-    try {
-      // Read the saved configuration
-      const config = await readConfigFile();
+    // Read the saved configuration
+    const config = await readConfigFile();
 
-      if (!config.settings || Object.keys(config.settings).length === 0) {
-        console.error('No saved customizations found in ' + CONFIG_FILE);
-        process.exit(1);
-      }
-
-      // Find Claude Code installation
-      const startupCheckInfo = await startupCheck();
-
-      if (!startupCheckInfo || !startupCheckInfo.ccInstInfo) {
-        console.error(`Cannot find Claude Code's cli.js`);
-        console.error('Searched at the following locations:');
-        CLIJS_SEARCH_PATH_INFO.forEach(info => {
-          if (info.isGlob) {
-            if (info.expandedPaths.length === 0) {
-              console.error(`  - ${info.pattern} (no matches)`);
-            } else {
-              console.error(`  - ${info.pattern}`);
-              info.expandedPaths.forEach(path => {
-                console.error(`    - ${path}`);
-              });
-            }
-          } else {
-            console.error(`  - ${info.pattern}`);
-          }
-        });
-        process.exit(1);
-      }
-
-      console.log(
-        `Found Claude Code at: ${startupCheckInfo.ccInstInfo.cliPath}`
-      );
-      console.log(`Version: ${startupCheckInfo.ccInstInfo.version}`);
-
-      // Apply the customizations
-      console.log('Applying customizations...');
-      await applyCustomization(config, startupCheckInfo.ccInstInfo);
-      console.log('Customizations applied successfully!');
-      process.exit(0);
-    } catch (error) {
-      console.error('Unexpected error:');
-      console.error(error instanceof Error ? error.message : String(error));
+    if (!config.settings || Object.keys(config.settings).length === 0) {
+      console.error('No saved customizations found in ' + CONFIG_FILE);
       process.exit(1);
     }
+
+    // Find Claude Code installation
+    const startupCheckInfo = await startupCheck();
+
+    if (!startupCheckInfo || !startupCheckInfo.ccInstInfo) {
+      console.error(`Cannot find Claude Code's cli.js`);
+      console.error('Searched at the following locations:');
+      CLIJS_SEARCH_PATH_INFO.forEach(info => {
+        if (info.isGlob) {
+          if (info.expandedPaths.length === 0) {
+            console.error(`  - ${info.pattern} (no matches)`);
+          } else {
+            console.error(`  - ${info.pattern}`);
+            info.expandedPaths.forEach(path => {
+              console.error(`    - ${path}`);
+            });
+          }
+        } else {
+          console.error(`  - ${info.pattern}`);
+        }
+      });
+      process.exit(1);
+    }
+
+    console.log(`Found Claude Code at: ${startupCheckInfo.ccInstInfo.cliPath}`);
+    console.log(`Version: ${startupCheckInfo.ccInstInfo.version}`);
+
+    // Apply the customizations
+    console.log('Applying customizations...');
+    await applyCustomization(config, startupCheckInfo.ccInstInfo);
+    console.log('Customizations applied successfully!');
+    process.exit(0);
   }
 
   const startupCheckInfo = await startupCheck();

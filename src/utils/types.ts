@@ -135,13 +135,14 @@ export interface StartupCheckInfo {
 }
 
 export enum MainMenuItem {
+  APPLY_CHANGES = '*Apply customizations to cli.js',
   THEMES = 'Themes',
   LAUNCH_TEXT = 'Launch text',
   THINKING_VERBS = 'Thinking verbs',
   THINKING_STYLE = 'Thinking style',
   USER_MESSAGE_DISPLAY = 'User message display',
   INPUT_BOX = 'Input box',
-  APPLY_CHANGES = '*Apply customizations to cli.js',
+  VIEW_SYSTEM_PROMPTS = 'View system prompts',
   RESTORE_ORIGINAL = 'Restore original Claude Code (preserves tweakcc.json)',
   OPEN_CONFIG = 'Open tweakcc.json',
   OPEN_CLI = "Open Claude Code's cli.js",
@@ -839,6 +840,7 @@ export const DEFAULT_SETTINGS: Settings = {
 export const CONFIG_DIR = path.join(os.homedir(), '.tweakcc');
 export const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 export const CLIJS_BACKUP_FILE = path.join(CONFIG_DIR, 'cli.js.backup');
+export const SYSTEM_PROMPTS_DIR = path.join(CONFIG_DIR, 'system-prompts');
 
 export interface SearchPathInfo {
   pattern: string;

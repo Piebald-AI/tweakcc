@@ -14,13 +14,14 @@ import {
   Settings,
   StartupCheckInfo,
   TweakccConfig,
+  SYSTEM_PROMPTS_DIR,
 } from './utils/types.js';
 import {
   readConfigFile,
   restoreClijsFromBackup,
   updateConfigFile,
 } from './utils/config.js';
-import { revealFileInExplorer } from './utils/misc.js';
+import { openInExplorer, revealFileInExplorer } from './utils/misc.js';
 import { applyCustomization } from './utils/patches/index.js';
 
 export const SettingsContext = createContext({
@@ -113,14 +114,6 @@ Please reapply your changes below.`,
   const handleMainSubmit = (item: MainMenuItem) => {
     setNotification(null);
     switch (item) {
-      case MainMenuItem.THEMES:
-      case MainMenuItem.LAUNCH_TEXT:
-      case MainMenuItem.THINKING_VERBS:
-      case MainMenuItem.THINKING_STYLE:
-      case MainMenuItem.USER_MESSAGE_DISPLAY:
-      case MainMenuItem.INPUT_BOX:
-        setCurrentView(item);
-        break;
       case MainMenuItem.APPLY_CHANGES:
         if (startupCheckInfo.ccInstInfo) {
           setNotification({
@@ -137,6 +130,17 @@ Please reapply your changes below.`,
             }
           );
         }
+        break;
+      case MainMenuItem.THEMES:
+      case MainMenuItem.LAUNCH_TEXT:
+      case MainMenuItem.THINKING_VERBS:
+      case MainMenuItem.THINKING_STYLE:
+      case MainMenuItem.USER_MESSAGE_DISPLAY:
+      case MainMenuItem.INPUT_BOX:
+        setCurrentView(item);
+        break;
+      case MainMenuItem.VIEW_SYSTEM_PROMPTS:
+        openInExplorer(SYSTEM_PROMPTS_DIR);
         break;
       case MainMenuItem.RESTORE_ORIGINAL:
         if (startupCheckInfo.ccInstInfo) {
