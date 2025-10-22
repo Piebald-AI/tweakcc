@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v2.0.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v2.0.0) - 2025-10-22
+
+- **New:** Add system prompt customization support
+
 ## [v1.6.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.6.0) - 2025-10-11
 
 - Update the builtin themes' colors and IDs to account for all the changes in CC over time (#110) - @bl-ue
