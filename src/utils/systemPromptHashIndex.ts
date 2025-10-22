@@ -7,7 +7,7 @@ import { StringsFile, reconstructContentFromPieces } from './promptSync.js';
 /**
  * Path to the system prompt hash index file
  */
-export const HASH_INDEX_PATH = path.join(CONFIG_DIR, 'systemPromptHashes.json');
+export const HASH_INDEX_PATH = path.join(CONFIG_DIR, 'systemPromptOriginalHashes.json');
 
 /**
  * Path to the system prompt applied hashes file

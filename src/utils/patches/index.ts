@@ -32,7 +32,6 @@ import { writeThinkerSymbolWidthLocation } from './thinkerSymbolWidth.js';
 import { writeThinkerVerbs } from './thinkerVerbs.js';
 import { writeUserMessageDisplay } from './userMessageDisplay.js';
 import { writeVerboseProperty } from './verboseProperty.js';
-import { writeWelcomeMessage } from './welcomeMessage.js';
 import { writeModelCustomizations } from './modelSelector.js';
 import { writeIgnoreMaxSubscription } from './ignoreMaxSubscription.js';
 import { writeVersionOutput } from './versionOutput.js';
@@ -156,13 +155,6 @@ export const applyCustomization = async (
     }
     if ((result = writeSigninBannerText(content, textToApply)))
       content = result;
-
-    // Also apply customText to welcome message if it's defined
-    const welcomeMessage = c.method === 'custom' ? c.customText : c.figletText;
-    if (welcomeMessage) {
-      if ((result = writeWelcomeMessage(content, welcomeMessage)))
-        content = result;
-    }
   }
 
   // Apply thinking verbs
