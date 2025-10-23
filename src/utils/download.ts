@@ -9,8 +9,7 @@ export async function downloadStringsFile(
   version: string
 ): Promise<StringsFile> {
   // Construct the GitHub raw URL
-  //const url = `https://raw.githubusercontent.com/Piebald-AI/tweakcc/refs/heads/main/data/prompts/prompts-${version}.json`;
-  const url = `https://raw.githubusercontent.com/Piebald-AI/tweakcc/refs/heads/strings-tmp/strings-${version}.json`;
+  const url = `https://raw.githubusercontent.com/Piebald-AI/tweakcc/refs/heads/main/data/prompts/prompts-${version}.json`;
 
   try {
     // Fetch the file from GitHub
