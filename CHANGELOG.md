@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Support `XDG_CONFIG_HOME` per #120 (#121) - @bl-ue
+- Add `C:\nvm4w\nodejs` to the cli.js search list per #118 (#119) - @bl-ue
+
 ## [v2.0.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v2.0.0) - 2025-10-22
 
 - **New:** Add system prompt customization support
