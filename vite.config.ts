@@ -20,4 +20,9 @@ export default defineConfig(({ mode }) => ({
     },
   },
   plugins: [nodeExternals(), react()],
+  define: {
+    // Prevent Vite from replacing process.env at build time
+    // This allows environment variables to be read at runtime
+    'process.env': 'process.env',
+  },
 }));

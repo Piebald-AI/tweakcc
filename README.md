@@ -48,7 +48,15 @@ $ pnpm dlx tweakcc
 
 ## How it works
 
-`tweakcc` works by patching the Claude Code's minified `cli.js` file.  When you update your Claude Code installation, your customizations will be overwritten, but they're remembered in your `~/.tweakcc/config.js` configuration file, so they can be reapplied by just re-running the tool.
+`tweakcc` works by patching the Claude Code's minified `cli.js` file.  When you update your Claude Code installation, your customizations will be overwritten, but they're remembered in your configuration file, so they can be reapplied by just re-running the tool.
+
+### Configuration directory
+
+`tweakcc` stores its configuration files in one of the following locations, in order of priority:
+
+1. **`~/.tweakcc/`** - If this directory already exists, it will always be used for backward compatibility; or if `XDG_CONFIG_HOME` is not set
+2. **`$XDG_CONFIG_HOME/tweakcc`** - If `~/.tweakcc/` doesn't exist and `$XDG_CONFIG_HOME` is set
+
 
 `tweakcc` is verified to work with Claude Code **2.0.25.**
 
@@ -75,17 +83,17 @@ node dist/index.js
 
 tweakcc stores a backup of your Claude Code `cli.js` file for when you want to revert your customimzations, and also to reapply patches.  Before it applies your customizations, it restores the original `cli.js` so that it can start from a clean slate.  Sometimes things can get confused and your `cli.js` can be corrupted.  In particular, you may run into a situation where you have a modified `cli.js`, and then tweakcc takes makes a backup of that modified `cli.js`.  If you then try to reinstall Claude Code and apply your customizations, tweakcc will restore its backup of the old _modified_ `cli.js`.
 
-To break out of this loop you can install a different version of Claude Code, which will cause tweakcc to make a new backup of the new `cli.js` file.  Or you can simply delete tweakcc's `~/.tweakcc/cli.backup.js`.  If you do delete `cli.backup.js`, make sure you reinstall Claude Code before you run tweakcc again, or else if `cli.js` is the modified version it, will again get into the loop described above.
+To break out of this loop you can install a different version of Claude Code, which will cause tweakcc to make a new backup of the new `cli.js` file.  Or you can simply delete tweakcc's backup file (located at `~/.tweakcc/cli.backup.js` or `$XDG_CONFIG_HOME/tweakcc/cli.backup.js`).  If you do delete `cli.backup.js`, make sure you reinstall Claude Code before you run tweakcc again, or else if `cli.js` is the modified version it, will again get into the loop described above.
 
 ### System prompts
 
-tweakcc tracks changes to your system prompt markdown files in `~/.tweakcc/systemPromptAppliedHashes.json`.  It also caches the hashes of the original system prompt text in `~/.tweakcc/systemPromptOriginalHashes.json`.  If you'd like to reset your system prompt markdown files to their original values, you can delete those JSON files and the `~/.tweakcc/system-prompts` directory.  Running `npx tweakcc` will then generate new markdown files.
+tweakcc tracks changes to your system prompt markdown files in its config directory (see [Configuration directory](#configuration-directory) above). It stores tracking data in `systemPromptAppliedHashes.json` and caches the hashes of the original system prompt text in `systemPromptOriginalHashes.json`.  If you'd like to reset your system prompt markdown files to their original values, you can delete those JSON files and the `system-prompts` directory in your config directory.  Running `npx tweakcc` will then generate new markdown files.
 
 ## FAQ
 
 #### How can I customize my Claude Code system prompts?
 
-Run `npx tweakcc` first, and then navigate to `~/.tweakcc/system-prompts`, which will have just been created, in your file browser.  Each markdown file contains parts of prompts, such as the main system prompt, built-in tool descriptions, and various agent and utility prompts.  Modify any of them, and then run `tweakcc --apply` or the tweakcc UI to apply your changes.
+Run `npx tweakcc` first, and then navigate to the `system-prompts` directory in your config directory (see [Configuration directory](#configuration-directory)), which will have just been created, in your file browser.  Each markdown file contains parts of prompts, such as the main system prompt, built-in tool descriptions, and various agent and utility prompts.  Modify any of them, and then run `tweakcc --apply` or the tweakcc UI to apply your changes.
 
 #### How can I customize my Claude Code theme?
 

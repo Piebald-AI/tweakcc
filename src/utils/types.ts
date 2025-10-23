@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as os from 'os';
+import * as fs from 'fs';
 import { globbySync } from 'globby';
 
 export interface Theme {
@@ -837,7 +838,34 @@ export const DEFAULT_SETTINGS: Settings = {
   },
 };
 
-export const CONFIG_DIR = path.join(os.homedir(), '.tweakcc');
+// Support XDG Base Directory Specification with backward compatibility
+// Priority:
+// 1. If ~/.tweakcc exists, use it (backward compatibility for existing users)
+// 2. Otherwise, if $XDG_CONFIG_HOME is set, use $XDG_CONFIG_HOME/tweakcc
+// 3. Otherwise, use ~/.tweakcc (default for new users without XDG_CONFIG_HOME)
+const getConfigDir = (): string => {
+  const legacyDir = path.join(os.homedir(), '.tweakcc');
+  const xdgConfigHome = process.env.XDG_CONFIG_HOME;
+
+  // Check if legacy directory exists - use it for backward compatibility
+  try {
+    if (fs.existsSync(legacyDir)) {
+      return legacyDir;
+    }
+  } catch {
+    // If we can't check, fall through to XDG logic
+  }
+
+  // No legacy directory - use XDG if available
+  if (xdgConfigHome) {
+    return path.join(xdgConfigHome, 'tweakcc');
+  }
+
+  // Default to legacy location
+  return legacyDir;
+};
+
+export const CONFIG_DIR = getConfigDir();
 export const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 export const CLIJS_BACKUP_FILE = path.join(CONFIG_DIR, 'cli.js.backup');
 export const SYSTEM_PROMPTS_DIR = path.join(CONFIG_DIR, 'system-prompts');
