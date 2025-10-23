@@ -893,6 +893,9 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
     addPath(`${home}/AppData/Local/Yarn/config/global/${mod}`);
     addPath(`${home}/AppData/Local/pnpm/global/*/${mod}`, true);
 
+    // nvm4w (https://github.com/coreybutler/nvm-windows) (#118)
+    addPath(`C:/nvm4w/nodejs/${mod}`);
+
     // n (https://github.com/tj/n)
     addPath(`${home}/n/versions/node/*/lib/${mod}`, true);
 
