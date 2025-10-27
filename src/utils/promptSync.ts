@@ -854,18 +854,26 @@ export const syncPrompt = async (
         // Get the old baseline content (unmodified version from old CC version)
         // We need to reconstruct what the old version looked like
         // For now, we'll fetch the old strings file to get the baseline
-        const oldStringsFile = await downloadStringsFile(
-          existingFile.ccVersion
-        );
-        const oldPrompt = oldStringsFile.prompts.find(p => p.id === prompt.id);
+        let oldBaselineContent = existingFile.content; // Default fallback
+        try {
+          const oldStringsFile = await downloadStringsFile(
+            existingFile.ccVersion
+          );
+          const oldPrompt = oldStringsFile.prompts.find(p => p.id === prompt.id);
 
-        const oldBaselineContent = oldPrompt
-          ? reconstructContentFromPieces(
+          if (oldPrompt) {
+            oldBaselineContent = reconstructContentFromPieces(
               oldPrompt.pieces,
               oldPrompt.identifiers,
               oldPrompt.identifierMap
-            )
-          : existingFile.content; // Fallback if we can't find old version
+            );
+          }
+        } catch (error) {
+          // If we can't download the old version, just use existing content as baseline
+          console.log(chalk.yellow(
+            `Warning: Could not fetch old version ${existingFile.ccVersion} for comparison. Using current file as baseline.`
+          ));
+        }
 
         // Get the new baseline content
         const newBaselineContent = reconstructContentFromPieces(

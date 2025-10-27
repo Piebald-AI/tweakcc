@@ -311,8 +311,13 @@ export async function startupCheck(): Promise<StartupCheckInfo | null> {
 
   // Sync system prompts with the current CC version
   if (ccInstInfo.version) {
-    const syncSummary = await syncSystemPrompts(ccInstInfo.version);
-    displaySyncResults(syncSummary);
+    try {
+      const syncSummary = await syncSystemPrompts(ccInstInfo.version);
+      displaySyncResults(syncSummary);
+    } catch (error) {
+      // Error already logged with chalk.red in syncSystemPrompts
+      // Continue with startup check even if prompt sync fails
+    }
   }
 
   const realVersion = ccInstInfo.version;
