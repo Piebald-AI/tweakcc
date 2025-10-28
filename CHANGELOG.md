@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Better error handling when the prompt JSON file doesn't exist yet (#130) - @bl-ue
+
 ## [v2.0.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v2.0.1) - 2025-10-23
 
 - Support `XDG_CONFIG_HOME` per #120 (#121) - @bl-ue
