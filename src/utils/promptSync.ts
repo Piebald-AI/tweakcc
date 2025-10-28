@@ -859,7 +859,9 @@ export const syncPrompt = async (
           const oldStringsFile = await downloadStringsFile(
             existingFile.ccVersion
           );
-          const oldPrompt = oldStringsFile.prompts.find(p => p.id === prompt.id);
+          const oldPrompt = oldStringsFile.prompts.find(
+            p => p.id === prompt.id
+          );
 
           if (oldPrompt) {
             oldBaselineContent = reconstructContentFromPieces(
@@ -868,11 +870,13 @@ export const syncPrompt = async (
               oldPrompt.identifierMap
             );
           }
-        } catch (_error) {
+        } catch {
           // If we can't download the old version, just use existing content as baseline
-          console.log(chalk.yellow(
-            `Warning: Could not fetch old version ${existingFile.ccVersion} for comparison. Using current file as baseline.`
-          ));
+          console.log(
+            chalk.yellow(
+              `Warning: Could not fetch old version ${existingFile.ccVersion} for comparison. Using current file as baseline.`
+            )
+          );
         }
 
         // Get the new baseline content

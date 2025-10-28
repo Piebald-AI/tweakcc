@@ -20,7 +20,8 @@ export async function downloadStringsFile(
       // Provide specific error messages for common HTTP errors
       let errorMessage: string;
       if (response.status === 429) {
-        errorMessage = 'Rate limit exceeded. GitHub has temporarily blocked requests. Please wait a few minutes and try again.';
+        errorMessage =
+          'Rate limit exceeded. GitHub has temporarily blocked requests. Please wait a few minutes and try again.';
       } else if (response.status === 404) {
         errorMessage = `Prompts file not found for Claude Code v${version}. This version was released within the past day or so and will be supported within a few hours.`;
       } else if (response.status >= 500) {
@@ -43,10 +44,12 @@ export async function downloadStringsFile(
   } catch (error) {
     if (error instanceof Error) {
       // If it's already our custom error with the message displayed, re-throw it
-      if (error.message.includes('Rate limit') ||
-          error.message.includes('not found') ||
-          error.message.includes('server error') ||
-          error.message.includes('HTTP')) {
+      if (
+        error.message.includes('Rate limit') ||
+        error.message.includes('not found') ||
+        error.message.includes('server error') ||
+        error.message.includes('HTTP')
+      ) {
         throw error;
       }
       // Otherwise wrap it and display
