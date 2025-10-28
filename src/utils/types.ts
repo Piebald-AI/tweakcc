@@ -966,8 +966,9 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
     addPath(`/usr/share/${mod}`);
     addPath(`/var/lib/${mod}`);
 
-    // Homebrew
+    // Homebrew / Linuxbrew
     addPath(`/opt/homebrew/lib/${mod}`);
+    addPath(`${home}/.linuxbrew/lib/${mod}`);
 
     // Yarn
     addPath(`${home}/.config/yarn/global/${mod}`);
