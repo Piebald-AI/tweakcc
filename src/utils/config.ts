@@ -314,7 +314,7 @@ export async function startupCheck(): Promise<StartupCheckInfo | null> {
     try {
       const syncSummary = await syncSystemPrompts(ccInstInfo.version);
       displaySyncResults(syncSummary);
-    } catch (error) {
+    } catch (_error) {
       // Error already logged with chalk.red in syncSystemPrompts
       // Continue with startup check even if prompt sync fails
     }

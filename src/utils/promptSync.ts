@@ -868,7 +868,7 @@ export const syncPrompt = async (
               oldPrompt.identifierMap
             );
           }
-        } catch (error) {
+        } catch (_error) {
           // If we can't download the old version, just use existing content as baseline
           console.log(chalk.yellow(
             `Warning: Could not fetch old version ${existingFile.ccVersion} for comparison. Using current file as baseline.`
