@@ -996,6 +996,7 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
 
     // fnm (https://github.com/Schniz/fnm)
     addPath(`${home}/.fnm/node-versions/*/installation/lib/${mod}`, true);
+    addPath(`${home}/.local/state/fnm_multishells/*/lib/${mod}`, true);
 
     // nvm (https://github.com/nvm-sh/nvm) - system & user
     addPath(`/usr/local/nvm/versions/node/*/lib/${mod}`, true);
