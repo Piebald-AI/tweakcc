@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import { render } from 'ink';
 import { Command } from 'commander';
+import chalk from 'chalk';
 import App from './App.js';
 import { CLIJS_SEARCH_PATH_INFO, CONFIG_FILE } from './utils/types.js';
 import { startupCheck, readConfigFile } from './utils/config.js';
 import { enableDebug } from './utils/misc.js';
 import { applyCustomization } from './utils/patches/index.js';
+import { preloadStringsFile } from './utils/promptSync.js';
 
 const main = async () => {
   const program = new Command();
@@ -63,6 +65,21 @@ const main = async () => {
     console.log(`Found Claude Code at: ${startupCheckInfo.ccInstInfo.cliPath}`);
     console.log(`Version: ${startupCheckInfo.ccInstInfo.version}`);
 
+    // Preload strings file for system prompts
+    console.log('Loading system prompts...');
+    const result = await preloadStringsFile(
+      startupCheckInfo.ccInstInfo.version
+    );
+    if (!result.success) {
+      console.log(chalk.red('\n✖ Error downloading system prompts:'));
+      console.log(chalk.red(`  ${result.errorMessage}`));
+      console.log(
+        chalk.yellow(
+          '\n⚠ System prompts not available - skipping system prompt customizations'
+        )
+      );
+    }
+
     // Apply the customizations
     console.log('Applying customizations...');
     await applyCustomization(config, startupCheckInfo.ccInstInfo);
@@ -73,6 +90,20 @@ const main = async () => {
   const startupCheckInfo = await startupCheck();
 
   if (startupCheckInfo) {
+    // Preload strings file for system prompts (for interactive mode)
+    const result = await preloadStringsFile(
+      startupCheckInfo.ccInstInfo.version
+    );
+    if (!result.success) {
+      console.log(chalk.red('\n✖ Error downloading system prompts:'));
+      console.log(chalk.red(`  ${result.errorMessage}`));
+      console.log(
+        chalk.yellow(
+          '⚠ System prompts not available - system prompt customizations will be skipped\n'
+        )
+      );
+    }
+
     render(<App startupCheckInfo={startupCheckInfo} />);
   } else {
     // Format the search paths to show glob patterns with their expansions

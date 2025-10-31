@@ -944,25 +944,39 @@ export const syncSystemPrompts = async (
   return summary;
 };
 
-// Cache for downloaded strings file to avoid multiple downloads
-let cachedStringsFile: StringsFile | null = null;
-let cachedVersion: string | null = null;
+// Global cache for downloaded strings file to avoid multiple downloads
+// This is loaded once at app startup and reused throughout the session
+let globalStringsFile: StringsFile | null = null;
+let globalCachedVersion: string | null = null;
 
 /**
- * Downloads or retrieves cached strings file for the given version
+ * Preloads the strings file for a given version into global cache
+ * Should be called once at app startup
+ * Returns an object with success status and optional error message
+ * @param version - Version string to preload
  */
-const getStringsFile = async (version: string): Promise<StringsFile> => {
-  // Return cached version if available
-  if (cachedStringsFile && cachedVersion === version) {
-    return cachedStringsFile;
+export const preloadStringsFile = async (
+  version: string
+): Promise<{ success: boolean; errorMessage?: string }> => {
+  try {
+    const stringsFile = await downloadStringsFile(version);
+    globalStringsFile = stringsFile;
+    globalCachedVersion = version;
+    return { success: true };
+  } catch (error) {
+    // If download fails, just leave global cache as null
+    globalStringsFile = null;
+    globalCachedVersion = null;
+
+    // Return the error message for display
+    if (error instanceof Error) {
+      return { success: false, errorMessage: error.message };
+    }
+    return {
+      success: false,
+      errorMessage: 'Unknown error occurred while downloading system prompts',
+    };
   }
-
-  // Download and cache
-  const stringsFile = await downloadStringsFile(version);
-  cachedStringsFile = stringsFile;
-  cachedVersion = version;
-
-  return stringsFile;
 };
 
 /**
@@ -1061,6 +1075,8 @@ const applyIdentifierMapping = (
  * 3. Match against cli.js to extract ACTUAL variable names
  * 4. Read corresponding .md file (has ${HUMAN_NAME} placeholders)
  * 5. Replace ${HUMAN_NAME} with actual vars from cli.js
+ *
+ * Returns empty array if strings file is not available (not preloaded or failed to download)
  */
 export const loadSystemPromptsWithRegex = async (
   ccVersion: string
@@ -1072,8 +1088,12 @@ export const loadSystemPromptsWithRegex = async (
     getInterpolatedContent: (match: RegExpMatchArray) => string;
   }>
 > => {
-  // Download strings file for the specified CC version to generate the SEARCH regex
-  const stringsJson: StringsFile = await getStringsFile(ccVersion);
+  // Check if strings file was preloaded - if not, return empty array
+  if (!globalStringsFile || globalCachedVersion !== ccVersion) {
+    return [];
+  }
+
+  const stringsJson: StringsFile = globalStringsFile;
 
   const results: Array<{
     promptId: string;

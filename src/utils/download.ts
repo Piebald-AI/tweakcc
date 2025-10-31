@@ -1,14 +1,27 @@
-import chalk from 'chalk';
+import * as fs from 'node:fs/promises';
+import * as path from 'path';
 import type { StringsFile } from './promptSync.js';
+import { PROMPT_CACHE_DIR } from './types.js';
 
 /**
  * Downloads the strings file for a given CC version from GitHub
- * @param version - Version string in format "X.Y.Z" (e.g., "0.17.0")
+ * Checks cache first before downloading
+ * @param version - Version string in format "X.Y.Z" (e.g., "2.0.30")
  * @returns Promise that resolves to the parsed JSON content
  */
 export async function downloadStringsFile(
   version: string
 ): Promise<StringsFile> {
+  // Check cache first
+  const cacheFilePath = path.join(PROMPT_CACHE_DIR, `prompts-${version}.json`);
+  try {
+    const cachedContent = await fs.readFile(cacheFilePath, 'utf-8');
+    const cached = JSON.parse(cachedContent) as StringsFile;
+    return cached;
+  } catch {
+    // Cache miss or invalid - proceed to download
+  }
+
   // Construct the GitHub raw URL
   const url = `https://raw.githubusercontent.com/Piebald-AI/tweakcc/refs/heads/main/data/prompts/prompts-${version}.json`;
 
@@ -30,15 +43,26 @@ export async function downloadStringsFile(
         errorMessage = `HTTP ${response.status}: ${response.statusText}`;
       }
 
-      // Display the error in red immediately
-      console.log(chalk.red('\n✖ Error downloading system prompts:'));
-      console.log(chalk.red(`  ${errorMessage}`));
-
+      // Just throw the error - it will be caught and displayed by the caller
       throw new Error(errorMessage);
     }
 
     // Parse JSON directly
     const jsonData = (await response.json()) as StringsFile;
+
+    // Save to cache
+    try {
+      await fs.mkdir(PROMPT_CACHE_DIR, { recursive: true });
+      await fs.writeFile(
+        cacheFilePath,
+        JSON.stringify(jsonData, null, 2),
+        'utf-8'
+      );
+    } catch (cacheError) {
+      console.warn(
+        `Failed to write to cache to ${cacheFilePath}: ${cacheError}`
+      );
+    }
 
     return jsonData;
   } catch (error) {
@@ -52,10 +76,8 @@ export async function downloadStringsFile(
       ) {
         throw error;
       }
-      // Otherwise wrap it and display
+      // Otherwise wrap it and throw
       const wrappedMessage = `Failed to download prompts for version ${version}: ${error.message}`;
-      console.log(chalk.red('\n✖ Error downloading system prompts:'));
-      console.log(chalk.red(`  ${wrappedMessage}`));
       throw new Error(wrappedMessage);
     }
     throw error;
