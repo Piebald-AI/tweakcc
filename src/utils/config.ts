@@ -260,9 +260,9 @@ export const findClaudeCodeInstallation = async (
       if (
         error instanceof Error &&
         'code' in error &&
-        error.code === 'ENOENT'
+        (error.code === 'ENOENT' || error.code === 'ENOTDIR')
       ) {
-        // Continue searching if this path fails.
+        // Continue searching if this path fails or is not a directory.
         continue;
       } else {
         throw error;
@@ -290,7 +290,11 @@ async function doesFileExist(filePath: string): Promise<boolean> {
     await fs.stat(filePath);
     return true;
   } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+    ) {
       return false;
     }
     throw error;
