@@ -58,7 +58,7 @@ $ pnpm dlx tweakcc
 2. **`$XDG_CONFIG_HOME/tweakcc`** - If `~/.tweakcc/` doesn't exist and `$XDG_CONFIG_HOME` is set
 
 
-`tweakcc` is verified to work with Claude Code **2.0.25.**
+`tweakcc` is verified to work with Claude Code **2.0.31.**
 
 ## Running
 

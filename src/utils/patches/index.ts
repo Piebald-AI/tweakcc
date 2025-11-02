@@ -245,7 +245,7 @@ export const applyCustomization = async (
   if ((result = writeIgnoreMaxSubscription(content))) content = result;
 
   // Apply version output modification (always enabled)
-  if ((result = writeVersionOutput(content, '2.0.2'))) content = result;
+  if ((result = writeVersionOutput(content, '2.0.3'))) content = result;
 
   // Replace the file, breaking hard links and preserving permissions
   await replaceFileBreakingHardLinks(ccInstInfo.cliPath, content, 'patch');
