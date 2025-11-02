@@ -31,6 +31,12 @@ const createEnoent = () => {
   return error;
 };
 
+const createEnotdir = () => {
+  const error: NodeJS.ErrnoException = new Error('ENOTDIR: not a directory');
+  error.code = 'ENOTDIR';
+  return error;
+};
+
 describe('config.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -209,6 +215,52 @@ describe('config.ts', () => {
       const result = await config.findClaudeCodeInstallation(mockConfig);
 
       expect(result).toBe(null);
+    });
+
+    it('should gracefully skip paths with ENOTDIR errors', async () => {
+      const mockConfig = {
+        ccInstallationDir: null,
+        changesApplied: false,
+        ccVersion: '',
+        lastModified: '',
+        settings: DEFAULT_SETTINGS,
+      };
+
+      // Mock fs.stat to simulate ENOTDIR on first path, then find cli.js on second path
+      const mockSecondCliPath = path.join(CLIJS_SEARCH_PATHS[1], 'cli.js');
+      const mockSecondPackageJsonPath = path.join(
+        CLIJS_SEARCH_PATHS[1],
+        'package.json'
+      );
+
+      let callCount = 0;
+      vi.spyOn(fs, 'stat').mockImplementation(async p => {
+        callCount++;
+        // First search path returns ENOTDIR (simulating ~/.claude being a file)
+        if (callCount === 1) {
+          throw createEnotdir();
+        }
+        // Second search path has cli.js
+        if (p === mockSecondCliPath) {
+          return {} as Stats;
+        }
+        throw createEnoent();
+      });
+
+      vi.spyOn(fs, 'readFile').mockImplementation(async p => {
+        if (p === mockSecondPackageJsonPath) {
+          return JSON.stringify({ version: '1.2.3' });
+        }
+        throw new Error('File not found');
+      });
+
+      const result = await config.findClaudeCodeInstallation(mockConfig);
+
+      expect(result).toEqual({
+        cliPath: mockSecondCliPath,
+        packageJsonPath: mockSecondPackageJsonPath,
+        version: '1.2.3',
+      });
     });
   });
 
