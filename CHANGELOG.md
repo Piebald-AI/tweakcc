@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Makes the Claude Code's native LSP support work (#152) - @bl-ue
+
 ## [v2.0.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v2.0.3) - 2025-11-02
 
 - Handle ENOTDIR errors when searching for Claude Code installation (#148) - @bl-ue

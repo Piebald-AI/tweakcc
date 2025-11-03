@@ -39,7 +39,9 @@ const getOpenDocumentLocation = (oldFile: string): LocationResult | null => {
   const sendRequestPattern = /sendRequest:([$\w]+)\b/;
   const sendRequestMatch = returnBlock.match(sendRequestPattern);
   if (!sendRequestMatch) {
-    console.error('patch: fixLspSupport: failed to find sendRequest in return block');
+    console.error(
+      'patch: fixLspSupport: failed to find sendRequest in return block'
+    );
     return null;
   }
 
@@ -75,7 +77,9 @@ const getOpenDocumentLocation = (oldFile: string): LocationResult | null => {
   const secondLinePattern = /let ([$\w]+)=await [$\w]+\([$\w]+\);/;
   const secondLineMatch = functionBody.match(secondLinePattern);
   if (!secondLineMatch || secondLineMatch.index === undefined) {
-    console.error('patch: fixLspSupport: failed to find second line of sendRequest');
+    console.error(
+      'patch: fixLspSupport: failed to find second line of sendRequest'
+    );
     return null;
   }
 
@@ -83,18 +87,22 @@ const getOpenDocumentLocation = (oldFile: string): LocationResult | null => {
   const serverVar = secondLineMatch[1];
 
   // Step ii.3: Find the if(!serverVar)return; line after the second line
-  const afterSecondLine = functionStart + secondLineMatch.index + secondLineMatch[0].length;
+  const afterSecondLine =
+    functionStart + secondLineMatch.index + secondLineMatch[0].length;
   const remainingBody = oldFile.slice(afterSecondLine, startBrace);
   const ifReturnPattern = new RegExp(`if\\(!${serverVar}\\)return;`);
   const ifReturnMatch = remainingBody.match(ifReturnPattern);
 
   if (!ifReturnMatch || ifReturnMatch.index === undefined) {
-    console.error('patch: fixLspSupport: failed to find if(!serverVar)return; line');
+    console.error(
+      'patch: fixLspSupport: failed to find if(!serverVar)return; line'
+    );
     return null;
   }
 
   // Calculate insertion point (right after the if(!serverVar)return; line)
-  const insertionPoint = afterSecondLine + ifReturnMatch.index + ifReturnMatch[0].length;
+  const insertionPoint =
+    afterSecondLine + ifReturnMatch.index + ifReturnMatch[0].length;
 
   return {
     startIndex: insertionPoint,
