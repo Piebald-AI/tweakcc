@@ -36,6 +36,7 @@ import { writeModelCustomizations } from './modelSelector.js';
 import { writeIgnoreMaxSubscription } from './ignoreMaxSubscription.js';
 import { writeVersionOutput } from './versionOutput.js';
 import { applySystemPrompts } from './systemPrompts.js';
+import { writeFixLspSupport } from './fixLspSupport.js';
 
 export interface LocationResult {
   startIndex: number;
@@ -246,6 +247,9 @@ export const applyCustomization = async (
 
   // Apply version output modification (always enabled)
   if ((result = writeVersionOutput(content, '2.0.3'))) content = result;
+
+  // Apply LSP support fixes (always enabled)
+  if ((result = writeFixLspSupport(content))) content = result;
 
   // Replace the file, breaking hard links and preserving permissions
   await replaceFileBreakingHardLinks(ccInstInfo.cliPath, content, 'patch');
