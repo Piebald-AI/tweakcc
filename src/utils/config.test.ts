@@ -319,4 +319,166 @@ describe('config.ts', () => {
       expect(result!.wasUpdated).toBe(true);
     });
   });
+
+  describe('userMessageDisplay migration', () => {
+    it('should migrate old prefix/message structure to new format string', async () => {
+      const oldConfig = {
+        ccVersion: '1.0.0',
+        ccInstallationDir: null,
+        lastModified: '2024-01-01',
+        changesApplied: true,
+        settings: {
+          ...DEFAULT_SETTINGS,
+          userMessageDisplay: {
+            prefix: {
+              format: '>',
+              styling: ['bold'],
+              foregroundColor: 'rgb(255,0,0)',
+              backgroundColor: 'rgb(0,0,0)',
+            },
+            message: {
+              format: '{}',
+              styling: ['italic'],
+              foregroundColor: 'rgb(0,255,0)',
+              backgroundColor: 'rgb(0,0,0)',
+            },
+          },
+        },
+      };
+
+      vi.spyOn(fs, 'readFile').mockResolvedValue(JSON.stringify(oldConfig));
+
+      const result = await config.readConfigFile();
+
+      expect(result.settings.userMessageDisplay).toEqual({
+        format: '> {}',
+        styling: ['bold', 'italic'],
+        foregroundColor: 'rgb(0,255,0)',
+        backgroundColor: null,
+        borderStyle: 'none',
+        borderColor: 'rgb(255,255,255)',
+        paddingX: 0,
+        paddingY: 0,
+      });
+    });
+
+    it('should convert rgb(0,0,0) to default/null', async () => {
+      const oldConfig = {
+        ccVersion: '1.0.0',
+        ccInstallationDir: null,
+        lastModified: '2024-01-01',
+        changesApplied: true,
+        settings: {
+          ...DEFAULT_SETTINGS,
+          userMessageDisplay: {
+            prefix: {
+              format: '> ',
+              styling: [],
+              foregroundColor: 'rgb(0,0,0)',
+              backgroundColor: 'rgb(0,0,0)',
+            },
+            message: {
+              format: '{}',
+              styling: [],
+              foregroundColor: 'rgb(0,0,0)',
+              backgroundColor: 'rgb(0,0,0)',
+            },
+          },
+        },
+      };
+
+      vi.spyOn(fs, 'readFile').mockResolvedValue(JSON.stringify(oldConfig));
+
+      const result = await config.readConfigFile();
+
+      expect(result.settings.userMessageDisplay).toEqual({
+        format: '> {}',
+        styling: [],
+        foregroundColor: 'default',
+        backgroundColor: null,
+        borderStyle: 'none',
+        borderColor: 'rgb(255,255,255)',
+        paddingX: 0,
+        paddingY: 0,
+      });
+    });
+
+    it('should preserve custom colors during migration', async () => {
+      const oldConfig = {
+        ccVersion: '1.0.0',
+        ccInstallationDir: null,
+        lastModified: '2024-01-01',
+        changesApplied: true,
+        settings: {
+          ...DEFAULT_SETTINGS,
+          userMessageDisplay: {
+            prefix: {
+              format: '>> ',
+              styling: [],
+              foregroundColor: 'rgb(100,100,100)',
+              backgroundColor: 'rgb(50,50,50)',
+            },
+            message: {
+              format: '{}',
+              styling: [],
+              foregroundColor: 'rgb(200,200,200)',
+              backgroundColor: 'rgb(75,75,75)',
+            },
+          },
+        },
+      };
+
+      vi.spyOn(fs, 'readFile').mockResolvedValue(JSON.stringify(oldConfig));
+
+      const result = await config.readConfigFile();
+
+      expect(result.settings.userMessageDisplay).toEqual({
+        format: '>> {}',
+        styling: [],
+        foregroundColor: 'rgb(200,200,200)',
+        backgroundColor: 'rgb(75,75,75)',
+        borderStyle: 'none',
+        borderColor: 'rgb(255,255,255)',
+        paddingX: 0,
+        paddingY: 0,
+      });
+    });
+
+    it('should not migrate if already in new format', async () => {
+      const newConfig = {
+        ccVersion: '1.0.0',
+        ccInstallationDir: null,
+        lastModified: '2024-01-01',
+        changesApplied: true,
+        settings: {
+          ...DEFAULT_SETTINGS,
+          userMessageDisplay: {
+            format: '> {}',
+            styling: [],
+            foregroundColor: 'default',
+            backgroundColor: null,
+            borderStyle: 'none',
+            borderColor: 'rgb(255,255,255)',
+            paddingX: 0,
+            paddingY: 0,
+          },
+        },
+      };
+
+      vi.spyOn(fs, 'readFile').mockResolvedValue(JSON.stringify(newConfig));
+
+      const result = await config.readConfigFile();
+
+      expect(result.settings.userMessageDisplay).toEqual({
+        format: '> {}',
+        styling: [],
+        foregroundColor: 'default',
+        backgroundColor: null,
+        borderStyle: 'none',
+        borderColor: 'rgb(255,255,255)',
+        paddingX: 0,
+        paddingY: 0,
+      });
+    });
+  });
 });

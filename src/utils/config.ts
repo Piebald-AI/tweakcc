@@ -128,6 +128,37 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
         DEFAULT_SETTINGS.userMessageDisplay;
     }
 
+    // In v2.0.3 userMessageDisplay was restructured from prefix/message to a single format string.
+    const tmpUserMessageDisplay = readConfig?.settings?.userMessageDisplay as any;
+    if (tmpUserMessageDisplay?.prefix) {
+      const old = tmpUserMessageDisplay;
+      readConfig.settings.userMessageDisplay = {
+        format: (old.prefix.format || '') + (old.message?.format || '{}'),
+        styling: [...(old.prefix.styling || []), ...(old.message?.styling || [])],
+        foregroundColor: old.message?.foregroundColor === 'rgb(0,0,0)' ? 'default' : old.message?.foregroundColor || old.prefix?.foregroundColor || 'default',
+        backgroundColor: old.message?.backgroundColor === 'rgb(0,0,0)' ? null : old.message?.backgroundColor || old.prefix?.backgroundColor || null,
+        borderStyle: 'none',
+        borderColor: 'rgb(255,255,255)',
+        paddingX: 0,
+        paddingY: 0,
+      };
+    }
+
+    // In v2.0.3 border properties were added to userMessageDisplay.
+    if (tmpUserMessageDisplay && !('borderStyle' in tmpUserMessageDisplay)) {
+      readConfig.settings.userMessageDisplay.borderStyle = 'none';
+      readConfig.settings.userMessageDisplay.borderColor = 'rgb(255,255,255)';
+      readConfig.settings.userMessageDisplay.paddingX = 0;
+      readConfig.settings.userMessageDisplay.paddingY = 0;
+    }
+
+    // In v2.0.3 padding was split into paddingX and paddingY.
+    if (tmpUserMessageDisplay && 'padding' in tmpUserMessageDisplay && !('paddingX' in tmpUserMessageDisplay)) {
+      readConfig.settings.userMessageDisplay.paddingX = tmpUserMessageDisplay.padding || 0;
+      readConfig.settings.userMessageDisplay.paddingY = 0;
+      delete (readConfig.settings.userMessageDisplay as any).padding;
+    }
+
     // Check if system prompts have been modified since they were last applied
     // If so, mark changesApplied as false to show the "*Apply customizations" indicator
     const hasSystemPromptChanges =

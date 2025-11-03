@@ -1,77 +1,47 @@
 // Please see the note about writing patches in ./index.js.
-
-import { buildChalkChain } from '../misc.js';
 import {
   findChalkVar,
   LocationResult,
-  ModificationEdit,
   showDiff,
 } from './index.js';
 
 const getUserMessageDisplayLocation = (
   oldFile: string
-): {
-  prefixLocation: LocationResult | null;
-  messageLocation: LocationResult | null;
-} | null => {
+): LocationResult | null => {
   // Search for the exact error message to find the component
-  const searchStart =
-    oldFile.indexOf('No content found in user prompt message') - 700;
-  if (searchStart === -1) {
-    console.error('patch: userMessageDisplay: failed to find error message');
+  const messageDisplayPattern =
+    /return [$\w]+\.createElement\([$\w]+,\{backgroundColor:"userMessageBackground",color:"text"\},"> ",([$\w]+)\+" "\);/;
+  const messageDisplayMatch = oldFile.match(messageDisplayPattern);
+  if (!messageDisplayMatch || messageDisplayMatch.index == undefined) {
+    console.error('patch: messageDisplayMatch: failed to find error message');
     return null;
   }
 
-  const searchEnd = Math.min(oldFile.length, searchStart + 700);
-  const searchSection = oldFile.slice(searchStart, searchEnd);
-
-  // `return cD.createElement(M,{dimColor:!0,backgroundColor:void 0},"> ",A);`
-  //                                                                 ^^^^ ^
-  //                                                                 1    2
-  const prefixAndTextPattern = /("> "),([$\w]+)/;
-  const prefixAndTextMatch = searchSection.match(prefixAndTextPattern);
-
-  if (!prefixAndTextMatch) {
-    return {
-      prefixLocation: null,
-      messageLocation: null,
-    };
-  }
-  const prefixStart =
-    searchStart + searchSection.indexOf(prefixAndTextMatch[1]);
-  const prefixEnd = prefixStart + prefixAndTextMatch[1].length;
-  const messageStart = prefixEnd + 1; // +1 for the comma
-  const messageEnd = messageStart + prefixAndTextMatch[2].length;
+  const subIndex =
+    messageDisplayMatch.index +
+    messageDisplayMatch[0].indexOf('{backgroundColor');
 
   return {
-    prefixLocation: {
-      startIndex: prefixStart,
-      endIndex: prefixEnd,
-    },
-    messageLocation: {
-      startIndex: messageStart,
-      endIndex: messageEnd,
-    },
+    startIndex: subIndex,
+    endIndex: messageDisplayMatch.length - 2,
+    identifiers: [messageDisplayMatch[2]],
   };
 };
 
 export const writeUserMessageDisplay = (
   oldFile: string,
-  prefix: string,
-  prefixColor: string,
-  prefixBackgroundColor: string,
-  prefixBold: boolean = false,
-  prefixItalic: boolean = false,
-  prefixUnderline: boolean = false,
-  prefixStrikethrough: boolean = false,
-  prefixInverse: boolean = false,
-  messageColor: string,
-  messageBackgroundColor: string,
-  messageBold: boolean = false,
-  messageItalic: boolean = false,
-  messageUnderline: boolean = false,
-  messageStrikethrough: boolean = false,
-  messageInverse: boolean = false
+  format: string,
+  foregroundColor: string | "default",
+  backgroundColor: string | "default" | null,
+  bold: boolean = false,
+  italic: boolean = false,
+  underline: boolean = false,
+  strikethrough: boolean = false,
+  inverse: boolean = false,
+  borderStyle: string = 'none',
+  borderColor: string = 'rgb(255,255,255)',
+  paddingX: number = 0,
+  paddingY: number = 0
 ): string | null => {
   const location = getUserMessageDisplayLocation(oldFile);
   if (!location) {
@@ -81,111 +51,116 @@ export const writeUserMessageDisplay = (
     return null;
   }
 
-  if (!location.prefixLocation) {
-    console.error('patch: userMessageDisplay: failed to find prefix location');
-    return null;
-  }
-  if (!location.messageLocation) {
-    console.error('patch: userMessageDisplay: failed to find message location');
-    return null;
-  }
-
   const chalkVar = findChalkVar(oldFile);
   if (!chalkVar) {
     console.error('patch: userMessageDisplay: failed to find chalk variable');
     return null;
   }
 
-  const modifications: ModificationEdit[] = [];
-
-  // Check if we should apply customization for prefix
-  const isPrefixBlack =
-    prefixColor === 'rgb(0,0,0)' && prefixBackgroundColor === 'rgb(0,0,0)';
-  const hasPrefixStyling =
-    prefixBold ||
-    prefixItalic ||
-    prefixUnderline ||
-    prefixStrikethrough ||
-    prefixInverse;
-  const shouldCustomizePrefix = !isPrefixBlack || hasPrefixStyling;
-
-  // Check if we should apply customization for message
-  const isMessageBlack =
-    messageColor === 'rgb(0,0,0)' && messageBackgroundColor === 'rgb(0,0,0)';
-  const hasMessageStyling =
-    messageBold ||
-    messageItalic ||
-    messageUnderline ||
-    messageStrikethrough ||
-    messageInverse;
-  const shouldCustomizeMessage = !isMessageBlack || hasMessageStyling;
-
-  // 1. Update prefix
-  if (shouldCustomizePrefix) {
-    // Build chalk chain for prefix
-    const prefixChalkChain = buildChalkChain(
-      chalkVar,
-      isPrefixBlack ? null : prefixColor.match(/\d+/g)?.join(',') || null,
-      isPrefixBlack
-        ? null
-        : prefixBackgroundColor.match(/\d+/g)?.join(',') || null,
-      prefixBold,
-      prefixItalic,
-      prefixUnderline,
-      prefixStrikethrough,
-      prefixInverse
-    );
-
-    modifications.push({
-      startIndex: location.prefixLocation.startIndex,
-      endIndex: location.prefixLocation.endIndex,
-      newContent: `${prefixChalkChain}("${prefix}")+" "`,
-    });
+  const messageIdentifier = location.identifiers?.[0];
+  if (!messageIdentifier) {
+    console.error('patch: userMessageDisplay: failed to find message identifier');
+    return null;
   }
 
-  // 2. Update message
-  if (shouldCustomizeMessage) {
-    // Build chalk chain for message
-    const messageChalkChain = buildChalkChain(
-      chalkVar,
-      isMessageBlack ? null : messageColor.match(/\d+/g)?.join(',') || null,
-      isMessageBlack
-        ? null
-        : messageBackgroundColor.match(/\d+/g)?.join(',') || null,
-      messageBold,
-      messageItalic,
-      messageUnderline,
-      messageStrikethrough,
-      messageInverse
-    );
+  // Determine if we need chalk styling (custom RGB colors or text styling)
+  const needsChalk =
+    (foregroundColor !== 'default') ||
+    (backgroundColor !== 'default' && backgroundColor !== null) ||
+    bold || italic || underline || strikethrough || inverse;
 
-    modifications.push({
-      startIndex: location.messageLocation.startIndex,
-      endIndex: location.messageLocation.endIndex,
-      newContent: oldFile
-        .slice(
-          location.messageLocation.startIndex,
-          location.messageLocation.endIndex
-        )
-        .replace(/([$\w]+)/, `${messageChalkChain}($1)`),
-    });
+  // Replace {} in format string with the message variable
+  const formattedMessage = format.replace(/\{\}/g, `"+${messageIdentifier}+"`);
+
+  let newContent: string;
+
+  if (needsChalk) {
+    // Build chalk chain for custom colors and/or styling
+    let chalkChain = chalkVar;
+
+    // Only add color methods for custom (non-default, non-null) colors
+    if (foregroundColor !== 'default') {
+      const fgMatch = foregroundColor.match(/\d+/g);
+      if (fgMatch) {
+        chalkChain += `.rgb(${fgMatch.join(',')})`;
+      }
+    }
+
+    if (backgroundColor !== 'default' && backgroundColor !== null) {
+      const bgMatch = backgroundColor.match(/\d+/g);
+      if (bgMatch) {
+        chalkChain += `.bgRgb(${bgMatch.join(',')})`;
+      }
+    }
+
+    // Apply styling
+    if (bold) chalkChain += '.bold';
+    if (italic) chalkChain += '.italic';
+    if (underline) chalkChain += '.underline';
+    if (strikethrough) chalkChain += '.strikethrough';
+    if (inverse) chalkChain += '.inverse';
+
+    // Build attributes object with border properties
+    const attrs: string[] = [];
+    // Custom border styles (topBottom*) are not standard Ink styles, so skip them
+    const isCustomBorder = borderStyle.startsWith('topBottom');
+    if (borderStyle !== 'none' && !isCustomBorder) {
+      attrs.push(`borderStyle:"${borderStyle}"`);
+      const borderMatch = borderColor.match(/\d+/g);
+      if (borderMatch) {
+        attrs.push(`borderColor:"rgb(${borderMatch.join(',')})"`);
+      }
+    }
+    if (paddingX > 0) {
+      attrs.push(`paddingX:${paddingX}`);
+    }
+    if (paddingY > 0) {
+      attrs.push(`paddingY:${paddingY}`);
+    }
+
+    const attrsStr = attrs.length > 0 ? `{${attrs.join(',')}}` : '{}';
+    newContent = `${attrsStr},${chalkChain}("${formattedMessage}")`;
+  } else {
+    // Use Ink/React attributes for default colors and border
+    const attrs: string[] = [];
+
+    if (backgroundColor === 'default') {
+      attrs.push('backgroundColor:"userMessageBackground"');
+    }
+
+    if (foregroundColor === 'default') {
+      attrs.push('color:"text"');
+    }
+
+    // Custom border styles (topBottom*) are not standard Ink styles, so skip them
+    const isCustomBorder = borderStyle.startsWith('topBottom');
+    if (borderStyle !== 'none' && !isCustomBorder) {
+      attrs.push(`borderStyle:"${borderStyle}"`);
+      const borderMatch = borderColor.match(/\d+/g);
+      if (borderMatch) {
+        attrs.push(`borderColor:"rgb(${borderMatch.join(',')})"`);
+      }
+    }
+
+    if (paddingX > 0) {
+      attrs.push(`paddingX:${paddingX}`);
+    }
+    if (paddingY > 0) {
+      attrs.push(`paddingY:${paddingY}`);
+    }
+
+    const attrsStr = attrs.length > 0 ? `{${attrs.join(',')}}` : '{}';
+    newContent = `${attrsStr},"${formattedMessage}"`;
   }
-  // If not customizing message, we don't need to modify it at all since we're not changing the text
 
-  // Sort modifications by startIndex in descending order to avoid index shifting issues
-  modifications.sort((a, b) => b.startIndex - a.startIndex);
+  // Apply modification
+  const before = oldFile;
+  const newFile =
+    oldFile.slice(0, location.startIndex) +
+    newContent +
+    oldFile.slice(location.endIndex);
 
-  // Apply modifications
-  let newFile = oldFile;
-  for (const mod of modifications) {
-    const before = newFile;
-    newFile =
-      newFile.slice(0, mod.startIndex) +
-      mod.newContent +
-      newFile.slice(mod.endIndex);
-
-    showDiff(before, newFile, mod.newContent, mod.startIndex, mod.endIndex);
-  }
+  showDiff(before, newFile, newContent, location.startIndex, location.endIndex);
 
   return newFile;
 };

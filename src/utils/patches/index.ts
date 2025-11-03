@@ -185,27 +185,18 @@ export const applyCustomization = async (
     if (
       (result = writeUserMessageDisplay(
         content,
-        config.settings.userMessageDisplay.prefix.format,
-        config.settings.userMessageDisplay.prefix.foreground_color,
-        config.settings.userMessageDisplay.prefix.background_color,
-        config.settings.userMessageDisplay.prefix.styling.includes('bold'),
-        config.settings.userMessageDisplay.prefix.styling.includes('italic'),
-        config.settings.userMessageDisplay.prefix.styling.includes('underline'),
-        config.settings.userMessageDisplay.prefix.styling.includes(
-          'strikethrough'
-        ),
-        config.settings.userMessageDisplay.prefix.styling.includes('inverse'),
-        config.settings.userMessageDisplay.message.foreground_color,
-        config.settings.userMessageDisplay.message.background_color,
-        config.settings.userMessageDisplay.message.styling.includes('bold'),
-        config.settings.userMessageDisplay.message.styling.includes('italic'),
-        config.settings.userMessageDisplay.message.styling.includes(
-          'underline'
-        ),
-        config.settings.userMessageDisplay.message.styling.includes(
-          'strikethrough'
-        ),
-        config.settings.userMessageDisplay.message.styling.includes('inverse')
+        config.settings.userMessageDisplay.format,
+        config.settings.userMessageDisplay.foregroundColor,
+        config.settings.userMessageDisplay.backgroundColor,
+        config.settings.userMessageDisplay.styling.includes('bold'),
+        config.settings.userMessageDisplay.styling.includes('italic'),
+        config.settings.userMessageDisplay.styling.includes('underline'),
+        config.settings.userMessageDisplay.styling.includes('strikethrough'),
+        config.settings.userMessageDisplay.styling.includes('inverse'),
+        config.settings.userMessageDisplay.borderStyle,
+        config.settings.userMessageDisplay.borderColor,
+        config.settings.userMessageDisplay.paddingX,
+        config.settings.userMessageDisplay.paddingY
       ))
     ) {
       content = result;

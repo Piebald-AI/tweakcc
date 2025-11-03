@@ -2,10 +2,7 @@ import { useState, useContext, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { ColorPicker } from './ColorPicker.js';
 import { SettingsContext } from '../App.js';
-import {
-  UserMessageDisplayElementConfig,
-  DEFAULT_SETTINGS,
-} from '../utils/types.js';
+import { DEFAULT_SETTINGS } from '../utils/types.js';
 import { getCurrentClaudeCodeTheme } from '../utils/misc.js';
 import Header from './Header.js';
 
@@ -21,52 +18,82 @@ const STYLING_OPTIONS = [
   { label: 'inverse', value: 'inverse' },
 ];
 
+const BORDER_STYLE_OPTIONS = [
+  { label: 'none', value: 'none' },
+  { label: 'single', value: 'single' },
+  { label: 'double', value: 'double' },
+  { label: 'round', value: 'round' },
+  { label: 'bold', value: 'bold' },
+  { label: 'singleDouble', value: 'singleDouble' },
+  { label: 'doubleSingle', value: 'doubleSingle' },
+  { label: 'classic', value: 'classic' },
+  { label: 'topBottomSingle', value: 'topBottomSingle' },
+  { label: 'topBottomDouble', value: 'topBottomDouble' },
+  { label: 'topBottomBold', value: 'topBottomBold' },
+];
+
+type ColorMode = 'default' | 'custom';
+type ColorPickerType = 'foreground' | 'background' | 'border';
+
 export function UserMessageDisplayView({
   onBack,
 }: UserMessageDisplayViewProps) {
   const { settings, updateSettings } = useContext(SettingsContext);
 
-  // Track which column is active (prefix or message)
-  const [activeColumn, setActiveColumn] = useState<'prefix' | 'message'>(
-    'prefix'
+  const [selectedOptionIndex, setSelectedOptionIndex] = useState(0);
+  const [editingFormat, setEditingFormat] = useState(false);
+  const [editingPaddingX, setEditingPaddingX] = useState(false);
+  const [editingPaddingY, setEditingPaddingY] = useState(false);
+  const [formatInput, setFormatInput] = useState(
+    () => settings.userMessageDisplay.format
+  );
+  const [paddingXInput, setPaddingXInput] = useState(
+    () => String(settings.userMessageDisplay.paddingX)
+  );
+  const [paddingYInput, setPaddingYInput] = useState(
+    () => String(settings.userMessageDisplay.paddingY)
+  );
+  const [stylingIndex, setStylingIndex] = useState(0);
+  const [activeStylings, setActiveStylings] = useState<string[]>(
+    () => [...settings.userMessageDisplay.styling]
   );
 
-  // Prefix state - initialize from settings
-  const [prefixSelectedOptionIndex, setPrefixSelectedOptionIndex] = useState(0);
-  const [prefixEditingFormat, setPrefixEditingFormat] = useState(false);
-  const [prefixFormatInput, setPrefixFormatInput] = useState(
-    () => settings.userMessageDisplay.prefix.format
+  // Foreground color state
+  const [foregroundMode, setForegroundMode] = useState<ColorMode>(
+    () => settings.userMessageDisplay.foregroundColor === 'default' ? 'default' : 'custom'
   );
-  const [prefixStylingIndex, setPrefixStylingIndex] = useState(0);
-  const [prefixActiveStylings, setPrefixActiveStylings] = useState<string[]>(
-    () => [...settings.userMessageDisplay.prefix.styling]
-  );
-  const [prefixForegroundColor, setPrefixForegroundColor] = useState(
-    () => settings.userMessageDisplay.prefix.foreground_color
-  );
-  const [prefixBackgroundColor, setPrefixBackgroundColor] = useState(
-    () => settings.userMessageDisplay.prefix.background_color
+  const [foregroundColor, setForegroundColor] = useState(
+    () => settings.userMessageDisplay.foregroundColor === 'default'
+      ? 'rgb(255,255,255)'
+      : settings.userMessageDisplay.foregroundColor
   );
 
-  // Message state - initialize from settings
-  const [messageSelectedOptionIndex, setMessageSelectedOptionIndex] =
-    useState(0);
-  const [messageStylingIndex, setMessageStylingIndex] = useState(0);
-  const [messageActiveStylings, setMessageActiveStylings] = useState<string[]>(
-    () => [...settings.userMessageDisplay.message.styling]
+  // Background color state
+  const [backgroundMode, setBackgroundMode] = useState<'default' | 'none' | 'custom'>(
+    () => {
+      const bg = settings.userMessageDisplay.backgroundColor;
+      if (bg === null) return 'none';
+      if (bg === 'default') return 'default';
+      return 'custom';
+    }
   );
-  const [messageForegroundColor, setMessageForegroundColor] = useState(
-    () => settings.userMessageDisplay.message.foreground_color
-  );
-  const [messageBackgroundColor, setMessageBackgroundColor] = useState(
-    () => settings.userMessageDisplay.message.background_color
+  const [backgroundColor, setBackgroundColor] = useState(
+    () => {
+      const bg = settings.userMessageDisplay.backgroundColor;
+      return (bg === null || bg === 'default') ? 'rgb(0,0,0)' : bg;
+    }
   );
 
-  // Shared state for color picker
-  const [colorPickerMode, setColorPickerMode] = useState<{
-    column: 'prefix' | 'message';
-    type: 'foreground' | 'background';
-  } | null>(null);
+  // Border state
+  const [borderStyleIndex, setBorderStyleIndex] = useState(
+    () => BORDER_STYLE_OPTIONS.findIndex(opt => opt.value === settings.userMessageDisplay.borderStyle)
+  );
+  const [borderColor, setBorderColor] = useState(
+    () => settings.userMessageDisplay.borderColor
+  );
+
+  // Color picker state
+  const [colorPickerType, setColorPickerType] = useState<ColorPickerType | null>(null);
   const [originalColor, setOriginalColor] = useState('');
 
   // Get current theme
@@ -74,464 +101,359 @@ export function UserMessageDisplayView({
   const currentTheme =
     settings.themes?.find(t => t.id === currentThemeId) || settings.themes?.[0];
 
-  const prefixOptions = [
-    'format',
-    'styling',
-    'foreground',
-    'background',
-  ] as const;
-  const messageOptions = ['styling', 'foreground', 'background'] as const;
+  // Track which column is active
+  const [activeColumn, setActiveColumn] = useState<'text' | 'border'>('text');
 
-  const selectedPrefixOption = prefixOptions[prefixSelectedOptionIndex];
-  const selectedMessageOption = messageOptions[messageSelectedOptionIndex];
+  const textOptions = ['format', 'styling', 'foreground', 'background'] as const;
+  const borderOptions = ['borderStyle', 'borderColor', 'paddingX', 'paddingY'] as const;
 
-  // Update element config and save to settings
-  const updateElementConfig = (
-    elementType: 'prefix' | 'message',
-    updater: (config: UserMessageDisplayElementConfig) => void
-  ) => {
+  const [textSelectedIndex, setTextSelectedIndex] = useState(0);
+  const [borderSelectedIndex, setBorderSelectedIndex] = useState(0);
+
+  const selectedOption = activeColumn === 'text'
+    ? textOptions[textSelectedIndex]
+    : borderOptions[borderSelectedIndex];
+
+  // Save to settings
+  const saveToSettings = () => {
     updateSettings(settings => {
-      const config =
-        elementType === 'prefix'
-          ? settings.userMessageDisplay.prefix
-          : settings.userMessageDisplay.message;
-      updater(config);
+      settings.userMessageDisplay.format = formatInput;
+      settings.userMessageDisplay.styling = [...activeStylings];
+      settings.userMessageDisplay.foregroundColor =
+        foregroundMode === 'default' ? 'default' : foregroundColor;
+      settings.userMessageDisplay.backgroundColor =
+        backgroundMode === 'none' ? null :
+        backgroundMode === 'default' ? 'default' :
+        backgroundColor;
+      settings.userMessageDisplay.borderStyle = BORDER_STYLE_OPTIONS[borderStyleIndex].value as any;
+      settings.userMessageDisplay.borderColor = borderColor;
+      settings.userMessageDisplay.paddingX = parseInt(paddingXInput) || 0;
+      settings.userMessageDisplay.paddingY = parseInt(paddingYInput) || 0;
     });
   };
 
-  // Restore element to original/default settings
-  const restoreToOriginal = (elementType: 'prefix' | 'message') => {
-    updateSettings(settings => {
-      if (elementType === 'prefix') {
-        settings.userMessageDisplay.prefix = {
-          ...DEFAULT_SETTINGS.userMessageDisplay.prefix,
-        };
-      } else {
-        settings.userMessageDisplay.message = {
-          ...DEFAULT_SETTINGS.userMessageDisplay.message,
-        };
-      }
-    });
+  // Restore to default settings
+  const restoreToOriginal = () => {
+    setFormatInput(DEFAULT_SETTINGS.userMessageDisplay.format);
+    setActiveStylings([...DEFAULT_SETTINGS.userMessageDisplay.styling]);
+    setForegroundMode('default');
+    setForegroundColor('rgb(255,255,255)');
+    setBackgroundMode('none');
+    setBackgroundColor('rgb(0,0,0)');
+    setBorderStyleIndex(BORDER_STYLE_OPTIONS.findIndex(opt => opt.value === DEFAULT_SETTINGS.userMessageDisplay.borderStyle));
+    setBorderColor(DEFAULT_SETTINGS.userMessageDisplay.borderColor);
+    setPaddingXInput(String(DEFAULT_SETTINGS.userMessageDisplay.paddingX));
+    setPaddingYInput(String(DEFAULT_SETTINGS.userMessageDisplay.paddingY));
 
-    // Update UI state
-    if (elementType === 'prefix') {
-      setPrefixFormatInput(DEFAULT_SETTINGS.userMessageDisplay.prefix.format);
-      setPrefixActiveStylings([
-        ...DEFAULT_SETTINGS.userMessageDisplay.prefix.styling,
-      ]);
-      setPrefixForegroundColor(
-        DEFAULT_SETTINGS.userMessageDisplay.prefix.foreground_color
-      );
-      setPrefixBackgroundColor(
-        DEFAULT_SETTINGS.userMessageDisplay.prefix.background_color
-      );
-    } else {
-      setMessageActiveStylings([
-        ...DEFAULT_SETTINGS.userMessageDisplay.message.styling,
-      ]);
-      setMessageForegroundColor(
-        DEFAULT_SETTINGS.userMessageDisplay.message.foreground_color
-      );
-      setMessageBackgroundColor(
-        DEFAULT_SETTINGS.userMessageDisplay.message.background_color
-      );
-    }
+    updateSettings(settings => {
+      settings.userMessageDisplay = { ...DEFAULT_SETTINGS.userMessageDisplay };
+    });
   };
 
   // Load existing configuration when component mounts
   useEffect(() => {
-    const prefixConfig = settings.userMessageDisplay.prefix;
-    setPrefixFormatInput(prefixConfig.format);
-    setPrefixActiveStylings([...prefixConfig.styling]);
-    setPrefixForegroundColor(prefixConfig.foreground_color);
-    setPrefixBackgroundColor(prefixConfig.background_color);
+    const config = settings.userMessageDisplay;
+    setFormatInput(config.format);
+    setActiveStylings([...config.styling]);
+    setPaddingXInput(String(config.paddingX));
+    setPaddingYInput(String(config.paddingY));
 
-    const messageConfig = settings.userMessageDisplay.message;
-    setMessageActiveStylings([...messageConfig.styling]);
-    setMessageForegroundColor(messageConfig.foreground_color);
-    setMessageBackgroundColor(messageConfig.background_color);
+    if (config.foregroundColor === 'default') {
+      setForegroundMode('default');
+      setForegroundColor('rgb(255,255,255)');
+    } else {
+      setForegroundMode('custom');
+      setForegroundColor(config.foregroundColor);
+    }
+
+    if (config.backgroundColor === null) {
+      setBackgroundMode('none');
+      setBackgroundColor('rgb(0,0,0)');
+    } else if (config.backgroundColor === 'default') {
+      setBackgroundMode('default');
+      setBackgroundColor('rgb(0,0,0)');
+    } else {
+      setBackgroundMode('custom');
+      setBackgroundColor(config.backgroundColor);
+    }
+
+    setBorderStyleIndex(BORDER_STYLE_OPTIONS.findIndex(opt => opt.value === config.borderStyle));
+    setBorderColor(config.borderColor);
   }, []);
 
+  // Save settings when borderStyleIndex changes
+  useEffect(() => {
+    saveToSettings();
+  }, [borderStyleIndex]);
+
   useInput((input, key) => {
-    // Handle format editing for prefix
-    if (prefixEditingFormat) {
+    // Handle format editing
+    if (editingFormat) {
       if (key.return) {
-        updateElementConfig('prefix', config => {
-          config.format = prefixFormatInput;
-        });
-        setPrefixEditingFormat(false);
+        saveToSettings();
+        setEditingFormat(false);
       } else if (key.escape) {
-        const config = settings.userMessageDisplay.prefix;
-        setPrefixFormatInput(config.format);
-        setPrefixEditingFormat(false);
+        setFormatInput(settings.userMessageDisplay.format);
+        setEditingFormat(false);
       } else if (key.backspace || key.delete) {
-        setPrefixFormatInput(prev => prev.slice(0, -1));
+        setFormatInput(prev => prev.slice(0, -1));
       } else if (input) {
-        setPrefixFormatInput(prev => prev + input);
+        setFormatInput(prev => prev + input);
       }
       return;
     }
 
-    if (colorPickerMode !== null) {
+    // Handle paddingX editing
+    if (editingPaddingX) {
+      if (key.return) {
+        saveToSettings();
+        setEditingPaddingX(false);
+      } else if (key.escape) {
+        setPaddingXInput(String(settings.userMessageDisplay.paddingX));
+        setEditingPaddingX(false);
+      } else if (key.backspace || key.delete) {
+        setPaddingXInput(prev => prev.slice(0, -1));
+      } else if (input && /^\d$/.test(input)) {
+        setPaddingXInput(prev => prev + input);
+      }
+      return;
+    }
+
+    // Handle paddingY editing
+    if (editingPaddingY) {
+      if (key.return) {
+        saveToSettings();
+        setEditingPaddingY(false);
+      } else if (key.escape) {
+        setPaddingYInput(String(settings.userMessageDisplay.paddingY));
+        setEditingPaddingY(false);
+      } else if (key.backspace || key.delete) {
+        setPaddingYInput(prev => prev.slice(0, -1));
+      } else if (input && /^\d$/.test(input)) {
+        setPaddingYInput(prev => prev + input);
+      }
+      return;
+    }
+
+    if (colorPickerType !== null) {
       return;
     }
 
     if (key.escape) {
       onBack();
     } else if (key.ctrl && input === 'r') {
-      restoreToOriginal(activeColumn);
+      restoreToOriginal();
     } else if (key.leftArrow || key.rightArrow) {
       // Switch between columns
-      setActiveColumn(prev => (prev === 'prefix' ? 'message' : 'prefix'));
+      setActiveColumn(prev => prev === 'text' ? 'border' : 'text');
     } else if (key.tab) {
       // Navigate within active column
-      if (activeColumn === 'prefix') {
+      if (activeColumn === 'text') {
         if (key.shift) {
-          setPrefixSelectedOptionIndex(prev =>
-            prev === 0 ? prefixOptions.length - 1 : prev - 1
+          setTextSelectedIndex(prev =>
+            prev === 0 ? textOptions.length - 1 : prev - 1
           );
         } else {
-          setPrefixSelectedOptionIndex(prev =>
-            prev === prefixOptions.length - 1 ? 0 : prev + 1
+          setTextSelectedIndex(prev =>
+            prev === textOptions.length - 1 ? 0 : prev + 1
           );
         }
       } else {
         if (key.shift) {
-          setMessageSelectedOptionIndex(prev =>
-            prev === 0 ? messageOptions.length - 1 : prev - 1
+          setBorderSelectedIndex(prev =>
+            prev === 0 ? borderOptions.length - 1 : prev - 1
           );
         } else {
-          setMessageSelectedOptionIndex(prev =>
-            prev === messageOptions.length - 1 ? 0 : prev + 1
+          setBorderSelectedIndex(prev =>
+            prev === borderOptions.length - 1 ? 0 : prev + 1
           );
         }
       }
     } else if (key.return) {
-      if (activeColumn === 'prefix') {
-        if (selectedPrefixOption === 'format') {
-          setPrefixEditingFormat(true);
-        } else if (selectedPrefixOption === 'foreground') {
-          setOriginalColor(prefixForegroundColor);
-          setColorPickerMode({ column: 'prefix', type: 'foreground' });
-        } else if (selectedPrefixOption === 'background') {
-          setOriginalColor(prefixBackgroundColor);
-          setColorPickerMode({ column: 'prefix', type: 'background' });
+      if (selectedOption === 'format') {
+        setEditingFormat(true);
+      } else if (selectedOption === 'paddingX') {
+        setEditingPaddingX(true);
+      } else if (selectedOption === 'paddingY') {
+        setEditingPaddingY(true);
+      } else if (selectedOption === 'foreground') {
+        if (foregroundMode === 'custom') {
+          setOriginalColor(foregroundColor);
+          setColorPickerType('foreground');
         }
-      } else {
-        if (selectedMessageOption === 'foreground') {
-          setOriginalColor(messageForegroundColor);
-          setColorPickerMode({ column: 'message', type: 'foreground' });
-        } else if (selectedMessageOption === 'background') {
-          setOriginalColor(messageBackgroundColor);
-          setColorPickerMode({ column: 'message', type: 'background' });
+      } else if (selectedOption === 'background') {
+        if (backgroundMode === 'custom') {
+          setOriginalColor(backgroundColor);
+          setColorPickerType('background');
         }
+      } else if (selectedOption === 'borderColor') {
+        setOriginalColor(borderColor);
+        setColorPickerType('border');
       }
     } else if (key.upArrow) {
-      if (activeColumn === 'prefix' && selectedPrefixOption === 'styling') {
-        setPrefixStylingIndex(prev => Math.max(0, prev - 1));
-      } else if (
-        activeColumn === 'message' &&
-        selectedMessageOption === 'styling'
-      ) {
-        setMessageStylingIndex(prev => Math.max(0, prev - 1));
+      if (selectedOption === 'styling') {
+        setStylingIndex(prev => Math.max(0, prev - 1));
+      } else if (selectedOption === 'borderStyle') {
+        setBorderStyleIndex(prev =>
+          prev === 0 ? BORDER_STYLE_OPTIONS.length - 1 : prev - 1
+        );
+      } else if (selectedOption === 'foreground') {
+        setForegroundMode(prev => {
+          const nextMode = prev === 'default' ? 'custom' : 'default';
+          // Ensure foregroundColor has a valid value when switching to custom mode
+          if (nextMode === 'custom' && (!foregroundColor || foregroundColor === '')) {
+            setForegroundColor('rgb(255,255,255)');
+          }
+          return nextMode;
+        });
+        saveToSettings();
+      } else if (selectedOption === 'background') {
+        setBackgroundMode(prev => {
+          const nextMode = prev === 'default' ? 'custom' : prev === 'custom' ? 'none' : 'default';
+          // Ensure backgroundColor has a valid value when switching to custom mode
+          if (nextMode === 'custom' && (!backgroundColor || backgroundColor === '')) {
+            setBackgroundColor('rgb(0,0,0)');
+          }
+          return nextMode;
+        });
+        saveToSettings();
       }
     } else if (key.downArrow) {
-      if (activeColumn === 'prefix' && selectedPrefixOption === 'styling') {
-        setPrefixStylingIndex(prev =>
+      if (selectedOption === 'styling') {
+        setStylingIndex(prev =>
           Math.min(STYLING_OPTIONS.length - 1, prev + 1)
         );
-      } else if (
-        activeColumn === 'message' &&
-        selectedMessageOption === 'styling'
-      ) {
-        setMessageStylingIndex(prev =>
-          Math.min(STYLING_OPTIONS.length - 1, prev + 1)
+      } else if (selectedOption === 'borderStyle') {
+        setBorderStyleIndex(prev =>
+          prev === BORDER_STYLE_OPTIONS.length - 1 ? 0 : prev + 1
         );
+      } else if (selectedOption === 'foreground') {
+        setForegroundMode(prev => {
+          const nextMode = prev === 'default' ? 'custom' : 'default';
+          // Ensure foregroundColor has a valid value when switching to custom mode
+          if (nextMode === 'custom' && (!foregroundColor || foregroundColor === '')) {
+            setForegroundColor('rgb(255,255,255)');
+          }
+          return nextMode;
+        });
+        saveToSettings();
+      } else if (selectedOption === 'background') {
+        setBackgroundMode(prev => {
+          const nextMode = prev === 'default' ? 'none' : prev === 'none' ? 'custom' : 'default';
+          // Ensure backgroundColor has a valid value when switching to custom mode
+          if (nextMode === 'custom' && (!backgroundColor || backgroundColor === '')) {
+            setBackgroundColor('rgb(0,0,0)');
+          }
+          return nextMode;
+        });
+        saveToSettings();
       }
     } else if (input === ' ') {
-      if (activeColumn === 'prefix' && selectedPrefixOption === 'styling') {
-        const option = STYLING_OPTIONS[prefixStylingIndex].value;
+      if (selectedOption === 'styling') {
+        const option = STYLING_OPTIONS[stylingIndex].value;
         const newStylings =
-          prefixActiveStylings.indexOf(option) >= 0
-            ? prefixActiveStylings.filter(s => s !== option)
-            : [...prefixActiveStylings, option];
-        setPrefixActiveStylings(newStylings);
-        updateElementConfig('prefix', config => {
-          config.styling = [...newStylings];
-        });
-      } else if (
-        activeColumn === 'message' &&
-        selectedMessageOption === 'styling'
-      ) {
-        const option = STYLING_OPTIONS[messageStylingIndex].value;
-        const newStylings =
-          messageActiveStylings.indexOf(option) >= 0
-            ? messageActiveStylings.filter(s => s !== option)
-            : [...messageActiveStylings, option];
-        setMessageActiveStylings(newStylings);
-        updateElementConfig('message', config => {
-          config.styling = [...newStylings];
-        });
+          activeStylings.indexOf(option) >= 0
+            ? activeStylings.filter(s => s !== option)
+            : [...activeStylings, option];
+        setActiveStylings(newStylings);
+        saveToSettings();
       }
     }
   });
 
   // Apply styling to preview text
-  const applyStylesToText = (
-    text: string,
-    elementType: 'prefix' | 'message',
-    useConfig: boolean = true
-  ) => {
-    const styling = useConfig
-      ? elementType === 'prefix'
-        ? prefixActiveStylings
-        : messageActiveStylings
-      : [];
-    const fgColor = useConfig
-      ? elementType === 'prefix'
-        ? prefixForegroundColor
-        : messageForegroundColor
-      : 'rgb(255,255,255)';
-    const bgColor = useConfig
-      ? elementType === 'prefix'
-        ? prefixBackgroundColor
-        : messageBackgroundColor
-      : 'rgb(0,0,0)';
+  const applyStylesToText = (text: string) => {
+    const fgColor = foregroundMode === 'default' ? undefined : foregroundColor;
+    const bgColor =
+      backgroundMode === 'none' ? undefined :
+      backgroundMode === 'default' ? undefined :
+      backgroundColor;
 
-    // Check if both colors are black (which means "no color" in the patching logic)
-    const isBlackOnBlack = fgColor === 'rgb(0,0,0)' && bgColor === 'rgb(0,0,0)';
-    const hasStyling = styling.length > 0;
+    const borderStyle = BORDER_STYLE_OPTIONS[borderStyleIndex].value as any;
+    const paddingX = parseInt(paddingXInput) || 0;
+    const paddingY = parseInt(paddingYInput) || 0;
 
-    // If black on black with no styling, don't apply any colors (use defaults)
-    if (isBlackOnBlack && !hasStyling) {
-      return <Text>{text}</Text>;
-    }
-
-    return (
+    const styledText = (
       <Text
-        bold={styling.includes('bold')}
-        italic={styling.includes('italic')}
-        underline={styling.includes('underline')}
-        strikethrough={styling.includes('strikethrough')}
-        inverse={styling.includes('inverse')}
-        color={isBlackOnBlack ? undefined : fgColor}
-        backgroundColor={isBlackOnBlack ? undefined : bgColor}
+        bold={activeStylings.includes('bold')}
+        italic={activeStylings.includes('italic')}
+        underline={activeStylings.includes('underline')}
+        strikethrough={activeStylings.includes('strikethrough')}
+        inverse={activeStylings.includes('inverse')}
+        color={fgColor}
+        backgroundColor={bgColor}
       >
         {text}
       </Text>
     );
+
+    // Handle custom top/bottom-only borders
+    const isTopBottomBorder = borderStyle === 'topBottomSingle' || borderStyle === 'topBottomDouble' || borderStyle === 'topBottomBold';
+
+    if (isTopBottomBorder) {
+      // Render custom top/bottom borders as text
+      const borderChar = borderStyle === 'topBottomSingle' ? '─' :
+                        borderStyle === 'topBottomDouble' ? '═' :
+                        '━';
+      const textLength = text.length + paddingX * 2;
+      const borderLine = borderChar.repeat(textLength);
+
+      return (
+        <Box flexDirection="column">
+          <Text color={borderColor}>{borderLine}</Text>
+          {paddingY > 0 && <Box height={paddingY} />}
+          <Box paddingX={paddingX}>
+            {styledText}
+          </Box>
+          {paddingY > 0 && <Box height={paddingY} />}
+          <Text color={borderColor}>{borderLine}</Text>
+        </Box>
+      );
+    } else if (borderStyle !== 'none' || paddingX > 0 || paddingY > 0) {
+      const content = paddingX > 0 || paddingY > 0 ? (
+        <Box paddingX={paddingX} paddingY={paddingY}>
+          {styledText}
+        </Box>
+      ) : styledText;
+
+      return borderStyle !== 'none' ? (
+        <Box
+          borderStyle={borderStyle}
+          borderColor={borderColor}
+        >
+          {content}
+        </Box>
+      ) : content;
+    } else {
+      return styledText;
+    }
   };
 
-  // Create preview showing prefix followed by message
-  const createMixedStylePreview = (useConfig: boolean = true) => {
+  // Create preview with format string
+  const createPreview = () => {
     const messageSampleText = 'list the dir';
-
-    return (
-      <Text>
-        {prefixFormatInput && (
-          <>{applyStylesToText(prefixFormatInput, 'prefix', useConfig)} </>
-        )}
-        {applyStylesToText(messageSampleText, 'message', useConfig)}
-      </Text>
-    );
-  };
-
-  // Render element configuration column
-  const renderElementColumn = (elementType: 'prefix' | 'message') => {
-    const isActive = activeColumn === elementType;
-    const options = elementType === 'prefix' ? prefixOptions : messageOptions;
-    const selectedOptionIndex =
-      elementType === 'prefix'
-        ? prefixSelectedOptionIndex
-        : messageSelectedOptionIndex;
-    const selectedOption = options[selectedOptionIndex];
-    const stylingIndex =
-      elementType === 'prefix' ? prefixStylingIndex : messageStylingIndex;
-    const activeStylings =
-      elementType === 'prefix' ? prefixActiveStylings : messageActiveStylings;
-    const foregroundColor =
-      elementType === 'prefix' ? prefixForegroundColor : messageForegroundColor;
-    const backgroundColor =
-      elementType === 'prefix' ? prefixBackgroundColor : messageBackgroundColor;
-
-    return (
-      <Box
-        flexDirection="column"
-        width="45%"
-        borderStyle={isActive ? 'round' : 'single'}
-        borderColor={isActive ? 'yellow' : 'gray'}
-        padding={1}
-      >
-        <Box marginBottom={1}>
-          <Text bold color={isActive ? 'yellow' : undefined}>
-            {elementType.charAt(0).toUpperCase() + elementType.slice(1)}{' '}
-            Configuration
-          </Text>
-        </Box>
-
-        {/* Format Section - only for prefix */}
-        {elementType === 'prefix' && (
-          <>
-            <Box>
-              <Text
-                color={
-                  isActive && selectedOption === 'format' ? 'yellow' : undefined
-                }
-                bold={isActive && selectedOption === 'format'}
-              >
-                {isActive && selectedOption === 'format' ? '❯ ' : '  '}Prefix
-                Text
-              </Text>
-            </Box>
-
-            {isActive && selectedOption === 'format' && (
-              <Box marginLeft={2}>
-                <Text dimColor>
-                  {prefixEditingFormat
-                    ? 'enter to save'
-                    : 'enter to edit (appears before message)'}
-                </Text>
-              </Box>
-            )}
-
-            <Box marginLeft={2} marginBottom={1}>
-              <Box
-                borderStyle="round"
-                borderColor={prefixEditingFormat ? 'yellow' : 'gray'}
-              >
-                <Text>{prefixFormatInput}</Text>
-              </Box>
-            </Box>
-          </>
-        )}
-
-        {/* Styling Section */}
-        <Box>
-          <Text
-            color={
-              isActive && selectedOption === 'styling' ? 'yellow' : undefined
-            }
-            bold={isActive && selectedOption === 'styling'}
-          >
-            {isActive && selectedOption === 'styling' ? '❯ ' : '  '}Styling
-          </Text>
-        </Box>
-
-        {isActive && selectedOption === 'styling' && (
-          <Box marginLeft={2}>
-            <Text dimColor>up/down to navigate · space to toggle</Text>
-          </Box>
-        )}
-
-        <Box marginLeft={2} marginBottom={1} flexDirection="column">
-          {STYLING_OPTIONS.map((option, index) => (
-            <Box key={option.value}>
-              <Text
-                color={
-                  isActive &&
-                  selectedOption === 'styling' &&
-                  stylingIndex === index
-                    ? 'cyan'
-                    : undefined
-                }
-              >
-                {isActive &&
-                selectedOption === 'styling' &&
-                stylingIndex === index
-                  ? '❯ '
-                  : '  '}
-                {activeStylings.includes(option.value) ? '●' : '○'}{' '}
-                {option.label}
-              </Text>
-            </Box>
-          ))}
-        </Box>
-
-        {/* Foreground Color Section */}
-        <Box>
-          <Text
-            color={
-              isActive && selectedOption === 'foreground' ? 'yellow' : undefined
-            }
-            bold={isActive && selectedOption === 'foreground'}
-          >
-            {isActive && selectedOption === 'foreground' ? '❯ ' : '  '}
-            Foreground color
-          </Text>
-        </Box>
-
-        {isActive && selectedOption === 'foreground' && (
-          <Box marginLeft={2}>
-            <Text dimColor>enter to open color picker</Text>
-          </Box>
-        )}
-
-        <Box marginLeft={2} marginBottom={1}>
-          <Text color={foregroundColor}>{foregroundColor}</Text>
-        </Box>
-
-        {/* Background Color Section */}
-        <Box>
-          <Text
-            color={
-              isActive && selectedOption === 'background' ? 'yellow' : undefined
-            }
-            bold={isActive && selectedOption === 'background'}
-          >
-            {isActive && selectedOption === 'background' ? '❯ ' : '  '}
-            Background color
-          </Text>
-        </Box>
-
-        {isActive && selectedOption === 'background' && (
-          <Box marginLeft={2}>
-            <Text dimColor>enter to open color picker</Text>
-          </Box>
-        )}
-
-        <Box marginLeft={2}>
-          <Text backgroundColor={backgroundColor}>{backgroundColor}</Text>
-        </Box>
-      </Box>
-    );
+    const formattedText = formatInput.replace(/\{\}/g, messageSampleText);
+    return applyStylesToText(formattedText);
   };
 
   // Color picker mode
-  if (colorPickerMode) {
-    const { column, type } = colorPickerMode;
+  if (colorPickerType) {
     return (
       <ColorPicker
         initialValue={originalColor}
         theme={currentTheme}
         onColorChange={color => {
-          if (column === 'prefix') {
-            if (type === 'foreground') {
-              setPrefixForegroundColor(color);
-              updateElementConfig('prefix', config => {
-                config.foreground_color = color;
-              });
-            } else {
-              setPrefixBackgroundColor(color);
-              updateElementConfig('prefix', config => {
-                config.background_color = color;
-              });
-            }
-          } else {
-            if (type === 'foreground') {
-              setMessageForegroundColor(color);
-              updateElementConfig('message', config => {
-                config.foreground_color = color;
-              });
-            } else {
-              setMessageBackgroundColor(color);
-              updateElementConfig('message', config => {
-                config.background_color = color;
-              });
-            }
+          if (colorPickerType === 'foreground') {
+            setForegroundColor(color);
+          } else if (colorPickerType === 'background') {
+            setBackgroundColor(color);
+          } else if (colorPickerType === 'border') {
+            setBorderColor(color);
           }
+          saveToSettings();
         }}
         onExit={() => {
-          setColorPickerMode(null);
+          setColorPickerType(null);
           setOriginalColor('');
         }}
       />
@@ -547,24 +469,329 @@ export function UserMessageDisplayView({
           left/right arrows to switch columns · tab to navigate options
         </Text>
         <Text dimColor>
-          enter to edit · ctrl+r to reset active column · esc to go back
+          enter to edit · ctrl+r to reset · esc to go back
         </Text>
       </Box>
 
       <Box flexDirection="row" gap={1}>
-        {/* Prefix Configuration Column */}
-        {renderElementColumn('prefix')}
+        {/* Text Styling Column */}
+        <Box
+          flexDirection="column"
+          width="50%"
+          borderStyle={activeColumn === 'text' ? 'round' : 'single'}
+          borderColor={activeColumn === 'text' ? 'yellow' : 'gray'}
+          paddingX={1}
+        >
+          <Box marginBottom={1}>
+            <Text bold color={activeColumn === 'text' ? 'yellow' : undefined}>
+              Text & Styling
+            </Text>
+          </Box>
 
-        {/* Message Configuration Column */}
-        {renderElementColumn('message')}
+          {/* Format Section */}
+          <Box>
+            <Text
+              color={selectedOption === 'format' ? 'yellow' : undefined}
+              bold={selectedOption === 'format'}
+            >
+              {selectedOption === 'format' ? '❯ ' : '  '}Format String
+            </Text>
+          </Box>
+
+        {selectedOption === 'format' && (
+          <Box marginLeft={2}>
+            <Text dimColor>
+              {editingFormat
+                ? 'enter to save · esc to cancel'
+                : 'enter to edit · use {} as message placeholder'}
+            </Text>
+          </Box>
+        )}
+
+        <Box marginLeft={2} marginBottom={1}>
+          <Box
+            borderStyle="round"
+            borderColor={editingFormat ? 'yellow' : 'gray'}
+          >
+            <Text>{formatInput}</Text>
+          </Box>
+        </Box>
+
+        {/* Styling Section */}
+        <Box>
+          <Text
+            color={selectedOption === 'styling' ? 'yellow' : undefined}
+            bold={selectedOption === 'styling'}
+          >
+            {selectedOption === 'styling' ? '❯ ' : '  '}Styling
+          </Text>
+        </Box>
+
+        {selectedOption === 'styling' && (
+          <Box marginLeft={2}>
+            <Text dimColor>up/down to navigate · space to toggle</Text>
+          </Box>
+        )}
+
+        <Box marginLeft={2} marginBottom={1} flexDirection="column">
+          {STYLING_OPTIONS.map((option, index) => (
+            <Box key={option.value}>
+              <Text
+                color={
+                  selectedOption === 'styling' && stylingIndex === index
+                    ? 'cyan'
+                    : undefined
+                }
+              >
+                {selectedOption === 'styling' && stylingIndex === index
+                  ? '❯ '
+                  : '  '}
+                {activeStylings.includes(option.value) ? '●' : '○'}{' '}
+                {option.label}
+              </Text>
+            </Box>
+          ))}
+        </Box>
+
+        {/* Foreground & Background Color Section */}
+        <Box flexDirection="row" gap={1} marginBottom={1}>
+          <Box flexDirection="column" width="50%">
+            <Box>
+              <Text
+                color={selectedOption === 'foreground' ? 'yellow' : undefined}
+                bold={selectedOption === 'foreground'}
+              >
+                {selectedOption === 'foreground' ? '❯ ' : '  '}Foreground
+              </Text>
+            </Box>
+
+            {selectedOption === 'foreground' && (
+              <Box marginLeft={2}>
+                <Text dimColor>
+                  up/down · {foregroundMode === 'custom' ? 'enter' : ''}
+                </Text>
+              </Box>
+            )}
+
+            <Box marginLeft={2} flexDirection="column">
+              <Box>
+                <Text>
+                  {foregroundMode === 'default' ? '● ' : '○ '}Default
+                </Text>
+              </Box>
+              <Box>
+                <Text>
+                  {foregroundMode === 'custom' ? '● ' : '○ '}Custom{foregroundMode === 'custom' && ': '}
+                  {foregroundMode === 'custom' && (
+                    <Text color={foregroundColor}>{foregroundColor}</Text>
+                  )}
+                </Text>
+              </Box>
+            </Box>
+          </Box>
+
+          <Box flexDirection="column" width="50%">
+            <Box>
+              <Text
+                color={selectedOption === 'background' ? 'yellow' : undefined}
+                bold={selectedOption === 'background'}
+              >
+                {selectedOption === 'background' ? '❯ ' : '  '}Background
+              </Text>
+            </Box>
+
+            {selectedOption === 'background' && (
+              <Box marginLeft={2}>
+                <Text dimColor>
+                  up/down · {backgroundMode === 'custom' ? 'enter' : ''}
+                </Text>
+              </Box>
+            )}
+
+            <Box marginLeft={2} flexDirection="column">
+              <Box>
+                <Text>
+                  {backgroundMode === 'default' ? '● ' : '○ '}Default
+                </Text>
+              </Box>
+              <Box>
+                <Text>
+                  {backgroundMode === 'none' ? '● ' : '○ '}None
+                </Text>
+              </Box>
+              <Box>
+                <Text>
+                  {backgroundMode === 'custom' ? '● ' : '○ '}Custom{backgroundMode === 'custom' && ': '}
+                  {backgroundMode === 'custom' && (
+                    <Text backgroundColor={backgroundColor}>{backgroundColor}</Text>
+                  )}
+                </Text>
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+        </Box>
+
+        {/* Border & Padding Column */}
+        <Box
+          flexDirection="column"
+          width="50%"
+          borderStyle={activeColumn === 'border' ? 'round' : 'single'}
+          borderColor={activeColumn === 'border' ? 'yellow' : 'gray'}
+          paddingX={1}
+        >
+          <Box marginBottom={1}>
+            <Text bold color={activeColumn === 'border' ? 'yellow' : undefined}>
+              Border & Padding
+            </Text>
+          </Box>
+
+          {/* Border Style Section */}
+          <Box>
+            <Text
+              color={selectedOption === 'borderStyle' ? 'yellow' : undefined}
+              bold={selectedOption === 'borderStyle'}
+            >
+              {selectedOption === 'borderStyle' ? '❯ ' : '  '}Border Style
+            </Text>
+          </Box>
+
+        {selectedOption === 'borderStyle' && (
+          <Box marginLeft={2}>
+            <Text dimColor>up/down to navigate</Text>
+          </Box>
+        )}
+
+        <Box marginLeft={2} marginBottom={1} flexDirection="row">
+          <Box flexDirection="column" width="50%">
+            {BORDER_STYLE_OPTIONS.slice(0, 6).map((option, index) => (
+              <Box key={option.value}>
+                <Text
+                  color={
+                    selectedOption === 'borderStyle' && borderStyleIndex === index
+                      ? 'cyan'
+                      : undefined
+                  }
+                >
+                  {selectedOption === 'borderStyle' && borderStyleIndex === index
+                    ? '❯ '
+                    : '  '}
+                  {borderStyleIndex === index ? '● ' : '○ '}
+                  {option.label}
+                </Text>
+              </Box>
+            ))}
+          </Box>
+          <Box flexDirection="column" width="50%">
+            {BORDER_STYLE_OPTIONS.slice(6).map((option, index) => {
+              const actualIndex = index + 6;
+              return (
+                <Box key={option.value}>
+                  <Text
+                    color={
+                      selectedOption === 'borderStyle' && borderStyleIndex === actualIndex
+                        ? 'cyan'
+                        : undefined
+                    }
+                  >
+                    {selectedOption === 'borderStyle' && borderStyleIndex === actualIndex
+                      ? '❯ '
+                      : '  '}
+                    {borderStyleIndex === actualIndex ? '● ' : '○ '}
+                    {option.label}
+                  </Text>
+                </Box>
+              );
+            })}
+          </Box>
+        </Box>
+
+        {/* Border Color Section */}
+        <Box>
+          <Text
+            color={selectedOption === 'borderColor' ? 'yellow' : undefined}
+            bold={selectedOption === 'borderColor'}
+          >
+            {selectedOption === 'borderColor' ? '❯ ' : '  '}Border Color
+          </Text>
+        </Box>
+
+        {selectedOption === 'borderColor' && (
+          <Box marginLeft={2}>
+            <Text dimColor>enter to pick color</Text>
+          </Box>
+        )}
+
+        <Box marginLeft={2} marginBottom={1}>
+          <Text color={borderColor}>{borderColor}</Text>
+        </Box>
+
+        {/* Padding X & Y Section */}
+        <Box flexDirection="row" gap={1}>
+          <Box flexDirection="column" width="50%">
+            <Box>
+              <Text
+                color={selectedOption === 'paddingX' ? 'yellow' : undefined}
+                bold={selectedOption === 'paddingX'}
+              >
+                {selectedOption === 'paddingX' ? '❯ ' : '  '}Padding X
+              </Text>
+            </Box>
+
+            {selectedOption === 'paddingX' && (
+              <Box marginLeft={2}>
+                <Text dimColor>
+                  {editingPaddingX ? 'enter/esc' : 'enter'}
+                </Text>
+              </Box>
+            )}
+
+            <Box marginLeft={2}>
+              <Box
+                borderStyle="round"
+                borderColor={editingPaddingX ? 'yellow' : 'gray'}
+              >
+                <Text>{paddingXInput}</Text>
+              </Box>
+            </Box>
+          </Box>
+
+          <Box flexDirection="column" width="50%">
+            <Box>
+              <Text
+                color={selectedOption === 'paddingY' ? 'yellow' : undefined}
+                bold={selectedOption === 'paddingY'}
+              >
+                {selectedOption === 'paddingY' ? '❯ ' : '  '}Padding Y
+              </Text>
+            </Box>
+
+            {selectedOption === 'paddingY' && (
+              <Box marginLeft={2}>
+                <Text dimColor>
+                  {editingPaddingY ? 'enter/esc' : 'enter'}
+                </Text>
+              </Box>
+            )}
+
+            <Box marginLeft={2}>
+              <Box
+                borderStyle="round"
+                borderColor={editingPaddingY ? 'yellow' : 'gray'}
+              >
+                <Text>{paddingYInput}</Text>
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+        </Box>
       </Box>
 
       {/* Preview Panel */}
-      <Box borderStyle="round" padding={1} marginTop={1}>
-        <Box flexDirection="column">
-          <Box marginBottom={1}>
-            <Text bold>Preview</Text>
-          </Box>
+      <Box flexDirection="column" marginTop={1} paddingX={1}>
+        <Box marginBottom={1}>
+          <Text bold>Preview</Text>
+        </Box>
 
           <Box flexDirection="row" gap={2}>
             {/* Before (Original) */}
@@ -593,7 +820,7 @@ export function UserMessageDisplayView({
               <Box marginBottom={1}>
                 <Text underline>After (Your customization):</Text>
               </Box>
-              <Box marginLeft={1}>{createMixedStylePreview(true)}</Box>
+              <Box marginLeft={1}>{createPreview()}</Box>
               <Box marginLeft={1} marginTop={1}>
                 <Text>
                   <Text color={currentTheme?.colors?.inactive || '#888888'}>
@@ -610,7 +837,6 @@ export function UserMessageDisplayView({
               </Box>
             </Box>
           </Box>
-        </Box>
       </Box>
     </Box>
   );
