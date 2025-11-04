@@ -1078,6 +1078,12 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
 
     // asdf (https://github.com/asdf-vm/asdf)
     addPath(`${home}/.asdf/installs/nodejs/*/lib/${mod}`, true);
+
+    // mise (https://github.com/jdx/mise)
+    if (process.env.MISE_DATA_DIR) {
+      addPath(`${process.env.MISE_DATA_DIR}/installs/node/*/lib/${mod}`, true);
+    }
+    addPath(`${home}/.local/share/mise/installs/node/*/lib/${mod}`, true);
   }
 
   // After we're done with globby, which required / even on Windows, convert / back to \\ for
