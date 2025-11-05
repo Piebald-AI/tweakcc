@@ -312,7 +312,10 @@ export const findTopLevelPositionBeforeSlashCommand = (
 /**
  * Sub-patch 1: Add toolset field to app state initialization
  */
-export const writeToolsetFieldToAppState = (oldFile: string): string | null => {
+export const writeToolsetFieldToAppState = (
+  oldFile: string,
+  defaultToolset: string | null
+): string | null => {
   // Find all occurrences of thinkingEnabled:SOMETHING()
   const thinkingEnabledPattern = /thinkingEnabled:([$\w]+)\(\)/g;
   const matches = Array.from(oldFile.matchAll(thinkingEnabledPattern));
@@ -336,7 +339,8 @@ export const writeToolsetFieldToAppState = (oldFile: string): string | null => {
 
   // Apply modifications
   let newFile = oldFile;
-  const textToInsert = ',toolset:undefined';
+  const toolsetValue = defaultToolset ? JSON.stringify(defaultToolset) : 'undefined';
+  const textToInsert = `,toolset:${toolsetValue}`;
 
   for (const mod of modifications) {
     newFile =
@@ -623,7 +627,8 @@ export const writeSlashCommandDefinition = (oldFile: string): string | null => {
  */
 export const writeToolsets = (
   oldFile: string,
-  toolsets: Toolset[]
+  toolsets: Toolset[],
+  defaultToolset: string | null
 ): string | null => {
   // Return null if no toolsets configured
   if (!toolsets || toolsets.length === 0) {
@@ -633,7 +638,7 @@ export const writeToolsets = (
   let result: string | null = oldFile;
 
   // Step 1: Add toolset field to app state
-  result = writeToolsetFieldToAppState(result);
+  result = writeToolsetFieldToAppState(result, defaultToolset);
   if (!result) {
     console.error(
       'patch: toolsets: step 1 failed (writeToolsetFieldToAppState)'

@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Enable a toolset to be the default toolset (#161) - @bl-ue
 - Add a misc view - @bl-ue
 - Expand thinking blocks by default (#159) - @bl-ue
 - Add indicators to CC's startup UI that tweakcc's patching has been applied (#158) - @bl-ue

@@ -405,7 +405,13 @@ export const applyCustomization = async (
 
   // Apply toolset restrictions (enabled if toolsets configured)
   if (config.settings.toolsets && config.settings.toolsets.length > 0) {
-    if ((result = writeToolsets(content, config.settings.toolsets)))
+    if (
+      (result = writeToolsets(
+        content,
+        config.settings.toolsets,
+        config.settings.defaultToolset
+      ))
+    )
       content = result;
   }
 

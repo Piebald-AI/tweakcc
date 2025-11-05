@@ -125,6 +125,7 @@ export interface Settings {
   inputBox: InputBoxConfig;
   misc: MiscConfig;
   toolsets: Toolset[];
+  defaultToolset: string | null;
 }
 
 export interface TweakccConfig {
@@ -923,6 +924,7 @@ export const DEFAULT_SETTINGS: Settings = {
     expandThinkingBlocks: true,
   },
   toolsets: [],
+  defaultToolset: null,
 };
 
 // Support XDG Base Directory Specification with backward compatibility

@@ -11,7 +11,7 @@ interface ToolsetsViewProps {
 
 export function ToolsetsView({ onBack }: ToolsetsViewProps) {
   const {
-    settings: { toolsets },
+    settings: { toolsets, defaultToolset },
     updateSettings,
   } = useContext(SettingsContext);
 
@@ -36,13 +36,25 @@ export function ToolsetsView({ onBack }: ToolsetsViewProps) {
   };
 
   const handleDeleteToolset = (index: number) => {
+    const toolsetToDelete = toolsets[index];
     updateSettings(settings => {
       settings.toolsets.splice(index, 1);
+      // Clear default if we're deleting the default toolset
+      if (settings.defaultToolset === toolsetToDelete.name) {
+        settings.defaultToolset = null;
+      }
     });
 
     if (selectedIndex >= toolsets.length - 1) {
       setSelectedIndex(Math.max(0, toolsets.length - 2));
     }
+  };
+
+  const handleSetDefaultToolset = (index: number) => {
+    const toolset = toolsets[index];
+    updateSettings(settings => {
+      settings.defaultToolset = toolset.name;
+    });
   };
 
   useInput(
@@ -60,6 +72,8 @@ export function ToolsetsView({ onBack }: ToolsetsViewProps) {
         handleCreateToolset();
       } else if (input === 'd' && toolsets.length > 0) {
         handleDeleteToolset(selectedIndex);
+      } else if (input === 's' && toolsets.length > 0) {
+        handleSetDefaultToolset(selectedIndex);
       }
     },
     { isActive: inputActive }
@@ -93,6 +107,7 @@ export function ToolsetsView({ onBack }: ToolsetsViewProps) {
       <Header>Toolsets</Header>
       <Box marginBottom={1} flexDirection="column">
         <Text dimColor>n to create a new toolset</Text>
+        {toolsets.length > 0 && <Text dimColor>s to set as default toolset</Text>}
         {toolsets.length > 0 && <Text dimColor>d to delete a toolset</Text>}
         {toolsets.length > 0 && <Text dimColor>enter to edit toolset</Text>}
         <Text dimColor>esc to go back</Text>
@@ -102,15 +117,21 @@ export function ToolsetsView({ onBack }: ToolsetsViewProps) {
         <Text>No toolsets created yet. Press n to create one.</Text>
       ) : (
         <Box flexDirection="column">
-          {toolsets.map((toolset, index) => (
-            <Text
-              key={index}
-              color={selectedIndex === index ? 'yellow' : undefined}
-            >
-              {selectedIndex === index ? '❯ ' : '  '}
-              {toolset.name} ({getToolsetDescription(toolset)})
-            </Text>
-          ))}
+          {toolsets.map((toolset, index) => {
+            const isDefault = toolset.name === defaultToolset;
+            const isSelected = selectedIndex === index;
+            return (
+              <Text
+                key={index}
+                color={isSelected ? 'yellow' : undefined}
+                bold={isDefault}
+              >
+                {isSelected ? '❯ ' : '  '}
+                {toolset.name}
+                {isDefault && ' [DEFAULT]'} ({getToolsetDescription(toolset)})
+              </Text>
+            );
+          })}
         </Box>
       )}
     </Box>
