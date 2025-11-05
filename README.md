@@ -26,6 +26,7 @@ With tweakcc, you can
 - Change the "CLAUDE CODE" banner text to your own text with your own [figlet](http://www.figlet.org/) fonts
 - Style the **user messages in the chat history** beyond the default plain gray text
 - Remove the **ASCII border** from the input box
+- Expands **thinking blocks** by default, so that you don't need to use the transcript (ctrl+o) to see them
 
 tweakcc also
 - Fixes a bug where the **spinner animation** is frozen if you have the `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` environment variable set ([#46](https://github.com/Piebald-AI/tweakcc/issues/46))
