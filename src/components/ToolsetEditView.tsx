@@ -132,7 +132,9 @@ export function ToolsetEditView({
       <Header>Edit Toolset</Header>
 
       <Box marginBottom={1} flexDirection="column">
-        <Text dimColor>n to edit name · space/enter to toggle · esc to go back</Text>
+        <Text dimColor>
+          n to edit name · space/enter to toggle · esc to go back
+        </Text>
       </Box>
 
       {/* Name Section */}

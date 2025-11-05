@@ -25,7 +25,9 @@ export const findSelectComponentName = (
 
   const matches = Array.from(fileContents.matchAll(selectPattern));
   if (matches.length === 0) {
-    console.error('patch: findSelectComponentName: failed to find selectPattern');
+    console.error(
+      'patch: findSelectComponentName: failed to find selectPattern'
+    );
     return null;
   }
 
@@ -52,7 +54,9 @@ export const findDividerComponentName = (
 
   const matches = Array.from(fileContents.matchAll(dividerPattern));
   if (matches.length === 0) {
-    console.error('patch: findDividerComponentName: failed to find dividerPattern');
+    console.error(
+      'patch: findDividerComponentName: failed to find dividerPattern'
+    );
     return null;
   }
 
@@ -79,7 +83,9 @@ export const getMainAppComponentBodyStart = (
 
   const matches = Array.from(fileContents.matchAll(appComponentPattern));
   if (matches.length === 0) {
-    console.error('patch: getMainAppComponentBodyStart: failed to find appComponentPattern');
+    console.error(
+      'patch: getMainAppComponentBodyStart: failed to find appComponentPattern'
+    );
     return null;
   }
 
@@ -92,7 +98,9 @@ export const getMainAppComponentBodyStart = (
   }
 
   if (longestMatch.index === undefined) {
-    console.error('patch: getMainAppComponentBodyStart: failed to find appComponentPattern longestMatch');
+    console.error(
+      'patch: getMainAppComponentBodyStart: failed to find appComponentPattern longestMatch'
+    );
     return null;
   }
 
@@ -107,7 +115,9 @@ export const getAppStateVarAndGetterFunction = (
 ): { appStateVar: string; appStateGetterFunction: string } | null => {
   const bodyStart = getMainAppComponentBodyStart(fileContents);
   if (bodyStart === null) {
-    console.error('patch: getAppStateVarAndGetterFunction: failed to find bodyStart');
+    console.error(
+      'patch: getAppStateVarAndGetterFunction: failed to find bodyStart'
+    );
     return null;
   }
 
@@ -117,7 +127,9 @@ export const getAppStateVarAndGetterFunction = (
   const match = chunk.match(statePattern);
 
   if (!match) {
-    console.error('patch: getAppStateVarAndGetterFunction: failed to find statePattern');
+    console.error(
+      'patch: getAppStateVarAndGetterFunction: failed to find statePattern'
+    );
     return null;
   }
 
@@ -142,7 +154,9 @@ export const getToolFetchingUseMemoLocation = (
 } | null => {
   const bodyStart = getMainAppComponentBodyStart(fileContents);
   if (bodyStart === null) {
-    console.error('patch: getToolFetchingUseMemoLocation: failed to find bodyStart');
+    console.error(
+      'patch: getToolFetchingUseMemoLocation: failed to find bodyStart'
+    );
     return null;
   }
 
@@ -155,7 +169,9 @@ export const getToolFetchingUseMemoLocation = (
   const match = chunk.match(useMemoPattern);
 
   if (!match || match.index === undefined) {
-    console.error('patch: getToolFetchingUseMemoLocation: failed to find useMemoPattern');
+    console.error(
+      'patch: getToolFetchingUseMemoLocation: failed to find useMemoPattern'
+    );
     return null;
   }
 
@@ -183,14 +199,18 @@ export const findSlashCommandListEndPosition = (
   const match = fileContents.match(arrayStartPattern);
 
   if (!match || match.index === undefined) {
-    console.error('patch: findSlashCommandListEndPosition: failed to find arrayStartPattern');
+    console.error(
+      'patch: findSlashCommandListEndPosition: failed to find arrayStartPattern'
+    );
     return null;
   }
 
   // Find the '[' in the match
   const bracketIndex = fileContents.indexOf('[', match.index);
   if (bracketIndex === -1) {
-    console.error('patch: findSlashCommandListEndPosition: failed to find bracketIndex');
+    console.error(
+      'patch: findSlashCommandListEndPosition: failed to find bracketIndex'
+    );
     return null;
   }
 
@@ -210,7 +230,9 @@ export const findSlashCommandListEndPosition = (
     i++;
   }
 
-  console.error('patch: findSlashCommandListEndPosition: failed to find matching closing-bracket');
+  console.error(
+    'patch: findSlashCommandListEndPosition: failed to find matching closing-bracket'
+  );
   return null;
 };
 
@@ -223,7 +245,9 @@ export const findTopLevelPositionBeforeSlashCommand = (
 ): number | null => {
   const arrayEnd = findSlashCommandListEndPosition(fileContents);
   if (arrayEnd === null) {
-    console.error('patch: findTopLevelPositionBeforeSlashCommand: failed to find arrayEnd');
+    console.error(
+      'patch: findTopLevelPositionBeforeSlashCommand: failed to find arrayEnd'
+    );
     return null;
   }
 
@@ -259,7 +283,9 @@ export const findTopLevelPositionBeforeSlashCommand = (
   }
 
   if (i < 0) {
-    console.error('patch: findTopLevelPositionBeforeSlashCommand: failed to find matching open-brace');
+    console.error(
+      'patch: findTopLevelPositionBeforeSlashCommand: failed to find matching open-brace'
+    );
     return null;
   }
 
@@ -269,7 +295,9 @@ export const findTopLevelPositionBeforeSlashCommand = (
   }
 
   if (i < 0) {
-    console.error('patch: findTopLevelPositionBeforeSlashCommand: failed to find matching semicolon');
+    console.error(
+      'patch: findTopLevelPositionBeforeSlashCommand: failed to find matching semicolon'
+    );
     return null;
   }
 
