@@ -34,7 +34,7 @@ import { writeUserMessageDisplay } from './userMessageDisplay.js';
 import { writeVerboseProperty } from './verboseProperty.js';
 import { writeModelCustomizations } from './modelSelector.js';
 import { writeIgnoreMaxSubscription } from './ignoreMaxSubscription.js';
-import { writeVersionOutput } from './versionOutput.js';
+import { writePatchesAppliedIndication } from './patchesAppliedIndication.js';
 import { applySystemPrompts } from './systemPrompts.js';
 import { writeFixLspSupport } from './fixLspSupport.js';
 import { writeToolsets } from './toolsets.js';
@@ -49,6 +49,11 @@ export interface ModificationEdit {
   startIndex: number;
   endIndex: number;
   newContent: string;
+}
+
+export interface PatchApplied {
+  newContent: string;
+  items: string[];
 }
 
 // Debug function for showing diffs (currently disabled)
@@ -247,12 +252,11 @@ export const applyCustomization = async (
 
   let content = await fs.readFile(ccInstInfo.cliPath, { encoding: 'utf8' });
 
-  // Apply system prompt customizations
-  content = await applySystemPrompts(content, ccInstInfo.version);
+  const items: string[] = [];
 
   // Apply themes
   let result: string | null = null;
-  if (config.settings.themes && config.settings.themes.length > 0) {
+  /*  if (config.settings.themes && config.settings.themes.length > 0) {
     if ((result = writeThemes(content, config.settings.themes)))
       content = result;
   }
@@ -370,11 +374,20 @@ export const applyCustomization = async (
   // Disable Max subscription gating for cost tool (always enabled)
   if ((result = writeIgnoreMaxSubscription(content))) content = result;
 
-  // Apply version output modification (always enabled)
-  if ((result = writeVersionOutput(content, '2.0.3'))) content = result;
+  */
+  // Apply system prompt customizations
+  const systemPromptsResult = await applySystemPrompts(
+    content,
+    ccInstInfo.version
+  );
+  content = systemPromptsResult.newContent;
+  items.push(...systemPromptsResult.items);
+  // Apply patches applied indication (always enabled)
+  if ((result = writePatchesAppliedIndication(content, '2.0.3', items)))
+    content = result;
 
   // Apply LSP support fixes (always enabled)
-  if ((result = writeFixLspSupport(content))) content = result;
+  // if ((result = writeFixLspSupport(content))) content = result;
 
   // Apply toolset restrictions (enabled if toolsets configured)
   if (config.settings.toolsets && config.settings.toolsets.length > 0) {

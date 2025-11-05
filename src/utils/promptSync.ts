@@ -1086,6 +1086,9 @@ export const loadSystemPromptsWithRegex = async (
     prompt: MarkdownPrompt;
     regex: string;
     getInterpolatedContent: (match: RegExpMatchArray) => string;
+    pieces: string[];
+    identifiers: (number | string)[];
+    identifierMap: Record<string, string>;
   }>
 > => {
   // Check if strings file was preloaded - if not, return empty array
@@ -1100,6 +1103,9 @@ export const loadSystemPromptsWithRegex = async (
     prompt: MarkdownPrompt;
     regex: string;
     getInterpolatedContent: (match: RegExpMatchArray) => string;
+    pieces: string[];
+    identifiers: (number | string)[];
+    identifierMap: Record<string, string>;
   }> = [];
 
   // For each prompt in strings.json
@@ -1139,6 +1145,9 @@ export const loadSystemPromptsWithRegex = async (
       prompt: replacementPrompt,
       regex,
       getInterpolatedContent,
+      pieces: jsonPrompt.pieces,
+      identifiers: jsonPrompt.identifiers,
+      identifierMap: jsonPrompt.identifierMap,
     });
   }
 

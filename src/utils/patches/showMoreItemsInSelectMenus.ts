@@ -29,6 +29,9 @@ export const writeShowMoreItemsInSelectMenus = (
 ): string | null => {
   const locations = getShowMoreItemsInSelectMenusLocation(oldFile);
   if (locations.length === 0) {
+    console.error(
+      'patch: writeShowMoreItemsInSelectMenus: failed to find locations'
+    );
     return null;
   }
 

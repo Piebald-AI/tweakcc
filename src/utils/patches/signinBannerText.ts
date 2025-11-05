@@ -19,13 +19,17 @@ function getSigninBannerTextLocation(oldFile: string): LocationResult | null {
  ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝`;
 
   const index = oldFile.indexOf(bannerText);
-  if (index !== -1) {
-    return {
-      startIndex: index - 1, // -1 for the opening back tick.
-      endIndex: index + bannerText.length + 1, // +1 for the closing back tick.
-    };
+  if (index == -1) {
+    console.error(
+      'patch: getSigninBannerTextLocation: failed to find banner text'
+    );
+    return null;
   }
-  return null;
+
+  return {
+    startIndex: index - 1, // -1 for the opening back tick.
+    endIndex: index + bannerText.length + 1, // +1 for the closing back tick.
+  };
 }
 
 export function writeSigninBannerText(
