@@ -107,7 +107,9 @@ export function ToolsetsView({ onBack }: ToolsetsViewProps) {
       <Header>Toolsets</Header>
       <Box marginBottom={1} flexDirection="column">
         <Text dimColor>n to create a new toolset</Text>
-        {toolsets.length > 0 && <Text dimColor>s to set as default toolset</Text>}
+        {toolsets.length > 0 && (
+          <Text dimColor>s to set as default toolset</Text>
+        )}
         {toolsets.length > 0 && <Text dimColor>d to delete a toolset</Text>}
         {toolsets.length > 0 && <Text dimColor>enter to edit toolset</Text>}
         <Text dimColor>esc to go back</Text>
