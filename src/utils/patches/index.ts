@@ -37,6 +37,7 @@ import { writeIgnoreMaxSubscription } from './ignoreMaxSubscription.js';
 import { writeVersionOutput } from './versionOutput.js';
 import { applySystemPrompts } from './systemPrompts.js';
 import { writeFixLspSupport } from './fixLspSupport.js';
+import { writeToolsets } from './toolsets.js';
 
 export interface LocationResult {
   startIndex: number;
@@ -110,6 +111,130 @@ export const findChalkVar = (fileContents: string): string | undefined => {
     }
   }
   return chalkVar;
+};
+
+/**
+ * Find the module loader function in the first 1000 chars
+ */
+export const getModuleLoaderFunction = (
+  fileContents: string
+): string | undefined => {
+  // Pattern: var X=(Y,Z,W)=>{
+  const firstChunk = fileContents.slice(0, 1000);
+  const pattern = /var ([$\w]+)=\([$\w]+,[$\w]+,[$\w]+\)=>\{/;
+  const match = firstChunk.match(pattern);
+  if (!match) {
+    console.log(
+      'patch: getModuleLoaderFunction: failed to find module loader function'
+    );
+    return undefined;
+  }
+  return match[1];
+};
+
+/**
+ * Find the React module name
+ */
+export const getReactModuleName = (
+  fileContents: string
+): string | undefined => {
+  // Pattern: var X=Y((Z)=>{var W=Symbol.for("react.element")
+  const pattern =
+    /var ([$\w]+)=[$\w]+\(\([$\w]+\)=>\{var [$\w]+=Symbol\.for\("react\.element"\)/;
+  const match = fileContents.match(pattern);
+  if (!match) {
+    console.log('patch: getReactModuleName: failed to find React module name');
+    return undefined;
+  }
+  return match[1];
+};
+
+// Cache for React variable to avoid recomputing
+let reactVarCache: string | undefined | null = null;
+
+/**
+ * Get the React variable name (cached)
+ */
+export const getReactVar = (fileContents: string): string | undefined => {
+  // Return cached value if available
+  if (reactVarCache != null) {
+    return reactVarCache;
+  }
+
+  const moduleLoader = getModuleLoaderFunction(fileContents);
+  if (!moduleLoader) {
+    reactVarCache = undefined;
+    return undefined;
+  }
+
+  const reactModule = getReactModuleName(fileContents);
+  if (!reactModule) {
+    reactVarCache = undefined;
+    return undefined;
+  }
+
+  // Pattern: X=moduleLoader(reactModule,1)
+  const pattern = new RegExp(
+    `\\b([$\\w]+)=${moduleLoader}\\(${reactModule}\\(\\),1\\)`
+  );
+  const match = fileContents.match(pattern);
+  if (!match) {
+    console.log('patch: getReactVar: failed to find React variable');
+    reactVarCache = undefined;
+    return undefined;
+  }
+  reactVarCache = match[1];
+  return reactVarCache;
+};
+
+/**
+ * Clear the React var cache (useful for testing or multiple runs)
+ */
+export const clearReactVarCache = (): void => {
+  reactVarCache = null;
+};
+
+/**
+ * Find the Text component variable name from Ink
+ */
+export const findTextComponent = (fileContents: string): string | undefined => {
+  // Find the Text component function definition from Ink
+  // The minified Text component has this signature:
+  // function X({color:A,backgroundColor:B,dimColor:C=!1,bold:D=!1,...})
+  const textComponentPattern =
+    /\bfunction ([$\w]+)\(\{color:[$\w]+,backgroundColor:[$\w]+,dimColor:[$\w]+=![01],bold:[$\w]+=![01]/;
+  const match = fileContents.match(textComponentPattern);
+  if (!match) {
+    console.log('patch: findTextComponent: failed to find text component');
+    return undefined;
+  }
+  return match[1];
+};
+
+/**
+ * Find the Box component variable name
+ */
+export const findBoxComponent = (fileContents: string): string | undefined => {
+  // 1. Search for Box displayName
+  const boxDisplayNamePattern = /\b([$\w]+)\.displayName="Box"/;
+  const boxDisplayNameMatch = fileContents.match(boxDisplayNamePattern);
+  if (!boxDisplayNameMatch) {
+    console.error('patch: findBoxComponent: failed to find Box displayName');
+    return undefined;
+  }
+  const boxOrigCompName = boxDisplayNameMatch[1];
+
+  // 2. Search for the variable that equals the original Box component
+  const boxVarPattern = new RegExp(`\\b([$\\w]+)=${boxOrigCompName}\\b`);
+  const boxVarMatch = fileContents.match(boxVarPattern);
+  if (!boxVarMatch) {
+    console.error(
+      'patch: findBoxComponent: failed to find Box component variable'
+    );
+    return undefined;
+  }
+
+  return boxVarMatch[1];
 };
 
 export const applyCustomization = async (
@@ -250,6 +375,12 @@ export const applyCustomization = async (
 
   // Apply LSP support fixes (always enabled)
   if ((result = writeFixLspSupport(content))) content = result;
+
+  // Apply toolset restrictions (enabled if toolsets configured)
+  if (config.settings.toolsets && config.settings.toolsets.length > 0) {
+    if ((result = writeToolsets(content, config.settings.toolsets)))
+      content = result;
+  }
 
   // Replace the file, breaking hard links and preserving permissions
   await replaceFileBreakingHardLinks(ccInstInfo.cliPath, content, 'patch');

@@ -41,6 +41,10 @@ const baseMenuItems: SelectItem[] = [
     desc: 'Customize the input box appearance (e.g., remove border)',
   },
   {
+    name: MainMenuItem.TOOLSETS,
+    desc: 'Manage toolsets to control which tools are available',
+  },
+  {
     name: MainMenuItem.VIEW_SYSTEM_PROMPTS,
     desc: 'Opens the system prompts directory where you can customize Claude Code\'s system prompts',
   },

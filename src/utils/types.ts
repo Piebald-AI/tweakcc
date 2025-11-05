@@ -105,6 +105,11 @@ export interface InputBoxConfig {
   removeBorder: boolean;
 }
 
+export interface Toolset {
+  name: string;
+  allowedTools: string[] | '*';
+}
+
 export interface Settings {
   themes: Theme[];
   launchText: LaunchTextConfig;
@@ -112,6 +117,7 @@ export interface Settings {
   thinkingStyle: ThinkingStyleConfig;
   userMessageDisplay: UserMessageDisplayConfig;
   inputBox: InputBoxConfig;
+  toolsets: Toolset[];
 }
 
 export interface TweakccConfig {
@@ -143,6 +149,7 @@ export enum MainMenuItem {
   THINKING_STYLE = 'Thinking style',
   USER_MESSAGE_DISPLAY = 'User message display',
   INPUT_BOX = 'Input box',
+  TOOLSETS = 'Toolsets',
   VIEW_SYSTEM_PROMPTS = 'View system prompts',
   RESTORE_ORIGINAL = 'Restore original Claude Code (preserves tweakcc.json)',
   OPEN_CONFIG = 'Open tweakcc.json',
@@ -903,6 +910,7 @@ export const DEFAULT_SETTINGS: Settings = {
   inputBox: {
     removeBorder: false,
   },
+  toolsets: [],
 };
 
 // Support XDG Base Directory Specification with backward compatibility

@@ -7,6 +7,7 @@ import { ThinkingVerbsView } from './components/ThinkingVerbsView.js';
 import { ThinkingStyleView } from './components/ThinkingStyleView.js';
 import { UserMessageDisplayView } from './components/UserMessageDisplayView.js';
 import { InputBoxView } from './components/InputBoxView.js';
+import { ToolsetsView } from './components/ToolsetsView.js';
 import {
   CONFIG_FILE,
   DEFAULT_SETTINGS,
@@ -137,6 +138,7 @@ Please reapply your changes below.`,
       case MainMenuItem.THINKING_STYLE:
       case MainMenuItem.USER_MESSAGE_DISPLAY:
       case MainMenuItem.INPUT_BOX:
+      case MainMenuItem.TOOLSETS:
         setCurrentView(item);
         break;
       case MainMenuItem.VIEW_SYSTEM_PROMPTS:
@@ -194,6 +196,8 @@ Please reapply your changes below.`,
           <UserMessageDisplayView onBack={handleBack} />
         ) : currentView === MainMenuItem.INPUT_BOX ? (
           <InputBoxView onSubmit={handleBack} />
+        ) : currentView === MainMenuItem.TOOLSETS ? (
+          <ToolsetsView onBack={handleBack} />
         ) : null}
       </Box>
     </SettingsContext.Provider>
