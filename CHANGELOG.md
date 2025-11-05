@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-- Add indicators to CC's startup UI that tweakcc's patching has been applied (#)
+- Add indicators to CC's startup UI that tweakcc's patching has been applied (#158) - @bl-ue
 - Add /toolset to Claude Code (#157) - @bl-ue
 - Makes the Claude Code's native LSP support work (#152) - @bl-ue
 
