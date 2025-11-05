@@ -376,7 +376,8 @@ export const applyCustomization = async (
   // if ((result = writeIgnoreMaxSubscription(content))) content = result;
 
   // Apply thinking visibility patch (respects misc settings)
-  const expandThinkingBlocks = config.settings.misc?.expandThinkingBlocks ?? true;
+  const expandThinkingBlocks =
+    config.settings.misc?.expandThinkingBlocks ?? true;
   if (expandThinkingBlocks) {
     if ((result = writeThinkingVisibility(content))) content = result;
   }

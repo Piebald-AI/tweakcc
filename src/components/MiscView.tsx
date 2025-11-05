@@ -24,7 +24,11 @@ export function MiscView({ onSubmit }: MiscViewProps) {
   const handleShowVersionToggle = () => {
     updateSettings(settings => {
       if (!settings.misc) {
-        settings.misc = { showTweakccVersion: true, showPatchesApplied: true, expandThinkingBlocks: true };
+        settings.misc = {
+          showTweakccVersion: true,
+          showPatchesApplied: true,
+          expandThinkingBlocks: true,
+        };
       }
       settings.misc.showTweakccVersion = !settings.misc.showTweakccVersion;
     });
@@ -33,7 +37,11 @@ export function MiscView({ onSubmit }: MiscViewProps) {
   const handleShowPatchesToggle = () => {
     updateSettings(settings => {
       if (!settings.misc) {
-        settings.misc = { showTweakccVersion: true, showPatchesApplied: true, expandThinkingBlocks: true };
+        settings.misc = {
+          showTweakccVersion: true,
+          showPatchesApplied: true,
+          expandThinkingBlocks: true,
+        };
       }
       settings.misc.showPatchesApplied = !settings.misc.showPatchesApplied;
     });
@@ -42,7 +50,11 @@ export function MiscView({ onSubmit }: MiscViewProps) {
   const handleExpandThinkingToggle = () => {
     updateSettings(settings => {
       if (!settings.misc) {
-        settings.misc = { showTweakccVersion: true, showPatchesApplied: true, expandThinkingBlocks: true };
+        settings.misc = {
+          showTweakccVersion: true,
+          showPatchesApplied: true,
+          expandThinkingBlocks: true,
+        };
       }
       settings.misc.expandThinkingBlocks = !settings.misc.expandThinkingBlocks;
     });
@@ -71,7 +83,9 @@ export function MiscView({ onSubmit }: MiscViewProps) {
   const removeBorderCheckbox = settings.inputBox?.removeBorder ? '☑' : '☐';
   const showVersionCheckbox = settings.misc?.showTweakccVersion ? '☑' : '☐';
   const showPatchesCheckbox = settings.misc?.showPatchesApplied ? '☑' : '☐';
-  const expandThinkingCheckbox = settings.misc?.expandThinkingBlocks ? '☑' : '☐';
+  const expandThinkingCheckbox = settings.misc?.expandThinkingBlocks
+    ? '☑'
+    : '☐';
 
   return (
     <Box flexDirection="column">

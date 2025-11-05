@@ -61,7 +61,7 @@ const getThinkingVisibilityLocation = (
   return {
     startIndex,
     endIndex,
-    identifiers: [visibilityMatch[1], visibilityMatch[2], visibilityMatch[3]]
+    identifiers: [visibilityMatch[1], visibilityMatch[2], visibilityMatch[3]],
   };
 };
 
