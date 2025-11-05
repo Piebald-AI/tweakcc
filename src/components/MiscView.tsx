@@ -137,8 +137,8 @@ export function MiscView({ onSubmit }: MiscViewProps) {
       {selectedIndex === 1 && (
         <Box marginBottom={1}>
           <Text color="gray" dimColor>
-            Shows the blue &quot;+ tweakcc v&lt;VERSION&gt;&quot; message when starting
-            Claude Code.
+            Shows the blue &quot;+ tweakcc v&lt;VERSION&gt;&quot; message when
+            starting Claude Code.
           </Text>
         </Box>
       )}
@@ -171,8 +171,8 @@ export function MiscView({ onSubmit }: MiscViewProps) {
       {selectedIndex === 2 && (
         <Box marginBottom={1}>
           <Text color="gray" dimColor>
-            Shows the green &quot;tweakcc patches are applied&quot; indicator when
-            starting Claude Code.
+            Shows the green &quot;tweakcc patches are applied&quot; indicator
+            when starting Claude Code.
           </Text>
         </Box>
       )}
