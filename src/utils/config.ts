@@ -69,6 +69,9 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
     if (!readConfig.settings.inputBox) {
       readConfig.settings.inputBox = DEFAULT_SETTINGS.inputBox;
     }
+    if (!readConfig.settings.toolsets) {
+      readConfig.settings.toolsets = DEFAULT_SETTINGS.toolsets;
+    }
     if (!Object.hasOwn(readConfig.settings, 'defaultToolset')) {
       readConfig.settings.defaultToolset = DEFAULT_SETTINGS.defaultToolset;
     }
