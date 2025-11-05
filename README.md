@@ -19,6 +19,7 @@
 With tweakcc, you can
 
 - Customize all of Claude Code's **system prompts**
+- Create custom **toolsets** that can be used in Claude Code with the new **`/toolset`** command
 - Create **custom themes** with a graphical HSL/RGB color picker
 - Add custom **thinking verbs** that will show while Claude's working
 - Create custom **thinking spinner animations** with different speeds and phases
