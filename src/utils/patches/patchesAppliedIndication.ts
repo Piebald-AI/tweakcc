@@ -7,7 +7,6 @@ import {
   showDiff,
 } from './index.js';
 
-
 /**
  * PATCH 1: Finds the location of the version output pattern in Claude Code's cli.js
  */
@@ -458,7 +457,8 @@ export const writePatchesAppliedIndication = (
         );
         return null;
       }
-      patch4ClosingParenIndex = alignItemsMatch.index + alignItemsMatch[0].length;
+      patch4ClosingParenIndex =
+        alignItemsMatch.index + alignItemsMatch[0].length;
     }
 
     const finalContent = applyIndicatorPatchesListPatch(

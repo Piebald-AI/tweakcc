@@ -384,7 +384,15 @@ export const applyCustomization = async (
   // Apply patches applied indication (respects misc settings)
   const showTweakccVersion = config.settings.misc?.showTweakccVersion ?? true;
   const showPatchesApplied = config.settings.misc?.showPatchesApplied ?? true;
-  if ((result = writePatchesAppliedIndication(content, '2.0.3', items, showTweakccVersion, showPatchesApplied)))
+  if (
+    (result = writePatchesAppliedIndication(
+      content,
+      '2.0.3',
+      items,
+      showTweakccVersion,
+      showPatchesApplied
+    ))
+  )
     content = result;
 
   // Apply LSP support fixes (always enabled)
