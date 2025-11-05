@@ -148,7 +148,7 @@ export enum MainMenuItem {
   THINKING_VERBS = 'Thinking verbs',
   THINKING_STYLE = 'Thinking style',
   USER_MESSAGE_DISPLAY = 'User message display',
-  INPUT_BOX = 'Input box',
+  MISC = 'Misc',
   TOOLSETS = 'Toolsets',
   VIEW_SYSTEM_PROMPTS = 'View system prompts',
   RESTORE_ORIGINAL = 'Restore original Claude Code (preserves tweakcc.json)',

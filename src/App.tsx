@@ -6,7 +6,7 @@ import { LaunchTextView } from './components/LaunchTextView.js';
 import { ThinkingVerbsView } from './components/ThinkingVerbsView.js';
 import { ThinkingStyleView } from './components/ThinkingStyleView.js';
 import { UserMessageDisplayView } from './components/UserMessageDisplayView.js';
-import { InputBoxView } from './components/InputBoxView.js';
+import { MiscView } from './components/MiscView.js';
 import { ToolsetsView } from './components/ToolsetsView.js';
 import {
   CONFIG_FILE,
@@ -137,7 +137,7 @@ Please reapply your changes below.`,
       case MainMenuItem.THINKING_VERBS:
       case MainMenuItem.THINKING_STYLE:
       case MainMenuItem.USER_MESSAGE_DISPLAY:
-      case MainMenuItem.INPUT_BOX:
+      case MainMenuItem.MISC:
       case MainMenuItem.TOOLSETS:
         setCurrentView(item);
         break;
@@ -194,8 +194,8 @@ Please reapply your changes below.`,
           <ThinkingStyleView onBack={handleBack} />
         ) : currentView === MainMenuItem.USER_MESSAGE_DISPLAY ? (
           <UserMessageDisplayView onBack={handleBack} />
-        ) : currentView === MainMenuItem.INPUT_BOX ? (
-          <InputBoxView onSubmit={handleBack} />
+        ) : currentView === MainMenuItem.MISC ? (
+          <MiscView onSubmit={handleBack} />
         ) : currentView === MainMenuItem.TOOLSETS ? (
           <ToolsetsView onBack={handleBack} />
         ) : null}

@@ -3,11 +3,11 @@ import { useContext, useState } from 'react';
 import { SettingsContext } from '../App.js';
 import Header from './Header.js';
 
-interface InputBoxViewProps {
+interface MiscViewProps {
   onSubmit: () => void;
 }
 
-export function InputBoxView({ onSubmit }: InputBoxViewProps) {
+export function MiscView({ onSubmit }: MiscViewProps) {
   const { settings, updateSettings } = useContext(SettingsContext);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -35,14 +35,12 @@ export function InputBoxView({ onSubmit }: InputBoxViewProps) {
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Header>Input Box Settings</Header>
+        <Header>Miscellaneous Settings</Header>
       </Box>
 
       <Box marginBottom={1}>
         <Text color="gray">
-          <Text bold>
-            Customize the appearance of the Claude Code input box.
-          </Text>{' '}
+          <Text bold>Various tweaks and customizations.</Text>{' '}
           <Text dimColor>
             Press space to toggle settings, enter to go back.
           </Text>
@@ -55,7 +53,7 @@ export function InputBoxView({ onSubmit }: InputBoxViewProps) {
             {selectedIndex === 0 ? '❯ ' : '  '}
           </Text>
           <Text bold color={selectedIndex === 0 ? 'cyan' : undefined}>
-            Remove border
+            Remove input box border
           </Text>
         </Text>
       </Box>
@@ -75,8 +73,7 @@ export function InputBoxView({ onSubmit }: InputBoxViewProps) {
 
       <Box marginBottom={1}>
         <Text color="gray" dimColor>
-          When enabled, removes the rounded border around the input box for a
-          cleaner look.
+          Removes the rounded border around the input box for a cleaner look.
         </Text>
       </Box>
     </Box>

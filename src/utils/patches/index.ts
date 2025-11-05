@@ -256,7 +256,7 @@ export const applyCustomization = async (
 
   // Apply themes
   let result: string | null = null;
-  /*  if (config.settings.themes && config.settings.themes.length > 0) {
+  if (config.settings.themes && config.settings.themes.length > 0) {
     if ((result = writeThemes(content, config.settings.themes)))
       content = result;
   }
@@ -374,7 +374,6 @@ export const applyCustomization = async (
   // Disable Max subscription gating for cost tool (always enabled)
   if ((result = writeIgnoreMaxSubscription(content))) content = result;
 
-  */
   // Apply system prompt customizations
   const systemPromptsResult = await applySystemPrompts(
     content,
@@ -387,7 +386,7 @@ export const applyCustomization = async (
     content = result;
 
   // Apply LSP support fixes (always enabled)
-  // if ((result = writeFixLspSupport(content))) content = result;
+  if ((result = writeFixLspSupport(content))) content = result;
 
   // Apply toolset restrictions (enabled if toolsets configured)
   if (config.settings.toolsets && config.settings.toolsets.length > 0) {
