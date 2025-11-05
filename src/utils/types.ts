@@ -105,6 +105,11 @@ export interface InputBoxConfig {
   removeBorder: boolean;
 }
 
+export interface MiscConfig {
+  showTweakccVersion: boolean;
+  showPatchesApplied: boolean;
+}
+
 export interface Toolset {
   name: string;
   allowedTools: string[] | '*';
@@ -117,6 +122,7 @@ export interface Settings {
   thinkingStyle: ThinkingStyleConfig;
   userMessageDisplay: UserMessageDisplayConfig;
   inputBox: InputBoxConfig;
+  misc: MiscConfig;
   toolsets: Toolset[];
 }
 
@@ -909,6 +915,10 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   inputBox: {
     removeBorder: false,
+  },
+  misc: {
+    showTweakccVersion: true,
+    showPatchesApplied: true,
   },
   toolsets: [],
 };
