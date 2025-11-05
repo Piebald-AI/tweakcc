@@ -108,6 +108,7 @@ export interface InputBoxConfig {
 export interface MiscConfig {
   showTweakccVersion: boolean;
   showPatchesApplied: boolean;
+  expandThinkingBlocks: boolean;
 }
 
 export interface Toolset {
@@ -919,6 +920,7 @@ export const DEFAULT_SETTINGS: Settings = {
   misc: {
     showTweakccVersion: true,
     showPatchesApplied: true,
+    expandThinkingBlocks: true,
   },
   toolsets: [],
 };

@@ -375,8 +375,11 @@ export const applyCustomization = async (
   // // Disable Max subscription gating for cost tool (always enabled)
   // if ((result = writeIgnoreMaxSubscription(content))) content = result;
 
-  // Apply thinking visibility patch (always enabled)
-  if ((result = writeThinkingVisibility(content))) content = result;
+  // Apply thinking visibility patch (respects misc settings)
+  const expandThinkingBlocks = config.settings.misc?.expandThinkingBlocks ?? true;
+  if (expandThinkingBlocks) {
+    if ((result = writeThinkingVisibility(content))) content = result;
+  }
 
   // Apply system prompt customizations
   // const systemPromptsResult = await applySystemPrompts(

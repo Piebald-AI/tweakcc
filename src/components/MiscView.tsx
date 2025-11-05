@@ -24,7 +24,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
   const handleShowVersionToggle = () => {
     updateSettings(settings => {
       if (!settings.misc) {
-        settings.misc = { showTweakccVersion: true, showPatchesApplied: true };
+        settings.misc = { showTweakccVersion: true, showPatchesApplied: true, expandThinkingBlocks: true };
       }
       settings.misc.showTweakccVersion = !settings.misc.showTweakccVersion;
     });
@@ -33,9 +33,18 @@ export function MiscView({ onSubmit }: MiscViewProps) {
   const handleShowPatchesToggle = () => {
     updateSettings(settings => {
       if (!settings.misc) {
-        settings.misc = { showTweakccVersion: true, showPatchesApplied: true };
+        settings.misc = { showTweakccVersion: true, showPatchesApplied: true, expandThinkingBlocks: true };
       }
       settings.misc.showPatchesApplied = !settings.misc.showPatchesApplied;
+    });
+  };
+
+  const handleExpandThinkingToggle = () => {
+    updateSettings(settings => {
+      if (!settings.misc) {
+        settings.misc = { showTweakccVersion: true, showPatchesApplied: true, expandThinkingBlocks: true };
+      }
+      settings.misc.expandThinkingBlocks = !settings.misc.expandThinkingBlocks;
     });
   };
 
@@ -45,7 +54,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     } else if (key.upArrow) {
       setSelectedIndex(prev => Math.max(0, prev - 1));
     } else if (key.downArrow) {
-      setSelectedIndex(prev => Math.min(2, prev + 1));
+      setSelectedIndex(prev => Math.min(3, prev + 1));
     } else if (input === ' ') {
       if (selectedIndex === 0) {
         handleRemoveBorderToggle();
@@ -53,6 +62,8 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         handleShowVersionToggle();
       } else if (selectedIndex === 2) {
         handleShowPatchesToggle();
+      } else if (selectedIndex === 3) {
+        handleExpandThinkingToggle();
       }
     }
   });
@@ -60,6 +71,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
   const removeBorderCheckbox = settings.inputBox?.removeBorder ? '☑' : '☐';
   const showVersionCheckbox = settings.misc?.showTweakccVersion ? '☑' : '☐';
   const showPatchesCheckbox = settings.misc?.showPatchesApplied ? '☑' : '☐';
+  const expandThinkingCheckbox = settings.misc?.expandThinkingBlocks ? '☑' : '☐';
 
   return (
     <Box flexDirection="column">
@@ -173,6 +185,40 @@ export function MiscView({ onSubmit }: MiscViewProps) {
           <Text color="gray" dimColor>
             Shows the green &quot;tweakcc patches are applied&quot; indicator
             when starting Claude Code.
+          </Text>
+        </Box>
+      )}
+
+      {/* Expand Thinking Blocks Option */}
+      <Box>
+        <Text>
+          <Text color={selectedIndex === 3 ? 'cyan' : undefined}>
+            {selectedIndex === 3 ? '❯ ' : '  '}
+          </Text>
+          <Text bold color={selectedIndex === 3 ? 'cyan' : undefined}>
+            Expand thinking blocks
+          </Text>
+        </Text>
+      </Box>
+
+      {selectedIndex === 3 && (
+        <Box marginBottom={1} flexDirection="column">
+          <Text dimColor>{'  '}space to toggle</Text>
+        </Box>
+      )}
+
+      <Box marginLeft={2} marginBottom={1}>
+        <Text>
+          {expandThinkingCheckbox}{' '}
+          {settings.misc?.expandThinkingBlocks ? 'Enabled' : 'Disabled'}
+        </Text>
+      </Box>
+
+      {selectedIndex === 3 && (
+        <Box marginBottom={1}>
+          <Text color="gray" dimColor>
+            Makes thinking blocks always expanded by default instead of
+            collapsed.
           </Text>
         </Box>
       )}
