@@ -69,6 +69,12 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
     if (!readConfig.settings.inputBox) {
       readConfig.settings.inputBox = DEFAULT_SETTINGS.inputBox;
     }
+    if (!readConfig.settings.toolsets) {
+      readConfig.settings.toolsets = DEFAULT_SETTINGS.toolsets;
+    }
+    if (!Object.hasOwn(readConfig.settings, 'defaultToolset')) {
+      readConfig.settings.defaultToolset = DEFAULT_SETTINGS.defaultToolset;
+    }
 
     // Add any colors that the user doesn't have to any built-in themes.
     for (const defaultTheme of DEFAULT_SETTINGS.themes) {

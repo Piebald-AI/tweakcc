@@ -19,16 +19,19 @@
 With tweakcc, you can
 
 - Customize all of Claude Code's **system prompts**
+- Create custom **toolsets** that can be used in Claude Code with the new **`/toolset`** command
 - Create **custom themes** with a graphical HSL/RGB color picker
 - Add custom **thinking verbs** that will show while Claude's working
 - Create custom **thinking spinner animations** with different speeds and phases
 - Change the "CLAUDE CODE" banner text to your own text with your own [figlet](http://www.figlet.org/) fonts
 - Style the **user messages in the chat history** beyond the default plain gray text
 - Remove the **ASCII border** from the input box
+- Expands **thinking blocks** by default, so that you don't need to use the transcript (ctrl+o) to see them
 
 tweakcc also
 - Fixes a bug where the **spinner animation** is frozen if you have the `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` environment variable set ([#46](https://github.com/Piebald-AI/tweakcc/issues/46))
 - Allows you to **change the context limit** (default: 200k tokens) used with models from custom Anthropic-compatible APIs with a new environment variable, `CLAUDE_CODE_CONTEXT_LIMIT`
+- Adds a message to Claude Code's startup banner indicating that you're running the patched version of CC (configurable)
 
 Additionally, we're working on features that will allow you to
 - Pick from over **70+ spinning/thinking animations** from [`cli-spinners`](https://github.com/sindresorhus/cli-spinners)

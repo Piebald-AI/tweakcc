@@ -34,8 +34,11 @@ import { writeUserMessageDisplay } from './userMessageDisplay.js';
 import { writeVerboseProperty } from './verboseProperty.js';
 import { writeModelCustomizations } from './modelSelector.js';
 import { writeIgnoreMaxSubscription } from './ignoreMaxSubscription.js';
-import { writeVersionOutput } from './versionOutput.js';
+import { writeThinkingVisibility } from './thinkingVisibility.js';
+import { writePatchesAppliedIndication } from './patchesAppliedIndication.js';
 import { applySystemPrompts } from './systemPrompts.js';
+import { writeFixLspSupport } from './fixLspSupport.js';
+import { writeToolsets } from './toolsets.js';
 
 export interface LocationResult {
   startIndex: number;
@@ -47,6 +50,11 @@ export interface ModificationEdit {
   startIndex: number;
   endIndex: number;
   newContent: string;
+}
+
+export interface PatchApplied {
+  newContent: string;
+  items: string[];
 }
 
 // Debug function for showing diffs (currently disabled)
@@ -111,6 +119,199 @@ export const findChalkVar = (fileContents: string): string | undefined => {
   return chalkVar;
 };
 
+/**
+ * Find the module loader function in the first 1000 chars
+ */
+export const getModuleLoaderFunction = (
+  fileContents: string
+): string | undefined => {
+  // Pattern: var X=(Y,Z,W)=>{
+  const firstChunk = fileContents.slice(0, 1000);
+  const pattern = /var ([$\w]+)=\([$\w]+,[$\w]+,[$\w]+\)=>\{/;
+  const match = firstChunk.match(pattern);
+  if (!match) {
+    console.log(
+      'patch: getModuleLoaderFunction: failed to find module loader function'
+    );
+    return undefined;
+  }
+  return match[1];
+};
+
+/**
+ * Find the React module name
+ */
+export const getReactModuleNameNonBun = (
+  fileContents: string
+): string | undefined => {
+  // Pattern: var X=Y((Z)=>{var W=Symbol.for("react.element")
+  const pattern =
+    /var ([$\w]+)=[$\w]+\(\([$\w]+\)=>\{var [$\w]+=Symbol\.for\("react\.element"\)/;
+  const match = fileContents.match(pattern);
+  if (!match) {
+    console.log(
+      'patch: getReactModuleNameNonBun: failed to find React module name'
+    );
+    return undefined;
+  }
+  return match[1];
+};
+
+/**
+ * Find the React module function (Bun variant)
+ *
+ * Steps:
+ * 1. Get "reactModuleNameNonBun" via getReactModuleNameNonBun()
+ * 2. Search for /var ([$\w]+)=[$\w]+\(\([$\w]+,[$\w]+\)=>\{[$\w]+\.exports=${reactModuleNameNonBun}\(\)/
+ * 3. The first match is it
+ *
+ * Example code:
+ * ```
+ * var fH = N((AtM, r7L) => {
+ *     r7L.exports = n7L();
+ * });
+ * ```
+ * `n7L` is `reactModuleNameNonBun`, and `fH` is `reactModuleFunctionBun`
+ */
+export const getReactModuleFunctionBun = (
+  fileContents: string
+): string | undefined => {
+  const reactModuleNameNonBun = getReactModuleNameNonBun(fileContents);
+  if (!reactModuleNameNonBun) {
+    console.log(
+      '^ patch: getReactModuleFunctionBun: failed to find React module name (Bun)'
+    );
+    return undefined;
+  }
+
+  // Pattern: var X=Y((Z,W)=>{W.exports=reactModuleNameNonBun()
+  const pattern = new RegExp(
+    `var ([$\\w]+)=[$\\w]+\\(\\([$\\w]+,[$\\w]+\\)=>\\{[$\\w]+\\.exports=${reactModuleNameNonBun}\\(\\)`
+  );
+  const match = fileContents.match(pattern);
+  if (!match) {
+    console.log(
+      'patch: getReactModuleFunctionBun: failed to find React module function (Bun)'
+    );
+    return undefined;
+  }
+  return match[1];
+};
+
+// Cache for React variable to avoid recomputing
+let reactVarCache: string | undefined | null = null;
+
+/**
+ * Get the React variable name (cached)
+ */
+export const getReactVar = (fileContents: string): string | undefined => {
+  // Return cached value if available
+  if (reactVarCache != null) {
+    return reactVarCache;
+  }
+
+  const moduleLoader = getModuleLoaderFunction(fileContents);
+  if (!moduleLoader) {
+    console.log('^ patch: getReactVar: failed to find moduleLoader');
+    reactVarCache = undefined;
+    return undefined;
+  }
+
+  // Try non-bun first (reactModuleNameNonBun)
+  const reactModuleVarNonBun = getReactModuleNameNonBun(fileContents);
+  if (!reactModuleVarNonBun) {
+    console.log('^ patch: getReactVar: failed to find reactModuleVarNonBun');
+    reactVarCache = undefined;
+    return undefined;
+  }
+
+  // Pattern: X=moduleLoader(reactModule,1)
+  const nonBunPattern = new RegExp(
+    `\\b([$\\w]+)=${moduleLoader}\\(${reactModuleVarNonBun}\\(\\),1\\)`
+  );
+  const nonBunMatch = fileContents.match(nonBunPattern);
+  if (nonBunMatch) {
+    reactVarCache = nonBunMatch[1];
+    return reactVarCache;
+  } else {
+    // DON'T fail just because we can't find the non-bun pattern.
+  }
+
+  // If reactModuleNameNonBun fails, try reactModuleFunctionBun
+  const reactModuleFunctionBun = getReactModuleFunctionBun(fileContents);
+  if (!reactModuleFunctionBun) {
+    console.log('^ patch: getReactVar: failed to find reactModuleFunctionBun');
+    reactVarCache = undefined;
+    return undefined;
+  }
+  // \b([$\w]+)=T\(fH\(\),1\)
+  // Pattern: X=moduleLoader(reactModuleBun,1)
+  const bunPattern = new RegExp(
+    `\\b([$\\w]+)=${moduleLoader}\\(${reactModuleFunctionBun}\\(\\),1\\)`
+  );
+  const bunMatch = fileContents.match(bunPattern);
+  if (!bunMatch) {
+    console.log(
+      `patch: getReactVar: failed to find bunPattern (moduleLoader=${moduleLoader}, reactModuleVarNonBun=${reactModuleVarNonBun}, reactModuleFunctionBun=${reactModuleFunctionBun})`
+    );
+    reactVarCache = undefined;
+    return undefined;
+  }
+
+  reactVarCache = bunMatch[1];
+  return reactVarCache;
+};
+
+/**
+ * Clear the React var cache (useful for testing or multiple runs)
+ */
+export const clearReactVarCache = (): void => {
+  reactVarCache = null;
+};
+
+/**
+ * Find the Text component variable name from Ink
+ */
+export const findTextComponent = (fileContents: string): string | undefined => {
+  // Find the Text component function definition from Ink
+  // The minified Text component has this signature:
+  // function X({color:A,backgroundColor:B,dimColor:C=!1,bold:D=!1,...})
+  const textComponentPattern =
+    /\bfunction ([$\w]+)\(\{color:[$\w]+,backgroundColor:[$\w]+,dimColor:[$\w]+=![01],bold:[$\w]+=![01]/;
+  const match = fileContents.match(textComponentPattern);
+  if (!match) {
+    console.log('patch: findTextComponent: failed to find text component');
+    return undefined;
+  }
+  return match[1];
+};
+
+/**
+ * Find the Box component variable name
+ */
+export const findBoxComponent = (fileContents: string): string | undefined => {
+  // 1. Search for Box displayName
+  const boxDisplayNamePattern = /\b([$\w]+)\.displayName="Box"/;
+  const boxDisplayNameMatch = fileContents.match(boxDisplayNamePattern);
+  if (!boxDisplayNameMatch) {
+    console.error('patch: findBoxComponent: failed to find Box displayName');
+    return undefined;
+  }
+  const boxOrigCompName = boxDisplayNameMatch[1];
+
+  // 2. Search for the variable that equals the original Box component
+  const boxVarPattern = new RegExp(`\\b([$\\w]+)=${boxOrigCompName}\\b`);
+  const boxVarMatch = fileContents.match(boxVarPattern);
+  if (!boxVarMatch) {
+    console.error(
+      'patch: findBoxComponent: failed to find Box component variable'
+    );
+    return undefined;
+  }
+
+  return boxVarMatch[1];
+};
+
 export const applyCustomization = async (
   config: TweakccConfig,
   ccInstInfo: ClaudeCodeInstallationInfo
@@ -121,8 +322,7 @@ export const applyCustomization = async (
 
   let content = await fs.readFile(ccInstInfo.cliPath, { encoding: 'utf8' });
 
-  // Apply system prompt customizations
-  content = await applySystemPrompts(content, ccInstInfo.version);
+  const items: string[] = [];
 
   // Apply themes
   let result: string | null = null;
@@ -235,8 +435,45 @@ export const applyCustomization = async (
   // Disable Max subscription gating for cost tool (always enabled)
   if ((result = writeIgnoreMaxSubscription(content))) content = result;
 
-  // Apply version output modification (always enabled)
-  if ((result = writeVersionOutput(content, '2.0.3'))) content = result;
+  // Apply thinking visibility patch (always enabled)
+  if ((result = writeThinkingVisibility(content))) content = result;
+
+  // Apply system prompt customizations
+  const systemPromptsResult = await applySystemPrompts(
+    content,
+    ccInstInfo.version
+  );
+  content = systemPromptsResult.newContent;
+  items.push(...systemPromptsResult.items);
+
+  // Apply patches applied indication
+  const showTweakccVersion = config.settings.misc?.showTweakccVersion ?? true;
+  const showPatchesApplied = config.settings.misc?.showPatchesApplied ?? true;
+  if (
+    (result = writePatchesAppliedIndication(
+      content,
+      '2.0.3',
+      items,
+      showTweakccVersion,
+      showPatchesApplied
+    ))
+  )
+    content = result;
+
+  // Apply LSP support fixes (always enabled)
+  if ((result = writeFixLspSupport(content))) content = result;
+
+  // Apply toolset restrictions (enabled if toolsets configured)
+  if (config.settings.toolsets && config.settings.toolsets.length > 0) {
+    if (
+      (result = writeToolsets(
+        content,
+        config.settings.toolsets,
+        config.settings.defaultToolset
+      ))
+    )
+      content = result;
+  }
 
   // Replace the file, breaking hard links and preserving permissions
   await replaceFileBreakingHardLinks(ccInstInfo.cliPath, content, 'patch');

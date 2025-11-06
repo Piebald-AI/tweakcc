@@ -37,8 +37,12 @@ const baseMenuItems: SelectItem[] = [
     desc: 'Customize how user messages are displayed',
   },
   {
-    name: MainMenuItem.INPUT_BOX,
-    desc: 'Customize the input box appearance (e.g., remove border)',
+    name: MainMenuItem.MISC,
+    desc: 'Miscellaneous settings (input box border, etc.)',
+  },
+  {
+    name: MainMenuItem.TOOLSETS,
+    desc: 'Manage toolsets to control which tools are available',
   },
   {
     name: MainMenuItem.VIEW_SYSTEM_PROMPTS,

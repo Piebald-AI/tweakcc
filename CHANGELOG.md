@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Support slight bun-specific differences in React module accessing, `$` identifier frequency, and unicode escaping (#163) - @bl-ue
+- Enable a toolset to be the default toolset (#161) - @bl-ue
+- Add a misc view - @bl-ue
+- Expand thinking blocks by default (#159) - @bl-ue
+- Add indicators to CC's startup UI that tweakcc's patching has been applied (#158) - @bl-ue
+- Add /toolset to Claude Code (#157) - @bl-ue
+- Makes the Claude Code's native LSP support work (#152) - @bl-ue
+
 ## [v2.0.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v2.0.3) - 2025-11-02
 
 - Handle ENOTDIR errors when searching for Claude Code installation (#148) - @bl-ue

@@ -21,6 +21,9 @@ const getModelSelectorInsertionPoint = (
 ): { insertionIndex: number; optionsVar: string } | null => {
   const labelIndex = oldFile.indexOf('Switch between Claude models');
   if (labelIndex === -1) {
+    console.error(
+      'patch: getModelSelectorInsertionPoint: failed to find labelIndex'
+    );
     return null;
   }
 
@@ -32,13 +35,21 @@ const getModelSelectorInsertionPoint = (
     /\[[$\w]+,\s*[$\w]+\]\s*=\s*[$\w]+\.useState\([^)]*\)\s*,\s*([$\w]+)=/
   );
   if (!m || m.index === undefined) {
+    console.error(
+      'patch: getModelSelectorInsertionPoint: failed to find useState'
+    );
     return null;
   }
 
   const absStart = searchStart + m.index;
   let i = absStart;
   while (i < oldFile.length && oldFile[i] !== ';') i++;
-  if (i >= oldFile.length) return null;
+  if (i >= oldFile.length) {
+    console.error(
+      'patch: getModelSelectorInsertionPoint: failed to find semicolon'
+    );
+    return null;
+  }
   const insertionIndex = i + 1; // right after the semicolon
 
   const optionsVar = m[1];
@@ -67,6 +78,9 @@ const writeModelSelectorOptions = (oldFile: string): string | null => {
 const writeKnownModelNames = (oldFile: string): string | null => {
   const m = oldFile.match(/"sonnet\[1m\]"/);
   if (!m || m.index === undefined) {
+    console.error(
+      'patch: writeKnownModelNames: failed to find sonnet[1m] marker'
+    );
     return null;
   }
   const markerIdx = m.index;
@@ -77,6 +91,7 @@ const writeKnownModelNames = (oldFile: string): string | null => {
     start--;
   }
   if (start < 0) {
+    console.error('patch: writeKnownModelNames: failed to find array start');
     return null;
   }
   // Ensure previous non-space char before '[' is '=' (assignment)
@@ -85,6 +100,7 @@ const writeKnownModelNames = (oldFile: string): string | null => {
     p--;
   }
   if (p < 0 || oldFile[p] !== '=') {
+    console.error('patch: writeKnownModelNames: failed to find assignment');
     return null;
   }
 
@@ -104,13 +120,17 @@ const writeKnownModelNames = (oldFile: string): string | null => {
     }
     end++;
   }
-  if (foundEnd === -1) return null;
+  if (foundEnd === -1) {
+    console.error('patch: writeKnownModelNames: failed to find array end');
+    return null;
+  }
 
   const arrayText = oldFile.slice(start, foundEnd + 1);
   let arr: string[];
   try {
     arr = JSON.parse(arrayText);
   } catch {
+    console.error('patch: writeKnownModelNames: failed to parse array');
     return null;
   }
 
@@ -132,6 +152,7 @@ const writeModelSwitchMapping = (oldFile: string): string | null => {
   const caseAnchor = 'case"sonnet[1m]"';
   const caseIdx = oldFile.indexOf(caseAnchor);
   if (caseIdx === -1) {
+    console.error('patch: writeModelSwitchMapping: failed to find caseAnchor');
     return null;
   }
 
@@ -141,6 +162,7 @@ const writeModelSwitchMapping = (oldFile: string): string | null => {
     open--;
   }
   if (open < 0) {
+    console.error('patch: writeModelSwitchMapping: failed to find switch open');
     return null;
   }
 
@@ -150,6 +172,9 @@ const writeModelSwitchMapping = (oldFile: string): string | null => {
     close++;
   }
   if (close >= oldFile.length) {
+    console.error(
+      'patch: writeModelSwitchMapping: failed to find switch close'
+    );
     return null;
   }
 

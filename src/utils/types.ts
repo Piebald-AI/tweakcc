@@ -104,6 +104,17 @@ export interface InputBoxConfig {
   removeBorder: boolean;
 }
 
+export interface MiscConfig {
+  showTweakccVersion: boolean;
+  showPatchesApplied: boolean;
+  expandThinkingBlocks: boolean;
+}
+
+export interface Toolset {
+  name: string;
+  allowedTools: string[] | '*';
+}
+
 export interface Settings {
   themes: Theme[];
   launchText: LaunchTextConfig;
@@ -111,6 +122,9 @@ export interface Settings {
   thinkingStyle: ThinkingStyleConfig;
   userMessageDisplay: UserMessageDisplayConfig;
   inputBox: InputBoxConfig;
+  misc: MiscConfig;
+  toolsets: Toolset[];
+  defaultToolset: string | null;
 }
 
 export interface TweakccConfig {
@@ -141,7 +155,8 @@ export enum MainMenuItem {
   THINKING_VERBS = 'Thinking verbs',
   THINKING_STYLE = 'Thinking style',
   USER_MESSAGE_DISPLAY = 'User message display',
-  INPUT_BOX = 'Input box',
+  MISC = 'Misc',
+  TOOLSETS = 'Toolsets',
   VIEW_SYSTEM_PROMPTS = 'View system prompts',
   RESTORE_ORIGINAL = 'Restore original Claude Code (preserves tweakcc.json)',
   OPEN_CONFIG = 'Open tweakcc.json',
@@ -898,6 +913,13 @@ export const DEFAULT_SETTINGS: Settings = {
   inputBox: {
     removeBorder: false,
   },
+  misc: {
+    showTweakccVersion: true,
+    showPatchesApplied: true,
+    expandThinkingBlocks: true,
+  },
+  toolsets: [],
+  defaultToolset: null,
 };
 
 // Support XDG Base Directory Specification with backward compatibility
@@ -1073,6 +1095,12 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
 
     // asdf (https://github.com/asdf-vm/asdf)
     addPath(`${home}/.asdf/installs/nodejs/*/lib/${mod}`, true);
+
+    // mise (https://github.com/jdx/mise)
+    if (process.env.MISE_DATA_DIR) {
+      addPath(`${process.env.MISE_DATA_DIR}/installs/node/*/lib/${mod}`, true);
+    }
+    addPath(`${home}/.local/share/mise/installs/node/*/lib/${mod}`, true);
   }
 
   // After we're done with globby, which required / even on Windows, convert / back to \\ for

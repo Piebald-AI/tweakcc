@@ -990,6 +990,33 @@ export const preloadStringsFile = async (
  *
  * We only capture the bare identifier, not the surrounding ${} or any method calls.
  */
+/**
+ * Converts non-ASCII characters to regex alternation patterns that match both
+ * literal and Unicode-escaped forms (e.g., … matches both "…" and "\u2026").
+ * This handles cases where cli.js has escaped Unicode characters.
+ */
+const escapeNonAsciiForRegex = (text: string): string => {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/[^\x00-\x7F]/g, char => {
+    const codePoint = char.charCodeAt(0);
+    const escaped = `\\\\u${codePoint.toString(16).padStart(4, '0')}`;
+    // Match either the literal character OR the escaped version
+    return `(?:${char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${escaped})`;
+  });
+};
+
+/**
+ * Converts non-ASCII characters to Unicode escape sequences (\uXXXX).
+ * Used when writing prompts back to cli.js for environments that only support ASCII.
+ */
+const escapeNonAsciiChars = (text: string): string => {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/[^\x00-\x7F]/g, char => {
+    const codePoint = char.charCodeAt(0);
+    return `\\u${codePoint.toString(16).padStart(4, '0')}`;
+  });
+};
+
 const buildSearchRegexFromPieces = (
   pieces: string[],
   ccVersion: string
@@ -1002,7 +1029,10 @@ const buildSearchRegexFromPieces = (
 
     // Escape special regex characters in the text piece
     const escapedPiece = piece.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    pattern += escapedPiece;
+
+    // Handle non-ASCII characters by creating alternation patterns
+    const withNonAsciiHandling = escapeNonAsciiForRegex(escapedPiece);
+    pattern += withNonAsciiHandling;
 
     // Add capture group for the variable if this isn't the last piece
     if (i < pieces.length - 1) {
@@ -1031,7 +1061,8 @@ const applyIdentifierMapping = (
   identifiers: (number | string)[],
   identifierMap: Record<string, string>,
   extractedVars: string[],
-  ccVersion: string
+  ccVersion: string,
+  escapeNonAscii = false
 ): string => {
   // Build reverse map: HUMAN_NAME -> actual minified var from cli.js
   const reverseMap: Record<string, string> = {};
@@ -1062,6 +1093,11 @@ const applyIdentifierMapping = (
   // Replace <<CCVERSION>> with the actual Claude Code version
   result = result.replace(/<<CCVERSION>>/g, ccVersion);
 
+  // Escape non-ASCII characters if requested (for Bun native executables)
+  if (escapeNonAscii) {
+    result = escapeNonAsciiChars(result);
+  }
+
   return result;
 };
 
@@ -1079,13 +1115,17 @@ const applyIdentifierMapping = (
  * Returns empty array if strings file is not available (not preloaded or failed to download)
  */
 export const loadSystemPromptsWithRegex = async (
-  ccVersion: string
+  ccVersion: string,
+  escapeNonAscii = false
 ): Promise<
   Array<{
     promptId: string;
     prompt: MarkdownPrompt;
     regex: string;
     getInterpolatedContent: (match: RegExpMatchArray) => string;
+    pieces: string[];
+    identifiers: (number | string)[];
+    identifierMap: Record<string, string>;
   }>
 > => {
   // Check if strings file was preloaded - if not, return empty array
@@ -1100,6 +1140,9 @@ export const loadSystemPromptsWithRegex = async (
     prompt: MarkdownPrompt;
     regex: string;
     getInterpolatedContent: (match: RegExpMatchArray) => string;
+    pieces: string[];
+    identifiers: (number | string)[];
+    identifierMap: Record<string, string>;
   }> = [];
 
   // For each prompt in strings.json
@@ -1130,7 +1173,8 @@ export const loadSystemPromptsWithRegex = async (
         jsonPrompt.identifiers,
         jsonPrompt.identifierMap,
         extractedVars,
-        ccVersion
+        ccVersion,
+        escapeNonAscii
       );
     };
 
@@ -1139,6 +1183,9 @@ export const loadSystemPromptsWithRegex = async (
       prompt: replacementPrompt,
       regex,
       getInterpolatedContent,
+      pieces: jsonPrompt.pieces,
+      identifiers: jsonPrompt.identifiers,
+      identifierMap: jsonPrompt.identifierMap,
     });
   }
 
