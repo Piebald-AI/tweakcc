@@ -69,6 +69,7 @@
     "node-lief": "0.1.0-pre.2",
     "ollama": "^0.6.0",
     "openai": "^6.3.0",
+    "pe-library": "^2.0.1",
     "react": "^19.1.1"
   }
 }
