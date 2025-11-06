@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { execSync } from 'node:child_process';
 import {
   ClaudeCodeInstallationInfo,
   CLIJS_BACKUP_FILE,
@@ -7,6 +8,7 @@ import {
   CONFIG_DIR,
   CONFIG_FILE,
   DEFAULT_SETTINGS,
+  NATIVE_BINARY_BACKUP_FILE,
   StartupCheckInfo,
   SYSTEM_PROMPTS_DIR,
   Theme,
@@ -23,6 +25,7 @@ import {
   hasUnappliedSystemPromptChanges,
   clearAllAppliedHashes,
 } from './systemPromptHashIndex.js';
+import { extractClaudeJsFromNativeInstallation } from './nativeInstallation.js';
 
 export const ensureConfigDir = async (): Promise<void> => {
   await fs.mkdir(CONFIG_DIR, { recursive: true });
@@ -183,11 +186,19 @@ const saveConfig = async (config: TweakccConfig): Promise<void> => {
 
 /**
  * Restores the original cli.js file from the backup.
- * Unlinks the file first to break any hard links (e.g., from Bun's linking system).
+ * Only applies to NPM installs. For native installs, this is a no-op.
  */
 export const restoreClijsFromBackup = async (
   ccInstInfo: ClaudeCodeInstallationInfo
 ): Promise<boolean> => {
+  // Only restore cli.js for NPM installs (when cliPath is set)
+  if (!ccInstInfo.cliPath) {
+    if (isDebug()) {
+      console.log('restoreClijsFromBackup: Skipping for native installation (no cliPath)');
+    }
+    return false;
+  }
+
   if (isDebug()) {
     console.log(`Restoring cli.js from backup to ${ccInstInfo.cliPath}`);
   }
@@ -211,6 +222,164 @@ export const restoreClijsFromBackup = async (
 
   return true;
 };
+
+/**
+ * Restores the native installation binary from backup.
+ * This function restores the original native binary and clears changesApplied,
+ * so patches can be re-applied from a clean state.
+ */
+export const restoreNativeBinaryFromBackup = async (
+  ccInstInfo: ClaudeCodeInstallationInfo
+): Promise<boolean> => {
+  if (!ccInstInfo.nativeInstallationPath) {
+    if (isDebug()) {
+      console.log('restoreNativeBinaryFromBackup: No native installation path, skipping');
+    }
+    return false;
+  }
+
+  if (!(await doesFileExist(NATIVE_BINARY_BACKUP_FILE))) {
+    if (isDebug()) {
+      console.log('restoreNativeBinaryFromBackup: No backup file exists, skipping');
+    }
+    return false;
+  }
+
+  if (isDebug()) {
+    console.log(`Restoring native binary from backup to ${ccInstInfo.nativeInstallationPath}`);
+  }
+
+  // Read the backup content
+  const backupContent = await fs.readFile(NATIVE_BINARY_BACKUP_FILE);
+
+  // Replace the file, breaking hard links and preserving permissions
+  await replaceFileBreakingHardLinks(
+    ccInstInfo.nativeInstallationPath,
+    backupContent,
+    'restore'
+  );
+
+  return true;
+};
+
+/**
+ * Finds the claude executable on PATH using platform-specific commands.
+ * Returns the path to the executable (resolved from symlink), or null if not found.
+ */
+async function findClaudeExecutableOnPath(): Promise<string | null> {
+  try {
+    const isWindows = process.platform === 'win32';
+    const command = isWindows ? 'where claude.exe' : 'which claude';
+
+    if (isDebug()) {
+      console.log(`Looking for claude executable using: ${command}`);
+    }
+
+    const result = execSync(command, { encoding: 'utf8' }).trim();
+    const firstPath = result.split('\n')[0].trim(); // In case multiple paths are returned
+
+    if (firstPath && (await doesFileExist(firstPath))) {
+      // Resolve symlinks to get the actual binary path
+      try {
+        const realPath = await fs.realpath(firstPath);
+        if (isDebug()) {
+          if (realPath !== firstPath) {
+            console.log(`Found claude executable at: ${firstPath} (symlink)`);
+            console.log(`Resolved to: ${realPath}`);
+          } else {
+            console.log(`Found claude executable at: ${firstPath}`);
+          }
+        }
+        return realPath;
+      } catch (error) {
+        if (isDebug()) {
+          console.log('Could not resolve symlink, using original path:', error);
+        }
+        return firstPath;
+      }
+    }
+  } catch (error) {
+    if (isDebug()) {
+      console.log('Could not find claude executable on PATH:', error);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Extracts version from claude.js content.
+ * Searches for VERSION:"x.y.z" patterns and returns the version that appears most frequently.
+ */
+function extractVersionFromContent(content: string): string | null {
+  const versionRegex = /\bVERSION:"(\d+\.\d+\.\d+)"/g;
+  const versionCounts = new Map<string, number>();
+
+  let match;
+  while ((match = versionRegex.exec(content)) !== null) {
+    const version = match[1];
+    versionCounts.set(version, (versionCounts.get(version) || 0) + 1);
+  }
+
+  if (versionCounts.size === 0) {
+    return null;
+  }
+
+  // Find the version with the most occurrences
+  let maxCount = 0;
+  let mostCommonVersion: string | undefined;
+
+  for (const [version, count] of versionCounts.entries()) {
+    if (isDebug()) {
+      console.log(`Found version ${version} with ${count} occurrences`);
+    }
+    if (count > maxCount) {
+      maxCount = count;
+      mostCommonVersion = version;
+    }
+  }
+
+  if (isDebug() && mostCommonVersion) {
+    console.log(
+      `Extracted version ${mostCommonVersion} (${maxCount} occurrences)`
+    );
+  }
+
+  return mostCommonVersion || null;
+}
+
+async function doesFileExist(filePath: string): Promise<boolean> {
+  try {
+    await fs.stat(filePath);
+    return true;
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+    ) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Extracts the Claude Code version from the minified JS file.
+ * @throws {Error} If the file cannot be read or no VERSION strings are found
+ */
+async function extractVersionFromJsFile(
+  cliPath: string
+): Promise<string> {
+  const content = await fs.readFile(cliPath, 'utf8');
+  const version = extractVersionFromContent(content);
+
+  if (!version) {
+    throw new Error(`No VERSION strings found in JS file: ${cliPath}`);
+  }
+
+  return version;
+}
 
 /**
  * Searches for the Claude Code installation in the default locations.
@@ -240,27 +409,12 @@ export const findClaudeCodeInstallation = async (
         console.log(`SHA256 hash: ${await hashFileInChunks(cliPath)}`);
       }
 
-      // Try package.json.  It's alright if it doesn't exist.
-      const packageJsonPath = path.join(searchPath, 'package.json');
-      let packageJson;
-      try {
-        packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf8'));
-      } catch (error) {
-        if (
-          error instanceof Error &&
-          'code' in error &&
-          error.code === 'ENOENT'
-        ) {
-          // Do nothing.
-        } else {
-          throw error;
-        }
-      }
+      // Extract version from the cli.js file itself
+      const version = await extractVersionFromJsFile(cliPath);
 
       return {
         cliPath: cliPath,
-        packageJsonPath,
-        version: packageJson?.version,
+        version,
       };
     } catch (error) {
       if (
@@ -276,10 +430,69 @@ export const findClaudeCodeInstallation = async (
     }
   }
 
+  // If we didn't find cli.js in the usual locations, try extracting from native installation
+  if (isDebug()) {
+    console.log(
+      'Could not find cli.js in standard locations, trying native installation method...'
+    );
+  }
+
+  const claudeExePath = await findClaudeExecutableOnPath();
+  if (isDebug()) {
+    console.log(`findClaudeExecutableOnPath() returned: ${claudeExePath}`);
+  }
+
+  if (claudeExePath) {
+    // Treat any found executable as a potential native installation
+    // If a backup exists, extract from the backup instead of the (potentially modified) current binary
+    const backupExists = await doesFileExist(NATIVE_BINARY_BACKUP_FILE);
+    const pathToExtractFrom = backupExists ? NATIVE_BINARY_BACKUP_FILE : claudeExePath;
+
+    if (isDebug()) {
+      console.log(
+        `Attempting to extract claude.js from ${backupExists ? 'backup' : 'native installation'}: ${pathToExtractFrom}`
+      );
+    }
+
+    const claudeJsBuffer = extractClaudeJsFromNativeInstallation(pathToExtractFrom);
+
+    if (claudeJsBuffer) {
+      // Successfully extracted claude.js from native installation
+      // Extract version from the buffer content
+      const content = claudeJsBuffer.toString('utf8');
+      const version = extractVersionFromContent(content);
+
+      if (!version) {
+        if (isDebug()) {
+          console.log('Failed to extract version from native installation');
+        }
+        return null;
+      }
+
+      if (isDebug()) {
+        console.log(`Extracted version ${version} from native installation`);
+      }
+
+      return {
+        // cliPath is undefined for native installs - no file on disk
+        version,
+        nativeInstallationPath: claudeExePath,
+      };
+    }
+  }
+
   return null;
 };
 
 const backupClijs = async (ccInstInfo: ClaudeCodeInstallationInfo) => {
+  // Only backup cli.js for NPM installs (when cliPath is set)
+  if (!ccInstInfo.cliPath) {
+    if (isDebug()) {
+      console.log('backupClijs: Skipping for native installation (no cliPath)');
+    }
+    return;
+  }
+
   await ensureConfigDir();
   if (isDebug()) {
     console.log(`Backing up cli.js to ${CLIJS_BACKUP_FILE}`);
@@ -291,21 +504,24 @@ const backupClijs = async (ccInstInfo: ClaudeCodeInstallationInfo) => {
   });
 };
 
-async function doesFileExist(filePath: string): Promise<boolean> {
-  try {
-    await fs.stat(filePath);
-    return true;
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      'code' in error &&
-      (error.code === 'ENOENT' || error.code === 'ENOTDIR')
-    ) {
-      return false;
-    }
-    throw error;
+/**
+ * Backs up the native installation binary to the config directory.
+ */
+const backupNativeBinary = async (ccInstInfo: ClaudeCodeInstallationInfo) => {
+  if (!ccInstInfo.nativeInstallationPath) {
+    return;
   }
-}
+
+  await ensureConfigDir();
+  if (isDebug()) {
+    console.log(`Backing up native binary to ${NATIVE_BINARY_BACKUP_FILE}`);
+  }
+  await fs.copyFile(ccInstInfo.nativeInstallationPath, NATIVE_BINARY_BACKUP_FILE);
+  await updateConfigFile(config => {
+    config.changesApplied = false;
+    config.ccVersion = ccInstInfo.version;
+  });
+};
 
 /**
  * Performs startup checking: finding Claude Code, creating a backup if necessary, checking if
@@ -345,6 +561,18 @@ export async function startupCheck(): Promise<StartupCheckInfo | null> {
     hasBackedUp = true;
   }
 
+  // Backup native binary if we don't have any backup yet (for native installations)
+  let hasBackedUpNativeBinary = false;
+  if (ccInstInfo.nativeInstallationPath && !(await doesFileExist(NATIVE_BINARY_BACKUP_FILE))) {
+    if (isDebug()) {
+      console.log(
+        `startupCheck: ${NATIVE_BINARY_BACKUP_FILE} not found; backing up native binary`
+      );
+    }
+    await backupNativeBinary(ccInstInfo);
+    hasBackedUpNativeBinary = true;
+  }
+
   // If the installed CC version is different from what we have backed up, clear out our backup
   // and make a new one.
   if (realVersion !== backedUpVersion) {
@@ -359,6 +587,19 @@ export async function startupCheck(): Promise<StartupCheckInfo | null> {
       }
       await fs.unlink(CLIJS_BACKUP_FILE);
       await backupClijs(ccInstInfo);
+    }
+
+    // Also backup native binary if version changed
+    if (ccInstInfo.nativeInstallationPath && !hasBackedUpNativeBinary) {
+      if (isDebug()) {
+        console.log(
+          `startupCheck: real version (${realVersion}) != backed up version (${backedUpVersion}); backing up native binary`
+        );
+      }
+      if (await doesFileExist(NATIVE_BINARY_BACKUP_FILE)) {
+        await fs.unlink(NATIVE_BINARY_BACKUP_FILE);
+      }
+      await backupNativeBinary(ccInstInfo);
     }
 
     return {

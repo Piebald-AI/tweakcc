@@ -159,7 +159,7 @@ Please reapply your changes below.`,
         revealFileInExplorer(CONFIG_FILE);
         break;
       case MainMenuItem.OPEN_CLI:
-        if (startupCheckInfo.ccInstInfo) {
+        if (startupCheckInfo.ccInstInfo?.cliPath) {
           revealFileInExplorer(startupCheckInfo.ccInstInfo.cliPath);
         }
         break;
@@ -183,7 +183,11 @@ Please reapply your changes below.`,
     >
       <Box flexDirection="column">
         {currentView === null ? (
-          <MainView onSubmit={handleMainSubmit} notification={notification} />
+          <MainView
+            onSubmit={handleMainSubmit}
+            notification={notification}
+            isNativeInstallation={!!startupCheckInfo.ccInstInfo?.nativeInstallationPath}
+          />
         ) : currentView === MainMenuItem.THEMES ? (
           <ThemesView onBack={handleBack} />
         ) : currentView === MainMenuItem.LAUNCH_TEXT ? (

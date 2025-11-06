@@ -44,7 +44,7 @@ const main = async () => {
 
     if (!startupCheckInfo || !startupCheckInfo.ccInstInfo) {
       console.error(`Cannot find Claude Code's cli.js`);
-      console.error('Searched at the following locations:');
+      console.error('Searched for cli.js at the following locations:');
       CLIJS_SEARCH_PATH_INFO.forEach(info => {
         if (info.isGlob) {
           if (info.expandedPaths.length === 0) {
@@ -59,10 +59,15 @@ const main = async () => {
           console.error(`  - ${info.pattern}`);
         }
       });
+      console.error(`\nAlso checked for 'claude' executable on PATH using '${process.platform === 'win32' ? 'where claude.exe' : 'which claude'}'.`);
       process.exit(1);
     }
 
-    console.log(`Found Claude Code at: ${startupCheckInfo.ccInstInfo.cliPath}`);
+    if (startupCheckInfo.ccInstInfo.nativeInstallationPath) {
+      console.log(`Found Claude Code (native installation): ${startupCheckInfo.ccInstInfo.nativeInstallationPath}`);
+    } else {
+      console.log(`Found Claude Code at: ${startupCheckInfo.ccInstInfo.cliPath}`);
+    }
     console.log(`Version: ${startupCheckInfo.ccInstInfo.version}`);
 
     // Preload strings file for system prompts
@@ -127,8 +132,10 @@ const main = async () => {
 
     console.error(`Cannot find Claude Code's cli.js -- do you have Claude Code installed?
 
-Searched at the following locations:
+Searched for cli.js at the following locations:
 ${formatSearchPaths()}
+
+Also checked for 'claude' executable on PATH using '${process.platform === 'win32' ? 'where claude.exe' : 'which claude'}'.
 
 If you have it installed but it's in a location not listed above, please open an issue at
 https://github.com/piebald-ai/tweakcc/issues and tell us where you have it--we'll add that location

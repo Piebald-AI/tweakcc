@@ -1,8 +1,9 @@
 import figlet from 'figlet';
 import * as fs from 'node:fs/promises';
-import { restoreClijsFromBackup, updateConfigFile } from '../config.js';
-import { ClaudeCodeInstallationInfo, TweakccConfig } from '../types.js';
+import { restoreClijsFromBackup, restoreNativeBinaryFromBackup, updateConfigFile } from '../config.js';
+import { ClaudeCodeInstallationInfo, TweakccConfig, NATIVE_BINARY_BACKUP_FILE } from '../types.js';
 import { isDebug, replaceFileBreakingHardLinks } from '../misc.js';
+import { extractClaudeJsFromNativeInstallation, repackNativeInstallation } from '../nativeInstallation.js';
 
 // Notes to patch-writers:
 //
@@ -247,11 +248,48 @@ export const applyCustomization = async (
   config: TweakccConfig,
   ccInstInfo: ClaudeCodeInstallationInfo
 ): Promise<TweakccConfig> => {
-  // Clean up any existing customizations, which will likely break the heuristics, by restoring the
-  // original file from the backup.
-  await restoreClijsFromBackup(ccInstInfo);
+  let content: string;
 
-  let content = await fs.readFile(ccInstInfo.cliPath, { encoding: 'utf8' });
+  if (ccInstInfo.nativeInstallationPath) {
+    // For native installations: restore the binary, then extract to memory
+    await restoreNativeBinaryFromBackup(ccInstInfo);
+
+    // Extract from backup if it exists, otherwise from the native installation
+    let backupExists = false;
+    try {
+      await fs.stat(NATIVE_BINARY_BACKUP_FILE);
+      backupExists = true;
+    } catch {
+      // Backup doesn't exist, extract from native installation
+    }
+
+    const pathToExtractFrom = backupExists
+      ? NATIVE_BINARY_BACKUP_FILE
+      : ccInstInfo.nativeInstallationPath;
+
+    if (isDebug()) {
+      console.log(
+        `Extracting claude.js from ${backupExists ? 'backup' : 'native installation'}: ${pathToExtractFrom}`
+      );
+    }
+
+    const claudeJsBuffer = extractClaudeJsFromNativeInstallation(pathToExtractFrom);
+
+    if (!claudeJsBuffer) {
+      throw new Error('Failed to extract claude.js from native installation');
+    }
+
+    content = claudeJsBuffer.toString('utf8');
+  } else {
+    // For NPM installations: restore cli.js from backup, then read it
+    await restoreClijsFromBackup(ccInstInfo);
+
+    if (!ccInstInfo.cliPath) {
+      throw new Error('cliPath is required for NPM installations');
+    }
+
+    content = await fs.readFile(ccInstInfo.cliPath, { encoding: 'utf8' });
+  }
 
   const items: string[] = [];
 
@@ -415,8 +453,23 @@ export const applyCustomization = async (
       content = result;
   }
 
-  // Replace the file, breaking hard links and preserving permissions
-  await replaceFileBreakingHardLinks(ccInstInfo.cliPath, content, 'patch');
+  // Write the modified content back
+  if (ccInstInfo.nativeInstallationPath) {
+    // For native installations: repack the modified claude.js back into the binary
+    if (isDebug()) {
+      console.log(`Repacking modified claude.js into native installation: ${ccInstInfo.nativeInstallationPath}`);
+    }
+
+    const modifiedBuffer = Buffer.from(content, 'utf8');
+    repackNativeInstallation(ccInstInfo.nativeInstallationPath, modifiedBuffer, ccInstInfo.nativeInstallationPath);
+  } else {
+    // For NPM installations: replace the cli.js file
+    if (!ccInstInfo.cliPath) {
+      throw new Error('cliPath is required for NPM installations');
+    }
+
+    await replaceFileBreakingHardLinks(ccInstInfo.cliPath, content, 'patch');
+  }
 
   return await updateConfigFile(config => {
     config.changesApplied = true;

@@ -137,9 +137,9 @@ export interface TweakccConfig {
 }
 
 export interface ClaudeCodeInstallationInfo {
-  cliPath: string;
-  packageJsonPath: string;
+  cliPath?: string; // Only set for NPM installs; undefined for native installs
   version: string;
+  nativeInstallationPath?: string; // Path to native installation binary
 }
 
 export interface StartupCheckInfo {
@@ -150,7 +150,7 @@ export interface StartupCheckInfo {
 }
 
 export enum MainMenuItem {
-  APPLY_CHANGES = '*Apply customizations to cli.js',
+  APPLY_CHANGES = '*Apply customizations',
   THEMES = 'Themes',
   LAUNCH_TEXT = 'Launch text',
   THINKING_VERBS = 'Thinking verbs',
@@ -957,6 +957,7 @@ const getConfigDir = (): string => {
 export const CONFIG_DIR = getConfigDir();
 export const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 export const CLIJS_BACKUP_FILE = path.join(CONFIG_DIR, 'cli.js.backup');
+export const NATIVE_BINARY_BACKUP_FILE = path.join(CONFIG_DIR, 'native-binary.backup');
 export const SYSTEM_PROMPTS_DIR = path.join(CONFIG_DIR, 'system-prompts');
 export const PROMPT_CACHE_DIR = path.join(CONFIG_DIR, 'prompt-data-cache');
 

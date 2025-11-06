@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "tsc -b && vite build",
+    "build:dev": "vite build --mode development",
     "watch": "vite build --watch --mode development",
     "start": "node dist/index.js",
     "lint": "tsc --noEmit && eslint src",
@@ -65,6 +66,7 @@
     "gray-matter": "^4.0.3",
     "ink": "^6.1.0",
     "ink-link": "^4.1.0",
+    "node-lief": "0.1.0-pre.2",
     "ollama": "^0.6.0",
     "openai": "^6.3.0",
     "react": "^19.1.1"

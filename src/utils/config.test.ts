@@ -169,11 +169,9 @@ describe('config.ts', () => {
       };
 
       const mockCliPath = path.join(CLIJS_SEARCH_PATHS[0], 'cli.js');
-      const mockPackageJsonPath = path.join(
-        CLIJS_SEARCH_PATHS[0],
-        'package.json'
-      );
-      const mockPackageJson = JSON.stringify({ version: '1.2.3' });
+      // Mock cli.js content with VERSION strings
+      const mockCliContent =
+        'some code VERSION:"1.2.3" more code VERSION:"1.2.3" and VERSION:"1.2.3"';
 
       // Mock fs.stat to simulate that cli.js exists
       vi.spyOn(fs, 'stat').mockImplementation(async p => {
@@ -183,9 +181,9 @@ describe('config.ts', () => {
         throw createEnoent(); // File not found
       });
 
-      vi.spyOn(fs, 'readFile').mockImplementation(async p => {
-        if (p === mockPackageJsonPath) {
-          return mockPackageJson;
+      vi.spyOn(fs, 'readFile').mockImplementation(async (p, encoding) => {
+        if (p === mockCliPath && encoding === 'utf8') {
+          return mockCliContent;
         }
         throw new Error('File not found');
       });
@@ -194,7 +192,6 @@ describe('config.ts', () => {
 
       expect(result).toEqual({
         cliPath: mockCliPath,
-        packageJsonPath: mockPackageJsonPath,
         version: '1.2.3',
       });
     });
@@ -228,10 +225,8 @@ describe('config.ts', () => {
 
       // Mock fs.stat to simulate ENOTDIR on first path, then find cli.js on second path
       const mockSecondCliPath = path.join(CLIJS_SEARCH_PATHS[1], 'cli.js');
-      const mockSecondPackageJsonPath = path.join(
-        CLIJS_SEARCH_PATHS[1],
-        'package.json'
-      );
+      const mockCliContent =
+        'some code VERSION:"1.2.3" more code VERSION:"1.2.3" and VERSION:"1.2.3"';
 
       let callCount = 0;
       vi.spyOn(fs, 'stat').mockImplementation(async p => {
@@ -247,9 +242,9 @@ describe('config.ts', () => {
         throw createEnoent();
       });
 
-      vi.spyOn(fs, 'readFile').mockImplementation(async p => {
-        if (p === mockSecondPackageJsonPath) {
-          return JSON.stringify({ version: '1.2.3' });
+      vi.spyOn(fs, 'readFile').mockImplementation(async (p, encoding) => {
+        if (p === mockSecondCliPath && encoding === 'utf8') {
+          return mockCliContent;
         }
         throw new Error('File not found');
       });
@@ -258,7 +253,6 @@ describe('config.ts', () => {
 
       expect(result).toEqual({
         cliPath: mockSecondCliPath,
-        packageJsonPath: mockSecondPackageJsonPath,
         version: '1.2.3',
       });
     });
@@ -266,28 +260,32 @@ describe('config.ts', () => {
 
   describe('startupCheck', () => {
     it('should backup cli.js if no backup exists', async () => {
-      const ccInstInfo: ClaudeCodeInstallationInfo = {
-        cliPath: '/fake/path/cli.js',
-        version: '1.0.0',
-        packageJsonPath: '/fake/path/package.json',
-      };
+      const mockCliPath = path.join(CLIJS_SEARCH_PATHS[0], 'cli.js');
+      const mockCliContent =
+        'some code VERSION:"1.0.0" more code VERSION:"1.0.0" and VERSION:"1.0.0"';
 
-      // Mock fs.stat to reject only for the backup file
+      // Mock fs.stat to make cli.js exist but backup not exist
       vi.spyOn(fs, 'stat').mockImplementation(async filePath => {
         if (filePath.toString().includes('cli.js.backup')) {
           throw createEnoent(); // Backup doesn't exist
         }
-        return {} as Stats; // Other files exist
+        if (filePath === mockCliPath) {
+          return {} as Stats; // cli.js exists
+        }
+        throw createEnoent();
       });
 
       const copyFileSpy = vi.spyOn(fs, 'copyFile').mockResolvedValue(undefined);
-      vi.spyOn(fs, 'readFile').mockResolvedValue(
-        JSON.stringify({ ccVersion: '1.0.0' })
-      );
+      vi.spyOn(fs, 'readFile').mockImplementation(async (p, encoding) => {
+        if (p === mockCliPath && encoding === 'utf8') {
+          return mockCliContent;
+        }
+        if (p === CONFIG_FILE) {
+          return JSON.stringify({ ccVersion: '1.0.0' });
+        }
+        throw createEnoent();
+      });
       vi.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
-      vi.spyOn(config, 'findClaudeCodeInstallation').mockResolvedValue(
-        ccInstInfo
-      );
 
       await config.startupCheck();
 
@@ -295,21 +293,33 @@ describe('config.ts', () => {
     });
 
     it('should re-backup if the version has changed', async () => {
-      const ccInstInfo: ClaudeCodeInstallationInfo = {
-        cliPath: '/fake/path/cli.js',
-        version: '2.0.0',
-        packageJsonPath: '/fake/path/package.json',
-      };
-      vi.spyOn(fs, 'stat').mockResolvedValue({} as Stats);
+      const mockCliPath = path.join(CLIJS_SEARCH_PATHS[0], 'cli.js');
+      const mockCliContent =
+        'some code VERSION:"2.0.0" more code VERSION:"2.0.0" and VERSION:"2.0.0"';
+
+      // Mock fs.stat to make both cli.js and backup exist
+      vi.spyOn(fs, 'stat').mockImplementation(async filePath => {
+        if (filePath === mockCliPath) {
+          return {} as Stats; // cli.js exists
+        }
+        if (filePath.toString().includes('cli.js.backup')) {
+          return {} as Stats; // Backup exists
+        }
+        throw createEnoent();
+      });
+
       const unlinkSpy = vi.spyOn(fs, 'unlink').mockResolvedValue(undefined);
       const copyFileSpy = vi.spyOn(fs, 'copyFile').mockResolvedValue(undefined);
-      vi.spyOn(fs, 'readFile').mockResolvedValue(
-        JSON.stringify({ ccVersion: '1.0.0' })
-      );
+      vi.spyOn(fs, 'readFile').mockImplementation(async (p, encoding) => {
+        if (p === mockCliPath && encoding === 'utf8') {
+          return mockCliContent;
+        }
+        if (p === CONFIG_FILE) {
+          return JSON.stringify({ ccVersion: '1.0.0' }); // Different version
+        }
+        throw createEnoent();
+      });
       vi.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
-      vi.spyOn(config, 'findClaudeCodeInstallation').mockResolvedValue(
-        ccInstInfo
-      );
 
       const result = await config.startupCheck();
 
