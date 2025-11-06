@@ -326,59 +326,59 @@ export const applyCustomization = async (
 
   // Apply themes
   let result: string | null = null;
-  if (config.settings.themes && config.settings.themes.length > 0) {
-    if ((result = writeThemes(content, config.settings.themes)))
-      content = result;
-  }
+  // if (config.settings.themes && config.settings.themes.length > 0) {
+  //   if ((result = writeThemes(content, config.settings.themes)))
+  //     content = result;
+  // }
 
-  // Apply launch text
-  if (config.settings.launchText) {
-    const c = config.settings.launchText;
-    let textToApply = '';
-    if (c.method === 'custom' && c.customText) {
-      textToApply = c.customText;
-    } else if (c.method === 'figlet' && c.figletText) {
-      textToApply = await new Promise<string>(resolve =>
-        figlet.text(
-          c.figletText.replace('\n', ' '),
-          c.figletFont as unknown as figlet.Fonts,
-          (err, data) => {
-            if (err) {
-              console.error('patch: figlet: failed to generate text', err);
-              resolve('');
-            } else {
-              resolve(data || '');
-            }
-          }
-        )
-      );
-    }
-    if ((result = writeSigninBannerText(content, textToApply)))
-      content = result;
-  }
+  // // Apply launch text
+  // if (config.settings.launchText) {
+  //   const c = config.settings.launchText;
+  //   let textToApply = '';
+  //   if (c.method === 'custom' && c.customText) {
+  //     textToApply = c.customText;
+  //   } else if (c.method === 'figlet' && c.figletText) {
+  //     textToApply = await new Promise<string>(resolve =>
+  //       figlet.text(
+  //         c.figletText.replace('\n', ' '),
+  //         c.figletFont as unknown as figlet.Fonts,
+  //         (err, data) => {
+  //           if (err) {
+  //             console.error('patch: figlet: failed to generate text', err);
+  //             resolve('');
+  //           } else {
+  //             resolve(data || '');
+  //           }
+  //         }
+  //       )
+  //     );
+  //   }
+  //   if ((result = writeSigninBannerText(content, textToApply)))
+  //     content = result;
+  // }
 
-  // Apply thinking verbs
-  // prettier-ignore
-  if (config.settings.thinkingVerbs) {
-    if ((result = writeThinkerVerbs(content, config.settings.thinkingVerbs.verbs)))
-      content = result;
-    if ((result = writeThinkerFormat(content, config.settings.thinkingVerbs.format)))
-      content = result;
-  }
+  // // Apply thinking verbs
+  // // prettier-ignore
+  // if (config.settings.thinkingVerbs) {
+  //   if ((result = writeThinkerVerbs(content, config.settings.thinkingVerbs.verbs)))
+  //     content = result;
+  //   if ((result = writeThinkerFormat(content, config.settings.thinkingVerbs.format)))
+  //     content = result;
+  // }
 
-  // Apply thinking style
-  // prettier-ignore
-  if ((result = writeThinkerSymbolChars(content, config.settings.thinkingStyle.phases)))
-    content = result;
-  // prettier-ignore
-  if ((result = writeThinkerSymbolSpeed(content, config.settings.thinkingStyle.updateInterval)))
-    content = result;
-  // prettier-ignore
-  if ((result = writeThinkerSymbolWidthLocation(content, Math.max(...config.settings.thinkingStyle.phases.map(p => p.length)) + 1)))
-    content = result;
-  // prettier-ignore
-  if ((result = writeThinkerSymbolMirrorOption(content, config.settings.thinkingStyle.reverseMirror)))
-    content = result;
+  // // Apply thinking style
+  // // prettier-ignore
+  // if ((result = writeThinkerSymbolChars(content, config.settings.thinkingStyle.phases)))
+  //   content = result;
+  // // prettier-ignore
+  // if ((result = writeThinkerSymbolSpeed(content, config.settings.thinkingStyle.updateInterval)))
+  //   content = result;
+  // // prettier-ignore
+  // if ((result = writeThinkerSymbolWidthLocation(content, Math.max(...config.settings.thinkingStyle.phases.map(p => p.length)) + 1)))
+  //   content = result;
+  // // prettier-ignore
+  // if ((result = writeThinkerSymbolMirrorOption(content, config.settings.thinkingStyle.reverseMirror)))
+  //   content = result;
 
   // Apply user message display customization
   if (config.settings.userMessageDisplay) {
@@ -403,77 +403,77 @@ export const applyCustomization = async (
     }
   }
 
-  // Apply input box border customization
-  if (
-    config.settings.inputBox &&
-    typeof config.settings.inputBox.removeBorder === 'boolean'
-  ) {
-    if (
-      (result = writeInputBoxBorder(
-        content,
-        config.settings.inputBox.removeBorder
-      ))
-    )
-      content = result;
-  }
+  // // Apply input box border customization
+  // if (
+  //   config.settings.inputBox &&
+  //   typeof config.settings.inputBox.removeBorder === 'boolean'
+  // ) {
+  //   if (
+  //     (result = writeInputBoxBorder(
+  //       content,
+  //       config.settings.inputBox.removeBorder
+  //     ))
+  //   )
+  //     content = result;
+  // }
 
-  // Apply verbose property patch (always true by default)
-  if ((result = writeVerboseProperty(content))) content = result;
+  // // Apply verbose property patch (always true by default)
+  // if ((result = writeVerboseProperty(content))) content = result;
 
-  // Apply spinner no-freeze patch (always enabled)
-  if ((result = writeSpinnerNoFreeze(content))) content = result;
+  // // Apply spinner no-freeze patch (always enabled)
+  // if ((result = writeSpinnerNoFreeze(content))) content = result;
 
-  // Apply context limit patch (always enabled)
-  if ((result = writeContextLimit(content))) content = result;
+  // // Apply context limit patch (always enabled)
+  // if ((result = writeContextLimit(content))) content = result;
 
-  // Apply model customizations (known names, mapping, selector options) (always enabled)
-  if ((result = writeModelCustomizations(content))) content = result;
+  // // Apply model customizations (known names, mapping, selector options) (always enabled)
+  // if ((result = writeModelCustomizations(content))) content = result;
 
-  // Apply show more items in select menus patch (always enabled)
-  if ((result = writeShowMoreItemsInSelectMenus(content, 25))) content = result;
+  // // Apply show more items in select menus patch (always enabled)
+  // if ((result = writeShowMoreItemsInSelectMenus(content, 25))) content = result;
 
-  // Disable Max subscription gating for cost tool (always enabled)
-  if ((result = writeIgnoreMaxSubscription(content))) content = result;
+  // // Disable Max subscription gating for cost tool (always enabled)
+  // if ((result = writeIgnoreMaxSubscription(content))) content = result;
 
-  // Apply thinking visibility patch (always enabled)
-  if ((result = writeThinkingVisibility(content))) content = result;
+  // // Apply thinking visibility patch (always enabled)
+  // if ((result = writeThinkingVisibility(content))) content = result;
 
-  // Apply system prompt customizations
-  const systemPromptsResult = await applySystemPrompts(
-    content,
-    ccInstInfo.version
-  );
-  content = systemPromptsResult.newContent;
-  items.push(...systemPromptsResult.items);
+  // // Apply system prompt customizations
+  // const systemPromptsResult = await applySystemPrompts(
+  //   content,
+  //   ccInstInfo.version
+  // );
+  // content = systemPromptsResult.newContent;
+  // items.push(...systemPromptsResult.items);
 
-  // Apply patches applied indication
-  const showTweakccVersion = config.settings.misc?.showTweakccVersion ?? true;
-  const showPatchesApplied = config.settings.misc?.showPatchesApplied ?? true;
-  if (
-    (result = writePatchesAppliedIndication(
-      content,
-      '2.0.3',
-      items,
-      showTweakccVersion,
-      showPatchesApplied
-    ))
-  )
-    content = result;
+  // // Apply patches applied indication
+  // const showTweakccVersion = config.settings.misc?.showTweakccVersion ?? true;
+  // const showPatchesApplied = config.settings.misc?.showPatchesApplied ?? true;
+  // if (
+  //   (result = writePatchesAppliedIndication(
+  //     content,
+  //     '2.0.3',
+  //     items,
+  //     showTweakccVersion,
+  //     showPatchesApplied
+  //   ))
+  // )
+  //   content = result;
 
-  // Apply LSP support fixes (always enabled)
-  if ((result = writeFixLspSupport(content))) content = result;
+  // // Apply LSP support fixes (always enabled)
+  // if ((result = writeFixLspSupport(content))) content = result;
 
-  // Apply toolset restrictions (enabled if toolsets configured)
-  if (config.settings.toolsets && config.settings.toolsets.length > 0) {
-    if (
-      (result = writeToolsets(
-        content,
-        config.settings.toolsets,
-        config.settings.defaultToolset
-      ))
-    )
-      content = result;
-  }
+  // // Apply toolset restrictions (enabled if toolsets configured)
+  // if (config.settings.toolsets && config.settings.toolsets.length > 0) {
+  //   if (
+  //     (result = writeToolsets(
+  //       content,
+  //       config.settings.toolsets,
+  //       config.settings.defaultToolset
+  //     ))
+  //   )
+  //     content = result;
+  // }
 
   // Replace the file, breaking hard links and preserving permissions
   await replaceFileBreakingHardLinks(ccInstInfo.cliPath, content, 'patch');

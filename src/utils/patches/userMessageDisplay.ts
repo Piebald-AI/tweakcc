@@ -1,38 +1,30 @@
 // Please see the note about writing patches in ./index.js.
-import {
-  findChalkVar,
-  LocationResult,
-  showDiff,
-} from './index.js';
+import { findChalkVar, LocationResult, showDiff } from './index.js';
 
 const getUserMessageDisplayLocation = (
   oldFile: string
 ): LocationResult | null => {
   // Search for the exact error message to find the component
   const messageDisplayPattern =
-    /return [$\w]+\.createElement\([$\w]+,\{backgroundColor:"userMessageBackground",color:"text"\},"> ",([$\w]+)\+" "\);/;
+    /return ([$\w]+)\.createElement\(([$\w]+),\{backgroundColor:"userMessageBackground",color:"text"\},"> ",([$\w]+)\+" "\);/;
   const messageDisplayMatch = oldFile.match(messageDisplayPattern);
   if (!messageDisplayMatch || messageDisplayMatch.index == undefined) {
     console.error('patch: messageDisplayMatch: failed to find error message');
     return null;
   }
 
-  const subIndex =
-    messageDisplayMatch.index +
-    messageDisplayMatch[0].indexOf('{backgroundColor');
-
   return {
-    startIndex: subIndex,
-    endIndex: messageDisplayMatch.length - 2,
-    identifiers: [messageDisplayMatch[2]],
+    startIndex: messageDisplayMatch.index,
+    endIndex: messageDisplayMatch.index + messageDisplayMatch[0].length,
+    identifiers: [messageDisplayMatch[1], messageDisplayMatch[2], messageDisplayMatch[3]],
   };
 };
 
 export const writeUserMessageDisplay = (
   oldFile: string,
   format: string,
-  foregroundColor: string | "default",
-  backgroundColor: string | "default" | null,
+  foregroundColor: string | 'default',
+  backgroundColor: string | 'default' | null,
   bold: boolean = false,
   italic: boolean = false,
   underline: boolean = false,
@@ -57,26 +49,22 @@ export const writeUserMessageDisplay = (
     return null;
   }
 
-  const messageIdentifier = location.identifiers?.[0];
-  if (!messageIdentifier) {
-    console.error('patch: userMessageDisplay: failed to find message identifier');
-    return null;
-  }
-
   // Determine if we need chalk styling (custom RGB colors or text styling)
   const needsChalk =
-    (foregroundColor !== 'default') ||
+    foregroundColor !== 'default' ||
     (backgroundColor !== 'default' && backgroundColor !== null) ||
-    bold || italic || underline || strikethrough || inverse;
+    bold ||
+    italic ||
+    underline ||
+    strikethrough ||
+    inverse;
 
-  // Replace {} in format string with the message variable
-  const formattedMessage = format.replace(/\{\}/g, `"+${messageIdentifier}+"`);
-
-  let newContent: string;
+  let attrsObjStr: string;
+  let chalkChain: string = '';
 
   if (needsChalk) {
     // Build chalk chain for custom colors and/or styling
-    let chalkChain = chalkVar;
+    chalkChain = chalkVar;
 
     // Only add color methods for custom (non-default, non-null) colors
     if (foregroundColor !== 'default') {
@@ -118,8 +106,7 @@ export const writeUserMessageDisplay = (
       attrs.push(`paddingY:${paddingY}`);
     }
 
-    const attrsStr = attrs.length > 0 ? `{${attrs.join(',')}}` : '{}';
-    newContent = `${attrsStr},${chalkChain}("${formattedMessage}")`;
+    attrsObjStr = attrs.length > 0 ? `{${attrs.join(',')}}` : '{}';
   } else {
     // Use Ink/React attributes for default colors and border
     const attrs: string[] = [];
@@ -149,18 +136,28 @@ export const writeUserMessageDisplay = (
       attrs.push(`paddingY:${paddingY}`);
     }
 
-    const attrsStr = attrs.length > 0 ? `{${attrs.join(',')}}` : '{}';
-    newContent = `${attrsStr},"${formattedMessage}"`;
+    attrsObjStr = attrs.length > 0 ? `{${attrs.join(',')}}` : '{}';
   }
 
+  const [reactVar, component, messageVar] = location.identifiers!;
+  // Replace {} in format string with the message variable
+  const formattedMessage = '"' + format.replace(/\{\}/g, `"+${messageVar}+"`) + '"';
+
+  const newContent = `return ${reactVar}.createElement(${component},${attrsObjStr},${chalkChain}(${formattedMessage}));`;
+
   // Apply modification
-  const before = oldFile;
   const newFile =
     oldFile.slice(0, location.startIndex) +
     newContent +
     oldFile.slice(location.endIndex);
 
-  showDiff(before, newFile, newContent, location.startIndex, location.endIndex);
+  showDiff(
+    oldFile,
+    newFile,
+    newContent,
+    location.startIndex,
+    location.endIndex
+  );
 
   return newFile;
 };
