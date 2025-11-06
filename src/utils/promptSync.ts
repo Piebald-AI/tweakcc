@@ -996,6 +996,7 @@ export const preloadStringsFile = async (
  * This handles cases where cli.js has escaped Unicode characters.
  */
 const escapeNonAsciiForRegex = (text: string): string => {
+  // eslint-disable-next-line no-control-regex
   return text.replace(/[^\x00-\x7F]/g, char => {
     const codePoint = char.charCodeAt(0);
     const escaped = `\\\\u${codePoint.toString(16).padStart(4, '0')}`;
@@ -1009,6 +1010,7 @@ const escapeNonAsciiForRegex = (text: string): string => {
  * Used when writing prompts back to cli.js for environments that only support ASCII.
  */
 const escapeNonAsciiChars = (text: string): string => {
+  // eslint-disable-next-line no-control-regex
   return text.replace(/[^\x00-\x7F]/g, char => {
     const codePoint = char.charCodeAt(0);
     return `\\u${codePoint.toString(16).padStart(4, '0')}`;
