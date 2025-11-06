@@ -7,7 +7,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import LIEF from 'node-lief';
-import { NtExecutable } from 'pe-library';
 import { isDebug } from './misc.js';
 
 // Constants
@@ -114,29 +113,6 @@ function parseCompiledModuleGraphFile(
   };
 }
 
-function detectBinaryFormat(filePath: string): 'ELF' | 'PE' | 'MachO' | 'Unknown' {
-  const fd = fs.openSync(filePath, 'r');
-  const magic = Buffer.allocUnsafe(4);
-  fs.readSync(fd, magic, 0, 4, 0);
-  fs.closeSync(fd);
-
-  // Check magic bytes
-  if (magic[0] === 0x7F && magic[1] === 0x45 && magic[2] === 0x4C && magic[3] === 0x46) {
-    return 'ELF';
-  } else if (magic[0] === 0x4D && magic[1] === 0x5A) {
-    return 'PE';
-  } else if (
-    (magic[0] === 0xCF || magic[0] === 0xCE) &&
-    (magic[1] === 0xFA || magic[1] === 0xFE) &&
-    (magic[2] === 0xED || magic[2] === 0xBA) &&
-    (magic[3] === 0xFE || magic[3] === 0xBE)
-  ) {
-    return 'MachO';
-  }
-
-  return 'Unknown';
-}
-
 function extractBunDataFromSection(sectionData: Buffer): BunData {
   if (sectionData.length < 4) {
     console.error('Section data too small');
@@ -213,33 +189,6 @@ function extractBunDataFromSection(sectionData: Buffer): BunData {
     bunData: bunDataContent,
     basePublicPathPrefix: BASE_PATH,
   };
-}
-
-function extractBunDataFromPE(filePath: string): BunData {
-  const fileData = fs.readFileSync(filePath);
-  const exe = NtExecutable.from(fileData.buffer, { ignoreCert: true });
-
-  // Find .bun section
-  const sections = exe.getAllSections();
-  const bunSection = sections.find((sec: any) => {
-    // sec.info.name is a string
-    const cleanName = sec.info.name.replace(/\0/g, '');
-    return cleanName === '.bun';
-  });
-
-  if (!bunSection || !bunSection.data) {
-    console.error('.bun section not found');
-    return {
-      bunOffsets: null,
-      bunData: null,
-      basePublicPathPrefix: BASE_PATH_WINDOWS,
-    };
-  }
-
-  const sectionData = Buffer.from(bunSection.data);
-  const { bunOffsets, bunData } = extractBunDataFromSection(sectionData);
-
-  return { bunOffsets, bunData, basePublicPathPrefix: BASE_PATH_WINDOWS };
 }
 
 function extractBunDataFromELFTail(filePath: string): BunData {
@@ -360,16 +309,16 @@ function getBunData(binPath: string): BunData {
   LIEF.logging.disable();
 
   try {
-    const format = detectBinaryFormat(binPath);
+    // Use LIEF.parse() which automatically detects format and returns the correct type
+    const binary = LIEF.parse(binPath);
 
     if (isDebug()) {
-      console.log(`getBunData: Binary format detected as ${format}`);
+      console.log(`getBunData: Binary format detected as ${binary.format}`);
     }
 
-    if (format === 'MachO') {
-      // Use LIEF for MachO files
-      const binary = LIEF.parse(binPath);
-      const machoBinary = binary as LIEF.MachO.Binary;
+    if (binary.format === 'MachO') {
+      // LIEF.parse() returns MachO.Binary for MachO files
+      const machoBinary = binary as LIEF.MachO.Binary; // Cast to access MachO-specific methods
       const bunSegment = machoBinary.getSegment('__BUN');
       if (!bunSegment) {
         console.error('__BUN segment not found');
@@ -395,10 +344,34 @@ function getBunData(binPath: string): BunData {
       const { bunOffsets, bunData } = extractBunDataFromSection(sectionData);
 
       return { bunOffsets, bunData, basePublicPathPrefix: BASE_PATH };
-    } else if (format === 'PE') {
-      // Use pe-library for PE files
-      return extractBunDataFromPE(binPath);
-    } else if (format === 'ELF') {
+    } else if (binary.format === 'PE') {
+      // LIEF.parse() returns PE.Binary for PE files
+      const peBinary = binary as LIEF.PE.Binary;
+      const sections = peBinary.sections();
+      let bunSection = null;
+
+      for (const section of sections) {
+        if (section.name === '.bun') {
+          bunSection = section;
+          break;
+        }
+      }
+
+      if (!bunSection) {
+        console.error('.bun section not found');
+        return {
+          bunOffsets: null,
+          bunData: null,
+          basePublicPathPrefix: BASE_PATH_WINDOWS,
+        };
+      }
+
+      // Extract section data
+      const sectionData = Buffer.from(bunSection.content);
+      const { bunOffsets, bunData } = extractBunDataFromSection(sectionData);
+
+      return { bunOffsets, bunData, basePublicPathPrefix: BASE_PATH_WINDOWS };
+    } else if (binary.format === 'ELF') {
       // For ELF, Bun data is appended to the end of the file
       const result = extractBunDataFromELFTail(binPath);
       if (isDebug()) {
@@ -408,7 +381,7 @@ function getBunData(binPath: string): BunData {
       }
       return { ...result, basePublicPathPrefix: BASE_PATH };
     } else {
-      console.error(`Unsupported binary format: ${format}`);
+      console.error(`Unsupported binary format: ${binary.format}`);
       return {
         bunOffsets: null,
         bunData: null,
@@ -985,34 +958,31 @@ function repackMachO(
   }
 }
 
-function align(value: number, alignment: number): number {
-  if (value % alignment === 0) return value;
-  return value + (alignment - (value % alignment));
-}
-
 function repackPE(
   binPath: string,
   newBunBuffer: Buffer,
   outputPath: string
 ): void {
   try {
-    const fileData = fs.readFileSync(binPath);
-    const exe = NtExecutable.from(fileData.buffer, { ignoreCert: true });
+    // Use LIEF.parse() which returns PE.Binary for PE files
+    const binary = LIEF.parse(binPath);
 
-    // Get alignment values
-    const fileAlignment = exe.getFileAlignment();
-    const sectionAlignment = exe.getSectionAlignment();
-
-    if (isDebug()) {
-      console.log(`repackPE: File alignment: ${fileAlignment}, Section alignment: ${sectionAlignment}`);
+    if (binary.format !== 'PE') {
+      throw new Error(`Expected PE binary, got ${binary.format}`);
     }
 
+    const peBinary = binary as LIEF.PE.Binary;
+
     // Find .bun section
-    const sections = exe.getAllSections();
-    const bunSection = sections.find((sec: any) => {
-      const cleanName = sec.info.name.replace(/\0/g, '');
-      return cleanName === '.bun';
-    });
+    const sections = peBinary.sections();
+    let bunSection = null;
+
+    for (const section of sections) {
+      if (section.name === '.bun') {
+        bunSection = section;
+        break;
+      }
+    }
 
     if (!bunSection) {
       throw new Error('.bun section not found');
@@ -1024,44 +994,32 @@ function repackPE(
     newBunBuffer.copy(newSectionData, 4);
 
     if (isDebug()) {
-      console.log(`repackPE: Original section size: ${bunSection.data?.byteLength || 0}`);
+      console.log(
+        `repackPE: Original section size: ${bunSection.size}, virtual size: ${bunSection.virtualSize}`
+      );
       console.log(`repackPE: New data size: ${newSectionData.length}`);
     }
 
-    // Update the section data
-    bunSection.data = newSectionData.buffer.slice(
-      newSectionData.byteOffset,
-      newSectionData.byteOffset + newSectionData.byteLength
-    );
+    // Update section content
+    bunSection.content = Array.from(newSectionData);
 
-    // Manually update section header sizes with proper alignment
-    bunSection.info.virtualSize = newSectionData.length;
-    bunSection.info.sizeOfRawData = align(newSectionData.length, fileAlignment);
-
-    if (isDebug()) {
-      console.log(`repackPE: Aligned SizeOfRawData: ${bunSection.info.sizeOfRawData}`);
-    }
-
-    // Recalculate SizeOfImage in optional header
-    const headers = exe.newHeader;
-    let newSizeOfImage = exe.getTotalHeaderSize();
-
-    for (const section of sections) {
-      newSizeOfImage += align(section.info.virtualSize, sectionAlignment);
-    }
-
-    headers.optionalHeader.sizeOfImage = newSizeOfImage;
+    // Explicitly set both the virtual size AND the raw size
+    // PE sections have both:
+    // - size (raw size on disk, must be aligned to FileAlignment)
+    // - virtualSize (size in memory when loaded)
+    bunSection.virtualSize = BigInt(newSectionData.length);
+    bunSection.size = BigInt(newSectionData.length);
 
     if (isDebug()) {
-      console.log(`repackPE: Updated SizeOfImage: ${newSizeOfImage}`);
       console.log(`repackPE: Writing modified binary to ${outputPath}...`);
     }
 
-    // Generate with proper file alignment padding
-    const newBinary = exe.generate(fileAlignment);
+    // Write the modified binary using atomic rename
+    const tempPath = outputPath + '.tmp';
+    peBinary.write(tempPath);
 
-    // Write the modified binary directly
-    fs.writeFileSync(outputPath, Buffer.from(newBinary));
+    // Atomically rename
+    fs.renameSync(tempPath, outputPath);
 
     if (isDebug()) {
       console.log('repackPE: Write completed successfully');
@@ -1151,17 +1109,17 @@ export function repackNativeInstallation(
     modifiedClaudeJs
   );
 
-  // Detect format
-  const format = detectBinaryFormat(binPath);
+  // Use LIEF.parse() to detect format automatically
+  const binary = LIEF.parse(binPath);
 
   // Repack based on format
-  if (format === 'MachO') {
+  if (binary.format === 'MachO') {
     repackMachO(binPath, newBuffer, outputPath);
-  } else if (format === 'PE') {
+  } else if (binary.format === 'PE') {
     repackPE(binPath, newBuffer, outputPath);
-  } else if (format === 'ELF') {
+  } else if (binary.format === 'ELF') {
     repackELF(binPath, newBuffer, bunOffsets, outputPath);
   } else {
-    throw new Error(`Unsupported binary format: ${format}`);
+    throw new Error(`Unsupported binary format: ${binary.format}`);
   }
 }
