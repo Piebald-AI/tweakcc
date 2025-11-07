@@ -340,9 +340,7 @@ function getBunData(binPath: string): BunData {
       }
 
       // Extract section data
-      const sectionData = Buffer.from(bunSection.content);
-      const { bunOffsets, bunData } = extractBunDataFromSection(sectionData);
-
+      const { bunOffsets, bunData } = extractBunDataFromSection(bunSection.content);
       return { bunOffsets, bunData, basePublicPathPrefix: BASE_PATH };
     } else if (binary.format === 'PE') {
       // LIEF.parse() returns PE.Binary for PE files
@@ -367,9 +365,7 @@ function getBunData(binPath: string): BunData {
       }
 
       // Extract section data
-      const sectionData = Buffer.from(bunSection.content);
-      const { bunOffsets, bunData } = extractBunDataFromSection(sectionData);
-
+      const { bunOffsets, bunData } = extractBunDataFromSection(bunSection.content);
       return { bunOffsets, bunData, basePublicPathPrefix: BASE_PATH_WINDOWS };
     } else if (binary.format === 'ELF') {
       // For ELF, Bun data is appended to the end of the file
@@ -804,7 +800,7 @@ function safeWriteFile(filePath: string, data: Buffer, mode?: number): void {
     ) {
       throw new Error(
         'Cannot update the Claude executable while it is running.\n' +
-          'Please close all Claude instances and try again.'
+        'Please close all Claude instances and try again.'
       );
     }
 
@@ -908,7 +904,7 @@ function repackMachO(
     }
 
     // Update section content
-    bunSection.content = Array.from(newSectionData);
+    bunSection.content = newSectionData;
 
     // Explicitly set the section size
     bunSection.size = BigInt(newSectionData.length);
@@ -1001,7 +997,7 @@ function repackPE(
     }
 
     // Update section content
-    bunSection.content = Array.from(newSectionData);
+    bunSection.content = newSectionData;
 
     // Explicitly set both the virtual size AND the raw size
     // PE sections have both:
