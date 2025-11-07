@@ -3,16 +3,23 @@
  */
 
 import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import { execSync } from 'node:child_process';
 import LIEF from 'node-lief';
 import { isDebug } from './misc.js';
 
-// Constants
+/**
+* Constants for Bun trailer and serialized layout sizes.
+*
+* Bun data layout (normalized across formats) is:
+* [data...][OFFSETS struct][BUN_TRAILER]
+*
+* Where OFFSETS struct (SIZEOF_OFFSETS bytes) is:
+* - byteCount:   u64  (total size of [data][OFFSETS][BUN_TRAILER])
+* - modulesPtr:  { u32 offset, u32 length } into [data...] for modules table
+* - entryPointId: u32
+* - compileExecArgvPtr: { u32 offset, u32 length }
+*/
 const BUN_TRAILER = Buffer.from('\n---- Bun! ----\n');
-const BASE_PATH = '/$bunfs/';
-const BASE_PATH_WINDOWS = 'B:/~BUN/';
 
 // Size constants for binary structures
 const SIZEOF_OFFSETS = 32;
@@ -26,10 +33,10 @@ interface StringPointer {
 }
 
 interface BunOffsets {
-  byte_count: bigint | number;
-  modules_ptr: StringPointer;
-  entry_point_id: number;
-  compile_exec_argv_ptr: StringPointer;
+  byteCount: bigint | number;
+  modulesPtr: StringPointer;
+  entryPointId: number;
+  compileExecArgvPtr: StringPointer;
 }
 
 interface BunModule {
@@ -39,25 +46,27 @@ interface BunModule {
   bytecode: StringPointer;
   encoding: number;
   loader: number;
-  module_format: number;
+  moduleFormat: number;
   side: number;
 }
 
 interface BunData {
-  bunOffsets: BunOffsets | null;
-  bunData: Buffer | null;
-  basePublicPathPrefix: string;
+  bunOffsets: BunOffsets;
+  bunData: Buffer;
 }
 
-// Helper functions
+
+/**
+* Read a StringPointer slice from given buffer.
+*/
 function getStringPointerContent(
-  buffer: Buffer,
-  stringPointer: StringPointer
+ buffer: Buffer,
+ stringPointer: StringPointer
 ): Buffer {
-  return buffer.slice(
-    stringPointer.offset,
-    stringPointer.offset + stringPointer.length
-  );
+ return buffer.subarray(
+   stringPointer.offset,
+   stringPointer.offset + stringPointer.length
+ );
 }
 
 function parseStringPointer(buffer: Buffer, offset: number): StringPointer {
@@ -67,17 +76,61 @@ function parseStringPointer(buffer: Buffer, offset: number): StringPointer {
   };
 }
 
+/**
+* True if the module represents the native claude entrypoint.
+*/
+function isClaudeModule(moduleName: string): boolean {
+ return (
+   moduleName.endsWith('/claude') ||
+   moduleName === 'claude' ||
+   moduleName.endsWith('/claude.exe') ||
+   moduleName === 'claude.exe'
+ );
+}
+
+/**
+ * Iterates over modules in the Bun data and calls visitor for each.
+ * Handles all module parsing and iteration logic in one place.
+ */
+function mapModules<T>(
+  bunData: Buffer,
+  bunOffsets: BunOffsets,
+  visitor: (module: BunModule, moduleName: string, index: number) => T | undefined
+): T | undefined {
+  const modulesListBytes = getStringPointerContent(
+    bunData,
+    bunOffsets.modulesPtr
+  );
+  const modulesListCount = Math.floor(modulesListBytes.length / SIZEOF_MODULE);
+
+  for (let i = 0; i < modulesListCount; i++) {
+    const offset = i * SIZEOF_MODULE;
+    const module = parseCompiledModuleGraphFile(modulesListBytes, offset);
+    const moduleName = getStringPointerContent(bunData, module.name).toString(
+      'utf-8'
+    );
+
+    const result = visitor(module, moduleName, i);
+    if (result !== undefined) {
+      return result;
+    }
+  }
+
+  return undefined;
+}
+
+
 function parseOffsets(buffer: Buffer): BunOffsets {
   let pos = 0;
-  const byte_count = buffer.readBigUInt64LE(pos);
+  const byteCount = buffer.readBigUInt64LE(pos);
   pos += 8;
-  const modules_ptr = parseStringPointer(buffer, pos);
+  const modulesPtr = parseStringPointer(buffer, pos);
   pos += 8;
-  const entry_point_id = buffer.readUInt32LE(pos);
+  const entryPointId = buffer.readUInt32LE(pos);
   pos += 4;
-  const compile_exec_argv_ptr = parseStringPointer(buffer, pos);
+  const compileExecArgvPtr = parseStringPointer(buffer, pos);
 
-  return { byte_count, modules_ptr, entry_point_id, compile_exec_argv_ptr };
+  return { byteCount, modulesPtr, entryPointId, compileExecArgvPtr };
 }
 
 function parseCompiledModuleGraphFile(
@@ -97,7 +150,7 @@ function parseCompiledModuleGraphFile(
   pos += 1;
   const loader = buffer.readUInt8(pos);
   pos += 1;
-  const module_format = buffer.readUInt8(pos);
+  const moduleFormat = buffer.readUInt8(pos);
   pos += 1;
   const side = buffer.readUInt8(pos);
 
@@ -108,77 +161,46 @@ function parseCompiledModuleGraphFile(
     bytecode,
     encoding,
     loader,
-    module_format,
+    moduleFormat,
     side,
   };
 }
 
-function extractBunDataFromSection(sectionData: Buffer): BunData {
-  if (sectionData.length < 4) {
-    console.error('Section data too small');
-    return { bunOffsets: null, bunData: null, basePublicPathPrefix: BASE_PATH };
-  }
-
-  if (isDebug()) {
-    console.log(
-      `extractBunDataFromSection: sectionData.length=${sectionData.length}`
-    );
-  }
-
-  // Read 4-byte size header
-  const bunDataSize = sectionData.readUInt32LE(0);
-
-  if (isDebug()) {
-    console.log(
-      `extractBunDataFromSection: bunDataSize from header=${bunDataSize}`
-    );
-  }
-
-  const bunDataContent = sectionData.slice(4, 4 + bunDataSize);
-
-  if (isDebug()) {
-    console.log(
-      `extractBunDataFromSection: bunDataContent.length=${bunDataContent.length}`
-    );
-  }
-
+/**
+ * Parses Bun data blob that contains: [data][offsets][trailer]
+ * This is the common structure across all formats after extraction.
+ */
+function parseBunDataBlob(bunDataContent: Buffer): {
+  bunOffsets: BunOffsets;
+  bunData: Buffer;
+} {
   if (bunDataContent.length < SIZEOF_OFFSETS + BUN_TRAILER.length) {
-    console.error('BUN data is too small to contain trailer and offsets');
-    return { bunOffsets: null, bunData: null, basePublicPathPrefix: BASE_PATH };
+    throw new Error('BUN data is too small to contain trailer and offsets');
   }
 
   // Verify trailer
   const trailerStart = bunDataContent.length - BUN_TRAILER.length;
-  const trailerBytes = bunDataContent.slice(trailerStart);
+  const trailerBytes = bunDataContent.subarray(trailerStart);
 
   if (isDebug()) {
     console.log(
-      `extractBunDataFromSection: Expected trailer: ${BUN_TRAILER.toString('hex')}`
+      `parseBunDataBlob: Expected trailer: ${BUN_TRAILER.toString('hex')}`
     );
-    console.log(
-      `extractBunDataFromSection: Got trailer: ${trailerBytes.toString('hex')}`
-    );
-    console.log(
-      `extractBunDataFromSection: Expected trailer (string): ${JSON.stringify(BUN_TRAILER.toString())}`
-    );
-    console.log(
-      `extractBunDataFromSection: Got trailer (string): ${JSON.stringify(trailerBytes.toString())}`
-    );
+    console.log(`parseBunDataBlob: Got trailer: ${trailerBytes.toString('hex')}`);
   }
 
   if (!trailerBytes.equals(BUN_TRAILER)) {
-    console.error('BUN trailer bytes do not match trailer');
     if (isDebug()) {
       console.log(`Expected: ${BUN_TRAILER.toString('hex')}`);
       console.log(`Got: ${trailerBytes.toString('hex')}`);
     }
-    return { bunOffsets: null, bunData: null, basePublicPathPrefix: BASE_PATH };
+    throw new Error('BUN trailer bytes do not match trailer');
   }
 
   // Parse Offsets structure
   const offsetsStart =
     bunDataContent.length - SIZEOF_OFFSETS - BUN_TRAILER.length;
-  const offsetsBytes = bunDataContent.slice(
+  const offsetsBytes = bunDataContent.subarray(
     offsetsStart,
     offsetsStart + SIZEOF_OFFSETS
   );
@@ -187,33 +209,65 @@ function extractBunDataFromSection(sectionData: Buffer): BunData {
   return {
     bunOffsets,
     bunData: bunDataContent,
-    basePublicPathPrefix: BASE_PATH,
   };
 }
 
+/**
+ * Section format helper:
+ * [u32 size][size bytes of Bun data blob...]
+ * Size is the length of the Bun blob (which itself is [data][OFFSETS][TRAILER]).
+ */
+function extractBunDataFromSection(sectionData: Buffer): BunData {
+  if (sectionData.length < 4) {
+    throw new Error('Section data too small');
+  }
+
+  if (isDebug()) {
+    console.log(
+      `extractBunDataFromSection: sectionData.length=${sectionData.length}`
+    );
+  }
+
+  const bunDataSize = sectionData.readUInt32LE(0);
+
+  if (isDebug()) {
+    console.log(
+      `extractBunDataFromSection: bunDataSize from header=${bunDataSize}`
+    );
+  }
+
+  const bunDataContent = sectionData.subarray(4, 4 + bunDataSize);
+
+  if (isDebug()) {
+    console.log(
+      `extractBunDataFromSection: bunDataContent.length=${bunDataContent.length}`
+    );
+  }
+
+  const { bunOffsets, bunData } = parseBunDataBlob(bunDataContent);
+
+  return { bunOffsets, bunData };
+}
+
+/**
+ * ELF layout:
+ * [original ELF ...][Bun blob...][u64 totalByteCount]
+ * totalByteCount is the size of the Bun blob (including OFFSETS and TRAILER).
+ */
 function extractBunDataFromELFOverlay(elfBinary: LIEF.ELF.Binary): BunData {
   if (!elfBinary.hasOverlay) {
-    console.error('ELF binary has no overlay data');
-    return {
-      bunOffsets: null,
-      bunData: null,
-      basePublicPathPrefix: BASE_PATH,
-    };
+    throw new Error('ELF binary has no overlay data');
   }
 
   const overlayData = elfBinary.overlay;
-
   if (isDebug()) {
-    console.log(`extractBunDataFromELFOverlay: Overlay size=${overlayData.length} bytes`);
+    console.log(
+      `extractBunDataFromELFOverlay: Overlay size=${overlayData.length} bytes`
+    );
   }
 
   if (overlayData.length < BUN_TRAILER.length + 8 + SIZEOF_OFFSETS) {
-    console.error('ELF overlay data is too small');
-    return {
-      bunOffsets: null,
-      bunData: null,
-      basePublicPathPrefix: BASE_PATH,
-    };
+    throw new Error('ELF overlay data is too small');
   }
 
   // Read total byte count from last 8 bytes
@@ -225,166 +279,80 @@ function extractBunDataFromELFOverlay(elfBinary: LIEF.ELF.Binary): BunData {
   }
 
   if (totalByteCount < 4096n || totalByteCount > 2n ** 32n - 1n) {
-    console.error(`ELF total byte count is out of range: ${totalByteCount}`);
-    return {
-      bunOffsets: null,
-      bunData: null,
-      basePublicPathPrefix: BASE_PATH,
-    };
+    throw new Error(`ELF total byte count is out of range: ${totalByteCount}`);
   }
 
-  // Verify trailer
-  const trailerStart = overlayData.length - 8 - BUN_TRAILER.length;
-  const trailerBytes = overlayData.slice(
-    trailerStart,
-    trailerStart + BUN_TRAILER.length
+  // ELF format: [data][offsets][trailer][8-byte size]
+  // Extract the Bun data blob without the trailing 8-byte size
+  const bunDataBlobStart = overlayData.length - Number(totalByteCount) - 8;
+  const bunDataBlob = overlayData.subarray(
+    bunDataBlobStart,
+    overlayData.length - 8
   );
-  if (!trailerBytes.equals(BUN_TRAILER)) {
-    console.error('ELF trailer bytes do not match trailer');
-    if (isDebug()) {
-      console.log(`Expected: ${BUN_TRAILER.toString('hex')}`);
-      console.log(`Got: ${trailerBytes.toString('hex')}`);
-    }
-    return {
-      bunOffsets: null,
-      bunData: null,
-      basePublicPathPrefix: BASE_PATH,
-    };
-  }
-
-  // Parse Offsets structure
-  const offsetsStart =
-    overlayData.length - 8 - BUN_TRAILER.length - SIZEOF_OFFSETS;
-  const offsetsBytes = overlayData.slice(
-    offsetsStart,
-    offsetsStart + SIZEOF_OFFSETS
-  );
-  const bunOffsets = parseOffsets(offsetsBytes);
-
-  const byteCountBigInt =
-    typeof bunOffsets.byte_count === 'bigint'
-      ? bunOffsets.byte_count
-      : BigInt(bunOffsets.byte_count);
 
   if (isDebug()) {
     console.log(
-      `extractBunDataFromELFOverlay: bunOffsets.byte_count=${byteCountBigInt}`
+      `extractBunDataFromELFOverlay: Extracted ${bunDataBlob.length} bytes of Bun data blob`
     );
   }
 
-  if (byteCountBigInt >= totalByteCount) {
-    console.error(
-      `ELF byte_count (${byteCountBigInt}) >= totalByteCount (${totalByteCount})`
-    );
-    return {
-      bunOffsets: null,
-      bunData: null,
-      basePublicPathPrefix: BASE_PATH,
-    };
-  }
-
-  // Extract actual Bun data
-  const tailDataLen = 8 + BUN_TRAILER.length + SIZEOF_OFFSETS;
-  const bunDataStart = overlayData.length - tailDataLen - Number(byteCountBigInt);
-  const bunDataBuffer = overlayData.slice(bunDataStart, bunDataStart + Number(byteCountBigInt));
-
-  if (isDebug()) {
-    console.log(
-      `extractBunDataFromELFOverlay: Successfully read ${bunDataBuffer.length} bytes of Bun data`
-    );
-  }
+  // Parse the common Bun data structure
+  const { bunOffsets, bunData } = parseBunDataBlob(bunDataBlob);
 
   return {
     bunOffsets,
-    bunData: bunDataBuffer,
-    basePublicPathPrefix: BASE_PATH,
+    bunData,
   };
 }
 
-function getBunData(binPath: string): BunData {
-  // Disable LIEF logging to avoid error spamming
-  LIEF.logging.disable();
+/**
+ * Mach-O layout:
+ * __BUN/__bun section content is:
+ * [u32 size][size bytes of Bun blob...]
+ */
+function extractBunDataFromMachO(machoBinary: LIEF.MachO.Binary): BunData {
+  const bunSegment = machoBinary.getSegment('__BUN');
+  if (!bunSegment) {
+    throw new Error('__BUN segment not found');
+  }
 
-  try {
-    // Use LIEF.parse() which automatically detects format and returns the correct type
-    const binary = LIEF.parse(binPath);
+  const bunSection = bunSegment.getSection('__bun');
+  if (!bunSection) {
+    throw new Error('__bun section not found');
+  }
 
-    if (isDebug()) {
-      console.log(`getBunData: Binary format detected as ${binary.format}`);
-    }
+  return extractBunDataFromSection(bunSection.content);
+}
 
-    if (binary.format === 'MachO') {
-      // LIEF.parse() returns MachO.Binary for MachO files
-      const machoBinary = binary as LIEF.MachO.Binary; // Cast to access MachO-specific methods
-      const bunSegment = machoBinary.getSegment('__BUN');
-      if (!bunSegment) {
-        console.error('__BUN segment not found');
-        return {
-          bunOffsets: null,
-          bunData: null,
-          basePublicPathPrefix: BASE_PATH,
-        };
-      }
+/**
+ * PE layout:
+ * .bun section content is:
+ * [u32 size][size bytes of Bun blob...]
+ */
+function extractBunDataFromPE(peBinary: LIEF.PE.Binary): BunData {
+  const bunSection = peBinary.sections().find(s => s.name === '.bun');
 
-      const bunSection = bunSegment.getSection('__bun');
-      if (!bunSection) {
-        console.error('__bun section not found');
-        return {
-          bunOffsets: null,
-          bunData: null,
-          basePublicPathPrefix: BASE_PATH,
-        };
-      }
+  if (!bunSection) {
+    throw new Error('.bun section not found');
+  }
 
-      // Extract section data
-      const { bunOffsets, bunData } = extractBunDataFromSection(bunSection.content);
-      return { bunOffsets, bunData, basePublicPathPrefix: BASE_PATH };
-    } else if (binary.format === 'PE') {
-      // LIEF.parse() returns PE.Binary for PE files
-      const peBinary = binary as LIEF.PE.Binary;
-      const sections = peBinary.sections();
-      let bunSection = null;
+  return extractBunDataFromSection(bunSection.content);
+}
 
-      for (const section of sections) {
-        if (section.name === '.bun') {
-          bunSection = section;
-          break;
-        }
-      }
+function getBunData(binary: LIEF.Abstract.Binary): BunData {
+  if (isDebug()) {
+    console.log(`getBunData: Binary format detected as ${binary.format}`);
+  }
 
-      if (!bunSection) {
-        console.error('.bun section not found');
-        return {
-          bunOffsets: null,
-          bunData: null,
-          basePublicPathPrefix: BASE_PATH_WINDOWS,
-        };
-      }
-
-      // Extract section data
-      const { bunOffsets, bunData } = extractBunDataFromSection(bunSection.content);
-      return { bunOffsets, bunData, basePublicPathPrefix: BASE_PATH_WINDOWS };
-    } else if (binary.format === 'ELF') {
-      // For ELF, Bun data is appended to the end of the file as overlay data
-      const elfBinary = binary as LIEF.ELF.Binary;
-      const result = extractBunDataFromELFOverlay(elfBinary);
-      if (isDebug()) {
-        console.log(
-          `getBunData: ELF extraction result: bunOffsets=${result.bunOffsets !== null}, bunData=${result.bunData !== null}`
-        );
-      }
-      return { ...result, basePublicPathPrefix: BASE_PATH };
-    } else {
-      console.error(`Unsupported binary format: ${binary.format}`);
-      return {
-        bunOffsets: null,
-        bunData: null,
-        basePublicPathPrefix: BASE_PATH,
-      };
-    }
-  } catch (error) {
-    console.error('Failed to parse binary file:', error);
-    return { bunOffsets: null, bunData: null, basePublicPathPrefix: BASE_PATH };
+  switch (binary.format) {
+    case 'MachO':
+      return extractBunDataFromMachO(binary as LIEF.MachO.Binary);
+    case 'PE':
+      return extractBunDataFromPE(binary as LIEF.PE.Binary);
+    case 'ELF':
+      return extractBunDataFromELFOverlay(binary as LIEF.ELF.Binary);
+    default:
+      throw new Error(`Unsupported binary format: ${binary.format}`);
   }
 }
 
@@ -396,16 +364,9 @@ export function extractClaudeJsFromNativeInstallation(
   nativeInstallationPath: string
 ): Buffer | null {
   try {
-    const { bunOffsets, bunData } = getBunData(nativeInstallationPath);
-
-    if (!bunOffsets || !bunData) {
-      if (isDebug()) {
-        console.log(
-          'extractClaudeJsFromNativeInstallation: getBunData returned null'
-        );
-      }
-      return null;
-    }
+    LIEF.logging.disable();
+    const binary = LIEF.parse(nativeInstallationPath);
+    const { bunOffsets, bunData } = getBunData(binary);
 
     if (isDebug()) {
       console.log(
@@ -413,73 +374,38 @@ export function extractClaudeJsFromNativeInstallation(
       );
     }
 
-    // Parse modules list
-    const modulesListBytes = getStringPointerContent(
+    const result = mapModules(
       bunData,
-      bunOffsets.modules_ptr
-    );
-    const modulesListCount = Math.floor(
-      modulesListBytes.length / SIZEOF_MODULE
-    );
+      bunOffsets,
+      (module, moduleName, index) => {
+        if (isDebug()) {
+          console.log(
+            `extractClaudeJsFromNativeInstallation: Module ${index}: ${moduleName}`
+          );
+        }
 
-    if (isDebug()) {
-      console.log(
-        `extractClaudeJsFromNativeInstallation: Found ${modulesListCount} modules`
-      );
-    }
+        // Module name is typically:
+        // - Unix/macOS: /$bunfs/root/claude
+        // - Windows:    B:/~BUN/root/claude.exe
+        if (!isClaudeModule(moduleName)) return undefined;
 
-    // Search for claude.js module
-    for (let i = 0; i < modulesListCount; i++) {
-      const offset = i * SIZEOF_MODULE;
-      const module = parseCompiledModuleGraphFile(modulesListBytes, offset);
-
-      const moduleName = getStringPointerContent(bunData, module.name).toString(
-        'utf-8'
-      );
-
-      if (isDebug()) {
-        console.log(
-          `extractClaudeJsFromNativeInstallation: Module ${i}: ${moduleName}`
-        );
-      }
-
-      // Look for the claude module
-      // The module name is typically:
-      // - On Unix/macOS: /$bunfs/root/claude
-      // - On Windows: B:/~BUN/root/claude.exe
-      if (
-        moduleName.endsWith('/claude') ||
-        moduleName === 'claude' ||
-        moduleName.endsWith('/claude.exe') ||
-        moduleName === 'claude.exe'
-      ) {
         const moduleContents = getStringPointerContent(
           bunData,
           module.contents
         );
+
         if (isDebug()) {
           console.log(
             `extractClaudeJsFromNativeInstallation: Found claude module, contents length=${moduleContents.length}`
           );
         }
-        if (moduleContents.length > 0) {
-          // TODO: REMOVE THIS TEMPORARY DEBUG CODE - Writing extracted claude.js to temp file for debugging
-          // TODO: This should be removed once debugging is complete
-          // TODO: Remove the os and path imports at the top of the file as well
-          try {
-            const tempDir = os.tmpdir();
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const tempFile = path.join(tempDir, `claude-extracted-${timestamp}.js`);
-            fs.writeFileSync(tempFile, moduleContents);
-            console.log(`[DEBUG] Extracted claude.js written to: ${tempFile}`);
-          } catch (writeError) {
-            console.error('[DEBUG] Failed to write extracted claude.js to temp file:', writeError);
-          }
-          // TODO: END OF TEMPORARY DEBUG CODE
 
-          return moduleContents;
-        }
+        return moduleContents.length > 0 ? moduleContents : undefined;
       }
+    );
+
+    if (result) {
+      return result;
     }
 
     if (isDebug()) {
@@ -496,86 +422,16 @@ export function extractClaudeJsFromNativeInstallation(
         error
       );
     }
+
     return null;
   }
 }
 
-function serializeOffsets(bunOffsets: BunOffsets): Buffer {
-  const buffer = Buffer.allocUnsafe(SIZEOF_OFFSETS);
-  let pos = 0;
-
-  // Write byte_count as uint64
-  const byteCount =
-    typeof bunOffsets.byte_count === 'bigint'
-      ? bunOffsets.byte_count
-      : BigInt(bunOffsets.byte_count);
-  buffer.writeBigUInt64LE(byteCount, pos);
-  pos += 8;
-
-  // Write modules_ptr (StringPointer)
-  buffer.writeUInt32LE(bunOffsets.modules_ptr.offset, pos);
-  pos += 4;
-  buffer.writeUInt32LE(bunOffsets.modules_ptr.length, pos);
-  pos += 4;
-
-  // Write entry_point_id
-  buffer.writeUInt32LE(bunOffsets.entry_point_id, pos);
-  pos += 4;
-
-  // Write compile_exec_argv_ptr (StringPointer)
-  buffer.writeUInt32LE(bunOffsets.compile_exec_argv_ptr.offset, pos);
-  pos += 4;
-  buffer.writeUInt32LE(bunOffsets.compile_exec_argv_ptr.length, pos);
-
-  return buffer;
-}
-
-function serializeCompiledModuleGraphFile(module: BunModule): Buffer {
-  const buffer = Buffer.allocUnsafe(SIZEOF_MODULE);
-  let pos = 0;
-
-  // Write name StringPointer
-  buffer.writeUInt32LE(module.name.offset, pos);
-  pos += 4;
-  buffer.writeUInt32LE(module.name.length, pos);
-  pos += 4;
-
-  // Write contents StringPointer
-  buffer.writeUInt32LE(module.contents.offset, pos);
-  pos += 4;
-  buffer.writeUInt32LE(module.contents.length, pos);
-  pos += 4;
-
-  // Write sourcemap StringPointer
-  buffer.writeUInt32LE(module.sourcemap.offset, pos);
-  pos += 4;
-  buffer.writeUInt32LE(module.sourcemap.length, pos);
-  pos += 4;
-
-  // Write bytecode StringPointer
-  buffer.writeUInt32LE(module.bytecode.offset, pos);
-  pos += 4;
-  buffer.writeUInt32LE(module.bytecode.length, pos);
-  pos += 4;
-
-  // Write flags
-  buffer.writeUInt8(module.encoding, pos);
-  pos += 1;
-  buffer.writeUInt8(module.loader, pos);
-  pos += 1;
-  buffer.writeUInt8(module.module_format, pos);
-  pos += 1;
-  buffer.writeUInt8(module.side, pos);
-
-  return buffer;
-}
-
 function rebuildBunData(
-  modulesList: BunModule[],
   bunData: Buffer,
   bunOffsets: BunOffsets,
   modifiedClaudeJs: Buffer | null
-): { newBuffer: Buffer; newOffsets: BunOffsets } {
+): Buffer {
   // Phase 1: Collect all string data
   const stringsData: Buffer[] = [];
   const modulesMetadata: Array<{
@@ -585,23 +441,17 @@ function rebuildBunData(
     bytecode: Buffer;
     encoding: number;
     loader: number;
-    module_format: number;
+    moduleFormat: number;
     side: number;
   }> = [];
 
-  for (const module of modulesList) {
+  // Use mapModules to iterate and collect module data
+  mapModules(bunData, bunOffsets, (module, moduleName) => {
     const nameBytes = getStringPointerContent(bunData, module.name);
-    const moduleName = nameBytes.toString('utf-8');
 
     // Check if this is claude.js and we have modified contents
     let contentsBytes: Buffer;
-    if (
-      modifiedClaudeJs &&
-      (moduleName.endsWith('/claude') ||
-        moduleName === 'claude' ||
-        moduleName.endsWith('/claude.exe') ||
-        moduleName === 'claude.exe')
-    ) {
+    if (modifiedClaudeJs && isClaudeModule(moduleName)) {
       contentsBytes = modifiedClaudeJs;
     } else {
       contentsBytes = getStringPointerContent(bunData, module.contents);
@@ -617,12 +467,13 @@ function rebuildBunData(
       bytecode: bytecodeBytes,
       encoding: module.encoding,
       loader: module.loader,
-      module_format: module.module_format,
+      moduleFormat: module.moduleFormat,
       side: module.side,
     });
 
     stringsData.push(nameBytes, contentsBytes, sourcemapBytes, bytecodeBytes);
-  }
+    return undefined;
+  });
 
   // Phase 2: Calculate buffer layout
   let currentOffset = 0;
@@ -636,13 +487,13 @@ function rebuildBunData(
 
   // Module structures
   const modulesListOffset = currentOffset;
-  const modulesListSize = modulesList.length * SIZEOF_MODULE;
+  const modulesListSize = modulesMetadata.length * SIZEOF_MODULE;
   currentOffset += modulesListSize;
 
-  // compile_exec_argv
+  // compileExecArgv
   const compileExecArgvBytes = getStringPointerContent(
     bunData,
-    bunOffsets.compile_exec_argv_ptr
+    bunOffsets.compileExecArgvPtr
   );
   const compileExecArgvOffset = currentOffset;
   const compileExecArgvLength = compileExecArgvBytes.length;
@@ -670,7 +521,7 @@ function rebuildBunData(
     stringIdx++;
   }
 
-  // Write compile_exec_argv
+  // Write compileExecArgv
   if (compileExecArgvLength > 0) {
     compileExecArgvBytes.copy(
       newBuffer,
@@ -705,79 +556,93 @@ function rebuildBunData(
       },
       encoding: metadata.encoding,
       loader: metadata.loader,
-      module_format: metadata.module_format,
+      moduleFormat: metadata.moduleFormat,
       side: metadata.side,
     };
 
-    const moduleBytes = serializeCompiledModuleGraphFile(moduleStruct);
+    // Serialize module structure inline
     const moduleOffset = modulesListOffset + i * SIZEOF_MODULE;
-    moduleBytes.copy(newBuffer, moduleOffset);
+    let pos = moduleOffset;
+
+    // Write StringPointers
+    newBuffer.writeUInt32LE(moduleStruct.name.offset, pos);
+    newBuffer.writeUInt32LE(moduleStruct.name.length, pos + 4);
+    pos += 8;
+    newBuffer.writeUInt32LE(moduleStruct.contents.offset, pos);
+    newBuffer.writeUInt32LE(moduleStruct.contents.length, pos + 4);
+    pos += 8;
+    newBuffer.writeUInt32LE(moduleStruct.sourcemap.offset, pos);
+    newBuffer.writeUInt32LE(moduleStruct.sourcemap.length, pos + 4);
+    pos += 8;
+    newBuffer.writeUInt32LE(moduleStruct.bytecode.offset, pos);
+    newBuffer.writeUInt32LE(moduleStruct.bytecode.length, pos + 4);
+    pos += 8;
+
+    // Write flags
+    newBuffer.writeUInt8(moduleStruct.encoding, pos);
+    newBuffer.writeUInt8(moduleStruct.loader, pos + 1);
+    newBuffer.writeUInt8(moduleStruct.moduleFormat, pos + 2);
+    newBuffer.writeUInt8(moduleStruct.side, pos + 3);
   }
 
-  // Build and write Offsets structure
+  // Build and write Offsets structure inline
   const newOffsets: BunOffsets = {
-    byte_count: offsetsOffset,
-    modules_ptr: {
+    byteCount: offsetsOffset,
+    modulesPtr: {
       offset: modulesListOffset,
       length: modulesListSize,
     },
-    entry_point_id: bunOffsets.entry_point_id,
-    compile_exec_argv_ptr: {
+    entryPointId: bunOffsets.entryPointId,
+    compileExecArgvPtr: {
       offset: compileExecArgvOffset,
       length: compileExecArgvLength,
     },
   };
 
-  const offsetsBytes = serializeOffsets(newOffsets);
-  offsetsBytes.copy(newBuffer, offsetsOffset);
+  let offsetsPos = offsetsOffset;
+  const byteCount =
+    typeof newOffsets.byteCount === 'bigint'
+      ? newOffsets.byteCount
+      : BigInt(newOffsets.byteCount);
+  newBuffer.writeBigUInt64LE(byteCount, offsetsPos);
+  offsetsPos += 8;
+  newBuffer.writeUInt32LE(newOffsets.modulesPtr.offset, offsetsPos);
+  newBuffer.writeUInt32LE(newOffsets.modulesPtr.length, offsetsPos + 4);
+  offsetsPos += 8;
+  newBuffer.writeUInt32LE(newOffsets.entryPointId, offsetsPos);
+  offsetsPos += 4;
+  newBuffer.writeUInt32LE(newOffsets.compileExecArgvPtr.offset, offsetsPos);
+  newBuffer.writeUInt32LE(newOffsets.compileExecArgvPtr.length, offsetsPos + 4);
 
   // Write trailer
   BUN_TRAILER.copy(newBuffer, trailerOffset);
 
-  return { newBuffer, newOffsets };
+  return newBuffer;
 }
 
 /**
- * Safely writes a buffer to a file using atomic rename.
- * Writes to a temp file first, then atomically renames it to the target path.
- * This allows updating executables even while they're running on Unix-like systems.
+ * Atomically writes a binary using LIEF and copies permissions from original.
+ * Includes robust handling for busy/executing files.
+ * @param binary - LIEF binary to write
+ * @param outputPath - Target file path
+ * @param originalPath - Original file to copy permissions from
  */
-function safeWriteFile(filePath: string, data: Buffer, mode?: number): void {
-  const tempPath = filePath + '.tmp';
+function atomicWriteBinary(
+  binary: LIEF.Abstract.Binary,
+  outputPath: string,
+  originalPath: string,
+  copyPermissions: boolean = true
+): void {
+  const tempPath = outputPath + '.tmp';
+  binary.write(tempPath);
 
-  if (isDebug()) {
-    console.log(`safeWriteFile: Writing ${data.length} bytes to ${tempPath}`);
+  if (copyPermissions) {
+    const origStat = fs.statSync(originalPath);
+    fs.chmodSync(tempPath, origStat.mode);
   }
 
   try {
-    // Write to temporary file
-    fs.writeFileSync(tempPath, data);
-
-    // Verify the write
-    const writtenSize = fs.statSync(tempPath).size;
-    if (isDebug()) {
-      console.log(`safeWriteFile: Wrote ${writtenSize} bytes to temp file`);
-    }
-
-    if (writtenSize !== data.length) {
-      throw new Error(
-        `Write size mismatch: expected ${data.length}, got ${writtenSize}`
-      );
-    }
-
-    // Set permissions if specified
-    if (mode !== undefined) {
-      fs.chmodSync(tempPath, mode);
-    }
-
-    // Atomically rename temp file to target
-    fs.renameSync(tempPath, filePath);
-
-    // Verify final file
-    const finalSize = fs.statSync(filePath).size;
-    if (isDebug()) {
-      console.log(`safeWriteFile: Final file size: ${finalSize} bytes`);
-    }
+    fs.renameSync(tempPath, outputPath);
   } catch (error) {
     // Clean up temp file if it exists
     try {
@@ -788,7 +653,7 @@ function safeWriteFile(filePath: string, data: Buffer, mode?: number): void {
       // Ignore cleanup errors
     }
 
-    // Check if it's a "file busy" error
+    // Check if it's a "file busy" / permission error when replacing the executable
     if (
       error instanceof Error &&
       'code' in error &&
@@ -798,7 +663,7 @@ function safeWriteFile(filePath: string, data: Buffer, mode?: number): void {
     ) {
       throw new Error(
         'Cannot update the Claude executable while it is running.\n' +
-        'Please close all Claude instances and try again.'
+          'Please close all Claude instances and try again.'
       );
     }
 
@@ -806,22 +671,24 @@ function safeWriteFile(filePath: string, data: Buffer, mode?: number): void {
   }
 }
 
+/**
+ * Builds section data with 4-byte size header followed by content.
+ * Format: [4-byte size][content]
+ */
+function buildSectionData(bunBuffer: Buffer): Buffer {
+  const sectionData = Buffer.allocUnsafe(4 + bunBuffer.length);
+  sectionData.writeUInt32LE(bunBuffer.length, 0);
+  bunBuffer.copy(sectionData, 4);
+  return sectionData;
+}
+
 function repackMachO(
+  machoBinary: LIEF.MachO.Binary,
   binPath: string,
   newBunBuffer: Buffer,
   outputPath: string
 ): void {
   try {
-    // Use LIEF.parse() which returns MachO.Binary for MachO files
-    const binary = LIEF.parse(binPath);
-
-    if (binary.format !== 'MachO') {
-      throw new Error(`Expected MachO binary, got ${binary.format}`);
-    }
-
-    // Cast to access MachO-specific methods
-    const machoBinary = binary as LIEF.MachO.Binary;
-
     // CRITICAL: Remove code signature first - it will be invalidated by modifications
     if (isDebug()) {
       console.log(
@@ -846,18 +713,13 @@ function repackMachO(
       throw new Error('__bun section not found');
     }
 
-    // Build new section data: 4-byte size + content
-    const newSectionData = Buffer.allocUnsafe(4 + newBunBuffer.length);
-    newSectionData.writeUInt32LE(newBunBuffer.length, 0);
-    newBunBuffer.copy(newSectionData, 4);
+    const newSectionData = buildSectionData(newBunBuffer);
 
     if (isDebug()) {
       console.log(`repackMachO: Original section size: ${bunSection.size}`);
+      console.log(`repackMachO: Original segment fileSize: ${bunSegment.fileSize}`);
       console.log(
-        `repackMachO: Original segment file_size: ${bunSegment.fileSize}`
-      );
-      console.log(
-        `repackMachO: Original segment virtual_size: ${bunSegment.virtualSize}`
+        `repackMachO: Original segment virtualSize: ${bunSegment.virtualSize}`
       );
       console.log(`repackMachO: New data size: ${newSectionData.length}`);
     }
@@ -878,7 +740,6 @@ function repackMachO(
         );
       }
 
-      // Extend the segment by the page-aligned amount
       const success = machoBinary.extendSegment(bunSegment, alignedSizeDiff);
       if (isDebug()) {
         console.log(`repackMachO: extendSegment returned: ${success}`);
@@ -889,22 +750,18 @@ function repackMachO(
       }
 
       if (isDebug()) {
+        console.log(`repackMachO: Section size after extend: ${bunSection.size}`);
         console.log(
-          `repackMachO: Section size after extend: ${bunSection.size}`
+          `repackMachO: Segment fileSize after extend: ${bunSegment.fileSize}`
         );
         console.log(
-          `repackMachO: Segment file_size after extend: ${bunSegment.fileSize}`
-        );
-        console.log(
-          `repackMachO: Segment virtual_size after extend: ${bunSegment.virtualSize}`
+          `repackMachO: Segment virtualSize after extend: ${bunSegment.virtualSize}`
         );
       }
     }
 
     // Update section content
     bunSection.content = newSectionData;
-
-    // Explicitly set the section size
     bunSection.size = BigInt(newSectionData.length);
 
     if (isDebug()) {
@@ -912,19 +769,9 @@ function repackMachO(
       console.log(`repackMachO: Writing modified binary to ${outputPath}...`);
     }
 
-    // Write the modified binary using atomic rename
-    const tempPath = outputPath + '.tmp';
-    machoBinary.write(tempPath);
-
-    // Copy original file permissions
-    const origStat = fs.statSync(binPath);
-    fs.chmodSync(tempPath, origStat.mode);
-
-    // Atomically rename
-    fs.renameSync(tempPath, outputPath);
+    atomicWriteBinary(machoBinary, outputPath, binPath);
 
     // Re-sign the binary with an ad-hoc signature
-    // This is required on macOS after modifying a binary
     try {
       if (isDebug()) {
         console.log(`repackMachO: Re-signing binary with ad-hoc signature...`);
@@ -940,7 +787,6 @@ function repackMachO(
         'Warning: Failed to re-sign binary. The binary may not run correctly on macOS:',
         codesignError
       );
-      // Don't throw - the binary might still work in some cases
     }
 
     if (isDebug()) {
@@ -953,39 +799,18 @@ function repackMachO(
 }
 
 function repackPE(
+  peBinary: LIEF.PE.Binary,
   binPath: string,
   newBunBuffer: Buffer,
   outputPath: string
 ): void {
   try {
-    // Use LIEF.parse() which returns PE.Binary for PE files
-    const binary = LIEF.parse(binPath);
-
-    if (binary.format !== 'PE') {
-      throw new Error(`Expected PE binary, got ${binary.format}`);
-    }
-
-    const peBinary = binary as LIEF.PE.Binary;
-
-    // Find .bun section
-    const sections = peBinary.sections();
-    let bunSection = null;
-
-    for (const section of sections) {
-      if (section.name === '.bun') {
-        bunSection = section;
-        break;
-      }
-    }
-
+    const bunSection = peBinary.sections().find(s => s.name === '.bun');
     if (!bunSection) {
       throw new Error('.bun section not found');
     }
 
-    // Build new section data: 4-byte size + content
-    const newSectionData = Buffer.allocUnsafe(4 + newBunBuffer.length);
-    newSectionData.writeUInt32LE(newBunBuffer.length, 0);
-    newBunBuffer.copy(newSectionData, 4);
+    const newSectionData = buildSectionData(newBunBuffer);
 
     if (isDebug()) {
       console.log(
@@ -1007,14 +832,7 @@ function repackPE(
     if (isDebug()) {
       console.log(`repackPE: Writing modified binary to ${outputPath}...`);
     }
-
-    // Write the modified binary using atomic rename
-    const tempPath = outputPath + '.tmp';
-    peBinary.write(tempPath);
-
-    // Atomically rename
-    fs.renameSync(tempPath, outputPath);
-
+    atomicWriteBinary(peBinary, outputPath, binPath, false);
     if (isDebug()) {
       console.log('repackPE: Write completed successfully');
     }
@@ -1025,49 +843,27 @@ function repackPE(
 }
 
 function repackELF(
+  elfBinary: LIEF.ELF.Binary,
   binPath: string,
   newBunBuffer: Buffer,
   outputPath: string
 ): void {
   try {
-    // Use LIEF.parse() which returns ELF.Binary for ELF files
-    const binary = LIEF.parse(binPath);
-
-    if (binary.format !== 'ELF') {
-      throw new Error(`Expected ELF binary, got ${binary.format}`);
-    }
-
-    const elfBinary = binary as LIEF.ELF.Binary;
-
-    // Build new overlay: [bun_data][total_byte_count (8 bytes)]
-    const totalByteCount =
-      newBunBuffer.length + BUN_TRAILER.length + SIZEOF_OFFSETS;
+    // Build new overlay: [bunData][totalByteCount (8 bytes)]
+    // Note: newBunBuffer already includes offsets and trailer
     const newOverlay = Buffer.allocUnsafe(newBunBuffer.length + 8);
     newBunBuffer.copy(newOverlay, 0);
-    newOverlay.writeBigUInt64LE(BigInt(totalByteCount), newBunBuffer.length);
+    newOverlay.writeBigUInt64LE(BigInt(newBunBuffer.length), newBunBuffer.length);
 
     if (isDebug()) {
       console.log(`repackELF: Setting overlay data (${newOverlay.length} bytes)`);
     }
 
-    // Set the overlay data
     elfBinary.overlay = newOverlay;
-
     if (isDebug()) {
       console.log(`repackELF: Writing modified binary to ${outputPath}...`);
     }
-
-    // Write the modified binary using atomic rename
-    const tempPath = outputPath + '.tmp';
-    elfBinary.write(tempPath);
-
-    // Copy original file permissions
-    const origStat = fs.statSync(binPath);
-    fs.chmodSync(tempPath, origStat.mode);
-
-    // Atomically rename
-    fs.renameSync(tempPath, outputPath);
-
+    atomicWriteBinary(elfBinary, outputPath, binPath);
     if (isDebug()) {
       console.log('repackELF: Write completed successfully');
     }
@@ -1088,49 +884,24 @@ export function repackNativeInstallation(
   modifiedClaudeJs: Buffer,
   outputPath: string
 ): void {
-  // Disable LIEF logging to avoid error spamming
   LIEF.logging.disable();
-
-  // Extract Bun data
-  const { bunOffsets, bunData } = getBunData(binPath);
-
-  if (!bunOffsets || !bunData) {
-    throw new Error('Failed to extract Bun data from binary');
-  }
-
-  // Parse modules
-  const modulesListBytes = getStringPointerContent(
-    bunData,
-    bunOffsets.modules_ptr
-  );
-  const modulesListCount = Math.floor(modulesListBytes.length / SIZEOF_MODULE);
-  const modulesList: BunModule[] = [];
-
-  for (let i = 0; i < modulesListCount; i++) {
-    const offset = i * SIZEOF_MODULE;
-    const module = parseCompiledModuleGraphFile(modulesListBytes, offset);
-    modulesList.push(module);
-  }
-
-  // Rebuild Bun data with modified claude.js
-  const { newBuffer } = rebuildBunData(
-    modulesList,
-    bunData,
-    bunOffsets,
-    modifiedClaudeJs
-  );
-
-  // Use LIEF.parse() to detect format automatically
   const binary = LIEF.parse(binPath);
 
-  // Repack based on format
-  if (binary.format === 'MachO') {
-    repackMachO(binPath, newBuffer, outputPath);
-  } else if (binary.format === 'PE') {
-    repackPE(binPath, newBuffer, outputPath);
-  } else if (binary.format === 'ELF') {
-    repackELF(binPath, newBuffer, outputPath);
-  } else {
-    throw new Error(`Unsupported binary format: ${binary.format}`);
+  // Extract Bun data and rebuild with modified claude.js
+  const { bunOffsets, bunData } = getBunData(binary);
+  const newBuffer = rebuildBunData(bunData, bunOffsets, modifiedClaudeJs);
+
+  switch (binary.format) {
+    case 'MachO':
+      repackMachO(binary as LIEF.MachO.Binary, binPath, newBuffer, outputPath);
+      break;
+    case 'PE':
+      repackPE(binary as LIEF.PE.Binary, binPath, newBuffer, outputPath);
+      break;
+    case 'ELF':
+      repackELF(binary as LIEF.ELF.Binary, binPath, newBuffer, outputPath);
+      break;
+    default:
+      throw new Error(`Unsupported binary format: ${binary.format}`);
   }
 }
