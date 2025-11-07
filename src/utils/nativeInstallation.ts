@@ -191,117 +191,114 @@ function extractBunDataFromSection(sectionData: Buffer): BunData {
   };
 }
 
-function extractBunDataFromELFTail(filePath: string): BunData {
-  const fd = fs.openSync(filePath, 'r');
-  try {
-    const stats = fs.fstatSync(fd);
-    const fileSize = stats.size;
-
-    if (isDebug()) {
-      console.log(`extractBunDataFromELFTail: File size=${fileSize} bytes`);
-    }
-
-    // Read last 4096 bytes
-    const tailSize = 4096;
-    const tailBuffer = Buffer.allocUnsafe(tailSize);
-    fs.readSync(fd, tailBuffer, 0, tailSize, fileSize - tailSize);
-
-    if (tailBuffer.length < BUN_TRAILER.length + 8 + SIZEOF_OFFSETS) {
-      console.error('ELF tail data is too small');
-      return {
-        bunOffsets: null,
-        bunData: null,
-        basePublicPathPrefix: BASE_PATH,
-      };
-    }
-
-    // Read total byte count from last 8 bytes
-    const totalByteCount = tailBuffer.readBigUInt64LE(tailBuffer.length - 8);
-    if (isDebug()) {
-      console.log(
-        `extractBunDataFromELFTail: Total byte count from tail=${totalByteCount}`
-      );
-    }
-
-    if (totalByteCount < 4096n || totalByteCount > 2n ** 32n - 1n) {
-      console.error(`ELF total byte count is out of range: ${totalByteCount}`);
-      return {
-        bunOffsets: null,
-        bunData: null,
-        basePublicPathPrefix: BASE_PATH,
-      };
-    }
-
-    // Verify trailer
-    const trailerStart = tailBuffer.length - 8 - BUN_TRAILER.length;
-    const trailerBytes = tailBuffer.slice(
-      trailerStart,
-      trailerStart + BUN_TRAILER.length
-    );
-    if (!trailerBytes.equals(BUN_TRAILER)) {
-      console.error('ELF trailer bytes do not match trailer');
-      if (isDebug()) {
-        console.log(`Expected: ${BUN_TRAILER.toString('hex')}`);
-        console.log(`Got: ${trailerBytes.toString('hex')}`);
-      }
-      return {
-        bunOffsets: null,
-        bunData: null,
-        basePublicPathPrefix: BASE_PATH,
-      };
-    }
-
-    // Parse Offsets structure
-    const offsetsStart =
-      tailBuffer.length - 8 - BUN_TRAILER.length - SIZEOF_OFFSETS;
-    const offsetsBytes = tailBuffer.slice(
-      offsetsStart,
-      offsetsStart + SIZEOF_OFFSETS
-    );
-    const bunOffsets = parseOffsets(offsetsBytes);
-
-    const byteCountBigInt =
-      typeof bunOffsets.byte_count === 'bigint'
-        ? bunOffsets.byte_count
-        : BigInt(bunOffsets.byte_count);
-
-    if (isDebug()) {
-      console.log(
-        `extractBunDataFromELFTail: bunOffsets.byte_count=${byteCountBigInt}`
-      );
-    }
-
-    if (byteCountBigInt >= totalByteCount) {
-      console.error(
-        `ELF byte_count (${byteCountBigInt}) >= totalByteCount (${totalByteCount})`
-      );
-      return {
-        bunOffsets: null,
-        bunData: null,
-        basePublicPathPrefix: BASE_PATH,
-      };
-    }
-
-    // Read actual Bun data
-    const tailDataLen = 8 + BUN_TRAILER.length + SIZEOF_OFFSETS;
-    const bunDataStart = fileSize - tailDataLen - Number(byteCountBigInt);
-    const bunDataBuffer = Buffer.allocUnsafe(Number(byteCountBigInt));
-    fs.readSync(fd, bunDataBuffer, 0, Number(byteCountBigInt), bunDataStart);
-
-    if (isDebug()) {
-      console.log(
-        `extractBunDataFromELFTail: Successfully read ${bunDataBuffer.length} bytes of Bun data`
-      );
-    }
-
+function extractBunDataFromELFOverlay(elfBinary: LIEF.ELF.Binary): BunData {
+  if (!elfBinary.hasOverlay) {
+    console.error('ELF binary has no overlay data');
     return {
-      bunOffsets,
-      bunData: bunDataBuffer,
+      bunOffsets: null,
+      bunData: null,
       basePublicPathPrefix: BASE_PATH,
     };
-  } finally {
-    fs.closeSync(fd);
   }
+
+  const overlayData = elfBinary.overlay;
+
+  if (isDebug()) {
+    console.log(`extractBunDataFromELFOverlay: Overlay size=${overlayData.length} bytes`);
+  }
+
+  if (overlayData.length < BUN_TRAILER.length + 8 + SIZEOF_OFFSETS) {
+    console.error('ELF overlay data is too small');
+    return {
+      bunOffsets: null,
+      bunData: null,
+      basePublicPathPrefix: BASE_PATH,
+    };
+  }
+
+  // Read total byte count from last 8 bytes
+  const totalByteCount = overlayData.readBigUInt64LE(overlayData.length - 8);
+  if (isDebug()) {
+    console.log(
+      `extractBunDataFromELFOverlay: Total byte count from tail=${totalByteCount}`
+    );
+  }
+
+  if (totalByteCount < 4096n || totalByteCount > 2n ** 32n - 1n) {
+    console.error(`ELF total byte count is out of range: ${totalByteCount}`);
+    return {
+      bunOffsets: null,
+      bunData: null,
+      basePublicPathPrefix: BASE_PATH,
+    };
+  }
+
+  // Verify trailer
+  const trailerStart = overlayData.length - 8 - BUN_TRAILER.length;
+  const trailerBytes = overlayData.slice(
+    trailerStart,
+    trailerStart + BUN_TRAILER.length
+  );
+  if (!trailerBytes.equals(BUN_TRAILER)) {
+    console.error('ELF trailer bytes do not match trailer');
+    if (isDebug()) {
+      console.log(`Expected: ${BUN_TRAILER.toString('hex')}`);
+      console.log(`Got: ${trailerBytes.toString('hex')}`);
+    }
+    return {
+      bunOffsets: null,
+      bunData: null,
+      basePublicPathPrefix: BASE_PATH,
+    };
+  }
+
+  // Parse Offsets structure
+  const offsetsStart =
+    overlayData.length - 8 - BUN_TRAILER.length - SIZEOF_OFFSETS;
+  const offsetsBytes = overlayData.slice(
+    offsetsStart,
+    offsetsStart + SIZEOF_OFFSETS
+  );
+  const bunOffsets = parseOffsets(offsetsBytes);
+
+  const byteCountBigInt =
+    typeof bunOffsets.byte_count === 'bigint'
+      ? bunOffsets.byte_count
+      : BigInt(bunOffsets.byte_count);
+
+  if (isDebug()) {
+    console.log(
+      `extractBunDataFromELFOverlay: bunOffsets.byte_count=${byteCountBigInt}`
+    );
+  }
+
+  if (byteCountBigInt >= totalByteCount) {
+    console.error(
+      `ELF byte_count (${byteCountBigInt}) >= totalByteCount (${totalByteCount})`
+    );
+    return {
+      bunOffsets: null,
+      bunData: null,
+      basePublicPathPrefix: BASE_PATH,
+    };
+  }
+
+  // Extract actual Bun data
+  const tailDataLen = 8 + BUN_TRAILER.length + SIZEOF_OFFSETS;
+  const bunDataStart = overlayData.length - tailDataLen - Number(byteCountBigInt);
+  const bunDataBuffer = overlayData.slice(bunDataStart, bunDataStart + Number(byteCountBigInt));
+
+  if (isDebug()) {
+    console.log(
+      `extractBunDataFromELFOverlay: Successfully read ${bunDataBuffer.length} bytes of Bun data`
+    );
+  }
+
+  return {
+    bunOffsets,
+    bunData: bunDataBuffer,
+    basePublicPathPrefix: BASE_PATH,
+  };
 }
 
 function getBunData(binPath: string): BunData {
@@ -368,8 +365,9 @@ function getBunData(binPath: string): BunData {
       const { bunOffsets, bunData } = extractBunDataFromSection(bunSection.content);
       return { bunOffsets, bunData, basePublicPathPrefix: BASE_PATH_WINDOWS };
     } else if (binary.format === 'ELF') {
-      // For ELF, Bun data is appended to the end of the file
-      const result = extractBunDataFromELFTail(binPath);
+      // For ELF, Bun data is appended to the end of the file as overlay data
+      const elfBinary = binary as LIEF.ELF.Binary;
+      const result = extractBunDataFromELFOverlay(elfBinary);
       if (isDebug()) {
         console.log(
           `getBunData: ELF extraction result: bunOffsets=${result.bunOffsets !== null}, bunData=${result.bunData !== null}`
@@ -1029,37 +1027,54 @@ function repackPE(
 function repackELF(
   binPath: string,
   newBunBuffer: Buffer,
-  bunOffsets: BunOffsets,
   outputPath: string
 ): void {
-  const fileSize = fs.statSync(binPath).size;
+  try {
+    // Use LIEF.parse() which returns ELF.Binary for ELF files
+    const binary = LIEF.parse(binPath);
 
-  // Calculate where Bun data starts
-  const tailDataSize = 8 + BUN_TRAILER.length + SIZEOF_OFFSETS;
-  const byteCount =
-    typeof bunOffsets.byte_count === 'bigint'
-      ? Number(bunOffsets.byte_count)
-      : bunOffsets.byte_count;
-  const bunDataStart = fileSize - tailDataSize - byteCount;
+    if (binary.format !== 'ELF') {
+      throw new Error(`Expected ELF binary, got ${binary.format}`);
+    }
 
-  // Read everything before Bun data
-  const fd = fs.openSync(binPath, 'r');
-  const originalBinary = Buffer.allocUnsafe(bunDataStart);
-  fs.readSync(fd, originalBinary, 0, bunDataStart, 0);
-  fs.closeSync(fd);
+    const elfBinary = binary as LIEF.ELF.Binary;
 
-  // Build new tail
-  const totalByteCount =
-    newBunBuffer.length + BUN_TRAILER.length + SIZEOF_OFFSETS;
-  const newTail = Buffer.allocUnsafe(newBunBuffer.length + 8);
-  newBunBuffer.copy(newTail, 0);
-  newTail.writeBigUInt64LE(BigInt(totalByteCount), newBunBuffer.length);
+    // Build new overlay: [bun_data][total_byte_count (8 bytes)]
+    const totalByteCount =
+      newBunBuffer.length + BUN_TRAILER.length + SIZEOF_OFFSETS;
+    const newOverlay = Buffer.allocUnsafe(newBunBuffer.length + 8);
+    newBunBuffer.copy(newOverlay, 0);
+    newOverlay.writeBigUInt64LE(BigInt(totalByteCount), newBunBuffer.length);
 
-  // Concatenate original binary with new tail
-  const modifiedBinary = Buffer.concat([originalBinary, newTail]);
+    if (isDebug()) {
+      console.log(`repackELF: Setting overlay data (${newOverlay.length} bytes)`);
+    }
 
-  // Write modified binary using atomic rename
-  safeWriteFile(outputPath, modifiedBinary, 0o755);
+    // Set the overlay data
+    elfBinary.overlay = newOverlay;
+
+    if (isDebug()) {
+      console.log(`repackELF: Writing modified binary to ${outputPath}...`);
+    }
+
+    // Write the modified binary using atomic rename
+    const tempPath = outputPath + '.tmp';
+    elfBinary.write(tempPath);
+
+    // Copy original file permissions
+    const origStat = fs.statSync(binPath);
+    fs.chmodSync(tempPath, origStat.mode);
+
+    // Atomically rename
+    fs.renameSync(tempPath, outputPath);
+
+    if (isDebug()) {
+      console.log('repackELF: Write completed successfully');
+    }
+  } catch (error) {
+    console.error('repackELF failed:', error);
+    throw error;
+  }
 }
 
 /**
@@ -1114,7 +1129,7 @@ export function repackNativeInstallation(
   } else if (binary.format === 'PE') {
     repackPE(binPath, newBuffer, outputPath);
   } else if (binary.format === 'ELF') {
-    repackELF(binPath, newBuffer, bunOffsets, outputPath);
+    repackELF(binPath, newBuffer, outputPath);
   } else {
     throw new Error(`Unsupported binary format: ${binary.format}`);
   }
