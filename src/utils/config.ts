@@ -194,7 +194,9 @@ export const restoreClijsFromBackup = async (
   // Only restore cli.js for NPM installs (when cliPath is set)
   if (!ccInstInfo.cliPath) {
     if (isDebug()) {
-      console.log('restoreClijsFromBackup: Skipping for native installation (no cliPath)');
+      console.log(
+        'restoreClijsFromBackup: Skipping for native installation (no cliPath)'
+      );
     }
     return false;
   }
@@ -233,20 +235,26 @@ export const restoreNativeBinaryFromBackup = async (
 ): Promise<boolean> => {
   if (!ccInstInfo.nativeInstallationPath) {
     if (isDebug()) {
-      console.log('restoreNativeBinaryFromBackup: No native installation path, skipping');
+      console.log(
+        'restoreNativeBinaryFromBackup: No native installation path, skipping'
+      );
     }
     return false;
   }
 
   if (!(await doesFileExist(NATIVE_BINARY_BACKUP_FILE))) {
     if (isDebug()) {
-      console.log('restoreNativeBinaryFromBackup: No backup file exists, skipping');
+      console.log(
+        'restoreNativeBinaryFromBackup: No backup file exists, skipping'
+      );
     }
     return false;
   }
 
   if (isDebug()) {
-    console.log(`Restoring native binary from backup to ${ccInstInfo.nativeInstallationPath}`);
+    console.log(
+      `Restoring native binary from backup to ${ccInstInfo.nativeInstallationPath}`
+    );
   }
 
   // Read the backup content
@@ -368,9 +376,7 @@ async function doesFileExist(filePath: string): Promise<boolean> {
  * Extracts the Claude Code version from the minified JS file.
  * @throws {Error} If the file cannot be read or no VERSION strings are found
  */
-async function extractVersionFromJsFile(
-  cliPath: string
-): Promise<string> {
+async function extractVersionFromJsFile(cliPath: string): Promise<string> {
   const content = await fs.readFile(cliPath, 'utf8');
   const version = extractVersionFromContent(content);
 
@@ -446,7 +452,9 @@ export const findClaudeCodeInstallation = async (
     // Treat any found executable as a potential native installation
     // If a backup exists, extract from the backup instead of the (potentially modified) current binary
     const backupExists = await doesFileExist(NATIVE_BINARY_BACKUP_FILE);
-    const pathToExtractFrom = backupExists ? NATIVE_BINARY_BACKUP_FILE : claudeExePath;
+    const pathToExtractFrom = backupExists
+      ? NATIVE_BINARY_BACKUP_FILE
+      : claudeExePath;
 
     if (isDebug()) {
       console.log(
@@ -454,7 +462,8 @@ export const findClaudeCodeInstallation = async (
       );
     }
 
-    const claudeJsBuffer = extractClaudeJsFromNativeInstallation(pathToExtractFrom);
+    const claudeJsBuffer =
+      extractClaudeJsFromNativeInstallation(pathToExtractFrom);
 
     if (claudeJsBuffer) {
       // Successfully extracted claude.js from native installation
@@ -516,7 +525,10 @@ const backupNativeBinary = async (ccInstInfo: ClaudeCodeInstallationInfo) => {
   if (isDebug()) {
     console.log(`Backing up native binary to ${NATIVE_BINARY_BACKUP_FILE}`);
   }
-  await fs.copyFile(ccInstInfo.nativeInstallationPath, NATIVE_BINARY_BACKUP_FILE);
+  await fs.copyFile(
+    ccInstInfo.nativeInstallationPath,
+    NATIVE_BINARY_BACKUP_FILE
+  );
   await updateConfigFile(config => {
     config.changesApplied = false;
     config.ccVersion = ccInstInfo.version;
@@ -563,7 +575,10 @@ export async function startupCheck(): Promise<StartupCheckInfo | null> {
 
   // Backup native binary if we don't have any backup yet (for native installations)
   let hasBackedUpNativeBinary = false;
-  if (ccInstInfo.nativeInstallationPath && !(await doesFileExist(NATIVE_BINARY_BACKUP_FILE))) {
+  if (
+    ccInstInfo.nativeInstallationPath &&
+    !(await doesFileExist(NATIVE_BINARY_BACKUP_FILE))
+  ) {
     if (isDebug()) {
       console.log(
         `startupCheck: ${NATIVE_BINARY_BACKUP_FILE} not found; backing up native binary`

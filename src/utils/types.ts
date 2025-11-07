@@ -957,7 +957,10 @@ const getConfigDir = (): string => {
 export const CONFIG_DIR = getConfigDir();
 export const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 export const CLIJS_BACKUP_FILE = path.join(CONFIG_DIR, 'cli.js.backup');
-export const NATIVE_BINARY_BACKUP_FILE = path.join(CONFIG_DIR, 'native-binary.backup');
+export const NATIVE_BINARY_BACKUP_FILE = path.join(
+  CONFIG_DIR,
+  'native-binary.backup'
+);
 export const SYSTEM_PROMPTS_DIR = path.join(CONFIG_DIR, 'system-prompts');
 export const PROMPT_CACHE_DIR = path.join(CONFIG_DIR, 'prompt-data-cache');
 

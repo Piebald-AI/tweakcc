@@ -8,17 +8,17 @@ import LIEF from 'node-lief';
 import { isDebug } from './misc.js';
 
 /**
-* Constants for Bun trailer and serialized layout sizes.
-*
-* Bun data layout (normalized across formats) is:
-* [data...][OFFSETS struct][BUN_TRAILER]
-*
-* Where OFFSETS struct (SIZEOF_OFFSETS bytes) is:
-* - byteCount:   u64  (total size of [data][OFFSETS][BUN_TRAILER])
-* - modulesPtr:  { u32 offset, u32 length } into [data...] for modules table
-* - entryPointId: u32
-* - compileExecArgvPtr: { u32 offset, u32 length }
-*/
+ * Constants for Bun trailer and serialized layout sizes.
+ *
+ * Bun data layout (normalized across formats) is:
+ * [data...][OFFSETS struct][BUN_TRAILER]
+ *
+ * Where OFFSETS struct (SIZEOF_OFFSETS bytes) is:
+ * - byteCount:   u64  (total size of [data][OFFSETS][BUN_TRAILER])
+ * - modulesPtr:  { u32 offset, u32 length } into [data...] for modules table
+ * - entryPointId: u32
+ * - compileExecArgvPtr: { u32 offset, u32 length }
+ */
 const BUN_TRAILER = Buffer.from('\n---- Bun! ----\n');
 
 // Size constants for binary structures
@@ -55,18 +55,17 @@ interface BunData {
   bunData: Buffer;
 }
 
-
 /**
-* Read a StringPointer slice from given buffer.
-*/
+ * Read a StringPointer slice from given buffer.
+ */
 function getStringPointerContent(
- buffer: Buffer,
- stringPointer: StringPointer
+  buffer: Buffer,
+  stringPointer: StringPointer
 ): Buffer {
- return buffer.subarray(
-   stringPointer.offset,
-   stringPointer.offset + stringPointer.length
- );
+  return buffer.subarray(
+    stringPointer.offset,
+    stringPointer.offset + stringPointer.length
+  );
 }
 
 function parseStringPointer(buffer: Buffer, offset: number): StringPointer {
@@ -77,15 +76,15 @@ function parseStringPointer(buffer: Buffer, offset: number): StringPointer {
 }
 
 /**
-* True if the module represents the native claude entrypoint.
-*/
+ * True if the module represents the native claude entrypoint.
+ */
 function isClaudeModule(moduleName: string): boolean {
- return (
-   moduleName.endsWith('/claude') ||
-   moduleName === 'claude' ||
-   moduleName.endsWith('/claude.exe') ||
-   moduleName === 'claude.exe'
- );
+  return (
+    moduleName.endsWith('/claude') ||
+    moduleName === 'claude' ||
+    moduleName.endsWith('/claude.exe') ||
+    moduleName === 'claude.exe'
+  );
 }
 
 /**
@@ -95,7 +94,11 @@ function isClaudeModule(moduleName: string): boolean {
 function mapModules<T>(
   bunData: Buffer,
   bunOffsets: BunOffsets,
-  visitor: (module: BunModule, moduleName: string, index: number) => T | undefined
+  visitor: (
+    module: BunModule,
+    moduleName: string,
+    index: number
+  ) => T | undefined
 ): T | undefined {
   const modulesListBytes = getStringPointerContent(
     bunData,
@@ -118,7 +121,6 @@ function mapModules<T>(
 
   return undefined;
 }
-
 
 function parseOffsets(buffer: Buffer): BunOffsets {
   let pos = 0;
@@ -186,7 +188,9 @@ function parseBunDataBlob(bunDataContent: Buffer): {
     console.log(
       `parseBunDataBlob: Expected trailer: ${BUN_TRAILER.toString('hex')}`
     );
-    console.log(`parseBunDataBlob: Got trailer: ${trailerBytes.toString('hex')}`);
+    console.log(
+      `parseBunDataBlob: Got trailer: ${trailerBytes.toString('hex')}`
+    );
   }
 
   if (!trailerBytes.equals(BUN_TRAILER)) {
@@ -717,7 +721,9 @@ function repackMachO(
 
     if (isDebug()) {
       console.log(`repackMachO: Original section size: ${bunSection.size}`);
-      console.log(`repackMachO: Original segment fileSize: ${bunSegment.fileSize}`);
+      console.log(
+        `repackMachO: Original segment fileSize: ${bunSegment.fileSize}`
+      );
       console.log(
         `repackMachO: Original segment virtualSize: ${bunSegment.virtualSize}`
       );
@@ -750,7 +756,9 @@ function repackMachO(
       }
 
       if (isDebug()) {
-        console.log(`repackMachO: Section size after extend: ${bunSection.size}`);
+        console.log(
+          `repackMachO: Section size after extend: ${bunSection.size}`
+        );
         console.log(
           `repackMachO: Segment fileSize after extend: ${bunSegment.fileSize}`
         );
@@ -853,10 +861,15 @@ function repackELF(
     // Note: newBunBuffer already includes offsets and trailer
     const newOverlay = Buffer.allocUnsafe(newBunBuffer.length + 8);
     newBunBuffer.copy(newOverlay, 0);
-    newOverlay.writeBigUInt64LE(BigInt(newBunBuffer.length), newBunBuffer.length);
+    newOverlay.writeBigUInt64LE(
+      BigInt(newBunBuffer.length),
+      newBunBuffer.length
+    );
 
     if (isDebug()) {
-      console.log(`repackELF: Setting overlay data (${newOverlay.length} bytes)`);
+      console.log(
+        `repackELF: Setting overlay data (${newOverlay.length} bytes)`
+      );
     }
 
     elfBinary.overlay = newOverlay;

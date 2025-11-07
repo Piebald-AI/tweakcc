@@ -59,14 +59,20 @@ const main = async () => {
           console.error(`  - ${info.pattern}`);
         }
       });
-      console.error(`\nAlso checked for 'claude' executable on PATH using '${process.platform === 'win32' ? 'where claude.exe' : 'which claude'}'.`);
+      console.error(
+        `\nAlso checked for 'claude' executable on PATH using '${process.platform === 'win32' ? 'where claude.exe' : 'which claude'}'.`
+      );
       process.exit(1);
     }
 
     if (startupCheckInfo.ccInstInfo.nativeInstallationPath) {
-      console.log(`Found Claude Code (native installation): ${startupCheckInfo.ccInstInfo.nativeInstallationPath}`);
+      console.log(
+        `Found Claude Code (native installation): ${startupCheckInfo.ccInstInfo.nativeInstallationPath}`
+      );
     } else {
-      console.log(`Found Claude Code at: ${startupCheckInfo.ccInstInfo.cliPath}`);
+      console.log(
+        `Found Claude Code at: ${startupCheckInfo.ccInstInfo.cliPath}`
+      );
     }
     console.log(`Version: ${startupCheckInfo.ccInstInfo.version}`);
 

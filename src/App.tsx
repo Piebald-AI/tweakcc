@@ -186,7 +186,9 @@ Please reapply your changes below.`,
           <MainView
             onSubmit={handleMainSubmit}
             notification={notification}
-            isNativeInstallation={!!startupCheckInfo.ccInstInfo?.nativeInstallationPath}
+            isNativeInstallation={
+              !!startupCheckInfo.ccInstInfo?.nativeInstallationPath
+            }
           />
         ) : currentView === MainMenuItem.THEMES ? (
           <ThemesView onBack={handleBack} />

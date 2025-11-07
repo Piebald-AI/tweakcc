@@ -1,9 +1,20 @@
 import figlet from 'figlet';
 import * as fs from 'node:fs/promises';
-import { restoreClijsFromBackup, restoreNativeBinaryFromBackup, updateConfigFile } from '../config.js';
-import { ClaudeCodeInstallationInfo, TweakccConfig, NATIVE_BINARY_BACKUP_FILE } from '../types.js';
+import {
+  restoreClijsFromBackup,
+  restoreNativeBinaryFromBackup,
+  updateConfigFile,
+} from '../config.js';
+import {
+  ClaudeCodeInstallationInfo,
+  TweakccConfig,
+  NATIVE_BINARY_BACKUP_FILE,
+} from '../types.js';
 import { isDebug, replaceFileBreakingHardLinks } from '../misc.js';
-import { extractClaudeJsFromNativeInstallation, repackNativeInstallation } from '../nativeInstallation.js';
+import {
+  extractClaudeJsFromNativeInstallation,
+  repackNativeInstallation,
+} from '../nativeInstallation.js';
 
 // Notes to patch-writers:
 //
@@ -273,7 +284,8 @@ export const applyCustomization = async (
       );
     }
 
-    const claudeJsBuffer = extractClaudeJsFromNativeInstallation(pathToExtractFrom);
+    const claudeJsBuffer =
+      extractClaudeJsFromNativeInstallation(pathToExtractFrom);
 
     if (!claudeJsBuffer) {
       throw new Error('Failed to extract claude.js from native installation');
@@ -457,11 +469,17 @@ export const applyCustomization = async (
   if (ccInstInfo.nativeInstallationPath) {
     // For native installations: repack the modified claude.js back into the binary
     if (isDebug()) {
-      console.log(`Repacking modified claude.js into native installation: ${ccInstInfo.nativeInstallationPath}`);
+      console.log(
+        `Repacking modified claude.js into native installation: ${ccInstInfo.nativeInstallationPath}`
+      );
     }
 
     const modifiedBuffer = Buffer.from(content, 'utf8');
-    repackNativeInstallation(ccInstInfo.nativeInstallationPath, modifiedBuffer, ccInstInfo.nativeInstallationPath);
+    repackNativeInstallation(
+      ccInstInfo.nativeInstallationPath,
+      modifiedBuffer,
+      ccInstInfo.nativeInstallationPath
+    );
   } else {
     // For NPM installations: replace the cli.js file
     if (!ccInstInfo.cliPath) {

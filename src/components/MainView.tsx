@@ -71,7 +71,11 @@ const systemMenuItems: SelectItem[] = [
   },
 ];
 
-export function MainView({ onSubmit, notification, isNativeInstallation }: MainViewProps) {
+export function MainView({
+  onSubmit,
+  notification,
+  isNativeInstallation,
+}: MainViewProps) {
   const filteredSystemMenuItems = isNativeInstallation
     ? systemMenuItems.filter(item => item.name !== MainMenuItem.OPEN_CLI)
     : systemMenuItems;
@@ -82,7 +86,7 @@ export function MainView({ onSubmit, notification, isNativeInstallation }: MainV
       : [
           {
             name: MainMenuItem.APPLY_CHANGES,
-            desc: "Required: Updates Claude Code in-place with your changes",
+            desc: 'Required: Updates Claude Code in-place with your changes',
             selectedStyles: {
               color: 'green',
             },
