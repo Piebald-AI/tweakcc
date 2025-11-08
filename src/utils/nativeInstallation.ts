@@ -255,8 +255,10 @@ function extractBunDataFromSection(sectionData: Buffer): BunData {
 
 /**
  * ELF layout:
- * [original ELF ...][Bun blob...][u64 totalByteCount]
- * totalByteCount is the size of the Bun blob (including OFFSETS and TRAILER).
+ * [original ELF ...][Bun data...][Bun offsets][Bun trailer][u64 totalByteCount]
+ *
+ * Matches bun_unpack.py logic: parse Offsets structure and use its byteCount
+ * field instead of the trailing totalByteCount (which is unreliable for musl).
  */
 function extractBunDataFromELFOverlay(elfBinary: LIEF.ELF.Binary): BunData {
   if (!elfBinary.hasOverlay) {
@@ -274,7 +276,7 @@ function extractBunDataFromELFOverlay(elfBinary: LIEF.ELF.Binary): BunData {
     throw new Error('ELF overlay data is too small');
   }
 
-  // Read total byte count from last 8 bytes
+  // Read totalByteCount from last 8 bytes
   const totalByteCount = overlayData.readBigUInt64LE(overlayData.length - 8);
   if (isDebug()) {
     console.log(
@@ -286,26 +288,71 @@ function extractBunDataFromELFOverlay(elfBinary: LIEF.ELF.Binary): BunData {
     throw new Error(`ELF total byte count is out of range: ${totalByteCount}`);
   }
 
-  // ELF format: [data][offsets][trailer][8-byte size]
-  // Extract the Bun data blob without the trailing 8-byte size
-  const bunDataBlobStart = overlayData.length - Number(totalByteCount) - 8;
-  const bunDataBlob = overlayData.subarray(
-    bunDataBlobStart,
+  // Verify trailer at [len - 8 - trailer_len : len - 8]
+  const trailerStart = overlayData.length - 8 - BUN_TRAILER.length;
+  const trailerBytes = overlayData.subarray(
+    trailerStart,
     overlayData.length - 8
   );
 
   if (isDebug()) {
     console.log(
-      `extractBunDataFromELFOverlay: Extracted ${bunDataBlob.length} bytes of Bun data blob`
+      `extractBunDataFromELFOverlay: Expected trailer: ${BUN_TRAILER.toString('hex')}`
+    );
+    console.log(
+      `extractBunDataFromELFOverlay: Got trailer: ${trailerBytes.toString('hex')}`
     );
   }
 
-  // Parse the common Bun data structure
-  const { bunOffsets, bunData } = parseBunDataBlob(bunDataBlob);
+  if (!trailerBytes.equals(BUN_TRAILER)) {
+    throw new Error('BUN trailer bytes do not match trailer');
+  }
+
+  // Parse Offsets at [len - 8 - trailer_len - sizeof_offsets : len - 8 - trailer_len]
+  const offsetsStart =
+    overlayData.length - 8 - BUN_TRAILER.length - SIZEOF_OFFSETS;
+  const offsetsBytes = overlayData.subarray(
+    offsetsStart,
+    overlayData.length - 8 - BUN_TRAILER.length
+  );
+  const bunOffsets = parseOffsets(offsetsBytes);
+
+  if (isDebug()) {
+    console.log(
+      `extractBunDataFromELFOverlay: Offsets.byteCount=${bunOffsets.byteCount}`
+    );
+  }
+
+  // Validate byteCount from Offsets structure
+  const byteCount =
+    typeof bunOffsets.byteCount === 'bigint'
+      ? bunOffsets.byteCount
+      : BigInt(bunOffsets.byteCount);
+
+  if (byteCount >= totalByteCount) {
+    throw new Error('ELF total byte count is out of range');
+  }
+
+  // Extract data region using byteCount from Offsets (not totalByteCount)
+  const tailDataLen = 8 + BUN_TRAILER.length + SIZEOF_OFFSETS;
+  const dataStart = overlayData.length - tailDataLen - Number(byteCount);
+  const dataRegion = overlayData.subarray(
+    dataStart,
+    overlayData.length - tailDataLen
+  );
+
+  if (isDebug()) {
+    console.log(
+      `extractBunDataFromELFOverlay: Extracted ${dataRegion.length} bytes of data`
+    );
+  }
+
+  // Reconstruct full blob [data][offsets][trailer] to match other formats
+  const bunDataBlob = Buffer.concat([dataRegion, offsetsBytes, trailerBytes]);
 
   return {
     bunOffsets,
-    bunData,
+    bunData: bunDataBlob,
   };
 }
 
