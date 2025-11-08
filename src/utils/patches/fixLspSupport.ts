@@ -3,7 +3,7 @@
 import { LocationResult, showDiff } from './index.js';
 
 const getOpenDocumentLocation = (oldFile: string): LocationResult | null => {
-  // Step 1: Find `ensureServerStarted:[$\w]+,`
+  // Step 1: Find `ensureServerStarted:[$\w]+`
   const ensureServerStartedPattern = /ensureServerStarted:([$\w]+)\b/;
   const ensureMatch = oldFile.match(ensureServerStartedPattern);
   if (!ensureMatch || ensureMatch.index === undefined) {
@@ -11,48 +11,29 @@ const getOpenDocumentLocation = (oldFile: string): LocationResult | null => {
     return null;
   }
 
-  // Step 2: crawl back char by char till {
-  let startBrace = ensureMatch.index;
-  while (startBrace > 0 && oldFile[startBrace] !== '{') {
-    startBrace--;
-  }
-  if (oldFile[startBrace] !== '{') {
-    console.error('patch: fixLspSupport: failed to find opening brace');
-    return null;
-  }
+  // Step 2: Get a window around the match
+  const windowStart = Math.max(0, ensureMatch.index - 50);
+  const windowEnd = Math.min(oldFile.length, ensureMatch.index + 50);
+  const window = oldFile.slice(windowStart, windowEnd);
 
-  // Step 3: crawl forward char by char till }
-  let endBrace = startBrace + 1;
-  let braceCount = 1;
-  while (endBrace < oldFile.length && braceCount > 0) {
-    if (oldFile[endBrace] === '{') braceCount++;
-    if (oldFile[endBrace] === '}') braceCount--;
-    endBrace++;
-  }
-  if (braceCount !== 0) {
-    console.error('patch: fixLspSupport: failed to find closing brace');
-    return null;
-  }
-
-  // Step 4: In the { ... }, search for `sendRequest:([$\w]+),`
-  const returnBlock = oldFile.slice(startBrace, endBrace);
-  const sendRequestPattern = /sendRequest:([$\w]+)\b/;
-  const sendRequestMatch = returnBlock.match(sendRequestPattern);
+  // Step 3: Search for sendRequest in the window
+  const sendRequestPattern = /sendRequest:([$\w]+)[,}]/;
+  const sendRequestMatch = window.match(sendRequestPattern);
   if (!sendRequestMatch) {
     console.error(
-      'patch: fixLspSupport: failed to find sendRequest in return block'
+      `patch: fixLspSupport: failed to find sendRequest near ensureServerStarted, window=${JSON.stringify([windowStart, windowEnd, window])}`
     );
     return null;
   }
 
-  // Step 5: Store the varname
+  // Step 4: Store the varname
   const varName = sendRequestMatch[1];
 
-  // Step 6: In the previous 1000-2000 characters, search for `async function {varName}\([$\w]+,`
-  const searchStart = Math.max(0, startBrace - 2000);
-  const searchChunk = oldFile.slice(searchStart, startBrace);
+  // Step 5: In the previous 1000-2000 characters, search for `async function {varName}\([$\w]+,`
+  const searchStart = Math.max(0, ensureMatch.index - 2000);
+  const searchChunk = oldFile.slice(searchStart, ensureMatch.index);
   const functionPattern = new RegExp(
-    `async function ${varName}\\(([$\\w]+),`,
+    `async function ${varName.replaceAll('$', '\\$')}\\(([$\\w]+),`,
     'g'
   );
   let functionMatch;
@@ -73,7 +54,7 @@ const getOpenDocumentLocation = (oldFile: string): LocationResult | null => {
 
   // Step ii.1: Match the 2nd line of sendRequest `let ([$\w]+)=await [$\w]+\([$\w]+\);`
   const functionStart = searchStart + lastMatch.index;
-  const functionBody = oldFile.slice(functionStart, startBrace);
+  const functionBody = oldFile.slice(functionStart, ensureMatch.index);
   const secondLinePattern = /let ([$\w]+)=await [$\w]+\([$\w]+\);/;
   const secondLineMatch = functionBody.match(secondLinePattern);
   if (!secondLineMatch || secondLineMatch.index === undefined) {
@@ -89,7 +70,7 @@ const getOpenDocumentLocation = (oldFile: string): LocationResult | null => {
   // Step ii.3: Find the if(!serverVar)return; line after the second line
   const afterSecondLine =
     functionStart + secondLineMatch.index + secondLineMatch[0].length;
-  const remainingBody = oldFile.slice(afterSecondLine, startBrace);
+  const remainingBody = oldFile.slice(afterSecondLine, ensureMatch.index);
   const ifReturnPattern = new RegExp(`if\\(!${serverVar}\\)return;`);
   const ifReturnMatch = remainingBody.match(ifReturnPattern);
 

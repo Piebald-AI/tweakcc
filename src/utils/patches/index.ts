@@ -153,7 +153,7 @@ export const getModuleLoaderFunction = (
 /**
  * Find the React module name
  */
-export const getReactModuleName = (
+export const getReactModuleNameNonBun = (
   fileContents: string
 ): string | undefined => {
   // Pattern: var X=Y((Z)=>{var W=Symbol.for("react.element")
@@ -161,7 +161,50 @@ export const getReactModuleName = (
     /var ([$\w]+)=[$\w]+\(\([$\w]+\)=>\{var [$\w]+=Symbol\.for\("react\.element"\)/;
   const match = fileContents.match(pattern);
   if (!match) {
-    console.log('patch: getReactModuleName: failed to find React module name');
+    console.log(
+      'patch: getReactModuleNameNonBun: failed to find React module name'
+    );
+    return undefined;
+  }
+  return match[1];
+};
+
+/**
+ * Find the React module function (Bun variant)
+ *
+ * Steps:
+ * 1. Get "reactModuleNameNonBun" via getReactModuleNameNonBun()
+ * 2. Search for /var ([$\w]+)=[$\w]+\(\([$\w]+,[$\w]+\)=>\{[$\w]+\.exports=${reactModuleNameNonBun}\(\)/
+ * 3. The first match is it
+ *
+ * Example code:
+ * ```
+ * var fH = N((AtM, r7L) => {
+ *     r7L.exports = n7L();
+ * });
+ * ```
+ * `n7L` is `reactModuleNameNonBun`, and `fH` is `reactModuleFunctionBun`
+ */
+export const getReactModuleFunctionBun = (
+  fileContents: string
+): string | undefined => {
+  const reactModuleNameNonBun = getReactModuleNameNonBun(fileContents);
+  if (!reactModuleNameNonBun) {
+    console.log(
+      '^ patch: getReactModuleFunctionBun: failed to find React module name (Bun)'
+    );
+    return undefined;
+  }
+
+  // Pattern: var X=Y((Z,W)=>{W.exports=reactModuleNameNonBun()
+  const pattern = new RegExp(
+    `var ([$\\w]+)=[$\\w]+\\(\\([$\\w]+,[$\\w]+\\)=>\\{[$\\w]+\\.exports=${reactModuleNameNonBun}\\(\\)`
+  );
+  const match = fileContents.match(pattern);
+  if (!match) {
+    console.log(
+      'patch: getReactModuleFunctionBun: failed to find React module function (Bun)'
+    );
     return undefined;
   }
   return match[1];
@@ -181,27 +224,53 @@ export const getReactVar = (fileContents: string): string | undefined => {
 
   const moduleLoader = getModuleLoaderFunction(fileContents);
   if (!moduleLoader) {
+    console.log('^ patch: getReactVar: failed to find moduleLoader');
     reactVarCache = undefined;
     return undefined;
   }
 
-  const reactModule = getReactModuleName(fileContents);
-  if (!reactModule) {
+  // Try non-bun first (reactModuleNameNonBun)
+  const reactModuleVarNonBun = getReactModuleNameNonBun(fileContents);
+  if (!reactModuleVarNonBun) {
+    console.log('^ patch: getReactVar: failed to find reactModuleVarNonBun');
     reactVarCache = undefined;
     return undefined;
   }
 
   // Pattern: X=moduleLoader(reactModule,1)
-  const pattern = new RegExp(
-    `\\b([$\\w]+)=${moduleLoader}\\(${reactModule}\\(\\),1\\)`
+  const nonBunPattern = new RegExp(
+    `\\b([$\\w]+)=${moduleLoader}\\(${reactModuleVarNonBun}\\(\\),1\\)`
   );
-  const match = fileContents.match(pattern);
-  if (!match) {
-    console.log('patch: getReactVar: failed to find React variable');
+  const nonBunMatch = fileContents.match(nonBunPattern);
+  if (nonBunMatch) {
+    reactVarCache = nonBunMatch[1];
+    return reactVarCache;
+  } else {
+    // DON'T fail just because we can't find the non-bun pattern.
+  }
+
+  // If reactModuleNameNonBun fails, try reactModuleFunctionBun
+  const reactModuleFunctionBun = getReactModuleFunctionBun(fileContents);
+  if (!reactModuleFunctionBun) {
+    console.log('^ patch: getReactVar: failed to find reactModuleFunctionBun');
     reactVarCache = undefined;
     return undefined;
   }
-  reactVarCache = match[1];
+  // \b([$\w]+)=T\(fH\(\),1\)
+  // Pattern: X=moduleLoader(reactModuleBun,1)
+  const bunPattern = new RegExp(
+    `\\b([$\\w]+)=${moduleLoader}\\(${reactModuleFunctionBun}\\(\\),1\\)`
+  );
+  const bunMatch = fileContents.match(bunPattern);
+  if (!bunMatch) {
+    console.log(
+      `patch: getReactVar: failed to find bunPattern (moduleLoader=${moduleLoader}, reactModuleVarNonBun=${reactModuleVarNonBun}, reactModuleFunctionBun=${reactModuleFunctionBun})`
+    );
+    reactVarCache = undefined;
+    return undefined;
+  }
+
+  reactVarCache = bunMatch[1];
   return reactVarCache;
 };
 

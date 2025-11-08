@@ -19,7 +19,7 @@ const getThinkerFormatLocation = (oldFile: string): LocationResult | null => {
   );
 
   // New nullish format: N=(Y??C?.activeForm??L)+"…"
-  const formatPattern = /([$\w]+)(=\(([^;]{1,200}?)\)\+"…")/;
+  const formatPattern = /([$\w]+)(=\(([^;]{1,200}?)\)\+"(?:…|\\u2026)")/;
   const formatMatch = searchSection.match(formatPattern);
 
   if (!formatMatch || formatMatch.index == undefined) {
