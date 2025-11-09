@@ -392,7 +392,7 @@ export function ThemePreview({ theme }: ThemePreviewProps) {
           </Text>
           <Text>
             <ColoredText color={theme.colors.autoAccept}>
-              ⏵⏵ auto-accept edits on (shift+tab to cycle)
+              ⏵⏵ accept edits on (shift+tab to cycle)
             </ColoredText>
           </Text>
           <Text>
