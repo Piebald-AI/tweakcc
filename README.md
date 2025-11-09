@@ -6,6 +6,11 @@
 
 `tweakcc` is a lightweight, interactive CLI tool that lets you personalize your Claude Code experience.
 
+<!--
+> [!important]
+> **NEW in 3.0.0:** tweakcc now supports Claude Code native installations!
+-->
+
 > [!important]
 > **NEW in 2.0.0:** tweakcc can now customize all of Claude Code's system prompts!
 
@@ -36,9 +41,8 @@ tweakcc also
 Additionally, we're working on features that will allow you to
 - Pick from over **70+ spinning/thinking animations** from [`cli-spinners`](https://github.com/sindresorhus/cli-spinners)
 - Apply **custom styling** to the markdown elements in Claude's responses like code, bold, headers, etc
-- Customize the **shimmering effect** on the thinking verb: disable it; change its speed, width, and colors
 
-tweakcc supports Claude Code installed on **Windows, macOS, and Linux**, using npm, yarn, pnpm, bun, Homebrew, nvm, fnm, n, volta, nvs, and nodenv, or a custom location.  (Note: it does **not** support native installations yet; see [#29](https://github.com/Piebald-AI/tweakcc/issues/29).)
+tweakcc supports Claude Code installed on **Windows, macOS, and Linux**, both **native/binary installations** and those installed via npm, yarn, pnpm, bun, Homebrew/Linuxbrew, nvm, fnm, n, volta, nvs, and nodenv, as well as custom locations.
 
 Run without installation:
 
@@ -51,9 +55,9 @@ $ pnpm dlx tweakcc
 
 ## How it works
 
-`tweakcc` works by patching Claude Code's minified `cli.js` file.  When you update your Claude Code installation, your customizations will be overwritten, but they're remembered in your configuration file, so they can be reapplied by just re-running the tool.
+`tweakcc` works by patching Claude Code's minified `cli.js` file.  For npm-based installations this file is modified directly, but for native installation it's extracted from the binary, patched, and then the binary is repacked.  When you update your Claude Code installation, your customizations will be overwritten, but they're remembered in your configuration file, so they can be reapplied by just running `npx tweakcc --apply`.
 
-`tweakcc` is verified to work with Claude Code **2.0.31**.
+`tweakcc` is verified to work with Claude Code **2.0.36**.
 
 ### Configuration directory
 
@@ -81,7 +85,6 @@ Other tools for customizing Claude Code:
 - [**ccstatusline**](https://github.com/sirmalloc/ccstatusline) - Highly customizable status line formatter for Claude Code CLI that displays model info, git branch, token usage, and other metrics in your terminal.
 - [**claude-powerline**](https://github.com/Owloops/claude-powerline) - Vim-style powerline statusline for Claude Code with real-time usage tracking, git integration, and custom themes.
 - [**CCometixLine**](https://github.com/Haleclipse/CCometixLine) - A high-performance Claude Code statusline tool written in Rust with Git integration, usage tracking, interactive TUI configuration, and Claude Code enhancement utilities.
-- [**cc-statuslines**](https://github.com/chongdashu/cc-statusline) - Transform your Claude Code experience with a beautiful, informative statusline.  One command.  Three questions.  Custom statusline.
 
 Forks:
 
@@ -112,7 +115,8 @@ When your Claude Code installation is updated, tweakcc will automatically update
 
 To assist you with resolving the conflicts, tweakcc will generate an HTML file that shows on the left, the diff of the change you've made, and on the right, the diff of Anthropic's changes.  That way you can recall at a glance what you've changed in the prompt, and easily see what's changed in the new prompt.  Then you can modify the markdown file for the prompt, incorporate or ignore new changes as you see fit.
 
-Make sure to update the `ccVersion` field at the top of the file when you're done resolving the conflicts.  If you don't, tweakcc won't know that you've resolved the conflicts and will continue to report conflicts and generate the HTML diff file.  **Important:** Also note that the version you update `ccVersion` to is **not** necessarily the new version of CC that you installed; rather, it's the most recent version this particular system prompt was updated in.  Different prompt files have different most-recently-modified versions.
+> [!tip]
+> Make sure to update the `ccVersion` field at the top of the file when you're done resolving the conflicts.  If you don't, tweakcc won't know that you've resolved the conflicts and will continue to report conflicts and generate the HTML diff file.  **Important:** Also note that the version you update `ccVersion` to is **not** necessarily the new version of CC that you installed; rather, it's the most recent version this particular system prompt was updated in.  Different prompt files have different most-recently-modified versions.
 
 Screenshot of the HTML file:
 
@@ -120,24 +124,15 @@ Screenshot of the HTML file:
 
 #### Git for version control over your customized prompts
 
-This is a great idea, and we recommend it; in fact, we have one ourselves [here.](https://github.com/bl-ue/tweakcc-system-prompts)  It allows you to keep your modified prompt safe in GitHub or elsewhere, and you can also switch from one set of prompts to another via branches, for example.  In the future we plan to integrate git repo management for the system prompt markdown files into tweakcc.  For now you'll need to manually initialize a git repository in `~/.tweakcc` directory.  We'd also recommend the following `.gitignore` file for it:
-```
-.DS_Store
-prompt-data-cache
-cli.js.backup
-systemPromptAppliedHashes.json
-systemPromptOriginalHashes.json
-system-prompts
-```
+This is a great idea, and we recommend it; in fact, we have one ourselves [here.](https://github.com/bl-ue/tweakcc-system-prompts)  It allows you to keep your modified prompt safe in GitHub or elsewhere, and you can also switch from one set of prompts to another via branches, for example.  In the future we plan to integrate git repo management for the system prompt markdown files into tweakcc.  For now you'll need to manually initialize a git repository in `~/.tweakcc` directory.  tweakcc automatically generates a recommended `.gitignore` file in that directory (which you can modify if you'd like).
 
-  
 ## Troubleshooting
 
-tweakcc stores a backup of your Claude Code `cli.js` file for when you want to revert your customizations and for reapplying patches.  Before it applies your customizations, it restores the original `cli.js` so that it can start from a clean slate.  Sometimes things can get confused and your `cli.js` can be corrupted.
+tweakcc stores a backup of your Claude Code `cli.js`/binary for when you want to revert your customizations and for reapplying patches.  Before it applies your customizations, it restores the original `cli.js`/binary so that it can start from a clean slate.  Sometimes things can get confused and your `claude` can be corrupted.
 
-In particular, you may run into a situation where you have a tweakcc-patched (or maybe a formatted) `cli.js` but no tweakcc backup.  And then it makes a backup of that modified `cli.js`.  If you then try to reinstall Claude Code and apply your customizations, tweakcc will restore its backup of the old _modified_ `cli.js`.
+In particular, you may run into a situation where you have a tweakcc-patched (or maybe a formatted) `claude` but no tweakcc backup.  And then it makes a backup of that modified `claude`.  If you then try to reinstall Claude Code and apply your customizations, tweakcc will restore its backup of the old _modified_ `claude`.
 
-To break out of this loop you can install a different version of Claude Code, which will cause tweakcc to discard its existing backup and take a fresh backup of the new `cli.js` file.  Or you can simply delete tweakcc's backup file (located at `~/.tweakcc/cli.backup.js` or `$XDG_CONFIG_HOME/tweakcc/cli.backup.js`).  If you do delete `cli.backup.js`, make sure you reinstall Claude Code _before_ you run tweakcc again, or else if `cli.js` is the modified version it, will again get into the loop described above.
+To break out of this loop you can install a different version of Claude Code, which will cause tweakcc to discard its existing backup and take a fresh backup of the new `claude` file.  Or you can simply delete tweakcc's backup file (located at `~/.tweakcc/cli.backup.js` or `~/.tweakcc/native-binary.backup`).  If you do delete `cli.backup.js` or `native-binary.backup`, make sure you reinstall Claude Code _before_ you run tweakcc again, because if your `claude` is still the modified version, it will get into the same loop again.
 
 ## FAQ
 
@@ -163,7 +158,7 @@ No, it fetches them fresh from the [data/prompts](https://github.com/Piebald-AI/
 <details>
 <summary>How can I customize my Claude Code theme?</summary>
 
-Run `npx tweakcc`, go to `Themes`, and modify existing themes or create a new one.  Then go back to the main menu and choose `Apply customizations to cli.js`.
+Run `npx tweakcc`, go to `Themes`, and modify existing themes or create a new one.  Then go back to the main menu and choose `Apply customizations`.
 
 </details>
 
