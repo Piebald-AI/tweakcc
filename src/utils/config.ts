@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { EOL } from 'node:os';
 import { execSync } from 'node:child_process';
 import {
   ClaudeCodeInstallationInfo,
@@ -30,6 +31,30 @@ import { extractClaudeJsFromNativeInstallation } from './nativeInstallation.js';
 export const ensureConfigDir = async (): Promise<void> => {
   await fs.mkdir(CONFIG_DIR, { recursive: true });
   await fs.mkdir(SYSTEM_PROMPTS_DIR, { recursive: true });
+
+  // Generate a .gitignore file in case the user wants to version control their ~/.tweakcc with
+  // config.json and the system prompts.
+  const gitignorePath = path.join(CONFIG_DIR, '.gitignore');
+  try {
+    await fs.stat(gitignorePath);
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      await fs.writeFile(
+        gitignorePath,
+        [
+          '.DS_Store',
+          'prompt-data-cache',
+          'cli.js.backup',
+          'native-binary.backup',
+          'native-claudejs-orig.js',
+          'native-claudejs-patched.js',
+          'systemPromptAppliedHashes.json',
+          'systemPromptOriginalHashes.json',
+          'system-prompts',
+        ].join(EOL) + EOL
+      );
+    }
+  }
 };
 
 let lastConfig: TweakccConfig = {
