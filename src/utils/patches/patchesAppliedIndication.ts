@@ -1,5 +1,6 @@
 import {
   LocationResult,
+  escapeIdent,
   findBoxComponent,
   findChalkVar,
   findTextComponent,
@@ -274,7 +275,7 @@ const findPatchesListLocation = (
 
   // 4. Search for the createElement call with the header component
   const createHeaderPattern = new RegExp(
-    `\\b([$\\w]+)\\.createElement\\(${headerComponentName},null\\),?`
+    `\\b([$\\w]+)\\.createElement\\(${escapeIdent(headerComponentName)},null\\),?`
   );
   const createHeaderMatch = fileContents.match(createHeaderPattern);
   if (!createHeaderMatch || createHeaderMatch.index === undefined) {

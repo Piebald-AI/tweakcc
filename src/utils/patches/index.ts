@@ -1,5 +1,8 @@
 import figlet from 'figlet';
 import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import {
   restoreClijsFromBackup,
   restoreNativeBinaryFromBackup,
@@ -106,6 +109,10 @@ export const showDiff = (
   }
 };
 
+export const escapeIdent = (ident: string): string => {
+  return ident.replace(/\$/g, '\\$');
+};
+
 export const findChalkVar = (fileContents: string): string | undefined => {
   // Find chalk variable using the counting method
   const chalkPattern =
@@ -198,12 +205,12 @@ export const getReactModuleFunctionBun = (
 
   // Pattern: var X=Y((Z,W)=>{W.exports=reactModuleNameNonBun()
   const pattern = new RegExp(
-    `var ([$\\w]+)=[$\\w]+\\(\\([$\\w]+,[$\\w]+\\)=>\\{[$\\w]+\\.exports=${reactModuleNameNonBun}\\(\\)`
+    `var ([$\\w]+)=[$\\w]+\\(\\([$\\w]+,[$\\w]+\\)=>\\{[$\\w]+\\.exports=${escapeIdent(reactModuleNameNonBun)}\\(\\)`
   );
   const match = fileContents.match(pattern);
   if (!match) {
     console.log(
-      'patch: getReactModuleFunctionBun: failed to find React module function (Bun)'
+      `patch: getReactModuleFunctionBun: failed to find React module function (Bun) (reactModuleNameNonBun=${reactModuleNameNonBun})`
     );
     return undefined;
   }
@@ -239,7 +246,7 @@ export const getReactVar = (fileContents: string): string | undefined => {
 
   // Pattern: X=moduleLoader(reactModule,1)
   const nonBunPattern = new RegExp(
-    `\\b([$\\w]+)=${moduleLoader}\\(${reactModuleVarNonBun}\\(\\),1\\)`
+    `\\b([$\\w]+)=${escapeIdent(moduleLoader)}\\(${escapeIdent(reactModuleVarNonBun)}\\(\\),1\\)`
   );
   const nonBunMatch = fileContents.match(nonBunPattern);
   if (nonBunMatch) {
@@ -259,7 +266,7 @@ export const getReactVar = (fileContents: string): string | undefined => {
   // \b([$\w]+)=T\(fH\(\),1\)
   // Pattern: X=moduleLoader(reactModuleBun,1)
   const bunPattern = new RegExp(
-    `\\b([$\\w]+)=${moduleLoader}\\(${reactModuleFunctionBun}\\(\\),1\\)`
+    `\\b([$\\w]+)=${escapeIdent(moduleLoader)}\\(${escapeIdent(reactModuleFunctionBun)}\\(\\),1\\)`
   );
   const bunMatch = fileContents.match(bunPattern);
   if (!bunMatch) {
@@ -312,11 +319,16 @@ export const findBoxComponent = (fileContents: string): string | undefined => {
   const boxOrigCompName = boxDisplayNameMatch[1];
 
   // 2. Search for the variable that equals the original Box component
-  const boxVarPattern = new RegExp(`\\b([$\\w]+)=${boxOrigCompName}\\b`);
+  const boxVarPattern = new RegExp(
+    // /[^$\w]/ = /\b/ but considering dollar signs word characters.
+    // Normally /$\b/ does NOT match "$}" but this does.
+    // Because once boxOrigCompName was `LK$` so `_=LK$}` wasn't matching.
+    `\\b([$\\w]+)=${escapeIdent(boxOrigCompName)}[^$\\w]`
+  );
   const boxVarMatch = fileContents.match(boxVarPattern);
   if (!boxVarMatch) {
     console.error(
-      'patch: findBoxComponent: failed to find Box component variable'
+      `patch: findBoxComponent: failed to find Box component variable (boxOrigCompName=${boxOrigCompName})`
     );
     return undefined;
   }
@@ -358,6 +370,14 @@ export const applyCustomization = async (
 
     if (!claudeJsBuffer) {
       throw new Error('Failed to extract claude.js from native installation');
+    }
+
+    // Save original extracted JS for debugging
+    const tweakccDir = path.join(os.homedir(), '.tweakcc');
+    const origPath = path.join(tweakccDir, 'native-claudejs-orig.js');
+    fsSync.writeFileSync(origPath, claudeJsBuffer);
+    if (isDebug()) {
+      console.log(`Saved original extracted JS from native to: ${origPath}`);
     }
 
     content = claudeJsBuffer.toString('utf8');
@@ -541,6 +561,14 @@ export const applyCustomization = async (
       console.log(
         `Repacking modified claude.js into native installation: ${ccInstInfo.nativeInstallationPath}`
       );
+    }
+
+    // Save patched JS for debugging
+    const tweakccDir = path.join(os.homedir(), '.tweakcc');
+    const patchedPath = path.join(tweakccDir, 'native-claudejs-patched.js');
+    fsSync.writeFileSync(patchedPath, content, 'utf8');
+    if (isDebug()) {
+      console.log(`Saved patched JS from native to: ${patchedPath}`);
     }
 
     const modifiedBuffer = Buffer.from(content, 'utf8');
