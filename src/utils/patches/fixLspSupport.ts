@@ -71,7 +71,9 @@ const getOpenDocumentLocation = (oldFile: string): LocationResult | null => {
   const afterSecondLine =
     functionStart + secondLineMatch.index + secondLineMatch[0].length;
   const remainingBody = oldFile.slice(afterSecondLine, ensureMatch.index);
-  const ifReturnPattern = new RegExp(`if\\(!${escapeIdent(serverVar)}\\)return;`);
+  const ifReturnPattern = new RegExp(
+    `if\\(!${escapeIdent(serverVar)}\\)return;`
+  );
   const ifReturnMatch = remainingBody.match(ifReturnPattern);
 
   if (!ifReturnMatch || ifReturnMatch.index === undefined) {
