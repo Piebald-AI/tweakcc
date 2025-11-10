@@ -4,7 +4,7 @@
 [![Mentioned in Awesome Claude Code](https://awesome.re/mentioned-badge.svg)](https://github.com/hesreallyhim/awesome-claude-code)
 [![ClaudeLog - A comprehensive knowledge base for Claude.](https://claudelog.com/img/claude_log_badge.svg)](https://claudelog.com/)
 
-`tweakcc` is a CLI tool that upgrades your Claude Code experience&mdash;customize its system prompts, add custom themes, create toolsets, and personalize the UI.
+tweakcc is a CLI tool that upgrades your Claude Code experience&mdash;customize its system prompts, add custom themes, create toolsets, and personalize the UI.
 
 > [!important]
 > **NEW in 3.0.0:** tweakcc now supports Claude Code native installations!  It also adds a new feature to CC called **toolsets**&mdash;try them out in Claude Code with the `/toolsets` command after you create them in tweakcc.  Lastly it makes Claude Code's native LSP server support work.
@@ -52,13 +52,13 @@ $ pnpm dlx tweakcc
 
 ## How it works
 
-`tweakcc` works by patching Claude Code's minified `cli.js` file.  For npm-based installations this file is modified directly, but for native installation it's extracted from the binary, patched, and then the binary is repacked.  When you update your Claude Code installation, your customizations will be overwritten, but they're remembered in your configuration file, so they can be reapplied by just running `npx tweakcc --apply`.
+tweakcc works by patching Claude Code's minified `cli.js` file.  For npm-based installations this file is modified directly, but for native installation it's extracted from the binary, patched, and then the binary is repacked.  When you update your Claude Code installation, your customizations will be overwritten, but they're remembered in your configuration file, so they can be reapplied by just running `npx tweakcc --apply`.
 
-`tweakcc` is verified to work with Claude Code **2.0.36**.
+tweakcc is verified to work with Claude Code **2.0.36**.
 
 ### Configuration directory
 
-`tweakcc` stores its configuration files in one of the following locations, in order of priority:
+tweakcc stores its configuration files in one of the following locations, in order of priority:
 
 1. **`~/.tweakcc/`** - If this directory already exists, it will always be used for backward compatibility; or if `XDG_CONFIG_HOME` is not set
 2. **`$XDG_CONFIG_HOME/tweakcc`** - If `~/.tweakcc/` doesn't exist and `$XDG_CONFIG_HOME` is set
@@ -183,9 +183,9 @@ Could you have forgotten to actually set Claude Code's theme to your new theme? 
 #### Other
 
 <details>
-<summary><code>tweakcc</code> vs. <code>tweakcn</code>...?</summary>
+<summary>tweakcc vs. tweakcn...?</summary>
 
-[`tweakcn`](https://github.com/jnsahaj/tweakcn), though similarly named, is unrelated to `tweakcc` or Claude Code.  It's a tool for editing your [shadcn/ui](https://github.com/shadcn-ui/ui) themes.  Check it out!
+[tweakcn](https://github.com/jnsahaj/tweakcn), though similarly named, is unrelated to tweakcc or Claude Code.  It's a tool for editing your [shadcn/ui](https://github.com/shadcn-ui/ui) themes.  Check it out!
 
 </details>
 
