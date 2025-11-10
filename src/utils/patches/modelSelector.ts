@@ -75,6 +75,7 @@ const writeModelSelectorOptions = (oldFile: string): string | null => {
 };
 
 // 2) Extend the known model names list (sB2=[...]) to include our lowercased friendly names
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const writeKnownModelNames = (oldFile: string): string | null => {
   const m = oldFile.match(/"sonnet\[1m\]"/);
   if (!m || m.index === undefined) {
@@ -148,6 +149,7 @@ const writeKnownModelNames = (oldFile: string): string | null => {
 };
 
 // 3) Append new cases to the switch that maps friendly names -> internal IDs
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const writeModelSwitchMapping = (oldFile: string): string | null => {
   const caseAnchor = 'case"sonnet[1m]"';
   const caseIdx = oldFile.indexOf(caseAnchor);
