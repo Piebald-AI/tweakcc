@@ -1,4 +1,3 @@
-import figlet from 'figlet';
 import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import * as os from 'node:os';
@@ -37,7 +36,6 @@ import { writeShowMoreItemsInSelectMenus } from './showMoreItemsInSelectMenus.js
 import { writeThemes } from './themes.js';
 import { writeContextLimit } from './contextLimit.js';
 import { writeInputBoxBorder } from './inputBorderBox.js';
-import { writeSigninBannerText } from './signinBannerText.js';
 import { writeSpinnerNoFreeze } from './spinnerNoFreeze.js';
 import { writeThinkerFormat } from './thinkerFormat.js';
 import { writeThinkerSymbolMirrorOption } from './thinkerMirrorOption.js';
@@ -394,36 +392,19 @@ export const applyCustomization = async (
 
   const items: string[] = [];
 
-  // Apply themes
+  // Apply system prompt customizations
+  const systemPromptsResult = await applySystemPrompts(
+    content,
+    ccInstInfo.version
+  );
+  content = systemPromptsResult.newContent;
+  items.push(...systemPromptsResult.items);
+
   let result: string | null = null;
+
+  // Apply themes
   if (config.settings.themes && config.settings.themes.length > 0) {
     if ((result = writeThemes(content, config.settings.themes)))
-      content = result;
-  }
-
-  // Apply launch text
-  if (config.settings.launchText) {
-    const c = config.settings.launchText;
-    let textToApply = '';
-    if (c.method === 'custom' && c.customText) {
-      textToApply = c.customText;
-    } else if (c.method === 'figlet' && c.figletText) {
-      textToApply = await new Promise<string>(resolve =>
-        figlet.text(
-          c.figletText.replace('\n', ' '),
-          c.figletFont as unknown as figlet.Fonts,
-          (err, data) => {
-            if (err) {
-              console.error('patch: figlet: failed to generate text', err);
-              resolve('');
-            } else {
-              resolve(data || '');
-            }
-          }
-        )
-      );
-    }
-    if ((result = writeSigninBannerText(content, textToApply)))
       content = result;
   }
 
@@ -516,14 +497,6 @@ export const applyCustomization = async (
 
   // Apply thinking visibility patch (always enabled)
   if ((result = writeThinkingVisibility(content))) content = result;
-
-  // Apply system prompt customizations
-  const systemPromptsResult = await applySystemPrompts(
-    content,
-    ccInstInfo.version
-  );
-  content = systemPromptsResult.newContent;
-  items.push(...systemPromptsResult.items);
 
   // Apply patches applied indication
   const showTweakccVersion = config.settings.misc?.showTweakccVersion ?? true;

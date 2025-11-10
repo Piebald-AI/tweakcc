@@ -2,7 +2,6 @@ import { useState, useEffect, createContext, useCallback } from 'react';
 import { Box, useInput } from 'ink';
 import { MainView } from './components/MainView.js';
 import { ThemesView } from './components/ThemesView.js';
-import { LaunchTextView } from './components/LaunchTextView.js';
 import { ThinkingVerbsView } from './components/ThinkingVerbsView.js';
 import { ThinkingStyleView } from './components/ThinkingStyleView.js';
 import { UserMessageDisplayView } from './components/UserMessageDisplayView.js';
@@ -133,7 +132,6 @@ Please reapply your changes below.`,
         }
         break;
       case MainMenuItem.THEMES:
-      case MainMenuItem.LAUNCH_TEXT:
       case MainMenuItem.THINKING_VERBS:
       case MainMenuItem.THINKING_STYLE:
       case MainMenuItem.USER_MESSAGE_DISPLAY:
@@ -192,8 +190,6 @@ Please reapply your changes below.`,
           />
         ) : currentView === MainMenuItem.THEMES ? (
           <ThemesView onBack={handleBack} />
-        ) : currentView === MainMenuItem.LAUNCH_TEXT ? (
-          <LaunchTextView onBack={handleBack} />
         ) : currentView === MainMenuItem.THINKING_VERBS ? (
           <ThinkingVerbsView onBack={handleBack} />
         ) : currentView === MainMenuItem.THINKING_STYLE ? (

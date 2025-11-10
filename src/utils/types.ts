@@ -71,13 +71,6 @@ export interface Theme {
   };
 }
 
-export interface LaunchTextConfig {
-  method: 'figlet' | 'custom';
-  figletText: string;
-  figletFont: string;
-  customText: string;
-}
-
 export interface ThinkingVerbsConfig {
   format: string;
   verbs: string[];
@@ -118,7 +111,6 @@ export interface Toolset {
 
 export interface Settings {
   themes: Theme[];
-  launchText: LaunchTextConfig;
   thinkingVerbs: ThinkingVerbsConfig;
   thinkingStyle: ThinkingStyleConfig;
   userMessageDisplay: UserMessageDisplayConfig;
@@ -152,7 +144,6 @@ export interface StartupCheckInfo {
 export enum MainMenuItem {
   APPLY_CHANGES = '*Apply customizations',
   THEMES = 'Themes',
-  LAUNCH_TEXT = 'Launch text',
   THINKING_VERBS = 'Thinking verbs',
   THINKING_STYLE = 'Thinking style',
   USER_MESSAGE_DISPLAY = 'User message display',
@@ -637,12 +628,6 @@ export const DEFAULT_SETTINGS: Settings = {
       },
     },
   ],
-  launchText: {
-    method: 'figlet',
-    figletText: 'Claude Code',
-    figletFont: 'ANSI Shadow',
-    customText: '',
-  },
   thinkingVerbs: {
     format: '{}… ',
     verbs: [

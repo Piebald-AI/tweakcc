@@ -22,10 +22,6 @@ const baseMenuItems: SelectItem[] = [
     desc: "Modify Claude Code's built-in themes or create your own",
   },
   {
-    name: MainMenuItem.LAUNCH_TEXT,
-    desc: 'Change the "CLAUDE CODE" banner text that\'s shown when you sign in to Claude Code',
-  },
-  {
     name: MainMenuItem.THINKING_VERBS,
     desc: "Customize the list of verbs that Claude Code uses when it's working",
   },

@@ -28,7 +28,6 @@ With tweakcc, you can
 - Create **custom themes** with a graphical HSL/RGB color picker
 - Add custom **thinking verbs** that will show while Claude's working
 - Create custom **thinking spinner animations** with different speeds and phases
-- Change the "CLAUDE CODE" banner text to your own text with your own [figlet](http://www.figlet.org/) fonts
 - Style the **user messages in the chat history** beyond the default plain gray text
 - Remove the **ASCII border** from the input box
 - Expand **thinking blocks** by default, so that you don't need to use the transcript (<kbd>Ctrl+O</kbd>) to see them

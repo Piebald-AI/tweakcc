@@ -28,7 +28,8 @@
     "installation",
     "theme",
     "claude-code-theme",
-    "figlet"
+    "system-prompts",
+    "toolsets"
   ],
   "author": {
     "name": "Piebald LLC",
@@ -58,10 +59,8 @@
   },
   "dependencies": {
     "@babel/parser": "^7.28.4",
-    "@types/figlet": "^1.7.0",
     "chalk": "^5.5.0",
     "commander": "^14.0.0",
-    "figlet": "^1.8.2",
     "globby": "^14.1.0",
     "gray-matter": "^4.0.3",
     "ink": "^6.1.0",

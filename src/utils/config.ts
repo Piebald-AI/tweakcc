@@ -10,6 +10,7 @@ import {
   CONFIG_FILE,
   DEFAULT_SETTINGS,
   NATIVE_BINARY_BACKUP_FILE,
+  Settings,
   StartupCheckInfo,
   SYSTEM_PROMPTS_DIR,
   Theme,
@@ -161,6 +162,10 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
       readConfig.settings.userMessageDisplay =
         DEFAULT_SETTINGS.userMessageDisplay;
     }
+
+    // Remove launchText if it exists in the config; it was removed in v3.0.0.
+    delete (readConfig.settings as Settings & { launchText: unknown })
+      .launchText;
 
     // Check if system prompts have been modified since they were last applied
     // If so, mark changesApplied as false to show the "*Apply customizations" indicator
