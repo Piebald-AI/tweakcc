@@ -4,14 +4,12 @@
 [![Mentioned in Awesome Claude Code](https://awesome.re/mentioned-badge.svg)](https://github.com/hesreallyhim/awesome-claude-code)
 [![ClaudeLog - A comprehensive knowledge base for Claude.](https://claudelog.com/img/claude_log_badge.svg)](https://claudelog.com/)
 
-`tweakcc` is a lightweight, interactive CLI tool that lets you personalize your Claude Code experience.
-
-<!--
-> [!important]
-> **NEW in 3.0.0:** tweakcc now supports Claude Code native installations!
--->
+`tweakcc` is a CLI tool that upgrades your Claude Code experience--customize its system prompts, add custom themes, create toolsets, and personalize the UI.
 
 > [!important]
+> **NEW in 3.0.0:** tweakcc now supports Claude Code native installations!  It also adds a new feature to CC called **toolsets**&mdash;try them out in Claude Code with the `/toolsets` command after you create them in tweakcc.  Lastly it makes Claude Code's native LSP server support work.
+
+> [!tip]
 > **NEW in 2.0.0:** tweakcc can now customize all of Claude Code's system prompts!
 
 <!--

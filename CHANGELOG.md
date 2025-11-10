@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v3.0.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.0.0) - 2025-11-10
+
 - Remove the "CLAUDE CODE" figlet ASCII art customization to keep up with Claude Code (#174) - @bl-ue
 - Support slight bun-specific differences in React module accessing, `$` identifier frequency, and unicode escaping (#163) - @bl-ue
 - Enable a toolset to be the default toolset (#161) - @bl-ue

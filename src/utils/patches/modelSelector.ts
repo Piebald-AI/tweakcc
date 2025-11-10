@@ -202,11 +202,11 @@ const writeModelSwitchMapping = (oldFile: string): string | null => {
 export const writeModelCustomizations = (oldFile: string): string | null => {
   let updated: string | null = oldFile;
 
-  const a = writeKnownModelNames(updated);
-  if (a) updated = a;
+  // const a = writeKnownModelNames(updated);
+  // if (a) updated = a;
 
-  const b = writeModelSwitchMapping(updated);
-  if (b) updated = b;
+  // const b = writeModelSwitchMapping(updated);
+  // if (b) updated = b;
 
   const c = writeModelSelectorOptions(updated);
   if (c) updated = c;
