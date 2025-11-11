@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v3.0.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.0.1) - 2025-11-11
+
 - Fix Mach-O segment alignment for ARM64 binaries (#183) - @signadou
 
 ## [v3.0.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.0.0) - 2025-11-10
