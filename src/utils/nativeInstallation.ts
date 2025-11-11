@@ -781,12 +781,19 @@ function repackMachO(
     const sizeDiff = newSectionData.length - Number(bunSection.size);
 
     if (sizeDiff > 0) {
-      // CRITICAL: Round up to page alignment (4096 bytes)
+      // CRITICAL: Round up to page alignment
       // macOS requires segments to be page-aligned, otherwise __LINKEDIT becomes misaligned
-      const PAGE_SIZE = 4096;
+      // Page size depends on architecture:
+      // - x86_64: 4KB (4096 bytes)
+      // - ARM64 (Apple Silicon): 16KB (16384 bytes)
+      const isARM64 =
+        machoBinary.header.cpuType === LIEF.MachO.Header.CPU_TYPE.ARM64;
+      const PAGE_SIZE = isARM64 ? 16384 : 4096;
       const alignedSizeDiff = Math.ceil(sizeDiff / PAGE_SIZE) * PAGE_SIZE;
 
       if (isDebug()) {
+        console.log(`repackMachO: CPU type: ${isARM64 ? 'ARM64' : 'x86_64'}`);
+        console.log(`repackMachO: Page size: ${PAGE_SIZE} bytes`);
         console.log(`repackMachO: Need to expand by ${sizeDiff} bytes`);
         console.log(
           `repackMachO: Rounding up to page-aligned: ${alignedSizeDiff} bytes`
