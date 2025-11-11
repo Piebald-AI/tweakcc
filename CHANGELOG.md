@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fix Mach-O segment alignment for ARM64 binaries (#183) - @signadou
+
 ## [v3.0.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.0.0) - 2025-11-10
 
 - Remove the "CLAUDE CODE" figlet ASCII art customization to keep up with Claude Code (#174) - @bl-ue
