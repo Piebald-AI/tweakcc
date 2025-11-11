@@ -782,6 +782,7 @@ function repackMachO(
 
     if (sizeDiff > 0) {
       // CRITICAL: Round up to page alignment
+      // See #180.
       // macOS requires segments to be page-aligned, otherwise __LINKEDIT becomes misaligned
       // Page size depends on architecture:
       // - x86_64: 4KB (4096 bytes)
