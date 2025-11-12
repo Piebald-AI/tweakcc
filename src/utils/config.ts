@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import type { Stats } from 'node:fs';
 import path from 'node:path';
 import { EOL } from 'node:os';
 import { execSync } from 'node:child_process';
@@ -300,41 +301,77 @@ export const restoreNativeBinaryFromBackup = async (
   return true;
 };
 
+interface ClaudeExecutablePathInfo {
+  commandPath: string;
+  resolvedPath: string;
+  isSymlink: boolean;
+}
+
 /**
- * Finds the claude executable on PATH using platform-specific commands.
- * Returns the path to the executable (resolved from symlink), or null if not found.
+ * Finds the claude executable on PATH (POSIX platforms only).
+ * Returns the resolved executable info, or null if not found.
  */
-async function findClaudeExecutableOnPath(): Promise<string | null> {
+async function findClaudeExecutableOnPath(): Promise<ClaudeExecutablePathInfo | null> {
+  if (process.platform === 'win32') {
+    if (isDebug()) {
+      console.log(
+        'Skipping PATH-based claude executable lookup on Windows; symlink fallback is POSIX-only.'
+      );
+    }
+    return null;
+  }
+
   try {
-    const isWindows = process.platform === 'win32';
-    const command = isWindows ? 'where claude.exe' : 'which claude';
+    const command = 'which claude';
 
     if (isDebug()) {
       console.log(`Looking for claude executable using: ${command}`);
     }
 
     const result = execSync(command, { encoding: 'utf8' }).trim();
-    const firstPath = result.split('\n')[0].trim(); // In case multiple paths are returned
+    const firstPath = result.split('\n')[0]?.trim();
 
-    if (firstPath && (await doesFileExist(firstPath))) {
-      // Resolve symlinks to get the actual binary path
-      try {
-        const realPath = await fs.realpath(firstPath);
-        if (isDebug()) {
-          if (realPath !== firstPath) {
-            console.log(`Found claude executable at: ${firstPath} (symlink)`);
-            console.log(`Resolved to: ${realPath}`);
-          } else {
-            console.log(`Found claude executable at: ${firstPath}`);
-          }
-        }
-        return realPath;
-      } catch (error) {
-        if (isDebug()) {
-          console.log('Could not resolve symlink, using original path:', error);
-        }
-        return firstPath;
+    if (!firstPath) {
+      return null;
+    }
+
+    let stats: Stats | null = null;
+    try {
+      stats = await fs.lstat(firstPath);
+    } catch (error) {
+      if (isDebug()) {
+        console.log('lstat failed for claude executable path:', error);
       }
+      return null;
+    }
+
+    const isSymlink = stats?.isSymbolicLink() ?? false;
+
+    try {
+      const realPath = await fs.realpath(firstPath);
+      if (isDebug()) {
+        if (isSymlink && realPath !== firstPath) {
+          console.log(`Found claude executable at: ${firstPath} (symlink)`);
+          console.log(`Resolved to: ${realPath}`);
+        } else {
+          console.log(`Found claude executable at: ${realPath}`);
+        }
+      }
+
+      return {
+        commandPath: firstPath,
+        resolvedPath: realPath,
+        isSymlink,
+      };
+    } catch (error) {
+      if (isDebug()) {
+        console.log('Could not resolve symlink, using original path:', error);
+      }
+      return {
+        commandPath: firstPath,
+        resolvedPath: firstPath,
+        isSymlink,
+      };
     }
   } catch (error) {
     if (isDebug()) {
@@ -402,6 +439,8 @@ async function doesFileExist(filePath: string): Promise<boolean> {
   }
 }
 
+const CLAUDE_PACKAGE_SEGMENT = `${path.sep}@anthropic-ai${path.sep}claude-code`;
+
 /**
  * Extracts the Claude Code version from the minified JS file.
  * @throws {Error} If the file cannot be read or no VERSION strings are found
@@ -415,6 +454,34 @@ async function extractVersionFromJsFile(cliPath: string): Promise<string> {
   }
 
   return version;
+}
+
+/**
+ * Attempts to derive the package root path for @anthropic-ai/claude-code from a resolved executable
+ * path (typically the target of a symlink returned by `which claude`).  Returns the cli.js path if
+ * it exists under that package root.
+ */
+async function findClijsFromExecutablePath(
+  resolvedExecutablePath: string
+): Promise<string | null> {
+  const normalizedPath = path.normalize(resolvedExecutablePath);
+  const segmentIndex = normalizedPath.lastIndexOf(CLAUDE_PACKAGE_SEGMENT);
+
+  if (segmentIndex === -1) {
+    return null;
+  }
+
+  const packageRoot = normalizedPath.slice(
+    0,
+    segmentIndex + CLAUDE_PACKAGE_SEGMENT.length
+  );
+  const potentialCliJs = path.join(packageRoot, 'cli.js');
+
+  if (await doesFileExist(potentialCliJs)) {
+    return potentialCliJs;
+  }
+
+  return null;
 }
 
 /**
@@ -473,18 +540,73 @@ export const findClaudeCodeInstallation = async (
     );
   }
 
-  const claudeExePath = await findClaudeExecutableOnPath();
+  const claudeExeInfo = await findClaudeExecutableOnPath();
   if (isDebug()) {
-    console.log(`findClaudeExecutableOnPath() returned: ${claudeExePath}`);
+    console.log(
+      `findClaudeExecutableOnPath() returned: ${
+        claudeExeInfo ? claudeExeInfo.resolvedPath : null
+      }`
+    );
   }
 
-  if (claudeExePath) {
+  if (claudeExeInfo) {
+    const { resolvedPath, isSymlink } = claudeExeInfo;
+
+    let derivedCliJsPath: string | null = null;
+
+    if (resolvedPath.endsWith('cli.js')) {
+      derivedCliJsPath = resolvedPath;
+      if (isDebug()) {
+        console.log(
+          'Resolved PATH executable already points at cli.js; treating as NPM installation.'
+        );
+      }
+    } else if (isSymlink) {
+      derivedCliJsPath = await findClijsFromExecutablePath(resolvedPath);
+      if (isDebug()) {
+        if (derivedCliJsPath) {
+          console.log(
+            `Symlink target resides inside Claude Code package; derived cli.js at ${derivedCliJsPath}`
+          );
+        } else {
+          console.log(
+            'Symlink target did not contain cli.js; attempting native extraction instead.'
+          );
+        }
+      }
+    }
+
+    if (derivedCliJsPath) {
+      try {
+        const version = await extractVersionFromJsFile(derivedCliJsPath);
+
+        if (isDebug()) {
+          console.log(
+            `Found Claude Code via symlink-derived cli.js at: ${derivedCliJsPath}`
+          );
+        }
+
+        return {
+          cliPath: derivedCliJsPath,
+          version,
+        };
+      } catch (error) {
+        if (isDebug()) {
+          console.log(
+            'Failed to extract version from cli.js found via symlink:',
+            error
+          );
+        }
+        // Fall through to try native installation method
+      }
+    }
+
     // Treat any found executable as a potential native installation
     // If a backup exists, extract from the backup instead of the (potentially modified) current binary
     const backupExists = await doesFileExist(NATIVE_BINARY_BACKUP_FILE);
     const pathToExtractFrom = backupExists
       ? NATIVE_BINARY_BACKUP_FILE
-      : claudeExePath;
+      : resolvedPath;
 
     if (isDebug()) {
       console.log(
@@ -515,7 +637,7 @@ export const findClaudeCodeInstallation = async (
       return {
         // cliPath is undefined for native installs - no file on disk
         version,
-        nativeInstallationPath: claudeExePath,
+        nativeInstallationPath: resolvedPath,
       };
     }
   }
