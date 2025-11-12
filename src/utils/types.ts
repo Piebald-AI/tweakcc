@@ -1079,6 +1079,7 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
 
     // nvm (https://github.com/nvm-sh/nvm) - system & user
     addPath(`/usr/local/nvm/versions/node/*/lib/${mod}`, true);
+    addPath(`/usr/local/share/nvm/versions/node/*/lib/${mod}`, true);
     addPath(`${home}/.nvm/versions/node/*/lib/${mod}`, true);
 
     // nodenv (https://github.com/nodenv/nodenv)
