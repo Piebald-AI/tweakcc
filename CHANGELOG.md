@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v3.0.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.0.2) - 2025-11-13
+
+- Create an example `config.json` if it doesn't exist and cli.js isn't found (#195) - @bl-ue
+- Add `/usr/local/{+ share/}nvm` to the list of search paths (#190) - @bl-ue
+
 ## [v3.0.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.0.1) - 2025-11-11
 
 - Fix Mach-O segment alignment for ARM64 binaries (#183) - @signadou
