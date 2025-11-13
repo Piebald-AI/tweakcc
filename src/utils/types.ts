@@ -150,8 +150,8 @@ export enum MainMenuItem {
   MISC = 'Misc',
   TOOLSETS = 'Toolsets',
   VIEW_SYSTEM_PROMPTS = 'View system prompts',
-  RESTORE_ORIGINAL = 'Restore original Claude Code (preserves tweakcc.json)',
-  OPEN_CONFIG = 'Open tweakcc.json',
+  RESTORE_ORIGINAL = 'Restore original Claude Code (preserves config.json)',
+  OPEN_CONFIG = 'Open config.json',
   OPEN_CLI = "Open Claude Code's cli.js",
   EXIT = 'Exit',
 }

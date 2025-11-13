@@ -2,12 +2,36 @@
 import { render } from 'ink';
 import { Command } from 'commander';
 import chalk from 'chalk';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import App from './App.js';
-import { CLIJS_SEARCH_PATH_INFO, CONFIG_FILE } from './utils/types.js';
+import { CLIJS_SEARCH_PATH_INFO, CONFIG_FILE, CONFIG_DIR } from './utils/types.js';
 import { startupCheck, readConfigFile } from './utils/config.js';
 import { enableDebug } from './utils/misc.js';
 import { applyCustomization } from './utils/patches/index.js';
 import { preloadStringsFile } from './utils/promptSync.js';
+
+const createExampleConfigIfMissing = async (examplePath: string): Promise<void> => {
+  try {
+    await fs.mkdir(CONFIG_DIR, { recursive: true });
+    // Only create if config file doesn't exist
+    try {
+      await fs.stat(CONFIG_FILE);
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+        const exampleConfig = {
+          ccInstallationDir: examplePath,
+        };
+        await fs.writeFile(
+          CONFIG_FILE,
+          JSON.stringify(exampleConfig, null, 2)
+        );
+      }
+    }
+  } catch (error) {
+    // Silently fail if we can't write the config file
+  }
+};
 
 const main = async () => {
   const program = new Command();
@@ -43,6 +67,13 @@ const main = async () => {
     const startupCheckInfo = await startupCheck();
 
     if (!startupCheckInfo || !startupCheckInfo.ccInstInfo) {
+      const examplePath =
+        process.platform == 'win32'
+          ? 'C:\\absolute\\path\\to\\node_modules\\@anthropic-ai\\claude-code'
+          : '/absolute/path/to/node_modules/@anthropic-ai/claude-code';
+
+      await createExampleConfigIfMissing(examplePath);
+
       console.error(`Cannot find Claude Code's cli.js`);
       console.error('Searched for cli.js at the following locations:');
       CLIJS_SEARCH_PATH_INFO.forEach(info => {
@@ -136,6 +167,13 @@ const main = async () => {
       }).join('\n');
     };
 
+    const examplePath =
+      process.platform == 'win32'
+        ? 'C:\\absolute\\path\\to\\node_modules\\@anthropic-ai\\claude-code'
+        : '/absolute/path/to/node_modules/@anthropic-ai/claude-code';
+
+    await createExampleConfigIfMissing(examplePath);
+
     console.error(`Cannot find Claude Code's cli.js -- do you have Claude Code installed?
 
 Searched for cli.js at the following locations:
@@ -149,11 +187,7 @@ to our search list and release an update today!  And in the meantime, you can ge
 by manually specifying that location in ${CONFIG_FILE} with the "ccInstallationDir" property:
 
 {
-  "ccInstallationDir": "${
-    process.platform == 'win32'
-      ? 'C:\\\\absolute\\\\path\\\\to\\\\node_modules\\\\@anthropic-ai\\\\claude-code'
-      : '/absolute/path/to/node_modules/@anthropic-ai/claude-code'
-  }"
+  "ccInstallationDir": "${examplePath}"
 }
 
 Notes:
