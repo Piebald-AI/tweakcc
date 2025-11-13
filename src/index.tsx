@@ -3,32 +3,38 @@ import { render } from 'ink';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import fs from 'node:fs/promises';
-import path from 'node:path';
 import App from './App.js';
-import { CLIJS_SEARCH_PATH_INFO, CONFIG_FILE, CONFIG_DIR } from './utils/types.js';
+import {
+  CLIJS_SEARCH_PATH_INFO,
+  CONFIG_FILE,
+  CONFIG_DIR,
+} from './utils/types.js';
 import { startupCheck, readConfigFile } from './utils/config.js';
 import { enableDebug } from './utils/misc.js';
 import { applyCustomization } from './utils/patches/index.js';
 import { preloadStringsFile } from './utils/promptSync.js';
 
-const createExampleConfigIfMissing = async (examplePath: string): Promise<void> => {
+const createExampleConfigIfMissing = async (
+  examplePath: string
+): Promise<void> => {
   try {
     await fs.mkdir(CONFIG_DIR, { recursive: true });
     // Only create if config file doesn't exist
     try {
       await fs.stat(CONFIG_FILE);
     } catch (error) {
-      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ) {
         const exampleConfig = {
           ccInstallationDir: examplePath,
         };
-        await fs.writeFile(
-          CONFIG_FILE,
-          JSON.stringify(exampleConfig, null, 2)
-        );
+        await fs.writeFile(CONFIG_FILE, JSON.stringify(exampleConfig, null, 2));
       }
     }
-  } catch (error) {
+  } catch {
     // Silently fail if we can't write the config file
   }
 };
