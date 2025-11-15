@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v3.1.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.0) - 2025-11-15
+
 - Show the currently-active toolset next to the "accept edits on"/"plan mode on" banner (#200) - @bl-ue
 - Add `/title` and `/rename` slash commands to CC for manual session naming per [CC#2112](https://github.com/anthropics/claude-code/issues/2112) (#199) - @bl-ue
 
