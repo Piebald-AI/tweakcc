@@ -533,6 +533,170 @@ export const writeToolsetComponentDefinition = (
 };
 
 /**
+ * Find where to insert the app state variable getter in the status line component
+ */
+export const findShiftTabAppStateVarInsertionPoint = (
+  oldFile: string
+): number | null => {
+  // Search for the bash mode indicator
+  const bashModePattern = /\{color:"bashBorder"\},"! for bash mode"/;
+  const match = oldFile.match(bashModePattern);
+
+  if (!match || match.index === undefined) {
+    console.error(
+      'patch: toolsets: findShiftTabAppStateVarInsertionPoint: failed to find bash mode pattern'
+    );
+    return null;
+  }
+
+  // Get 500 chars before the match
+  const lookbackStart = Math.max(0, match.index - 500);
+  const chunk = oldFile.slice(lookbackStart, match.index);
+
+  // Find the function declaration pattern: function NAME({...}){
+  const functionPattern = /function ([$\w]+)\(\{[^}]+\}\)\{/g;
+  const matches = Array.from(chunk.matchAll(functionPattern));
+
+  if (matches.length === 0) {
+    console.error(
+      'patch: toolsets: findShiftTabAppStateVarInsertionPoint: failed to find function pattern'
+    );
+    return null;
+  }
+
+  // Take the last match (closest to the bash mode indicator)
+  const lastMatch = matches[matches.length - 1];
+  if (lastMatch.index === undefined) {
+    console.error(
+      'patch: toolsets: findShiftTabAppStateVarInsertionPoint: match has no index'
+    );
+    return null;
+  }
+
+  // Return position AFTER the opening brace
+  return lookbackStart + lastMatch.index + lastMatch[0].length;
+};
+
+/**
+ * Insert the state getter variable at the start of the status line component
+ */
+export const insertShiftTabAppStateVar = (oldFile: string): string | null => {
+  const insertionPoint = findShiftTabAppStateVarInsertionPoint(oldFile);
+  if (insertionPoint === null) {
+    console.error(
+      'patch: toolsets: insertShiftTabAppStateVar: failed to find insertion point'
+    );
+    return null;
+  }
+
+  const stateInfo = getAppStateVarAndGetterFunction(oldFile);
+  if (!stateInfo) {
+    console.error(
+      'patch: toolsets: insertShiftTabAppStateVar: failed to find app state getter'
+    );
+    return null;
+  }
+
+  const { appStateGetterFunction } = stateInfo;
+  const codeToInsert = `let[state]=${appStateGetterFunction}();`;
+
+  const newFile =
+    oldFile.slice(0, insertionPoint) +
+    codeToInsert +
+    oldFile.slice(insertionPoint);
+
+  showDiff(oldFile, newFile, codeToInsert, insertionPoint, insertionPoint);
+
+  return newFile;
+};
+
+/**
+ * Append the toolset name to the mode display text
+ */
+export const appendToolsetToModeDisplay = (oldFile: string): string | null => {
+  // Find the pattern where mode text is rendered
+  // Looking for: tl(Y).toLowerCase(), " on"
+  // We want to change it to: tl(Y).toLowerCase(), " on: ", state.toolset || "undefined"
+
+  const modeDisplayPattern = /([$\w]+)\((\w+)\)\.toLowerCase\(\)," on"/;
+  const match = oldFile.match(modeDisplayPattern);
+
+  if (!match || match.index === undefined) {
+    console.error(
+      'patch: toolsets: appendToolsetToModeDisplay: failed to find mode display pattern'
+    );
+    return null;
+  }
+
+  const tlFunction = match[1];
+  const modeVar = match[2];
+
+  // Replace with the new pattern that includes toolset
+  const oldText = match[0];
+  const newText = `${tlFunction}(${modeVar}).toLowerCase()," on [",state.toolset||"undefined","]"`;
+
+  const newFile = oldFile.replace(oldText, newText);
+
+  if (newFile === oldFile) {
+    console.error(
+      'patch: toolsets: appendToolsetToModeDisplay: failed to modify mode display'
+    );
+    return null;
+  }
+
+  showDiff(
+    oldFile,
+    newFile,
+    newText,
+    match.index,
+    match.index + oldText.length
+  );
+
+  return newFile;
+};
+
+/**
+ * Append the toolset name to the "? for shortcuts" display
+ */
+export const appendToolsetToShortcutsDisplay = (
+  oldFile: string
+): string | null => {
+  const shortcutsPattern = /"\? for shortcuts"/g;
+  const matches = Array.from(oldFile.matchAll(shortcutsPattern));
+
+  // Use the last match (there are two in 2.0.37, 1 in .41).
+  const match = matches.at(-1);
+  if (!match || match.index === undefined) {
+    console.error(
+      "patch: toolsets: appendToolsetToShortcutsDisplay: could not find '? for shortcuts'"
+    );
+    return null;
+  }
+
+  // Replace with the new pattern that includes toolset
+  const oldText = match[0];
+  const newText = `"? for shortcuts [",state.toolset||"undefined","]"`;
+
+  const newFile = oldFile.replace(oldText, newText);
+  if (newFile === oldFile) {
+    console.error(
+      'patch: toolsets: appendToolsetToModeDisplay: failed to modify mode display'
+    );
+    return null;
+  }
+
+  showDiff(
+    oldFile,
+    newFile,
+    newText,
+    match.index,
+    match.index + oldText.length
+  );
+
+  return newFile;
+};
+
+/**
  * Sub-patch 4: Add the slash command definition
  */
 export const writeSlashCommandDefinition = (oldFile: string): string | null => {
@@ -612,6 +776,31 @@ export const writeToolsets = (
   if (!result) {
     console.error(
       'patch: toolsets: step 4 failed (writeSlashCommandDefinition)'
+    );
+    return null;
+  }
+
+  // Step 5: Insert state getter in status line component
+  result = insertShiftTabAppStateVar(result);
+  if (!result) {
+    console.error('patch: toolsets: step 5 failed (insertShiftTabAppStateVar)');
+    return null;
+  }
+
+  // Step 6: Append toolset name to mode display
+  result = appendToolsetToModeDisplay(result);
+  if (!result) {
+    console.error(
+      'patch: toolsets: step 6 failed (appendToolsetToModeDisplay)'
+    );
+    return null;
+  }
+
+  // Step 7: Append toolset name to shortcuts display
+  result = appendToolsetToShortcutsDisplay(result);
+  if (!result) {
+    console.error(
+      'patch: toolsets: step 7 failed (appendToolsetToShortcutsDisplay)'
     );
     return null;
   }
