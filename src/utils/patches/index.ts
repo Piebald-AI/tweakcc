@@ -52,6 +52,7 @@ import { writePatchesAppliedIndication } from './patchesAppliedIndication.js';
 import { applySystemPrompts } from './systemPrompts.js';
 import { writeFixLspSupport } from './fixLspSupport.js';
 import { writeToolsets } from './toolsets.js';
+import { writeConversationTitle } from './conversationTitle.js';
 
 export interface LocationResult {
   startIndex: number;
@@ -78,6 +79,10 @@ export const showDiff = (
   startIndex: number,
   endIndex: number
 ): void => {
+  if (!isDebug()) {
+    return;
+  }
+
   const contextStart = Math.max(0, startIndex - 20);
   const contextEndOld = Math.min(oldFileContents.length, endIndex + 20);
   const contextEndNew = Math.min(
@@ -99,7 +104,7 @@ export const showDiff = (
     contextEndNew
   );
 
-  if (isDebug() && oldChanged !== newChanged) {
+  if (oldChanged !== newChanged) {
     console.log('\n--- Diff ---');
     console.log('OLD:', oldBefore + `\x1b[31m${oldChanged}\x1b[0m` + oldAfter);
     console.log('NEW:', newBefore + `\x1b[32m${newChanged}\x1b[0m` + newAfter);
@@ -526,6 +531,9 @@ export const applyCustomization = async (
     )
       content = result;
   }
+
+  // Apply conversation title management (always enabled)
+  if ((result = writeConversationTitle(content))) content = result;
 
   // Write the modified content back
   if (ccInstInfo.nativeInstallationPath) {
