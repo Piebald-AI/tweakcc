@@ -7,10 +7,10 @@
 tweakcc is a CLI tool that upgrades your Claude Code experience.  Customize its system prompts, add custom themes, create toolsets, and personalize the UI.
 
 > [!important]
-> **NEW in 3.0.0:** tweakcc now supports Claude Code native installations!  It also adds a new feature to CC called **toolsets**&mdash;try them out in Claude Code with the `/toolsets` command after you create them in tweakcc.  Lastly it makes [Claude Code's native LSP server support work.](https://www.reddit.com/r/ClaudeAI/comments/1otdfo9/lsp_is_coming_to_claude_code_and_you_can_try_it/)
+> **NEW in 3.1.0:** tweakcc now enables you to manually name your Claude Code sessions&mdash;run `npx tweakc --apply` now to get a `/title my chat title` slash command (or `/rename`)!
 
 > [!tip]
-> **NEW in 2.0.0:** tweakcc can now customize all of Claude Code's system prompts!
+> **NEW in 3.0.0:** tweakcc now supports Claude Code native installations!  It also adds a new feature to CC called **toolsets**&mdash;try them out in Claude Code with the `/toolsets` command after you create them in tweakcc.  Lastly it makes [Claude Code's native LSP server support work.](https://www.reddit.com/r/ClaudeAI/comments/1otdfo9/lsp_is_coming_to_claude_code_and_you_can_try_it/)
 
 <!--
 > [!note]
@@ -23,6 +23,7 @@ With tweakcc, you can
 
 - Customize all of Claude Code's **system prompts**
 - Create custom **toolsets** that can be used in Claude Code with the new **`/toolset`** command
+- Manually name **sessions** in Claude Code with `/title my chat name` or `/rename`
 - Create **custom themes** with a graphical HSL/RGB color picker
 - Add custom **thinking verbs** that will show while Claude's working
 - Create custom **thinking spinner animations** with different speeds and phases

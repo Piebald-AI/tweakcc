@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Add `/title` and `/rename` slash commands to CC for manual session naming per [CC#2112](https://github.com/anthropics/claude-code/issues/2112) (#199) - @bl-ue
+
 ## [v3.0.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.0.2) - 2025-11-13
 
 - Create an example `config.json` if it doesn't exist and cli.js isn't found (#195) - @bl-ue
