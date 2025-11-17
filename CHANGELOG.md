@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v3.1.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.1) - 2025-11-17
+
 - Fix Restore menu item to account for native binary too (#208) - @bl-ue
 - Detect the native CC version from the active binary instead of the backup (#207) - @bl-ue
 - Use `require` instead of `import` in patches (`import` doesn't work in Bun) (closes #205) (#206) - @bl-ue
