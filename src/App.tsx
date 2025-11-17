@@ -146,7 +146,8 @@ Please reapply your changes below.`,
       case MainMenuItem.RESTORE_ORIGINAL:
         if (startupCheckInfo.ccInstInfo) {
           // Use the appropriate restore function based on installation type
-          const restorePromise = startupCheckInfo.ccInstInfo.nativeInstallationPath
+          const restorePromise = startupCheckInfo.ccInstInfo
+            .nativeInstallationPath
             ? restoreNativeBinaryFromBackup(startupCheckInfo.ccInstInfo)
             : restoreClijsFromBackup(startupCheckInfo.ccInstInfo);
 
