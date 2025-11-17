@@ -19,6 +19,7 @@ import {
 import {
   readConfigFile,
   restoreClijsFromBackup,
+  restoreNativeBinaryFromBackup,
   updateConfigFile,
 } from './utils/config.js';
 import { openInExplorer, revealFileInExplorer } from './utils/misc.js';
@@ -144,7 +145,12 @@ Please reapply your changes below.`,
         break;
       case MainMenuItem.RESTORE_ORIGINAL:
         if (startupCheckInfo.ccInstInfo) {
-          restoreClijsFromBackup(startupCheckInfo.ccInstInfo).then(() => {
+          // Use the appropriate restore function based on installation type
+          const restorePromise = startupCheckInfo.ccInstInfo.nativeInstallationPath
+            ? restoreNativeBinaryFromBackup(startupCheckInfo.ccInstInfo)
+            : restoreClijsFromBackup(startupCheckInfo.ccInstInfo);
+
+          restorePromise.then(() => {
             setNotification({
               message: 'Original Claude Code restored successfully!',
               type: 'success',
