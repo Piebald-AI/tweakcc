@@ -1,7 +1,7 @@
 // Conversation title management patch for Claude Code
 // Adds ability to set conversation titles and persist them
 
-import { showDiff, getReactVar } from './index.js';
+import { showDiff, getReactVar, getRequireFuncName } from './index.js';
 import { writeSlashCommandDefinition as writeSlashCmd } from './slashCommands.js';
 
 // ============================================================================
@@ -81,24 +81,14 @@ export const writeCustomNamingFunctions = (oldFile: string): string | null => {
     return null;
   }
 
-  // The entire insertion code from insertionCode.js (175 lines)
-  const insertionCode = `import {
-  join as pathJoin,
-  basename as pathBasename,
-  dirname as pathDirname,
-} from "node:path";
-import { homedir as osHomedir } from "node:os";
-import {
-  statSync as fsStatSync,
-  readFileSync as fsReadFileSync,
-  writeFileSync as fsWriteFileSync,
-  readdirSync as fsReaddirSync,
-  mkdirSync as fsMkdirSync,
-  renameSync as fsRenameSync,
-} from "node:fs";
-import { randomUUID as cryptoRandomUUID } from "node:crypto";
+  const requireFunc = getRequireFuncName(oldFile);
 
+  // The entire insertion code from insertionCode.js (175 lines)
+  const insertionCode = `
 function getTweakccBaseDir() {
+  const { join: pathJoin } = ${requireFunc}('path');
+  const { homedir: osHomedir } = ${requireFunc}('os');
+  const { statSync: fsStatSync, mkdirSync: fsMkdirSync } = ${requireFunc}('fs');
   // Prioritize ~/.tweakcc which is the original and default.  Only respect
   // XDG_CONFIG_HOME if it doesn't exist.
   let dir;
@@ -128,6 +118,7 @@ function getTweakccBaseDir() {
 }
 
 const findSummaryEntryForLeafUuid = (filePath, messageUuid) => {
+  const { readFileSync: fsReadFileSync } = ${requireFunc}('fs');
   const lines = fsReadFileSync(filePath, "utf8")
     .split("\\n")
     .map((l) => JSON.parse(l.trim()));
@@ -144,6 +135,8 @@ const getSummaryFileForLeafMessage = (
   projectSlug,
   messageUuid
 ) => {
+  const { join: pathJoin } = ${requireFunc}('path');
+  const { readFileSync: fsReadFileSync, readdirSync: fsReaddirSync } = ${requireFunc}('fs');
   try {
     // File contains the uuid
     const summaryFileId = fsReadFileSync(
@@ -179,6 +172,9 @@ const setTerminalTitleOverride = (title) => {
 
 let CUR_CONVERSATION_TITLE = "";
 function onNewMessage(projectDir, projectSlug, msg) {
+  const { join: pathJoin } = ${requireFunc}('path');
+  const { readFileSync: fsReadFileSync, writeFileSync: fsWriteFileSync, mkdirSync: fsMkdirSync, renameSync: fsRenameSync } = ${requireFunc}('fs');
+  const { randomUUID: cryptoRandomUUID } = ${requireFunc}('crypto');
   const tweakcc = getTweakccBaseDir();
 
   if (msg.parentUuid) {
@@ -309,9 +305,12 @@ export const writeAppendEntryInterceptor = (oldFile: string): string | null => {
     return null;
   }
 
+  const requireFunc = getRequireFuncName(oldFile);
+
   const { location, messageVar } = result;
 
-  const code = `
+  // NOTE: appendEntry IS async so dynamic imports are okay.
+  const code = `const { dirname: pathDirname, basename: pathBasename } = ${requireFunc}('path');
 const projectDir = pathDirname(this.sessionFile);
 const projectSlug = pathBasename(projectDir);
 onNewMessage(projectDir, projectSlug, ${messageVar});
@@ -386,13 +385,17 @@ export const writeTweakccSummaryCheck = (oldFile: string): string | null => {
     return null;
   }
 
+  const requireFunc = getRequireFuncName(oldFile);
+
   const { orLocation, loopLocation, messageVar, fileListVar } = locations;
 
   // Apply modifications in reverse order to preserve indices
   let newFile = oldFile;
 
-  // First, insert at loopLocation (before the loop)
-  const loopCode = `const tweakccSummaries = new Set();
+  // First, insert at loopLocation (before the loop).
+  // NOTE: The function this code is called in IS async so dynamic importing is okay.
+  const loopCode = `const { readFileSync: fsReadFileSync } = ${requireFunc}('fs');
+const tweakccSummaries = new Set();
 for (const file of ${fileListVar}) {
     const contents = fsReadFileSync(file, "utf8").trim();
     if (contents.includes("\\n")) continue;
@@ -529,13 +532,15 @@ export const writeConversationTitle = (oldFile: string): string | null => {
     return null;
   }
 
-  // Step 5: Enable rename conversation command
-  result = enableRenameConversationCommand(result);
-  if (!result) {
-    console.error(
+  // Optional Step 5: Enable rename conversation command
+  let tmp = enableRenameConversationCommand(result);
+  if (tmp) {
+    result = tmp;
+  } else {
+    console.log(
       'patch: conversationTitle: step 5 failed (enableRenameConversationCommand)'
     );
-    return null;
+    // It's okay if it fails--we'll not abort the whole operation.
   }
 
   return result;

@@ -223,6 +223,9 @@ export const getReactModuleFunctionBun = (
 // Cache for React variable to avoid recomputing
 let reactVarCache: string | undefined | null = null;
 
+// Cache for require function name to avoid recomputing
+let requireFuncNameCache: string | null = null;
+
 /**
  * Get the React variable name (cached)
  */
@@ -289,6 +292,87 @@ export const getReactVar = (fileContents: string): string | undefined => {
  */
 export const clearReactVarCache = (): void => {
   reactVarCache = null;
+};
+
+/**
+ * Find the require function variable name (no caching)
+ *
+ * This finds the variable name used to call require() in esbuild-bundled code.
+ * Bun uses "require" directly, but esbuild uses a variable that points to
+ * the result of createRequire(import.meta.url).
+ *
+ * Steps:
+ * 1. Find the createRequire import: import{createRequire as X}from"node:module";
+ * 2. Find the variable that calls it: var Y=X(import.meta.url)
+ * 3. Return Y (the require function variable)
+ */
+export const findRequireFunc = (fileContents: string): string | undefined => {
+  // Step 1: Find createRequire import
+  // Pattern: import{createRequire as X}from"node:module";
+  const createRequirePattern =
+    /import\{createRequire as ([$\w]+)\}from"node:module";/;
+  const createRequireMatch = fileContents.match(createRequirePattern);
+  if (!createRequireMatch) {
+    // If this is not found it's not necessarily a bug because we use its absence to detect Bun...
+    // console.log(
+    //   'patch: findRequireFunc: failed to find createRequire import'
+    // );
+    return undefined;
+  }
+  const createRequireVar = createRequireMatch[1];
+
+  // Step 2: Find the variable that calls createRequire
+  // Pattern: var X=createRequireVar(import.meta.url)
+  const requireFuncPattern = new RegExp(
+    `var ([$\\w]+)=${escapeIdent(createRequireVar)}\\(import\\.meta\\.url\\)`
+  );
+  const requireFuncMatch = fileContents.match(requireFuncPattern);
+  if (!requireFuncMatch) {
+    console.log(
+      `patch: findRequireFunc: failed to find require function variable (createRequireVar=${createRequireVar})`
+    );
+    return undefined;
+  }
+
+  return requireFuncMatch[1];
+};
+
+/**
+ * Get the appropriate require function name for the current environment (cached)
+ *
+ * - Bun native installations use "require" directly
+ * - esbuild-bundled code uses a variable that points to createRequire(import.meta.url)
+ *
+ * This function detects which environment we're in and returns the correct name.
+ *
+ * @param fileContents The file content to analyze
+ * @returns "require" for Bun, or the require function variable name for esbuild
+ */
+export const getRequireFuncName = (fileContents: string): string => {
+  // Return cached value if available
+  if (requireFuncNameCache != null) {
+    return requireFuncNameCache;
+  }
+
+  // Try to find the esbuild-style require function
+  const requireFunc = findRequireFunc(fileContents);
+
+  // If we found it, we're in esbuild environment
+  if (requireFunc) {
+    requireFuncNameCache = requireFunc;
+    return requireFuncNameCache;
+  }
+
+  // Otherwise, assume Bun environment which uses "require" directly
+  requireFuncNameCache = 'require';
+  return requireFuncNameCache;
+};
+
+/**
+ * Clear the require func name cache (useful for testing or multiple runs)
+ */
+export const clearRequireFuncNameCache = (): void => {
+  requireFuncNameCache = null;
 };
 
 /**
