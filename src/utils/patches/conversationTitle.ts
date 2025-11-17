@@ -533,7 +533,7 @@ export const writeConversationTitle = (oldFile: string): string | null => {
   }
 
   // Optional Step 5: Enable rename conversation command
-  let tmp = enableRenameConversationCommand(result);
+  const tmp = enableRenameConversationCommand(result);
   if (tmp) {
     result = tmp;
   } else {
