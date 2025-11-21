@@ -95,7 +95,7 @@ tweakcc allows you to customize the various parts of Claude Code's system prompt
 - prompts for builtin Task/Plan/Explore subagents, and
 - prompts for utilities such as conversation compaction, WebFetch summarization, Bash command analysis, CLAUDE.md/output style/statusline creation, and many more.
 
-👉 See [**Claude Code System Prompts**](https://github.com/Piebald-AI/claude-code-system-prompts) for a breakdown of all the system prompt parts, as well as a changelog and diffs for version CC version.
+👉 See [**Claude Code System Prompts**](https://github.com/Piebald-AI/claude-code-system-prompts) for a breakdown of all the system prompt parts, as well as a changelog and diffs for each CC version.
 
 Because the system prompt is **dynamically composed** based on several factors, **it's not one string** that can be simply modified in a text editor.  It's a bunch of smaller strings sprinkled throughout Claude Code's source code.
 
