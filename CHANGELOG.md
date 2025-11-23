@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fix `/title` patching for CC 2.0.49+ (#221) - @bl-ue
+
 ## [v3.1.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.1) - 2025-11-17
 
 - Fix Restore menu item to account for native binary too (#208) - @bl-ue
