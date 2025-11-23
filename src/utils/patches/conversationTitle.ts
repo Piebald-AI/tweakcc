@@ -54,9 +54,9 @@ export const writeTitleSlashCommand = (oldFile: string): string | null => {
 export const findCustomNamingFunctionsLocation = (
   fileContents: string
 ): number | null => {
-  // Match: class [$\w]+{summaries;(?:customTitles;)?messages;checkpoints;fileHistorySnapshots;
+  // Match: class [$\w]+{summaries;customTitles;messages;fileHistorySnapshots;
   const classPattern =
-    /class ([$\w]+)\{summaries;(?:customTitles;)?messages;checkpoints;fileHistorySnapshots;/;
+    /class ([$\w]+)\{summaries;(?:customTitles;)?messages;(?:checkpoints;)?fileHistorySnapshots;/;
   const match = fileContents.match(classPattern);
 
   if (!match || match.index === undefined) {
