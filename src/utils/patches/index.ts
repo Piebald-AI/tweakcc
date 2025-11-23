@@ -589,7 +589,7 @@ export const applyCustomization = async (
   if (
     (result = writePatchesAppliedIndication(
       content,
-      '3.1.1',
+      '3.1.2',
       items,
       showTweakccVersion,
       showPatchesApplied

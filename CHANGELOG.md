@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v3.1.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.2) - 2025-11-23
+
 - Fix toolset patching (#224) - @bl-ue
 - Remove the `/cost` patch (#223) - @bl-ue
 - Fix `/title` patching for CC 2.0.49+ (#222) - @bl-ue
