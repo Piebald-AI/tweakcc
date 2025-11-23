@@ -46,7 +46,6 @@ import { writeThinkerVerbs } from './thinkerVerbs.js';
 import { writeUserMessageDisplay } from './userMessageDisplay.js';
 import { writeVerboseProperty } from './verboseProperty.js';
 import { writeModelCustomizations } from './modelSelector.js';
-import { writeIgnoreMaxSubscription } from './ignoreMaxSubscription.js';
 import { writeThinkingVisibility } from './thinkingVisibility.js';
 import { writePatchesAppliedIndication } from './patchesAppliedIndication.js';
 import { applySystemPrompts } from './systemPrompts.js';
@@ -580,9 +579,6 @@ export const applyCustomization = async (
 
   // Apply show more items in select menus patch (always enabled)
   if ((result = writeShowMoreItemsInSelectMenus(content, 25))) content = result;
-
-  // Disable Max subscription gating for cost tool (always enabled)
-  if ((result = writeIgnoreMaxSubscription(content))) content = result;
 
   // Apply thinking visibility patch (always enabled)
   if ((result = writeThinkingVisibility(content))) content = result;
