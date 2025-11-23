@@ -83,9 +83,11 @@ export const getMainAppComponentBodyStart = (
 ): number | null => {
   // Pattern matches the main app component function signature with all its props
   const appComponentPattern =
-    /function ([$\w]+)\(\{(?:(?:commands|debug|initialPrompt|initialTools|initialMessages|initialCheckpoints|initialFileHistorySnapshots|mcpClients|dynamicMcpConfig|autoConnectIdeFlag|strictMcpConfig|systemPrompt|appendSystemPrompt|onBeforeQuery|onTurnComplete|disabled):[$\w]+(?:=(?:[^,]+,|[^}]+\})|[,}]))+\)/g;
+    /function ([$\w]+)\(\{(?:(?:commands|debug|initialPrompt|initialTools|initialMessages|initialCheckpoints|initialFileHistorySnapshots|mcpClients|dynamicMcpConfig|mcpCliEndpoint|autoConnectIdeFlag|strictMcpConfig|systemPrompt|appendSystemPrompt|onBeforeQuery|onTurnComplete|disabled):[$\w]+(?:=(?:[^,]+,|[^}]+\})|[,}]))+\)/g;
 
-  const matches = Array.from(fileContents.matchAll(appComponentPattern));
+  const allMatches = Array.from(fileContents.matchAll(appComponentPattern));
+  // Filter to only matches that contain 'commands:' - unique to main app component
+  const matches = allMatches.filter(m => m[0].includes('commands:'));
   if (matches.length === 0) {
     console.error(
       'patch: getMainAppComponentBodyStart: failed to find appComponentPattern'
@@ -155,6 +157,7 @@ export const getToolFetchingUseMemoLocation = (
   reactVarName: string;
   toolFilterFunction: string;
   toolPermissionContextVar: string;
+  needsSemicolonPrefix: boolean;
 } | null => {
   const bodyStart = getMainAppComponentBodyStart(fileContents);
   if (bodyStart === null) {
@@ -164,12 +167,13 @@ export const getToolFetchingUseMemoLocation = (
     return null;
   }
 
-  // Look at the next 300 chars
-  const chunk = fileContents.slice(bodyStart, bodyStart + 300);
+  // Look at the next 2000 chars
+  const chunk = fileContents.slice(bodyStart, bodyStart + 2000);
 
-  // Pattern to match: let outputVar=reactVar.useMemo(()=>filterFunc(contextVar),[contextVar])
+  // Pattern to match: outputVar=reactVar.useMemo(()=>filterFunc(contextVar),[contextVar])
+  // Note: may be comma-separated (,v=...) or let-prefixed (let v=...)
   const useMemoPattern =
-    /let ([$\w]+)=([$\w]+)\.useMemo\(\(\)=>([$\w]+)\(([$\w]+)\),\[\4\]\)/;
+    /(?:let |,)([$\w]+)=([$\w]+)\.useMemo\(\(\)=>([$\w]+)\(([$\w]+)\),\[\4\]\)/;
   const match = chunk.match(useMemoPattern);
 
   if (!match || match.index === undefined) {
@@ -182,6 +186,10 @@ export const getToolFetchingUseMemoLocation = (
   const absoluteStart = bodyStart + match.index;
   const absoluteEnd = absoluteStart + match[0].length;
 
+  // Check if match started with comma (needs semicolon prefix in replacement)
+  const matchedText = match[0];
+  const needsSemicolonPrefix = matchedText.startsWith(',');
+
   return {
     startIndex: absoluteStart,
     endIndex: absoluteEnd,
@@ -189,6 +197,7 @@ export const getToolFetchingUseMemoLocation = (
     reactVarName: match[2],
     toolFilterFunction: match[3],
     toolPermissionContextVar: match[4],
+    needsSemicolonPrefix,
   };
 };
 
@@ -342,6 +351,7 @@ export const writeToolFetchingUseMemo = (
     reactVarName,
     toolFilterFunction,
     toolPermissionContextVar,
+    needsSemicolonPrefix,
   } = useMemoLoc;
 
   // Create toolsets mapping: { "toolset-name": ["tool1", "tool2", ...] }
@@ -355,7 +365,9 @@ export const writeToolFetchingUseMemo = (
   );
 
   // Generate the new useMemo code
-  const newUseMemo = `let ${outputVarName} = ${reactVarName}.useMemo(() => {
+  // Use semicolon prefix when replacing comma-separated declaration to properly terminate previous statement
+  const prefix = needsSemicolonPrefix ? ';' : '';
+  const newUseMemo = `${prefix}let ${outputVarName} = ${reactVarName}.useMemo(() => {
     const toolsets = ${toolsetsJSON};
     if (toolsets.hasOwnProperty(${appStateVar}.toolset)) {
       const allowedTools = toolsets[${appStateVar}.toolset];
