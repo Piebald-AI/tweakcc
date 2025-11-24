@@ -1190,9 +1190,7 @@ export const formatBacktickError = (
   // Caret line pointing to first backtick (adjusted for prefix truncation text)
   const caretOffset = prefixTruncationLen + displayColumns[0] - 1;
   const caretLine = ' '.repeat(caretOffset) + '^' + ' unescaped backtick';
-  lines.push(
-    `${padding} ${chalk.blue.bold('|')} ${chalk.red.bold(caretLine)}`
-  );
+  lines.push(`${padding} ${chalk.blue.bold('|')} ${chalk.red.bold(caretLine)}`);
 
   // Empty pipe line before help
   lines.push(`${padding} ${chalk.blue.bold('|')}`);
@@ -1207,7 +1205,7 @@ export const formatBacktickError = (
 
   // Fixed line with escaped backticks (using displayLine and displayColumns)
   // Build the line with green backslashes
-  let fixedLineParts: string[] = [];
+  const fixedLineParts: string[] = [];
   let lastPos = 0;
   for (const col of displayColumns) {
     fixedLineParts.push(displayLine.substring(lastPos, col - 1));
@@ -1216,7 +1214,8 @@ export const formatBacktickError = (
   }
   fixedLineParts.push(displayLine.substring(lastPos));
 
-  const fullFixedLine = prefixTruncation + fixedLineParts.join('') + suffixTruncation;
+  const fullFixedLine =
+    prefixTruncation + fixedLineParts.join('') + suffixTruncation;
   lines.push(
     `${chalk.blue.bold(lineNumStr)} ${chalk.blue.bold('|')} ${fullFixedLine}`
   );
@@ -1231,9 +1230,7 @@ export const formatBacktickError = (
     offset++; // Each added backslash shifts subsequent positions
   }
 
-  lines.push(
-    `${padding} ${chalk.blue.bold('|')} ${chalk.green(plusLine)}`
-  );
+  lines.push(`${padding} ${chalk.blue.bold('|')} ${chalk.green(plusLine)}`);
 
   return lines.join('\n');
 };

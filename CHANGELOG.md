@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Emit a Rust-style error when system prompt markdown files contain unescaped backslashes (#226) - @bl-ue
+
 ## [v3.1.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.2) - 2025-11-23
 
 - Fix toolset patching (#224) - @bl-ue

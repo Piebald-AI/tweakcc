@@ -86,7 +86,9 @@ export const applySystemPrompts = async (
 
         for (const [lineNum, columns] of unescapedBackticks) {
           const lineText = contentLines[lineNum - 1] || '';
-          console.log(formatBacktickError(filePath, lineNum, lineText, columns));
+          console.log(
+            formatBacktickError(filePath, lineNum, lineText, columns)
+          );
           console.log();
         }
 
