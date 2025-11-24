@@ -41,6 +41,8 @@ This is the content with \${SETTINGS.preferredName} and \${CONFIG.taskType}.`;
         variables: ['SETTINGS', 'CONFIG'],
         content:
           'This is the content with ${SETTINGS.preferredName} and ${CONFIG.taskType}.',
+        // 8 lines of frontmatter + 1 blank line before content
+        contentLineOffset: 9,
       });
     });
 
@@ -61,6 +63,8 @@ Simple content.`;
         ccVersion: '1.0.0',
         variables: [],
         content: 'Simple content.',
+        // 5 lines of frontmatter + 1 blank line before content
+        contentLineOffset: 6,
       });
     });
 
@@ -78,6 +82,8 @@ Content only.`;
         ccVersion: '',
         variables: [],
         content: 'Content only.',
+        // 2 lines of frontmatter + 1 blank line before content
+        contentLineOffset: 3,
       });
     });
   });

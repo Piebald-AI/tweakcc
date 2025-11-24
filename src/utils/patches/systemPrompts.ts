@@ -85,9 +85,12 @@ export const applySystemPrompts = async (
         const contentLines = prompt.content.split('\n');
 
         for (const [lineNum, columns] of unescapedBackticks) {
+          // lineNum is relative to prompt.content; adjust to absolute file line
+          // number by accounting for any frontmatter/comment lines.
+          const absoluteLineNum = lineNum + (prompt.contentLineOffset || 0);
           const lineText = contentLines[lineNum - 1] || '';
           console.log(
-            formatBacktickError(filePath, lineNum, lineText, columns)
+            formatBacktickError(filePath, absoluteLineNum, lineText, columns)
           );
           console.log();
         }

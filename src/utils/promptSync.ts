@@ -40,6 +40,13 @@ export interface MarkdownPrompt {
   ccVersion: string; // CC version this prompt is based on
   variables?: string[]; // Available variables extracted from identifierMap
   content: string; // The actual prompt content with ${VARIABLE_NAME} placeholders
+  /**
+   * Line offset of the first content line within the original markdown file.
+   * This counts how many lines (including frontmatter and delimiters) appear
+   * before the first character of `content`, so we can map content-relative
+   * line numbers back to real file line numbers when reporting errors.
+   */
+  contentLineOffset: number;
 }
 
 /**
@@ -73,12 +80,25 @@ export const parseMarkdownPrompt = (markdown: string): MarkdownPrompt => {
   });
   const { name, description, ccVersion, variables } = parsed.data;
 
+  // Compute how many lines appear before the start of parsed.content in the
+  // original markdown. This lets us translate content-relative line numbers
+  // (starting at 1 for the first line of `parsed.content.trim()`) back to
+  // absolute file line numbers for error reporting.
+  let contentLineOffset = 0;
+  const contentIndex = markdown.indexOf(parsed.content);
+  if (contentIndex >= 0) {
+    const prefix = markdown.slice(0, contentIndex);
+    // Number of newline characters before the first character of content
+    contentLineOffset = prefix.split('\n').length - 1;
+  }
+
   return {
     name: name || '',
     description: description || '',
     ccVersion: ccVersion || '',
     variables: variables || [],
     content: parsed.content.trim(),
+    contentLineOffset,
   };
 };
 
@@ -1049,68 +1069,32 @@ const buildSearchRegexFromPieces = (
  * Finds unescaped backticks outside of ${...} interpolation regions using a stack-based parser.
  * Returns a Map of line number -> array of column numbers for each unescaped backtick found.
  */
-export const findUnescapedBackticks = (
-  content: string
-): Map<number, number[]> => {
-  const results = new Map<number, number[]>();
-  let depth = 0; // Track nesting depth inside ${...}
-  let line = 1;
-  let column = 1;
-  let i = 0;
+export const findUnescapedBackticks = (content: string) => {
+  const result = new Map<number, number[]>();
+  let depth = 0, line = 1, col = 1;
 
-  while (i < content.length) {
-    const char = content[i];
-    const nextChar = content[i + 1];
+  for (let i = 0; i < content.length; i++, col++) {
+    const ch = content[i];
 
-    // Track line/column for error reporting
-    if (char === '\n') {
-      line++;
-      column = 1;
-      i++;
+    if (ch === '\n') { line++; col = 0; continue; }
+
+    const next = content[i + 1];
+    if (ch === '$' && next === '{') { depth++; i++; col++; continue; }
+
+    if (depth) {
+      if (ch === '{') depth++;
+      else if (ch === '}') depth--;
       continue;
     }
 
-    // Check for ${ which starts an interpolation
-    if (char === '$' && nextChar === '{') {
-      depth++;
-      i += 2;
-      column += 2;
-      continue;
+    if (ch === '`' && content[i - 1] !== '\\') {
+      const arr = result.get(line) ?? [];
+      arr.push(col);
+      result.set(line, arr);
     }
-
-    // Check for } which might end an interpolation
-    if (char === '}' && depth > 0) {
-      depth--;
-      i++;
-      column++;
-      continue;
-    }
-
-    // Check for { inside interpolation (nested braces)
-    if (char === '{' && depth > 0) {
-      depth++;
-      i++;
-      column++;
-      continue;
-    }
-
-    // Check for unescaped backtick outside interpolation
-    if (char === '`' && depth === 0) {
-      // Check if it's escaped (preceded by \)
-      const prevChar = i > 0 ? content[i - 1] : '';
-      if (prevChar !== '\\') {
-        if (!results.has(line)) {
-          results.set(line, []);
-        }
-        results.get(line)!.push(column);
-      }
-    }
-
-    i++;
-    column++;
   }
 
-  return results;
+  return result;
 };
 
 /**
