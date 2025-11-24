@@ -1071,15 +1071,26 @@ const buildSearchRegexFromPieces = (
  */
 export const findUnescapedBackticks = (content: string) => {
   const result = new Map<number, number[]>();
-  let depth = 0, line = 1, col = 1;
+  let depth = 0,
+    line = 1,
+    col = 1;
 
   for (let i = 0; i < content.length; i++, col++) {
     const ch = content[i];
 
-    if (ch === '\n') { line++; col = 0; continue; }
+    if (ch === '\n') {
+      line++;
+      col = 0;
+      continue;
+    }
 
     const next = content[i + 1];
-    if (ch === '$' && next === '{') { depth++; i++; col++; continue; }
+    if (ch === '$' && next === '{') {
+      depth++;
+      i++;
+      col++;
+      continue;
+    }
 
     if (depth) {
       if (ch === '{') depth++;
