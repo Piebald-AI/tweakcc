@@ -4,6 +4,9 @@ import { showDiff, PatchApplied } from './index.js';
 import {
   loadSystemPromptsWithRegex,
   reconstructContentFromPieces,
+  findUnescapedBackticks,
+  formatBacktickError,
+  getPromptFilePath,
 } from '../promptSync.js';
 import { setAppliedHash, computeMD5Hash } from '../systemPromptHashIndex.js';
 
@@ -74,6 +77,21 @@ export const applySystemPrompts = async (
     if (match && match.index !== undefined) {
       // Generate the interpolated content using the actual variables from the match
       const interpolatedContent = getInterpolatedContent(match);
+
+      // Check for unescaped backticks that would break the template literal
+      const unescapedBackticks = findUnescapedBackticks(interpolatedContent);
+      if (unescapedBackticks.size > 0) {
+        const filePath = getPromptFilePath(promptId);
+        const contentLines = prompt.content.split('\n');
+
+        for (const [lineNum, columns] of unescapedBackticks) {
+          const lineText = contentLines[lineNum - 1] || '';
+          console.log(formatBacktickError(filePath, lineNum, lineText, columns));
+          console.log();
+        }
+
+        continue; // Skip this prompt
+      }
 
       // Calculate character counts for this prompt (both with human-readable placeholders)
       // Note: trim() to match how markdown files are parsed (parsed.content.trim() in parseMarkdownPrompt)
