@@ -1096,6 +1096,12 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
       addPath(`${process.env.MISE_DATA_DIR}/installs/node/*/lib/${mod}`, true);
     }
     addPath(`${home}/.local/share/mise/installs/node/*/lib/${mod}`, true);
+
+    // mise (npm backend) (https://mise.jdx.dev/dev-tools/backends/npm.html)
+    if (process.env.MISE_DATA_DIR) {
+      addPath(`${process.env.MISE_DATA_DIR}/installs/npm-anthropic-ai-claude-code/*/lib/${mod}`, true);
+    }
+    addPath(`${home}/.local/share/mise/installs/npm-anthropic-ai-claude-code/*/lib/${mod}`, true);
   }
 
   // After we're done with globby, which required / even on Windows, convert / back to \\ for
