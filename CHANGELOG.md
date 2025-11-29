@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v3.1.4](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.4) - 2025-11-29
+
 - Allow making a toolset the default for plan mode (#238) - @bl-ue
 
 ## [v3.1.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.3) - 2025-11-26
