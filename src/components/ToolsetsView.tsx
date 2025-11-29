@@ -168,7 +168,6 @@ export function ToolsetsView({ onBack }: ToolsetsViewProps) {
                   ({getToolsetDescription(toolset)})
                 </Text>
 
-
                 {isDefault && (
                   <Text color={autoAcceptColor}> ⏵⏵ accept edits</Text>
                 )}
