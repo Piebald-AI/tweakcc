@@ -164,15 +164,15 @@ export function ToolsetsView({ onBack }: ToolsetsViewProps) {
                   {toolset.name}{' '}
                 </Text>
 
+                <Text color={lineColor}>
+                  ({getToolsetDescription(toolset)})
+                </Text>
+
+
                 {isDefault && (
                   <Text color={autoAcceptColor}> ⏵⏵ accept edits</Text>
                 )}
                 {isPlanMode && <Text color={planModeColor}> ⏸ plan mode</Text>}
-
-                <Text color={lineColor}>
-                  {' '}
-                  ({getToolsetDescription(toolset)})
-                </Text>
               </Box>
             );
           })}
