@@ -1,9 +1,10 @@
 import React, { useState, useContext } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { Toolset } from '../utils/types.js';
+import { Toolset, DEFAULT_SETTINGS } from '../utils/types.js';
 import { SettingsContext } from '../App.js';
 import { ToolsetEditView } from './ToolsetEditView.js';
 import Header from './Header.js';
+import { getCurrentClaudeCodeTheme } from '../utils/misc.js';
 
 interface ToolsetsViewProps {
   onBack: () => void;
@@ -11,9 +12,19 @@ interface ToolsetsViewProps {
 
 export function ToolsetsView({ onBack }: ToolsetsViewProps) {
   const {
-    settings: { toolsets, defaultToolset },
+    settings: { toolsets, defaultToolset, planModeToolset, themes },
     updateSettings,
   } = useContext(SettingsContext);
+
+  // Get current theme colors
+  const currentThemeId = getCurrentClaudeCodeTheme();
+  const currentTheme = themes.find(t => t.id === currentThemeId) || themes[0];
+
+  const defaultTheme = DEFAULT_SETTINGS.themes[0]; // Dark mode theme
+  const planModeColor =
+    currentTheme?.colors.planMode || defaultTheme.colors.planMode;
+  const autoAcceptColor =
+    currentTheme?.colors.autoAccept || defaultTheme.colors.autoAccept;
 
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [editingToolsetIndex, setEditingToolsetIndex] = useState<number | null>(
@@ -43,6 +54,10 @@ export function ToolsetsView({ onBack }: ToolsetsViewProps) {
       if (settings.defaultToolset === toolsetToDelete.name) {
         settings.defaultToolset = null;
       }
+      // Clear plan mode if we're deleting the plan mode toolset
+      if (settings.planModeToolset === toolsetToDelete.name) {
+        settings.planModeToolset = null;
+      }
     });
 
     if (selectedIndex >= toolsets.length - 1) {
@@ -54,6 +69,13 @@ export function ToolsetsView({ onBack }: ToolsetsViewProps) {
     const toolset = toolsets[index];
     updateSettings(settings => {
       settings.defaultToolset = toolset.name;
+    });
+  };
+
+  const handleSetPlanModeToolset = (index: number) => {
+    const toolset = toolsets[index];
+    updateSettings(settings => {
+      settings.planModeToolset = toolset.name;
     });
   };
 
@@ -70,10 +92,12 @@ export function ToolsetsView({ onBack }: ToolsetsViewProps) {
         setInputActive(false);
       } else if (input === 'n') {
         handleCreateToolset();
-      } else if (input === 'd' && toolsets.length > 0) {
+      } else if (input === 'x' && toolsets.length > 0) {
         handleDeleteToolset(selectedIndex);
-      } else if (input === 's' && toolsets.length > 0) {
+      } else if (input === 'd' && toolsets.length > 0) {
         handleSetDefaultToolset(selectedIndex);
+      } else if (input === 'p' && toolsets.length > 0) {
+        handleSetPlanModeToolset(selectedIndex);
       }
     },
     { isActive: inputActive }
@@ -108,9 +132,12 @@ export function ToolsetsView({ onBack }: ToolsetsViewProps) {
       <Box marginBottom={1} flexDirection="column">
         <Text dimColor>n to create a new toolset</Text>
         {toolsets.length > 0 && (
-          <Text dimColor>s to set as default toolset</Text>
+          <Text dimColor>d to set as default toolset</Text>
         )}
-        {toolsets.length > 0 && <Text dimColor>d to delete a toolset</Text>}
+        {toolsets.length > 0 && (
+          <Text dimColor>p to set as plan mode toolset</Text>
+        )}
+        {toolsets.length > 0 && <Text dimColor>x to delete a toolset</Text>}
         {toolsets.length > 0 && <Text dimColor>enter to edit toolset</Text>}
         <Text dimColor>esc to go back</Text>
       </Box>
@@ -121,17 +148,32 @@ export function ToolsetsView({ onBack }: ToolsetsViewProps) {
         <Box flexDirection="column">
           {toolsets.map((toolset, index) => {
             const isDefault = toolset.name === defaultToolset;
+            const isPlanMode = toolset.name === planModeToolset;
             const isSelected = selectedIndex === index;
+
+            // Determine the color for the entire line
+            let lineColor: string | undefined = undefined;
+            if (isSelected) {
+              lineColor = 'yellow';
+            }
+
             return (
-              <Text
-                key={index}
-                color={isSelected ? 'yellow' : undefined}
-                bold={isDefault}
-              >
-                {isSelected ? '❯ ' : '  '}
-                {toolset.name}
-                {isDefault && ' [DEFAULT]'} ({getToolsetDescription(toolset)})
-              </Text>
+              <Box key={index} flexDirection="row">
+                <Text color={lineColor}>
+                  {isSelected ? '❯ ' : '  '}
+                  {toolset.name}{' '}
+                </Text>
+
+                {isDefault && (
+                  <Text color={autoAcceptColor}> ⏵⏵ accept edits</Text>
+                )}
+                {isPlanMode && <Text color={planModeColor}> ⏸ plan mode</Text>}
+
+                <Text color={lineColor}>
+                  {' '}
+                  ({getToolsetDescription(toolset)})
+                </Text>
+              </Box>
             );
           })}
         </Box>

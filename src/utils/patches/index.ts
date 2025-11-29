@@ -50,7 +50,11 @@ import { writeThinkingVisibility } from './thinkingVisibility.js';
 import { writePatchesAppliedIndication } from './patchesAppliedIndication.js';
 import { applySystemPrompts } from './systemPrompts.js';
 import { writeFixLspSupport } from './fixLspSupport.js';
-import { writeToolsets } from './toolsets.js';
+import {
+  writeToolsets,
+  writeModeChangeUpdateToolset,
+  addSetStateFnAccessAtToolChangeComponentScope,
+} from './toolsets.js';
 import { writeConversationTitle } from './conversationTitle.js';
 
 export interface LocationResult {
@@ -606,6 +610,23 @@ export const applyCustomization = async (
       (result = writeToolsets(
         content,
         config.settings.toolsets,
+        config.settings.defaultToolset
+      ))
+    )
+      content = result;
+  }
+
+  // Apply mode-change toolset switching (if both toolsets are configured)
+  if (config.settings.planModeToolset && config.settings.defaultToolset) {
+    // First, add setState access at the tool change component scope
+    if ((result = addSetStateFnAccessAtToolChangeComponentScope(content)))
+      content = result;
+
+    // Then, inject the mode change toolset switching code
+    if (
+      (result = writeModeChangeUpdateToolset(
+        content,
+        config.settings.planModeToolset,
         config.settings.defaultToolset
       ))
     )

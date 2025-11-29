@@ -740,6 +740,114 @@ export const writeSlashCommandDefinition = (oldFile: string): string | null => {
 };
 
 // ============================================================================
+// MODE CHANGE TOOLSET FUNCTIONS
+// ============================================================================
+
+/**
+ * Find the tool change component scope
+ * Pattern: X(Y,function(Z){W("tengu_ext_at_mentioned",{});
+ * Returns the start index
+ */
+export const findToolChangeComponentScope = (
+  fileContents: string
+): number | null => {
+  const pattern =
+    /[\w$]+\([\w$]+,function\([\w$]+\)\{[\w$]+\("tengu_ext_at_mentioned",\{\}\);/;
+  const match = fileContents.match(pattern);
+
+  if (!match || match.index === undefined) {
+    console.error(
+      'patch: findToolChangeComponentScope: failed to find tool change component scope'
+    );
+    return null;
+  }
+
+  return match.index;
+};
+
+/**
+ * Add setState function access at the tool change component scope
+ * Injects: const [state, setState] = appStateGetterFn();
+ */
+export const addSetStateFnAccessAtToolChangeComponentScope = (
+  oldFile: string
+): string | null => {
+  const scopeIndex = findToolChangeComponentScope(oldFile);
+  if (scopeIndex === null) {
+    return null;
+  }
+
+  const stateInfo = getAppStateVarAndGetterFunction(oldFile);
+  if (!stateInfo) {
+    console.error(
+      'patch: addSetStateFnAccessAtToolChangeComponentScope: failed to get app state getter function'
+    );
+    return null;
+  }
+
+  const { appStateGetterFunction } = stateInfo;
+
+  // Inject the setState access right at the start of the component scope
+  const injectionCode = `const [state, setState] = ${appStateGetterFunction}();`;
+
+  const newFile =
+    oldFile.slice(0, scopeIndex) + injectionCode + oldFile.slice(scopeIndex);
+
+  return newFile;
+};
+
+/**
+ * Find the mode change location in the code
+ * Pattern: let X=Y(Z,{type:"setMode",mode:W,destination:"session"});
+ * Returns the start index and the mode variable (W)
+ */
+export const findModeChange = (
+  fileContents: string
+): { index: number; modeVar: string } | null => {
+  const pattern =
+    /let [\w$]+=[\w$]+\([\w$]+,\{type:"setMode",mode:([\w$]+),destination:"session"\}\);/;
+  const match = fileContents.match(pattern);
+
+  if (!match || match.index === undefined) {
+    console.error('patch: findModeChange: failed to find mode change location');
+    return null;
+  }
+
+  return {
+    index: match.index,
+    modeVar: match[1],
+  };
+};
+
+/**
+ * Write the mode change toolset update code
+ * This injects code before the mode change to automatically switch toolsets
+ */
+export const writeModeChangeUpdateToolset = (
+  oldFile: string,
+  planModeToolset: string,
+  defaultToolset: string
+): string | null => {
+  const modeChangeResult = findModeChange(oldFile);
+  if (!modeChangeResult) {
+    return null;
+  }
+
+  const { index: modeChangeIndex, modeVar } = modeChangeResult;
+
+  // Build the injection code using setState directly
+  const injectionCode = `if(${modeVar}==="plan"){setState((prev)=>({...prev,toolset:${JSON.stringify(planModeToolset)}}));}else{setState((prev)=>({...prev,toolset:${JSON.stringify(defaultToolset)}}));}`;
+
+  // Inject right before the mode change
+  const newFile =
+    oldFile.slice(0, modeChangeIndex) +
+    injectionCode +
+    oldFile.slice(modeChangeIndex);
+
+  return newFile;
+};
+
+// ============================================================================
 // MAIN ORCHESTRATOR
 // ============================================================================
 

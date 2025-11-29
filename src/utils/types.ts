@@ -118,6 +118,7 @@ export interface Settings {
   misc: MiscConfig;
   toolsets: Toolset[];
   defaultToolset: string | null;
+  planModeToolset: string | null;
 }
 
 export interface TweakccConfig {
@@ -910,6 +911,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   toolsets: [],
   defaultToolset: null,
+  planModeToolset: null,
 };
 
 // Support XDG Base Directory Specification with backward compatibility
