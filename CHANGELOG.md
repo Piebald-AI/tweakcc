@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v3.1.5](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.5) - 2025-11-30
+
+- Fix `$` variable name replacement in system prompts (#241) - @signadou
+
 ## [v3.1.4](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.4) - 2025-11-29
 
 - Allow making a toolset the default for plan mode (#238) - @bl-ue
