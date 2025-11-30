@@ -1272,7 +1272,7 @@ const applyIdentifierMapping = (
 
   for (const [humanName, actualVar] of sortedEntries) {
     const pattern = new RegExp(`\\b${humanName}\\b`, 'g');
-    // Use a replacer function to avoid special replacement pattern interpretation (e.g., $$ -> $)
+    // Use a replacer function to avoid special replacement pattern interpretation (e.g., $$ -> $), see #237
     result = result.replace(pattern, () => actualVar);
   }
 
