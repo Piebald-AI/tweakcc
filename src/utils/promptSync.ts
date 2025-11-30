@@ -1272,7 +1272,8 @@ const applyIdentifierMapping = (
 
   for (const [humanName, actualVar] of sortedEntries) {
     const pattern = new RegExp(`\\b${humanName}\\b`, 'g');
-    result = result.replace(pattern, actualVar);
+    // Use a replacer function to avoid special replacement pattern interpretation (e.g., $$ -> $)
+    result = result.replace(pattern, () => actualVar);
   }
 
   // Replace <<CCVERSION>> with the actual Claude Code version

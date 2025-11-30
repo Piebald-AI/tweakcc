@@ -143,7 +143,8 @@ export const applySystemPrompts = async (
       const matchLength = match[0].length;
 
       // Replace the matched content with the interpolated content from the markdown file
-      content = content.replace(pattern, interpolatedContent);
+      // Use a replacer function to avoid special replacement pattern interpretation (e.g., $$ -> $)
+      content = content.replace(pattern, () => interpolatedContent);
 
       // Store the hash of the applied prompt content
       const appliedHash = computeMD5Hash(prompt.content);
