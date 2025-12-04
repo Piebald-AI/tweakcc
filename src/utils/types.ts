@@ -1015,8 +1015,12 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
     addPath(`${home}/AppData/Roaming/pnpm-global/${mod}`);
     addPath(`${home}/AppData/Roaming/pnpm-global/*/${mod}`, true);
 
-    // Bun
+    // Bun (global CLI installations)
     addPath(`${home}/.bun/install/global/${mod}`);
+
+    // Bun cache (used by bunx) - both default and XDG locations on Windows
+    addPath(`${home}/.bun/install/cache/@anthropic-ai/claude-code*@@@*`, true);
+    addPath(`${home}/AppData/Local/Bun/install/cache/@anthropic-ai/claude-code*@@@*`, true);
 
     // fnm
     addPath(`${home}/AppData/Local/fnm_multishells/*/node_modules/${mod}`, true);
@@ -1028,6 +1032,9 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
       addPath(`${home}/Library/${mod}`);
       // MacPorts
       addPath(`/opt/local/lib/${mod}`);
+      // Bun cache (used by bunx on macOS) - both default and XDG locations
+      addPath(`${home}/.bun/install/cache/@anthropic-ai/claude-code*@@@*`, true);
+      addPath(`${home}/Library/Caches/bun/install/cache/@anthropic-ai/claude-code*@@@*`, true);
     }
 
     // Various user paths
@@ -1064,8 +1071,12 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
     addPath(`${home}/.local/share/pnpm/global/${mod}`);
     addPath(`${home}/.local/share/pnpm/global/*/${mod}`, true);
 
-    // Bun
+    // Bun (global CLI installations)
     addPath(`${home}/.bun/install/global/${mod}`);
+
+    // Bun cache (used by bunx) - both default and XDG locations
+    addPath(`${home}/.bun/install/cache/@anthropic-ai/claude-code*@@@*`, true);
+    addPath(`${home}/.local/share/bun/install/cache/@anthropic-ai/claude-code*@@@*`, true);
 
     // n (https://github.com/tj/n) - system & user
     addPath(`/usr/local/n/versions/node/*/lib/${mod}`, true);
