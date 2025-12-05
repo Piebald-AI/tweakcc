@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v3.1.6](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.6) - 2025-12-05
+
+- Add bunx cache detection and lazy-load node-lief for NixOS compatibility (#255) - @y0usaf
+
 ## [v3.1.5](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.5) - 2025-11-30
 
 - Fix `$` variable name replacement in system prompts (#241) - @signadou
