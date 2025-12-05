@@ -28,6 +28,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
           showTweakccVersion: true,
           showPatchesApplied: true,
           expandThinkingBlocks: true,
+          enableConversationTitle: true,
         };
       }
       settings.misc.showTweakccVersion = !settings.misc.showTweakccVersion;
@@ -41,6 +42,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
           showTweakccVersion: true,
           showPatchesApplied: true,
           expandThinkingBlocks: true,
+          enableConversationTitle: true,
         };
       }
       settings.misc.showPatchesApplied = !settings.misc.showPatchesApplied;
@@ -54,9 +56,24 @@ export function MiscView({ onSubmit }: MiscViewProps) {
           showTweakccVersion: true,
           showPatchesApplied: true,
           expandThinkingBlocks: true,
+          enableConversationTitle: true,
         };
       }
       settings.misc.expandThinkingBlocks = !settings.misc.expandThinkingBlocks;
+    });
+  };
+
+  const handleEnableConversationTitleToggle = () => {
+    updateSettings(settings => {
+      if (!settings.misc) {
+        settings.misc = {
+          showTweakccVersion: true,
+          showPatchesApplied: true,
+          expandThinkingBlocks: true,
+          enableConversationTitle: true,
+        };
+      }
+      settings.misc.enableConversationTitle = !settings.misc.enableConversationTitle;
     });
   };
 
@@ -66,7 +83,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     } else if (key.upArrow) {
       setSelectedIndex(prev => Math.max(0, prev - 1));
     } else if (key.downArrow) {
-      setSelectedIndex(prev => Math.min(3, prev + 1));
+      setSelectedIndex(prev => Math.min(4, prev + 1));
     } else if (input === ' ') {
       if (selectedIndex === 0) {
         handleRemoveBorderToggle();
@@ -76,6 +93,8 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         handleShowPatchesToggle();
       } else if (selectedIndex === 3) {
         handleExpandThinkingToggle();
+      } else if (selectedIndex === 4) {
+        handleEnableConversationTitleToggle();
       }
     }
   });
@@ -84,6 +103,9 @@ export function MiscView({ onSubmit }: MiscViewProps) {
   const showVersionCheckbox = settings.misc?.showTweakccVersion ? '☑' : '☐';
   const showPatchesCheckbox = settings.misc?.showPatchesApplied ? '☑' : '☐';
   const expandThinkingCheckbox = settings.misc?.expandThinkingBlocks
+    ? '☑'
+    : '☐';
+  const enableConversationTitleCheckbox = settings.misc?.enableConversationTitle ?? true
     ? '☑'
     : '☐';
 
@@ -203,6 +225,31 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         <Text>
           {expandThinkingCheckbox}{' '}
           {settings.misc?.expandThinkingBlocks ? 'Enabled' : 'Disabled'}
+        </Text>
+      </Box>
+
+      {/* Enable Conversation Title Option */}
+      <Box>
+        <Text>
+          <Text color={selectedIndex === 4 ? 'cyan' : undefined}>
+            {selectedIndex === 4 ? '❯ ' : '  '}
+          </Text>
+          <Text bold color={selectedIndex === 4 ? 'cyan' : undefined}>
+            Allow renaming sessions via /title
+          </Text>
+        </Text>
+      </Box>
+
+      <Box flexDirection="column">
+        <Text dimColor>
+          {'  '}Enables /title and /rename commands for manually naming conversations.
+        </Text>
+      </Box>
+
+      <Box marginLeft={4} marginBottom={1}>
+        <Text>
+          {enableConversationTitleCheckbox}{' '}
+          {(settings.misc?.enableConversationTitle ?? true) ? 'Enabled' : 'Disabled'}
         </Text>
       </Box>
     </Box>

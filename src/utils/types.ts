@@ -102,6 +102,7 @@ export interface MiscConfig {
   showTweakccVersion: boolean;
   showPatchesApplied: boolean;
   expandThinkingBlocks: boolean;
+  enableConversationTitle: boolean;
 }
 
 export interface Toolset {
@@ -908,6 +909,7 @@ export const DEFAULT_SETTINGS: Settings = {
     showTweakccVersion: true,
     showPatchesApplied: true,
     expandThinkingBlocks: true,
+    enableConversationTitle: true,
   },
   toolsets: [],
   defaultToolset: null,

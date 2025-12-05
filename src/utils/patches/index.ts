@@ -633,8 +633,10 @@ export const applyCustomization = async (
       content = result;
   }
 
-  // Apply conversation title management (always enabled)
-  if ((result = writeConversationTitle(content))) content = result;
+  // Apply conversation title management (if enabled)
+  if (config.settings.misc?.enableConversationTitle ?? true) {
+    if ((result = writeConversationTitle(content))) content = result;
+  }
 
   // Write the modified content back
   if (ccInstInfo.nativeInstallationPath) {
