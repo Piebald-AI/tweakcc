@@ -118,7 +118,11 @@ function getTweakccBaseDir() {
 }
 
 const findSummaryEntryForLeafUuid = (filePath, messageUuid) => {
-  const { readFileSync: fsReadFileSync } = ${requireFunc}('fs');
+  const { readFileSync: fsReadFileSync, statSync: fsStatSync } = ${requireFunc}('fs');
+  // Optimization: skip files that are
+  if (fsStatSync(filePath).size > 1000) {
+    return null;
+  }
   const lines = fsReadFileSync(filePath, "utf8")
     .split("\\n")
     .map((l) => JSON.parse(l.trim()));
