@@ -21,7 +21,7 @@ With tweakcc, you can
 
 - Customize all of Claude Code's **system prompts** (**NEW:** also see [**Claude Code System Prompts**](https://github.com/Piebald-AI/claude-code-system-prompts))
 - Create custom **toolsets** that can be used in Claude Code with the new **`/toolset`** command
-- Manually name **sessions** in Claude Code with `/title my chat name` or `/rename` (see [**our blog post**](https://piebald.ai/blog/messages-as-commits-claude-codes-git-like-dag-of-conversations))
+- Manually name **sessions** in Claude Code with `/title my chat name` or `/rename` (see [**our blog post**](https://piebald.ai/blog/messages-as-commits-claude-codes-git-like-dag-of-conversations) for implementation details)
 - Create **custom themes** with a graphical HSL/RGB color picker
 - Add custom **thinking verbs** that will show while Claude's working
 - Create custom **thinking spinner animations** with different speeds and phases
