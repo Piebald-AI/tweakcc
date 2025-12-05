@@ -4,18 +4,22 @@
 
 import fs from 'node:fs';
 import { execSync } from 'node:child_process';
+import type LIEF from 'node-lief';
 import { isDebug } from './misc.js';
 
-// Lazy import LIEF to avoid requiring native modules when not needed (e.g., on systems without required C++ libraries)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let LIEF: any = null;
-const getLIEF = () => {
-  if (!LIEF) {
+let liefModule: typeof LIEF | null = null;
+
+/**
+ * Lazy-load the LIEF module to avoid import errors on systems without C++ libraries.
+ * This is especially important for NixOS and other systems where native modules may fail.
+ */
+function getLIEF(): typeof LIEF {
+  if (liefModule === null) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    LIEF = require('node-lief');
+    liefModule = require('node-lief');
   }
-  return LIEF;
-};
+  return liefModule as typeof LIEF;
+}
 
 /**
  * Constants for Bun trailer and serialized layout sizes.
@@ -270,8 +274,7 @@ function extractBunDataFromSection(sectionData: Buffer): BunData {
  * Matches bun_unpack.py logic: parse Offsets structure and use its byteCount
  * field instead of the trailing totalByteCount (which is unreliable for musl).
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractBunDataFromELFOverlay(elfBinary: any): BunData {
+function extractBunDataFromELFOverlay(elfBinary: LIEF.ELF.Binary): BunData {
   if (!elfBinary.hasOverlay) {
     throw new Error('ELF binary has no overlay data');
   }
@@ -372,8 +375,7 @@ function extractBunDataFromELFOverlay(elfBinary: any): BunData {
  * __BUN/__bun section content is:
  * [u32 size][size bytes of Bun blob...]
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractBunDataFromMachO(machoBinary: any): BunData {
+function extractBunDataFromMachO(machoBinary: LIEF.MachO.Binary): BunData {
   const bunSegment = machoBinary.getSegment('__BUN');
   if (!bunSegment) {
     throw new Error('__BUN segment not found');
@@ -392,10 +394,8 @@ function extractBunDataFromMachO(machoBinary: any): BunData {
  * .bun section content is:
  * [u32 size][size bytes of Bun blob...]
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractBunDataFromPE(peBinary: any): BunData {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const bunSection = peBinary.sections().find((s: any) => s.name === '.bun');
+function extractBunDataFromPE(peBinary: LIEF.PE.Binary): BunData {
+  const bunSection = peBinary.sections().find(s => s.name === '.bun');
 
   if (!bunSection) {
     throw new Error('.bun section not found');
@@ -404,19 +404,18 @@ function extractBunDataFromPE(peBinary: any): BunData {
   return extractBunDataFromSection(bunSection.content);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getBunData(binary: any): BunData {
+function getBunData(binary: LIEF.Abstract.Binary): BunData {
   if (isDebug()) {
     console.log(`getBunData: Binary format detected as ${binary.format}`);
   }
 
   switch (binary.format) {
     case 'MachO':
-      return extractBunDataFromMachO(binary);
+      return extractBunDataFromMachO(binary as LIEF.MachO.Binary);
     case 'PE':
-      return extractBunDataFromPE(binary);
+      return extractBunDataFromPE(binary as LIEF.PE.Binary);
     case 'ELF':
-      return extractBunDataFromELFOverlay(binary);
+      return extractBunDataFromELFOverlay(binary as LIEF.ELF.Binary);
     default:
       throw new Error(`Unsupported binary format: ${binary.format}`);
   }
@@ -430,9 +429,8 @@ export function extractClaudeJsFromNativeInstallation(
   nativeInstallationPath: string
 ): Buffer | null {
   try {
-    const LIEF = getLIEF();
-    LIEF.logging.disable();
-    const binary = LIEF.parse(nativeInstallationPath);
+    getLIEF().logging.disable();
+    const binary = getLIEF().parse(nativeInstallationPath);
     const { bunOffsets, bunData } = getBunData(binary);
 
     if (isDebug()) {
@@ -695,7 +693,7 @@ function rebuildBunData(
  * @param originalPath - Original file to copy permissions from
  */
 function atomicWriteBinary(
-  binary: any, // eslint-disable-line @typescript-eslint/no-explicit-any
+  binary: LIEF.Abstract.Binary,
   outputPath: string,
   originalPath: string,
   copyPermissions: boolean = true
@@ -750,7 +748,7 @@ function buildSectionData(bunBuffer: Buffer): Buffer {
 }
 
 function repackMachO(
-  machoBinary: any, // eslint-disable-line @typescript-eslint/no-explicit-any
+  machoBinary: LIEF.MachO.Binary,
   binPath: string,
   newBunBuffer: Buffer,
   outputPath: string
@@ -803,9 +801,8 @@ function repackMachO(
       // Page size depends on architecture:
       // - x86_64: 4KB (4096 bytes)
       // - ARM64 (Apple Silicon): 16KB (16384 bytes)
-      const LIEF = getLIEF();
       const isARM64 =
-        machoBinary.header.cpuType === LIEF.MachO.Header.CPU_TYPE.ARM64;
+        machoBinary.header.cpuType === getLIEF().MachO.Header.CPU_TYPE.ARM64;
       const PAGE_SIZE = isARM64 ? 16384 : 4096;
       const alignedSizeDiff = Math.ceil(sizeDiff / PAGE_SIZE) * PAGE_SIZE;
 
@@ -879,14 +876,13 @@ function repackMachO(
 }
 
 function repackPE(
-  peBinary: any, // eslint-disable-line @typescript-eslint/no-explicit-any
+  peBinary: LIEF.PE.Binary,
   binPath: string,
   newBunBuffer: Buffer,
   outputPath: string
 ): void {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const bunSection = peBinary.sections().find((s: any) => s.name === '.bun');
+    const bunSection = peBinary.sections().find(s => s.name === '.bun');
     if (!bunSection) {
       throw new Error('.bun section not found');
     }
@@ -924,7 +920,7 @@ function repackPE(
 }
 
 function repackELF(
-  elfBinary: any, // eslint-disable-line @typescript-eslint/no-explicit-any
+  elfBinary: LIEF.ELF.Binary,
   binPath: string,
   newBunBuffer: Buffer,
   outputPath: string
@@ -970,9 +966,8 @@ export function repackNativeInstallation(
   modifiedClaudeJs: Buffer,
   outputPath: string
 ): void {
-  const LIEF = getLIEF();
-  LIEF.logging.disable();
-  const binary = LIEF.parse(binPath);
+  getLIEF().logging.disable();
+  const binary = getLIEF().parse(binPath);
 
   // Extract Bun data and rebuild with modified claude.js
   const { bunOffsets, bunData } = getBunData(binary);
@@ -980,13 +975,13 @@ export function repackNativeInstallation(
 
   switch (binary.format) {
     case 'MachO':
-      repackMachO(binary, binPath, newBuffer, outputPath);
+      repackMachO(binary as LIEF.MachO.Binary, binPath, newBuffer, outputPath);
       break;
     case 'PE':
-      repackPE(binary, binPath, newBuffer, outputPath);
+      repackPE(binary as LIEF.PE.Binary, binPath, newBuffer, outputPath);
       break;
     case 'ELF':
-      repackELF(binary, binPath, newBuffer, outputPath);
+      repackELF(binary as LIEF.ELF.Binary, binPath, newBuffer, outputPath);
       break;
     default:
       throw new Error(`Unsupported binary format: ${binary.format}`);
