@@ -4,8 +4,11 @@
 
 import fs from 'node:fs';
 import { execSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import type LIEF from 'node-lief';
 import { isDebug } from './misc.js';
+
+const require = createRequire(import.meta.url);
 
 let liefModule: typeof LIEF | null = null;
 
@@ -15,7 +18,6 @@ let liefModule: typeof LIEF | null = null;
  */
 function getLIEF(): typeof LIEF {
   if (liefModule === null) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     liefModule = require('node-lief');
   }
   return liefModule as typeof LIEF;
