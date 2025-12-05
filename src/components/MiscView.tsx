@@ -73,7 +73,8 @@ export function MiscView({ onSubmit }: MiscViewProps) {
           enableConversationTitle: true,
         };
       }
-      settings.misc.enableConversationTitle = !settings.misc.enableConversationTitle;
+      settings.misc.enableConversationTitle =
+        !settings.misc.enableConversationTitle;
     });
   };
 
@@ -105,9 +106,8 @@ export function MiscView({ onSubmit }: MiscViewProps) {
   const expandThinkingCheckbox = settings.misc?.expandThinkingBlocks
     ? '☑'
     : '☐';
-  const enableConversationTitleCheckbox = settings.misc?.enableConversationTitle ?? true
-    ? '☑'
-    : '☐';
+  const enableConversationTitleCheckbox =
+    (settings.misc?.enableConversationTitle ?? true) ? '☑' : '☐';
 
   return (
     <Box flexDirection="column">
@@ -242,14 +242,17 @@ export function MiscView({ onSubmit }: MiscViewProps) {
 
       <Box flexDirection="column">
         <Text dimColor>
-          {'  '}Enables /title and /rename commands for manually naming conversations.
+          {'  '}Enables /title and /rename commands for manually naming
+          conversations.
         </Text>
       </Box>
 
       <Box marginLeft={4} marginBottom={1}>
         <Text>
           {enableConversationTitleCheckbox}{' '}
-          {(settings.misc?.enableConversationTitle ?? true) ? 'Enabled' : 'Disabled'}
+          {(settings.misc?.enableConversationTitle ?? true)
+            ? 'Enabled'
+            : 'Disabled'}
         </Text>
       </Box>
     </Box>
