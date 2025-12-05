@@ -119,7 +119,7 @@ function getTweakccBaseDir() {
 
 const findSummaryEntryForLeafUuid = (filePath, messageUuid) => {
   const { readFileSync: fsReadFileSync, statSync: fsStatSync } = ${requireFunc}('fs');
-  // Optimization: skip files that are
+  // Optimization: skip files that are certain to not be tweakcc summary files (which only contain 1 small line).
   if (fsStatSync(filePath).size > 1000) {
     return null;
   }
