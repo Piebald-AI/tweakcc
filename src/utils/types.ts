@@ -1025,6 +1025,11 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
     // fnm
     addPath(`${home}/AppData/Local/fnm_multishells/*/node_modules/${mod}`, true);
 
+    // mise (global npm installation)
+    addPath(`${home}/AppData/Local/mise/installs/node/*/${mod}`, true);
+
+    // mise (npm backend) (https://mise.jdx.dev/dev-tools/backends/npm.html)
+    addPath(`${home}/AppData/Local/mise/installs/npm-anthropic-ai-claude-code/*/${mod}`, true);
   } else {
     // macOS-specific paths
     if (process.platform == 'darwin') {
