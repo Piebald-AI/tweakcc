@@ -13,6 +13,7 @@ import { startupCheck, readConfigFile } from './utils/config.js';
 import { enableDebug } from './utils/misc.js';
 import { applyCustomization } from './utils/patches/index.js';
 import { preloadStringsFile } from './utils/promptSync.js';
+import { detectOSAppearance } from './utils/osAppearance.js';
 
 const createExampleConfigIfMissing = async (
   examplePath: string
@@ -48,7 +49,11 @@ const main = async () => {
     )
     .version('3.1.6')
     .option('-d, --debug', 'enable debug mode')
-    .option('-a, --apply', 'apply saved customizations without interactive UI');
+    .option('-a, --apply', 'apply saved customizations without interactive UI')
+    .option(
+      '--auto-theme',
+      'automatically select theme based on OS appearance mode (use with --apply)'
+    );
   program.parse();
   const options = program.opts();
 
@@ -67,6 +72,61 @@ const main = async () => {
     if (!config.settings || Object.keys(config.settings).length === 0) {
       console.error('No saved customizations found in ' + CONFIG_FILE);
       process.exit(1);
+    }
+
+    // Auto-select theme based on OS appearance mode
+    if (options.autoTheme && config.settings.themes) {
+      const osAppearance = detectOSAppearance();
+      console.log(`Detected OS appearance mode: ${osAppearance}`);
+
+      // Use explicitly configured theme IDs only
+      const explicitThemeId =
+        osAppearance === 'dark'
+          ? config.settings.darkModeThemeId
+          : config.settings.lightModeThemeId;
+
+      if (!explicitThemeId) {
+        console.log(
+          chalk.yellow(
+            `⚠ No ${osAppearance} mode theme configured. Please set "${osAppearance === 'dark' ? 'darkModeThemeId' : 'lightModeThemeId'}" in ${CONFIG_FILE}`
+          )
+        );
+        console.log(
+          chalk.dim(
+            `   Example: "lightModeThemeId": "light", "darkModeThemeId": "dark"`
+          )
+        );
+        console.log(
+          chalk.dim(`   Or configure via: npx tweakcc (in the Themes section)`)
+        );
+      } else {
+        const matchedTheme = config.settings.themes.find(
+          theme => theme.id === explicitThemeId
+        );
+
+        if (matchedTheme) {
+          console.log(
+            `Using ${osAppearance} mode theme: ${chalk.cyan(matchedTheme.name)} (${matchedTheme.id})`
+          );
+
+          // Reorder themes to make the matched theme default (first in array)
+          config.settings.themes = [
+            matchedTheme,
+            ...config.settings.themes.filter(t => t.id !== matchedTheme.id),
+          ];
+        } else {
+          console.log(
+            chalk.red(
+              `✖ Configured ${osAppearance} mode theme ID "${explicitThemeId}" not found in your themes.`
+            )
+          );
+          console.log(
+            chalk.dim(
+              `   Available theme IDs: ${config.settings.themes.map(t => t.id).join(', ')}`
+            )
+          );
+        }
+      }
     }
 
     // Find Claude Code installation
