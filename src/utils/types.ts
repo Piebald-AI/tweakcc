@@ -111,6 +111,8 @@ export interface Toolset {
 
 export interface Settings {
   themes: Theme[];
+  lightModeThemeId?: string | null;
+  darkModeThemeId?: string | null;
   thinkingVerbs: ThinkingVerbsConfig;
   thinkingStyle: ThinkingStyleConfig;
   userMessageDisplay: UserMessageDisplayConfig;
