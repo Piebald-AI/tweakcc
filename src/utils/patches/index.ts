@@ -508,19 +508,19 @@ export const applyCustomization = async (
       content = result;
   }
 
-  // // Apply thinking style
-  // // prettier-ignore
-  // if ((result = writeThinkerSymbolChars(content, config.settings.thinkingStyle.phases)))
-  //   content = result;
-  // // prettier-ignore
-  // if ((result = writeThinkerSymbolSpeed(content, config.settings.thinkingStyle.updateInterval)))
-  //   content = result;
-  // // prettier-ignore
-  // if ((result = writeThinkerSymbolWidthLocation(content, Math.max(...config.settings.thinkingStyle.phases.map(p => p.length)) + 1)))
-  //   content = result;
-  // // prettier-ignore
-  // if ((result = writeThinkerSymbolMirrorOption(content, config.settings.thinkingStyle.reverseMirror)))
-  //   content = result;
+  // Apply thinking style
+  // prettier-ignore
+  if ((result = writeThinkerSymbolChars(content, config.settings.thinkingStyle.phases)))
+    content = result;
+  // prettier-ignore
+  if ((result = writeThinkerSymbolSpeed(content, config.settings.thinkingStyle.updateInterval)))
+    content = result;
+  // prettier-ignore
+  if ((result = writeThinkerSymbolWidthLocation(content, Math.max(...config.settings.thinkingStyle.phases.map(p => p.length)) + 1)))
+    content = result;
+  // prettier-ignore
+  if ((result = writeThinkerSymbolMirrorOption(content, config.settings.thinkingStyle.reverseMirror)))
+    content = result;
 
   // Apply user message display customization
   if (config.settings.userMessageDisplay) {
@@ -538,41 +538,42 @@ export const applyCustomization = async (
         config.settings.userMessageDisplay.borderStyle,
         config.settings.userMessageDisplay.borderColor,
         config.settings.userMessageDisplay.paddingX,
-        config.settings.userMessageDisplay.paddingY
+        config.settings.userMessageDisplay.paddingY,
+        config.settings.userMessageDisplay.fitBoxToContent
       ))
     ) {
       content = result;
     }
   }
 
-  // // Apply input box border customization
-  // if (
-  //   config.settings.inputBox &&
-  //   typeof config.settings.inputBox.removeBorder === 'boolean'
-  // ) {
-  //   if (
-  //     (result = writeInputBoxBorder(
-  //       content,
-  //       config.settings.inputBox.removeBorder
-  //     ))
-  //   )
-  //     content = result;
-  // }
+  // Apply input box border customization
+  if (
+    config.settings.inputBox &&
+    typeof config.settings.inputBox.removeBorder === 'boolean'
+  ) {
+    if (
+      (result = writeInputBoxBorder(
+        content,
+        config.settings.inputBox.removeBorder
+      ))
+    )
+      content = result;
+  }
 
-  // // Apply verbose property patch (always true by default)
-  // if ((result = writeVerboseProperty(content))) content = result;
+  // Apply verbose property patch (always true by default)
+  if ((result = writeVerboseProperty(content))) content = result;
 
-  // // Apply spinner no-freeze patch (always enabled)
-  // if ((result = writeSpinnerNoFreeze(content))) content = result;
+  // Apply spinner no-freeze patch (always enabled)
+  if ((result = writeSpinnerNoFreeze(content))) content = result;
 
-  // // Apply context limit patch (always enabled)
-  // if ((result = writeContextLimit(content))) content = result;
+  // Apply context limit patch (always enabled)
+  if ((result = writeContextLimit(content))) content = result;
 
-  // // Apply model customizations (known names, mapping, selector options) (always enabled)
-  // if ((result = writeModelCustomizations(content))) content = result;
+  // Apply model customizations (known names, mapping, selector options) (always enabled)
+  if ((result = writeModelCustomizations(content))) content = result;
 
-  // // Apply show more items in select menus patch (always enabled)
-  // if ((result = writeShowMoreItemsInSelectMenus(content, 25))) content = result;
+  // Apply show more items in select menus patch (always enabled)
+  if ((result = writeShowMoreItemsInSelectMenus(content, 25))) content = result;
 
   // Apply thinking visibility patch (always enabled)
   if ((result = writeThinkingVisibility(content))) content = result;
@@ -591,20 +592,20 @@ export const applyCustomization = async (
   )
     content = result;
 
-  // // Apply LSP support fixes (always enabled)
-  // if ((result = writeFixLspSupport(content))) content = result;
+  // Apply LSP support fixes (always enabled)
+  if ((result = writeFixLspSupport(content))) content = result;
 
-  // // Apply toolset restrictions (enabled if toolsets configured)
-  // if (config.settings.toolsets && config.settings.toolsets.length > 0) {
-  //   if (
-  //     (result = writeToolsets(
-  //       content,
-  //       config.settings.toolsets,
-  //       config.settings.defaultToolset
-  //     ))
-  //   )
-  //     content = result;
-  // }
+  // Apply toolset restrictions (enabled if toolsets configured)
+  if (config.settings.toolsets && config.settings.toolsets.length > 0) {
+    if (
+      (result = writeToolsets(
+        content,
+        config.settings.toolsets,
+        config.settings.defaultToolset
+      ))
+    )
+      content = result;
+  }
 
   // Apply mode-change toolset switching (if both toolsets are configured)
   if (config.settings.planModeToolset && config.settings.defaultToolset) {
