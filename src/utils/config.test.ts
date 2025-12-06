@@ -1,23 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import * as config from '../../src/utils/config.js';
+import * as config from './config.js';
 import {
   ClaudeCodeInstallationInfo,
   CLIJS_SEARCH_PATHS,
   CONFIG_DIR,
   CONFIG_FILE,
   DEFAULT_SETTINGS,
-} from '../../src/utils/types.js';
+} from './types.js';
 import fs from 'node:fs/promises';
 import type { Stats } from 'node:fs';
 import path from 'node:path';
-import * as misc from '../../src/utils/misc.js';
-import * as systemPromptHashIndex from '../../src/utils/systemPromptHashIndex.js';
+import * as misc from './misc.js';
+import * as systemPromptHashIndex from './systemPromptHashIndex.js';
 import { execSync } from 'node:child_process';
-import * as nativeInstallation from '../../src/utils/nativeInstallation.js';
+import * as nativeInstallation from './nativeInstallation.js';
 
 vi.mock('node:fs/promises');
 vi.mock('node:child_process');
-vi.mock('../../src/utils/nativeInstallation.js', () => ({
+vi.mock('./nativeInstallation.js', () => ({
   extractClaudeJsFromNativeInstallation: vi.fn(),
   repackNativeInstallation: vi.fn(),
 }));
