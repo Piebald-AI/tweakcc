@@ -8,6 +8,7 @@ import {
   DEFAULT_SETTINGS,
 } from './types.js';
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import type { Stats } from 'node:fs';
 import path from 'node:path';
 import * as misc from './misc.js';
@@ -21,6 +22,7 @@ vi.mock('./nativeInstallation.js', () => ({
   extractClaudeJsFromNativeInstallation: vi.fn(),
   repackNativeInstallation: vi.fn(),
 }));
+vi.mock('node:fs');
 
 // Mock the replaceFileBreakingHardLinks function
 vi.spyOn(misc, 'replaceFileBreakingHardLinks').mockImplementation(
@@ -65,6 +67,7 @@ describe('config.ts', () => {
     vi.spyOn(console, 'clear').mockImplementation(() => {});
     lstatSpy.mockReset();
     lstatSpy.mockRejectedValue(createEnoent());
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     // Mock hasUnappliedSystemPromptChanges to always return false by default
     vi.spyOn(
       systemPromptHashIndex,
@@ -81,6 +84,42 @@ describe('config.ts', () => {
     while (CLIJS_SEARCH_PATHS.length > originalSearchPathsLength) {
       CLIJS_SEARCH_PATHS.shift();
     }
+  });
+
+  describe('warnAboutMultipleConfigs', () => {
+    it('should warn when multiple config locations exist', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      // Mock multiple locations existing
+      vi.spyOn(fsSync, 'existsSync').mockImplementation(p => {
+        const pathStr = p.toString();
+        // CONFIG_DIR is one location, simulate another exists
+        return pathStr.includes('.tweakcc') || pathStr.includes('.claude');
+      });
+
+      config.warnAboutMultipleConfigs();
+
+      expect(warnSpy).toHaveBeenCalled();
+      // Check that warning mentions multiple locations
+      const warnings = warnSpy.mock.calls.map(call => call[0]);
+      const hasMultipleWarning = warnings.some((w: string) =>
+        w.includes('Multiple configuration locations')
+      );
+      expect(hasMultipleWarning).toBe(true);
+    });
+
+    it('should not warn when only one config location exists', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      // Mock only CONFIG_DIR existing
+      vi.spyOn(fsSync, 'existsSync').mockImplementation(p => {
+        return p.toString() === CONFIG_DIR;
+      });
+
+      config.warnAboutMultipleConfigs();
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('ensureConfigDir', () => {

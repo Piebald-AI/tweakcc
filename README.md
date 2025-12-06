@@ -59,8 +59,20 @@ tweakcc is verified to work with Claude Code **2.0.55**.
 
 tweakcc stores its configuration files in one of the following locations, in order of priority:
 
-1. **`~/.tweakcc/`** - If this directory already exists, it will always be used for backward compatibility; or if `XDG_CONFIG_HOME` is not set
-2. **`$XDG_CONFIG_HOME/tweakcc`** - If `~/.tweakcc/` doesn't exist and `$XDG_CONFIG_HOME` is set
+1. **`TWEAKCC_CONFIG_DIR`** environment variable if set, or
+2. **`~/.tweakcc/`** if it exists, or
+3. **`~/.claude/tweakcc`** if it exists, or
+4. **`$XDG_CONFIG_HOME/tweakcc`** if the `XDG_CONFIG_HOME` environment variable is set.
+
+If none of the above exist, `~/.tweakcc` will be created and used.  If you version control `~/.claude` for Claude Code configuration and want your tweakcc config and system prompts there too, then manually create the directory first, or move your existing `~/.tweakcc` directory there:
+
+```bash
+# For new users
+mkdir -p ~/.claude/tweakcc
+
+# For existing users
+mv ~/.tweakcc ~/.claude/tweakcc
+```
 
 ## Building from source
 
@@ -78,7 +90,7 @@ node dist/index.js
 
 Other tools for customizing Claude Code or adding functionality to it:
 
-- [**clotilde**](https://github.com/fgrehm/clotilde) - Wrapper for Claude Code that adds powerful manual session naming, resuming, forking, and incognito (ephemeral) session management to Claude Code. 
+- [**clotilde**](https://github.com/fgrehm/clotilde) - Wrapper for Claude Code that adds powerful manual session naming, resuming, forking, and incognito (ephemeral) session management to Claude Code.
 - [**ccstatusline**](https://github.com/sirmalloc/ccstatusline) - Highly customizable status line formatter for Claude Code CLI that displays model info, git branch, token usage, and other metrics in your terminal.
 - [**claude-powerline**](https://github.com/Owloops/claude-powerline) - Vim-style powerline statusline for Claude Code with real-time usage tracking, git integration, and custom themes.
 - [**CCometixLine**](https://github.com/Haleclipse/CCometixLine) - A high-performance Claude Code statusline tool written in Rust with Git integration, usage tracking, interactive TUI configuration, and Claude Code enhancement utilities.
@@ -124,6 +136,14 @@ Screenshot of the HTML file:
 #### Git for version control over your customized prompts
 
 This is a great idea, and we recommend it; in fact, we have one ourselves [here.](https://github.com/bl-ue/tweakcc-system-prompts)  It allows you to keep your modified prompt safe in GitHub or elsewhere, and you can also switch from one set of prompts to another via branches, for example.  In the future we plan to integrate git repo management for the system prompt markdown files into tweakcc.  For now you'll need to manually initialize a git repository in `~/.tweakcc` directory.  tweakcc automatically generates a recommended `.gitignore` file in that directory (which you can modify if you'd like).
+
+## Toolsets
+
+Toolsets are collections of built-in tools that Claude is allowed to call.  Unlike Claude Code's builtin permission system, however, built-in tools that are not in the currently active toolset are not even sent to the model.  As a result, Claude has no idea of tools that are not enabled in the current toolset (unless they happen to be mentioned in other parts of the system prompt), and it's not able to call them.
+
+Toolsets can be helpful both for using Claude in different modes, e.g. a research mode where you might only include `WebFetch` and `WebSearch`, and for keeping the size of your system prompt by trimming out tools you don't ever want Claude to call.  The description of each tool call is placed in the system prompt (see [here](https://github.com/Piebald-AI/claude-code-system-prompts#builtin-tool-descriptions)), and if there are multiple tools you don't care about (like `Skill`, `SlashCommand`, `BashOutput`, etc.), the accumulated size of their descriptions and parameters can bloat the context by several thousand tokens.
+
+To create a toolset, run `npx tweakcc`, go to `Toolsets`, and hit `n` to create a new toolset.  Set tapply your customizations, and then run `claude`.  If you marked a toolset as the default in tweakcc, it will be automatically selected.
 
 ## Troubleshooting
 

@@ -2,6 +2,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 import { globbySync } from 'globby';
+import { isDebug } from './misc.js';
 
 export interface Theme {
   name: string;
@@ -916,31 +917,63 @@ export const DEFAULT_SETTINGS: Settings = {
   planModeToolset: null,
 };
 
+// Helper function to expand ~ in paths
+const expandTilde = (filepath: string): string => {
+  if (filepath.startsWith('~')) {
+    return path.join(os.homedir(), filepath.slice(1));
+  }
+  return filepath;
+};
+
 // Support XDG Base Directory Specification with backward compatibility
 // Priority:
-// 1. If ~/.tweakcc exists, use it (backward compatibility for existing users)
-// 2. Otherwise, if $XDG_CONFIG_HOME is set, use $XDG_CONFIG_HOME/tweakcc
-// 3. Otherwise, use ~/.tweakcc (default for new users without XDG_CONFIG_HOME)
+// 1. If TWEAKCC_CONFIG_DIR env var is set, use it (explicit override)
+// 2. If ~/.tweakcc exists, use it (backward compatibility)
+// 3. If ~/.claude/tweakcc exists, use it (Claude ecosystem alignment)
+// 4. If $XDG_CONFIG_HOME is set, use $XDG_CONFIG_HOME/tweakcc
+// 5. Otherwise, use ~/.tweakcc (default)
 const getConfigDir = (): string => {
-  const legacyDir = path.join(os.homedir(), '.tweakcc');
+  // Check TWEAKCC_CONFIG_DIR first (explicit override)
+  const tweakccConfigDir = process.env.TWEAKCC_CONFIG_DIR?.trim();
+  if (tweakccConfigDir && tweakccConfigDir.length > 0) {
+    return expandTilde(tweakccConfigDir);
+  }
+
+  const defaultDir = path.join(os.homedir(), '.tweakcc');
+  const claudeDir = path.join(os.homedir(), '.claude', 'tweakcc');
   const xdgConfigHome = process.env.XDG_CONFIG_HOME;
 
-  // Check if legacy directory exists - use it for backward compatibility
+  // Check if default directory exists - use it for backward compatibility
   try {
-    if (fs.existsSync(legacyDir)) {
-      return legacyDir;
+    if (fs.existsSync(defaultDir)) {
+      return defaultDir;
     }
-  } catch {
+  } catch (e) {
+    if (isDebug()) {
+      console.log(`Failed to check if ${defaultDir} exists: ${e}`);
+    }
+    // If we can't check, fall through to next location
+  }
+
+  // Check .claude-aligned location next
+  try {
+    if (fs.existsSync(claudeDir)) {
+      return claudeDir;
+    }
+  } catch (e) {
+    if (isDebug()) {
+      console.log(`Failed to check if ${claudeDir} exists: ${e}`);
+    }
     // If we can't check, fall through to XDG logic
   }
 
-  // No legacy directory - use XDG if available
+  // No default or .claude directory - use XDG if available
   if (xdgConfigHome) {
     return path.join(xdgConfigHome, 'tweakcc');
   }
 
   // Default to legacy location
-  return legacyDir;
+  return defaultDir;
 };
 
 export const CONFIG_DIR = getConfigDir();

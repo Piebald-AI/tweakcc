@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Support for `~/.claude/tweakcc` configuration directory location (#259) - @bl-ue
+- `TWEAKCC_CONFIG_DIR` environment variable for explicit config location override (#259) - @bl-ue
+- Warning when multiple configuration locations are detected  (#259) - @bl-ue
+- Configuration priority order now: `TWEAKCC_CONFIG_DIR` > `~/.tweakcc` (if exists) > `~/.claude/tweakcc` > `XDG_CONFIG_HOME/tweakcc` > `~/.tweakcc` (default) (#259) - @bl-ue
 - Fix Claude Code hanging due to `/title` patches (#265) - @bl-ue
 - Allow disabling `/title` patches via the Misc view (#265) - @bl-ue
 - Add `EnterPlanMode` and `LSP` to the toolset edit view (#266) - @bl-ue

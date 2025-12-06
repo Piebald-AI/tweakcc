@@ -1,6 +1,5 @@
 import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   restoreClijsFromBackup,
@@ -11,6 +10,7 @@ import {
   ClaudeCodeInstallationInfo,
   TweakccConfig,
   NATIVE_BINARY_BACKUP_FILE,
+  CONFIG_DIR,
 } from '../types.js';
 import { isDebug, replaceFileBreakingHardLinks } from '../misc.js';
 import {
@@ -463,8 +463,7 @@ export const applyCustomization = async (
     }
 
     // Save original extracted JS for debugging
-    const tweakccDir = path.join(os.homedir(), '.tweakcc');
-    const origPath = path.join(tweakccDir, 'native-claudejs-orig.js');
+    const origPath = path.join(CONFIG_DIR, 'native-claudejs-orig.js');
     fsSync.writeFileSync(origPath, claudeJsBuffer);
     if (isDebug()) {
       console.log(`Saved original extracted JS from native to: ${origPath}`);
@@ -648,8 +647,7 @@ export const applyCustomization = async (
     }
 
     // Save patched JS for debugging
-    const tweakccDir = path.join(os.homedir(), '.tweakcc');
-    const patchedPath = path.join(tweakccDir, 'native-claudejs-patched.js');
+    const patchedPath = path.join(CONFIG_DIR, 'native-claudejs-patched.js');
     fsSync.writeFileSync(patchedPath, content, 'utf8');
     if (isDebug()) {
       console.log(`Saved patched JS from native to: ${patchedPath}`);

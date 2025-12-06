@@ -1,8 +1,11 @@
 import fs from 'node:fs/promises';
-import type { Stats } from 'node:fs';
+import { Stats } from 'node:fs';
+import fsSync from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { EOL } from 'node:os';
 import { execSync } from 'node:child_process';
+import chalk from 'chalk';
 import {
   ClaudeCodeInstallationInfo,
   CLIJS_BACKUP_FILE,
@@ -30,12 +33,52 @@ import {
 } from './systemPromptHashIndex.js';
 import { extractClaudeJsFromNativeInstallation } from './nativeInstallation.js';
 
+/**
+ * Checks for multiple config locations and warns user
+ * Called during startup to help users understand which config is active
+ */
+export const warnAboutMultipleConfigs = (): void => {
+  const configDir = CONFIG_DIR;
+  const home = os.homedir();
+
+  const locations = [
+    path.join(home, '.tweakcc'),
+    path.join(home, '.claude', 'tweakcc'),
+    process.env.XDG_CONFIG_HOME
+      ? path.join(process.env.XDG_CONFIG_HOME, 'tweakcc')
+      : null,
+  ].filter((loc): loc is string => loc !== null);
+
+  const existingLocations = locations.filter(loc => {
+    try {
+      return fsSync.existsSync(loc) && loc !== configDir;
+    } catch {
+      return false;
+    }
+  });
+
+  if (existingLocations.length > 0) {
+    console.warn(chalk.yellow('\nMultiple configuration locations detected:'));
+    console.warn(chalk.gray(`   Active: ${configDir}`));
+    console.warn(chalk.gray('   Other existing locations:'));
+    existingLocations.forEach(loc => {
+      console.warn(chalk.gray(`     - ${loc}`));
+    });
+    console.warn(
+      chalk.gray('   Only the active location is used. To switch locations,')
+    );
+    console.warn(
+      chalk.gray('   move your config.json to the desired directory.\n')
+    );
+  }
+};
+
 export const ensureConfigDir = async (): Promise<void> => {
   await fs.mkdir(CONFIG_DIR, { recursive: true });
   await fs.mkdir(SYSTEM_PROMPTS_DIR, { recursive: true });
 
-  // Generate a .gitignore file in case the user wants to version control their ~/.tweakcc with
-  // config.json and the system prompts.
+  // Generate a .gitignore file in case the user wants to version control their config directory
+  // with config.json and the system prompts.
   const gitignorePath = path.join(CONFIG_DIR, '.gitignore');
   try {
     await fs.stat(gitignorePath);
@@ -52,20 +95,15 @@ export const ensureConfigDir = async (): Promise<void> => {
           'native-claudejs-patched.js',
           'systemPromptAppliedHashes.json',
           'systemPromptOriginalHashes.json',
-          'system-prompts',
+          'system-prompts/*.diff.html',
         ].join(EOL) + EOL
       );
     }
   }
 };
 
-let lastConfig: TweakccConfig = {
-  settings: DEFAULT_SETTINGS,
-  changesApplied: false,
-  ccVersion: '',
-  lastModified: '',
-  ccInstallationDir: null,
-};
+// Lazy initialization to avoid circular dependency with DEFAULT_SETTINGS
+let lastConfig: TweakccConfig | null = null;
 
 /**
  * Loads the contents of the config file, or default values if it doesn't exist yet.
@@ -82,6 +120,9 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
     if (isDebug()) {
       console.log(`Reading config at ${CONFIG_FILE}`);
     }
+
+    // Check for multiple configs and warn user
+    warnAboutMultipleConfigs();
 
     const content = await fs.readFile(CONFIG_FILE, 'utf8');
     const readConfig: TweakccConfig = { ...config, ...JSON.parse(content) };
@@ -197,6 +238,10 @@ export const updateConfigFile = async (
 ): Promise<TweakccConfig> => {
   if (isDebug()) {
     console.log(`Updating config at ${CONFIG_FILE}`);
+  }
+  // Ensure lastConfig is initialized
+  if (!lastConfig) {
+    lastConfig = await readConfigFile();
   }
   updateFn(lastConfig);
   lastConfig.lastModified = new Date().toISOString();

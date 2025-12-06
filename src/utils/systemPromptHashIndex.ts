@@ -5,21 +5,19 @@ import { CONFIG_DIR } from './types.js';
 import { StringsFile, reconstructContentFromPieces } from './promptSync.js';
 
 /**
- * Path to the system prompt hash index file
+ * Gets the path to the system prompt hash index file
  */
-export const HASH_INDEX_PATH = path.join(
-  CONFIG_DIR,
-  'systemPromptOriginalHashes.json'
-);
+const getHashIndexPath = (): string => {
+  return path.join(CONFIG_DIR, 'systemPromptOriginalHashes.json');
+};
 
 /**
- * Path to the system prompt applied hashes file
+ * Gets the path to the system prompt applied hashes file
  * This tracks which hash was last applied to cli.js for each prompt
  */
-export const APPLIED_HASHES_PATH = path.join(
-  CONFIG_DIR,
-  'systemPromptAppliedHashes.json'
-);
+const getAppliedHashesPath = (): string => {
+  return path.join(CONFIG_DIR, 'systemPromptAppliedHashes.json');
+};
 
 /**
  * Structure of the hash index
@@ -50,7 +48,7 @@ export const computeMD5Hash = (content: string): string => {
  */
 export const readHashIndex = async (): Promise<HashIndex> => {
   try {
-    const content = await fs.readFile(HASH_INDEX_PATH, 'utf8');
+    const content = await fs.readFile(getHashIndexPath(), 'utf8');
     return JSON.parse(content);
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
@@ -75,7 +73,7 @@ export const writeHashIndex = async (index: HashIndex): Promise<void> => {
   }
 
   await fs.writeFile(
-    HASH_INDEX_PATH,
+    getHashIndexPath(),
     JSON.stringify(sortedIndex, null, 2),
     'utf8'
   );
@@ -171,7 +169,7 @@ export interface AppliedHashIndex {
  */
 export const readAppliedHashIndex = async (): Promise<AppliedHashIndex> => {
   try {
-    const content = await fs.readFile(APPLIED_HASHES_PATH, 'utf8');
+    const content = await fs.readFile(getAppliedHashesPath(), 'utf8');
     return JSON.parse(content);
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
@@ -198,7 +196,7 @@ export const writeAppliedHashIndex = async (
   }
 
   await fs.writeFile(
-    APPLIED_HASHES_PATH,
+    getAppliedHashesPath(),
     JSON.stringify(sortedIndex, null, 2),
     'utf8'
   );
