@@ -12,9 +12,7 @@ vi.mock('./misc.js', () => ({
 }));
 
 const createEacces = () => {
-  const error: NodeJS.ErrnoException = new Error(
-    'EACCES: permission denied'
-  );
+  const error: NodeJS.ErrnoException = new Error('EACCES: permission denied');
   error.code = 'EACCES';
   return error;
 };
@@ -53,8 +51,7 @@ describe('getClijsSearchPathsWithInfo - glob error handling', () => {
 
     // Find the /usr/local/n/versions/node pattern in search paths
     const problematicPath = CLIJS_SEARCH_PATH_INFO.find(
-      info =>
-        info.isGlob && info.pattern.includes('/usr/local/n/versions/node')
+      info => info.isGlob && info.pattern.includes('/usr/local/n/versions/node')
     );
 
     // Should exist and have empty expandedPaths (not crash)
@@ -172,6 +169,9 @@ describe('getClijsSearchPathsWithInfo - glob error handling', () => {
     const globPattern = CLIJS_SEARCH_PATH_INFO.find(info => info.isGlob);
 
     expect(globPattern).toBeDefined();
-    expect(globPattern?.expandedPaths).toEqual(['/mock/path/1', '/mock/path/2']);
+    expect(globPattern?.expandedPaths).toEqual([
+      '/mock/path/1',
+      '/mock/path/2',
+    ]);
   });
 });

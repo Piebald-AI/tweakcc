@@ -49,9 +49,7 @@ const createEnotdir = () => {
 };
 
 const createEacces = () => {
-  const error: NodeJS.ErrnoException = new Error(
-    'EACCES: permission denied'
-  );
+  const error: NodeJS.ErrnoException = new Error('EACCES: permission denied');
   error.code = 'EACCES';
   return error;
 };
