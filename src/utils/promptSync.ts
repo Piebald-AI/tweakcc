@@ -40,6 +40,13 @@ export interface MarkdownPrompt {
   ccVersion: string; // CC version this prompt is based on
   variables?: string[]; // Available variables extracted from identifierMap
   content: string; // The actual prompt content with ${VARIABLE_NAME} placeholders
+  /**
+   * Line offset of the first content line within the original markdown file.
+   * This counts how many lines (including frontmatter and delimiters) appear
+   * before the first character of `content`, so we can map content-relative
+   * line numbers back to real file line numbers when reporting errors.
+   */
+  contentLineOffset: number;
 }
 
 /**
@@ -73,12 +80,25 @@ export const parseMarkdownPrompt = (markdown: string): MarkdownPrompt => {
   });
   const { name, description, ccVersion, variables } = parsed.data;
 
+  // Compute how many lines appear before the start of parsed.content in the
+  // original markdown. This lets us translate content-relative line numbers
+  // (starting at 1 for the first line of `parsed.content.trim()`) back to
+  // absolute file line numbers for error reporting.
+  let contentLineOffset = 0;
+  const contentIndex = markdown.indexOf(parsed.content);
+  if (contentIndex >= 0) {
+    const prefix = markdown.slice(0, contentIndex);
+    // Number of newline characters before the first character of content
+    contentLineOffset = prefix.split('\n').length - 1;
+  }
+
   return {
     name: name || '',
     description: description || '',
     ccVersion: ccVersion || '',
     variables: variables || [],
     content: parsed.content.trim(),
+    contentLineOffset,
   };
 };
 
@@ -1046,6 +1066,171 @@ const buildSearchRegexFromPieces = (
 };
 
 /**
+ * Finds unescaped backticks outside of ${...} interpolation regions using a stack-based parser.
+ * Returns a Map of line number -> array of column numbers for each unescaped backtick found.
+ */
+export const findUnescapedBackticks = (content: string) => {
+  const result = new Map<number, number[]>();
+  let depth = 0,
+    line = 1,
+    col = 1;
+
+  for (let i = 0; i < content.length; i++, col++) {
+    const ch = content[i];
+
+    if (ch === '\n') {
+      line++;
+      col = 0;
+      continue;
+    }
+
+    const next = content[i + 1];
+    if (ch === '$' && next === '{') {
+      depth++;
+      i++;
+      col++;
+      continue;
+    }
+
+    if (depth) {
+      if (ch === '{') depth++;
+      else if (ch === '}') depth--;
+      continue;
+    }
+
+    if (ch === '`' && content[i - 1] !== '\\') {
+      const arr = result.get(line) ?? [];
+      arr.push(col);
+      result.set(line, arr);
+    }
+  }
+
+  return result;
+};
+
+/**
+ * Formats a Rust-style error message for unescaped backticks in a file.
+ */
+export const formatBacktickError = (
+  filePath: string,
+  lineNumber: number,
+  lineText: string,
+  columns: number[]
+): string => {
+  const lines: string[] = [];
+  const lineNumStr = String(lineNumber);
+  const lineNumWidth = lineNumStr.length;
+  const padding = ' '.repeat(lineNumWidth);
+
+  // First and last column for truncation logic
+  const firstColumn = columns[0];
+  const lastColumn = columns[columns.length - 1];
+
+  // Calculate truncation
+  const maxPrefix = 30;
+  const maxSuffix = 30;
+  const prefixLen = firstColumn - 1;
+  const suffixLen = lineText.length - lastColumn;
+
+  let displayLine = lineText;
+  let displayColumns = columns;
+  let prefixTruncation = '';
+  let suffixTruncation = '';
+  let prefixTruncationLen = 0; // Visible length without ANSI codes
+
+  if (prefixLen > maxPrefix || suffixLen > maxSuffix) {
+    // Need to truncate
+    let startIdx = 0;
+    let endIdx = lineText.length;
+    let colOffset = 0;
+
+    if (prefixLen > maxPrefix) {
+      const charsToSkip = prefixLen - maxPrefix;
+      startIdx = charsToSkip;
+      colOffset = -charsToSkip;
+      const prefixText = `[${charsToSkip} chars] ...`;
+      prefixTruncation = chalk.dim(prefixText);
+      prefixTruncationLen = prefixText.length;
+    }
+
+    if (suffixLen > maxSuffix) {
+      const charsToSkip = suffixLen - maxSuffix;
+      endIdx = lineText.length - charsToSkip;
+      suffixTruncation = chalk.dim(`... [${charsToSkip} chars]`);
+    }
+
+    displayLine = lineText.substring(startIdx, endIdx);
+    displayColumns = columns.map(c => c + colOffset);
+  }
+
+  // Header: error message
+  lines.push(
+    `${chalk.red.bold('error')}${chalk.bold(': system prompt file contains unescaped backtick')}`
+  );
+
+  // File location (use original column number)
+  lines.push(
+    `${chalk.blue.bold(' '.repeat(lineNumWidth) + ' -->')} ${filePath}:${lineNumber}:${firstColumn}`
+  );
+
+  // Empty pipe line
+  lines.push(`${padding} ${chalk.blue.bold('|')}`);
+
+  // The actual line with line number (with truncation indicators)
+  const fullDisplayLine = prefixTruncation + displayLine + suffixTruncation;
+  lines.push(
+    `${chalk.blue.bold(lineNumStr)} ${chalk.blue.bold('|')} ${fullDisplayLine}`
+  );
+
+  // Caret line pointing to first backtick (adjusted for prefix truncation text)
+  const caretOffset = prefixTruncationLen + displayColumns[0] - 1;
+  const caretLine = ' '.repeat(caretOffset) + '^' + ' unescaped backtick';
+  lines.push(`${padding} ${chalk.blue.bold('|')} ${chalk.red.bold(caretLine)}`);
+
+  // Empty pipe line before help
+  lines.push(`${padding} ${chalk.blue.bold('|')}`);
+
+  // Help message
+  lines.push(
+    `${chalk.cyan.bold('help')}: add \`\\\` before the backtick to escape it`
+  );
+
+  // Empty pipe line
+  lines.push(`${padding} ${chalk.blue.bold('|')}`);
+
+  // Fixed line with escaped backticks (using displayLine and displayColumns)
+  // Build the line with green backslashes
+  const fixedLineParts: string[] = [];
+  let lastPos = 0;
+  for (const col of displayColumns) {
+    fixedLineParts.push(displayLine.substring(lastPos, col - 1));
+    fixedLineParts.push(chalk.green('\\') + '`');
+    lastPos = col; // Skip the original backtick
+  }
+  fixedLineParts.push(displayLine.substring(lastPos));
+
+  const fullFixedLine =
+    prefixTruncation + fixedLineParts.join('') + suffixTruncation;
+  lines.push(
+    `${chalk.blue.bold(lineNumStr)} ${chalk.blue.bold('|')} ${fullFixedLine}`
+  );
+
+  // Plus signs under the added backslashes only (adjusted for prefix truncation)
+  let plusLine = '';
+  let offset = 0;
+  for (let i = 0; i < displayColumns.length; i++) {
+    const col = displayColumns[i];
+    const targetPos = prefixTruncationLen + col - 1 + offset;
+    plusLine = plusLine.padEnd(targetPos, ' ') + '+';
+    offset++; // Each added backslash shifts subsequent positions
+  }
+
+  lines.push(`${padding} ${chalk.blue.bold('|')} ${chalk.green(plusLine)}`);
+
+  return lines.join('\n');
+};
+
+/**
  * Applies identifier mapping to convert human-readable names to actual minified variables.
  * Takes content with ${HUMAN_NAME} and converts to ${actualVar} using extracted variable names.
  *
@@ -1087,7 +1272,8 @@ const applyIdentifierMapping = (
 
   for (const [humanName, actualVar] of sortedEntries) {
     const pattern = new RegExp(`\\b${humanName}\\b`, 'g');
-    result = result.replace(pattern, actualVar);
+    // Use a replacer function to avoid special replacement pattern interpretation (e.g., $$ -> $), see #237
+    result = result.replace(pattern, () => actualVar);
   }
 
   // Replace <<CCVERSION>> with the actual Claude Code version

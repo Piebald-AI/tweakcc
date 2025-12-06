@@ -46,12 +46,16 @@ import { writeThinkerVerbs } from './thinkerVerbs.js';
 import { writeUserMessageDisplay } from './userMessageDisplay.js';
 import { writeVerboseProperty } from './verboseProperty.js';
 import { writeModelCustomizations } from './modelSelector.js';
-import { writeIgnoreMaxSubscription } from './ignoreMaxSubscription.js';
 import { writeThinkingVisibility } from './thinkingVisibility.js';
 import { writePatchesAppliedIndication } from './patchesAppliedIndication.js';
 import { applySystemPrompts } from './systemPrompts.js';
 import { writeFixLspSupport } from './fixLspSupport.js';
-import { writeToolsets } from './toolsets.js';
+import {
+  writeToolsets,
+  writeModeChangeUpdateToolset,
+  addSetStateFnAccessAtToolChangeComponentScope,
+} from './toolsets.js';
+import { writeConversationTitle } from './conversationTitle.js';
 
 export interface LocationResult {
   startIndex: number;
@@ -78,6 +82,10 @@ export const showDiff = (
   startIndex: number,
   endIndex: number
 ): void => {
+  if (!isDebug()) {
+    return;
+  }
+
   const contextStart = Math.max(0, startIndex - 20);
   const contextEndOld = Math.min(oldFileContents.length, endIndex + 20);
   const contextEndNew = Math.min(
@@ -99,7 +107,7 @@ export const showDiff = (
     contextEndNew
   );
 
-  if (isDebug() && oldChanged !== newChanged) {
+  if (oldChanged !== newChanged) {
     console.log('\n--- Diff ---');
     console.log('OLD:', oldBefore + `\x1b[31m${oldChanged}\x1b[0m` + oldAfter);
     console.log('NEW:', newBefore + `\x1b[32m${newChanged}\x1b[0m` + newAfter);
@@ -218,6 +226,9 @@ export const getReactModuleFunctionBun = (
 // Cache for React variable to avoid recomputing
 let reactVarCache: string | undefined | null = null;
 
+// Cache for require function name to avoid recomputing
+let requireFuncNameCache: string | null = null;
+
 /**
  * Get the React variable name (cached)
  */
@@ -284,6 +295,87 @@ export const getReactVar = (fileContents: string): string | undefined => {
  */
 export const clearReactVarCache = (): void => {
   reactVarCache = null;
+};
+
+/**
+ * Find the require function variable name (no caching)
+ *
+ * This finds the variable name used to call require() in esbuild-bundled code.
+ * Bun uses "require" directly, but esbuild uses a variable that points to
+ * the result of createRequire(import.meta.url).
+ *
+ * Steps:
+ * 1. Find the createRequire import: import{createRequire as X}from"node:module";
+ * 2. Find the variable that calls it: var Y=X(import.meta.url)
+ * 3. Return Y (the require function variable)
+ */
+export const findRequireFunc = (fileContents: string): string | undefined => {
+  // Step 1: Find createRequire import
+  // Pattern: import{createRequire as X}from"node:module";
+  const createRequirePattern =
+    /import\{createRequire as ([$\w]+)\}from"node:module";/;
+  const createRequireMatch = fileContents.match(createRequirePattern);
+  if (!createRequireMatch) {
+    // If this is not found it's not necessarily a bug because we use its absence to detect Bun...
+    // console.log(
+    //   'patch: findRequireFunc: failed to find createRequire import'
+    // );
+    return undefined;
+  }
+  const createRequireVar = createRequireMatch[1];
+
+  // Step 2: Find the variable that calls createRequire
+  // Pattern: var X=createRequireVar(import.meta.url)
+  const requireFuncPattern = new RegExp(
+    `var ([$\\w]+)=${escapeIdent(createRequireVar)}\\(import\\.meta\\.url\\)`
+  );
+  const requireFuncMatch = fileContents.match(requireFuncPattern);
+  if (!requireFuncMatch) {
+    console.log(
+      `patch: findRequireFunc: failed to find require function variable (createRequireVar=${createRequireVar})`
+    );
+    return undefined;
+  }
+
+  return requireFuncMatch[1];
+};
+
+/**
+ * Get the appropriate require function name for the current environment (cached)
+ *
+ * - Bun native installations use "require" directly
+ * - esbuild-bundled code uses a variable that points to createRequire(import.meta.url)
+ *
+ * This function detects which environment we're in and returns the correct name.
+ *
+ * @param fileContents The file content to analyze
+ * @returns "require" for Bun, or the require function variable name for esbuild
+ */
+export const getRequireFuncName = (fileContents: string): string => {
+  // Return cached value if available
+  if (requireFuncNameCache != null) {
+    return requireFuncNameCache;
+  }
+
+  // Try to find the esbuild-style require function
+  const requireFunc = findRequireFunc(fileContents);
+
+  // If we found it, we're in esbuild environment
+  if (requireFunc) {
+    requireFuncNameCache = requireFunc;
+    return requireFuncNameCache;
+  }
+
+  // Otherwise, assume Bun environment which uses "require" directly
+  requireFuncNameCache = 'require';
+  return requireFuncNameCache;
+};
+
+/**
+ * Clear the require func name cache (useful for testing or multiple runs)
+ */
+export const clearRequireFuncNameCache = (): void => {
+  requireFuncNameCache = null;
 };
 
 /**
@@ -492,9 +584,6 @@ export const applyCustomization = async (
   // Apply show more items in select menus patch (always enabled)
   if ((result = writeShowMoreItemsInSelectMenus(content, 25))) content = result;
 
-  // Disable Max subscription gating for cost tool (always enabled)
-  if ((result = writeIgnoreMaxSubscription(content))) content = result;
-
   // Apply thinking visibility patch (always enabled)
   if ((result = writeThinkingVisibility(content))) content = result;
 
@@ -504,7 +593,7 @@ export const applyCustomization = async (
   if (
     (result = writePatchesAppliedIndication(
       content,
-      '3.0.1',
+      '3.1.6',
       items,
       showTweakccVersion,
       showPatchesApplied
@@ -525,6 +614,28 @@ export const applyCustomization = async (
       ))
     )
       content = result;
+  }
+
+  // Apply mode-change toolset switching (if both toolsets are configured)
+  if (config.settings.planModeToolset && config.settings.defaultToolset) {
+    // First, add setState access at the tool change component scope
+    if ((result = addSetStateFnAccessAtToolChangeComponentScope(content)))
+      content = result;
+
+    // Then, inject the mode change toolset switching code
+    if (
+      (result = writeModeChangeUpdateToolset(
+        content,
+        config.settings.planModeToolset,
+        config.settings.defaultToolset
+      ))
+    )
+      content = result;
+  }
+
+  // Apply conversation title management (if enabled)
+  if (config.settings.misc?.enableConversationTitle ?? true) {
+    if ((result = writeConversationTitle(content))) content = result;
   }
 
   // Write the modified content back

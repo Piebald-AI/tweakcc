@@ -7,22 +7,21 @@
 tweakcc is a CLI tool that upgrades your Claude Code experience.  Customize its system prompts, add custom themes, create toolsets, and personalize the UI.
 
 > [!important]
-> **NEW in 3.0.0:** tweakcc now supports Claude Code native installations!  It also adds a new feature to CC called **toolsets**&mdash;try them out in Claude Code with the `/toolsets` command after you create them in tweakcc.  Lastly it makes [Claude Code's native LSP server support work.](https://www.reddit.com/r/ClaudeAI/comments/1otdfo9/lsp_is_coming_to_claude_code_and_you_can_try_it/)
+> **NEW in 3.1.0:** tweakcc now enables you to manually name your Claude Code sessions&mdash;run `npx tweakcc --apply` now to get a `/title my chat title` slash command (or `/rename`)!
 
 > [!tip]
-> **NEW in 2.0.0:** tweakcc can now customize all of Claude Code's system prompts!
+> **NEW in 3.0.0:** tweakcc now supports Claude Code native installations!  It also adds a new feature to CC called **toolsets**&mdash;try them out in Claude Code with the `/toolsets` command after you create them in tweakcc.  Lastly it makes [Claude Code's native LSP server support work.](https://www.reddit.com/r/ClaudeAI/comments/1otdfo9/lsp_is_coming_to_claude_code_and_you_can_try_it/)
 
-<!--
 > [!note]
 > ⭐ **If you find tweakcc useful, please consider [starring the repository](https://github.com/Piebald-AI/tweakcc) to show your support!** ⭐
--->
 
 <img src="./assets/demo.gif" alt="Animated GIF demonstrating running `npx tweakcc`, creating a new theme, changing all of Claude Code's UI colors to purple, changing the thinking format from '<verb>ing...' to 'Claude is <verb>ing', changing the generating spinner style to a 50m glow animation, applying the changes, running Claude, and using '/config' to switch to the new theme, and sending a message to see the new thinking verb format." width="800">
 
 With tweakcc, you can
 
-- Customize all of Claude Code's **system prompts**
+- Customize all of Claude Code's **system prompts** (**NEW:** also see [**Claude Code System Prompts**](https://github.com/Piebald-AI/claude-code-system-prompts))
 - Create custom **toolsets** that can be used in Claude Code with the new **`/toolset`** command
+- Manually name **sessions** in Claude Code with `/title my chat name` or `/rename` (see [**our blog post**](https://piebald.ai/blog/messages-as-commits-claude-codes-git-like-dag-of-conversations) for implementation details)
 - Create **custom themes** with a graphical HSL/RGB color picker
 - Add custom **thinking verbs** that will show while Claude's working
 - Create custom **thinking spinner animations** with different speeds and phases
@@ -54,7 +53,7 @@ $ pnpm dlx tweakcc
 
 tweakcc works by patching Claude Code's minified `cli.js` file.  For npm-based installations this file is modified directly, but for native installation it's extracted from the binary, patched, and then the binary is repacked.  When you update your Claude Code installation, your customizations will be overwritten, but they're remembered in your configuration file, so they can be reapplied by just running `npx tweakcc --apply`.
 
-tweakcc is verified to work with Claude Code **2.0.36**.
+tweakcc is verified to work with Claude Code **2.0.55**.
 
 ### Configuration directory
 
@@ -77,8 +76,9 @@ node dist/index.js
 
 ## Related projects
 
-Other tools for customizing Claude Code:
+Other tools for customizing Claude Code or adding functionality to it:
 
+- [**clotilde**](https://github.com/fgrehm/clotilde) - Wrapper for Claude Code that adds powerful manual session naming, resuming, forking, and incognito (ephemeral) session management to Claude Code. 
 - [**ccstatusline**](https://github.com/sirmalloc/ccstatusline) - Highly customizable status line formatter for Claude Code CLI that displays model info, git branch, token usage, and other metrics in your terminal.
 - [**claude-powerline**](https://github.com/Owloops/claude-powerline) - Vim-style powerline statusline for Claude Code with real-time usage tracking, git integration, and custom themes.
 - [**CCometixLine**](https://github.com/Haleclipse/CCometixLine) - A high-performance Claude Code statusline tool written in Rust with Git integration, usage tracking, interactive TUI configuration, and Claude Code enhancement utilities.
@@ -95,6 +95,8 @@ tweakcc allows you to customize the various parts of Claude Code's system prompt
 - descriptions for all 17 builtin tools like `Bash`, `TodoWrite`, `Read`, etc.,
 - prompts for builtin Task/Plan/Explore subagents, and
 - prompts for utilities such as conversation compaction, WebFetch summarization, Bash command analysis, CLAUDE.md/output style/statusline creation, and many more.
+
+👉 See [**Claude Code System Prompts**](https://github.com/Piebald-AI/claude-code-system-prompts) for a breakdown of all the system prompt parts, as well as a changelog and diffs for each CC version.
 
 Because the system prompt is **dynamically composed** based on several factors, **it's not one string** that can be simply modified in a text editor.  It's a bunch of smaller strings sprinkled throughout Claude Code's source code.
 

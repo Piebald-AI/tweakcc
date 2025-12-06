@@ -105,6 +105,9 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
     if (!Object.hasOwn(readConfig.settings, 'defaultToolset')) {
       readConfig.settings.defaultToolset = DEFAULT_SETTINGS.defaultToolset;
     }
+    if (!Object.hasOwn(readConfig.settings, 'planModeToolset')) {
+      readConfig.settings.planModeToolset = DEFAULT_SETTINGS.planModeToolset;
+    }
 
     // Add any colors that the user doesn't have to any built-in themes.
     for (const defaultTheme of DEFAULT_SETTINGS.themes) {
@@ -602,20 +605,15 @@ export const findClaudeCodeInstallation = async (
     }
 
     // Treat any found executable as a potential native installation
-    // If a backup exists, extract from the backup instead of the (potentially modified) current binary
-    const backupExists = await doesFileExist(NATIVE_BINARY_BACKUP_FILE);
-    const pathToExtractFrom = backupExists
-      ? NATIVE_BINARY_BACKUP_FILE
-      : resolvedPath;
-
+    // Always extract from the actual binary to get the correct version
+    // (The backup is only used when applying modifications, not for version detection)
     if (isDebug()) {
       console.log(
-        `Attempting to extract claude.js from ${backupExists ? 'backup' : 'native installation'}: ${pathToExtractFrom}`
+        `Attempting to extract claude.js from native installation: ${resolvedPath}`
       );
     }
 
-    const claudeJsBuffer =
-      extractClaudeJsFromNativeInstallation(pathToExtractFrom);
+    const claudeJsBuffer = extractClaudeJsFromNativeInstallation(resolvedPath);
 
     if (claudeJsBuffer) {
       // Successfully extracted claude.js from native installation

@@ -102,6 +102,7 @@ export interface MiscConfig {
   showTweakccVersion: boolean;
   showPatchesApplied: boolean;
   expandThinkingBlocks: boolean;
+  enableConversationTitle: boolean;
 }
 
 export interface Toolset {
@@ -118,6 +119,7 @@ export interface Settings {
   misc: MiscConfig;
   toolsets: Toolset[];
   defaultToolset: string | null;
+  planModeToolset: string | null;
 }
 
 export interface TweakccConfig {
@@ -150,8 +152,8 @@ export enum MainMenuItem {
   MISC = 'Misc',
   TOOLSETS = 'Toolsets',
   VIEW_SYSTEM_PROMPTS = 'View system prompts',
-  RESTORE_ORIGINAL = 'Restore original Claude Code (preserves tweakcc.json)',
-  OPEN_CONFIG = 'Open tweakcc.json',
+  RESTORE_ORIGINAL = 'Restore original Claude Code (preserves config.json)',
+  OPEN_CONFIG = 'Open config.json',
   OPEN_CLI = "Open Claude Code's cli.js",
   EXIT = 'Exit',
 }
@@ -907,9 +909,11 @@ export const DEFAULT_SETTINGS: Settings = {
     showTweakccVersion: true,
     showPatchesApplied: true,
     expandThinkingBlocks: true,
+    enableConversationTitle: true,
   },
   toolsets: [],
   defaultToolset: null,
+  planModeToolset: null,
 };
 
 // Support XDG Base Directory Specification with backward compatibility
@@ -1013,12 +1017,21 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
     addPath(`${home}/AppData/Roaming/pnpm-global/${mod}`);
     addPath(`${home}/AppData/Roaming/pnpm-global/*/${mod}`, true);
 
-    // Bun
+    // Bun (global CLI installations)
     addPath(`${home}/.bun/install/global/${mod}`);
+
+    // Bun cache (used by bunx) - both default and XDG locations on Windows
+    addPath(`${home}/.bun/install/cache/@anthropic-ai/claude-code*@@@*`, true);
+    addPath(`${home}/AppData/Local/Bun/install/cache/@anthropic-ai/claude-code*@@@*`, true);
 
     // fnm
     addPath(`${home}/AppData/Local/fnm_multishells/*/node_modules/${mod}`, true);
 
+    // mise (global npm installation)
+    addPath(`${home}/AppData/Local/mise/installs/node/*/${mod}`, true);
+
+    // mise (npm backend) (https://mise.jdx.dev/dev-tools/backends/npm.html)
+    addPath(`${home}/AppData/Local/mise/installs/npm-anthropic-ai-claude-code/*/${mod}`, true);
   } else {
     // macOS-specific paths
     if (process.platform == 'darwin') {
@@ -1026,6 +1039,9 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
       addPath(`${home}/Library/${mod}`);
       // MacPorts
       addPath(`/opt/local/lib/${mod}`);
+      // Bun cache (used by bunx on macOS) - both default and XDG locations
+      addPath(`${home}/.bun/install/cache/@anthropic-ai/claude-code*@@@*`, true);
+      addPath(`${home}/Library/Caches/bun/install/cache/@anthropic-ai/claude-code*@@@*`, true);
     }
 
     // Various user paths
@@ -1062,8 +1078,12 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
     addPath(`${home}/.local/share/pnpm/global/${mod}`);
     addPath(`${home}/.local/share/pnpm/global/*/${mod}`, true);
 
-    // Bun
+    // Bun (global CLI installations)
     addPath(`${home}/.bun/install/global/${mod}`);
+
+    // Bun cache (used by bunx) - both default and XDG locations
+    addPath(`${home}/.bun/install/cache/@anthropic-ai/claude-code*@@@*`, true);
+    addPath(`${home}/.local/share/bun/install/cache/@anthropic-ai/claude-code*@@@*`, true);
 
     // n (https://github.com/tj/n) - system & user
     addPath(`/usr/local/n/versions/node/*/lib/${mod}`, true);
@@ -1079,6 +1099,7 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
 
     // nvm (https://github.com/nvm-sh/nvm) - system & user
     addPath(`/usr/local/nvm/versions/node/*/lib/${mod}`, true);
+    addPath(`/usr/local/share/nvm/versions/node/*/lib/${mod}`, true);
     addPath(`${home}/.nvm/versions/node/*/lib/${mod}`, true);
 
     // nodenv (https://github.com/nodenv/nodenv)
@@ -1095,6 +1116,12 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
       addPath(`${process.env.MISE_DATA_DIR}/installs/node/*/lib/${mod}`, true);
     }
     addPath(`${home}/.local/share/mise/installs/node/*/lib/${mod}`, true);
+
+    // mise (npm backend) (https://mise.jdx.dev/dev-tools/backends/npm.html)
+    if (process.env.MISE_DATA_DIR) {
+      addPath(`${process.env.MISE_DATA_DIR}/installs/npm-anthropic-ai-claude-code/*/lib/${mod}`, true);
+    }
+    addPath(`${home}/.local/share/mise/installs/npm-anthropic-ai-claude-code/*/lib/${mod}`, true);
   }
 
   // After we're done with globby, which required / even on Windows, convert / back to \\ for

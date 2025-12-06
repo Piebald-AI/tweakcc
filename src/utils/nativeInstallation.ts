@@ -4,8 +4,22 @@
 
 import fs from 'node:fs';
 import { execSync } from 'node:child_process';
-import LIEF from 'node-lief';
+import type LIEF from 'node-lief';
 import { isDebug } from './misc.js';
+
+let liefModule: typeof LIEF | null = null;
+
+/**
+ * Lazy-load the LIEF module to avoid import errors on systems without C++ libraries.
+ * This is especially important for NixOS and other systems where native modules may fail.
+ */
+function getLIEF(): typeof LIEF {
+  if (liefModule === null) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    liefModule = require('node-lief');
+  }
+  return liefModule as typeof LIEF;
+}
 
 /**
  * Constants for Bun trailer and serialized layout sizes.
@@ -415,8 +429,8 @@ export function extractClaudeJsFromNativeInstallation(
   nativeInstallationPath: string
 ): Buffer | null {
   try {
-    LIEF.logging.disable();
-    const binary = LIEF.parse(nativeInstallationPath);
+    getLIEF().logging.disable();
+    const binary = getLIEF().parse(nativeInstallationPath);
     const { bunOffsets, bunData } = getBunData(binary);
 
     if (isDebug()) {
@@ -788,7 +802,7 @@ function repackMachO(
       // - x86_64: 4KB (4096 bytes)
       // - ARM64 (Apple Silicon): 16KB (16384 bytes)
       const isARM64 =
-        machoBinary.header.cpuType === LIEF.MachO.Header.CPU_TYPE.ARM64;
+        machoBinary.header.cpuType === getLIEF().MachO.Header.CPU_TYPE.ARM64;
       const PAGE_SIZE = isARM64 ? 16384 : 4096;
       const alignedSizeDiff = Math.ceil(sizeDiff / PAGE_SIZE) * PAGE_SIZE;
 
@@ -952,8 +966,8 @@ export function repackNativeInstallation(
   modifiedClaudeJs: Buffer,
   outputPath: string
 ): void {
-  LIEF.logging.disable();
-  const binary = LIEF.parse(binPath);
+  getLIEF().logging.disable();
+  const binary = getLIEF().parse(binPath);
 
   // Extract Bun data and rebuild with modified claude.js
   const { bunOffsets, bunData } = getBunData(binary);
