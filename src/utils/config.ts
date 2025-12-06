@@ -479,7 +479,10 @@ async function doesFileExist(filePath: string): Promise<boolean> {
     if (
       error instanceof Error &&
       'code' in error &&
-      (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+      (error.code === 'ENOENT' ||
+        error.code === 'ENOTDIR' ||
+        error.code === 'EACCES' ||
+        error.code === 'EPERM')
     ) {
       return false;
     }

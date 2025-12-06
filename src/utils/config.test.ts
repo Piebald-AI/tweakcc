@@ -48,6 +48,22 @@ const createEnotdir = () => {
   return error;
 };
 
+const createEacces = () => {
+  const error: NodeJS.ErrnoException = new Error(
+    'EACCES: permission denied'
+  );
+  error.code = 'EACCES';
+  return error;
+};
+
+const createEperm = () => {
+  const error: NodeJS.ErrnoException = new Error(
+    'EPERM: operation not permitted'
+  );
+  error.code = 'EPERM';
+  return error;
+};
+
 const createSymlinkStats = (): Stats =>
   ({
     isSymbolicLink: () => true,
@@ -307,6 +323,92 @@ describe('config.ts', () => {
         // First search path returns ENOTDIR (simulating ~/.claude being a file)
         if (callCount === 1) {
           throw createEnotdir();
+        }
+        // Second search path has cli.js
+        if (p === mockSecondCliPath) {
+          return {} as Stats;
+        }
+        throw createEnoent();
+      });
+
+      vi.spyOn(fs, 'readFile').mockImplementation(async (p, encoding) => {
+        if (p === mockSecondCliPath && encoding === 'utf8') {
+          return mockCliContent;
+        }
+        throw new Error('File not found');
+      });
+
+      const result = await config.findClaudeCodeInstallation(mockConfig);
+
+      expect(result).toEqual({
+        cliPath: mockSecondCliPath,
+        version: '1.2.3',
+      });
+    });
+
+    it('should gracefully skip paths with EACCES permission errors', async () => {
+      const mockConfig = {
+        ccInstallationDir: null,
+        changesApplied: false,
+        ccVersion: '',
+        lastModified: '',
+        settings: DEFAULT_SETTINGS,
+      };
+
+      // Mock fs.stat to simulate EACCES on first path (NixOS /usr/local), then find cli.js on second path
+      const mockSecondCliPath = path.join(CLIJS_SEARCH_PATHS[1], 'cli.js');
+      const mockCliContent =
+        'some code VERSION:"1.2.3" more code VERSION:"1.2.3" and VERSION:"1.2.3"';
+
+      let callCount = 0;
+      vi.spyOn(fs, 'stat').mockImplementation(async p => {
+        callCount++;
+        // First search path returns EACCES (simulating permission denied on /usr/local)
+        if (callCount === 1) {
+          throw createEacces();
+        }
+        // Second search path has cli.js
+        if (p === mockSecondCliPath) {
+          return {} as Stats;
+        }
+        throw createEnoent();
+      });
+
+      vi.spyOn(fs, 'readFile').mockImplementation(async (p, encoding) => {
+        if (p === mockSecondCliPath && encoding === 'utf8') {
+          return mockCliContent;
+        }
+        throw new Error('File not found');
+      });
+
+      const result = await config.findClaudeCodeInstallation(mockConfig);
+
+      expect(result).toEqual({
+        cliPath: mockSecondCliPath,
+        version: '1.2.3',
+      });
+    });
+
+    it('should gracefully skip paths with EPERM permission errors', async () => {
+      const mockConfig = {
+        ccInstallationDir: null,
+        changesApplied: false,
+        ccVersion: '',
+        lastModified: '',
+        settings: DEFAULT_SETTINGS,
+      };
+
+      // Mock fs.stat to simulate EPERM on first path, then find cli.js on second path
+      const mockSecondCliPath = path.join(CLIJS_SEARCH_PATHS[1], 'cli.js');
+      const mockCliContent =
+        'some code VERSION:"1.2.3" more code VERSION:"1.2.3" and VERSION:"1.2.3"';
+
+      let callCount = 0;
+      vi.spyOn(fs, 'stat').mockImplementation(async p => {
+        callCount++;
+        // First search path returns EPERM
+        if (callCount === 1) {
+          throw createEperm();
         }
         // Second search path has cli.js
         if (p === mockSecondCliPath) {

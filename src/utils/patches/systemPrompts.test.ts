@@ -3,6 +3,10 @@ import { applySystemPrompts } from './systemPrompts.js';
 import * as promptSync from '../promptSync.js';
 import * as systemPromptHashIndex from '../systemPromptHashIndex.js';
 
+vi.mock('../misc.js', () => ({
+  isDebug: vi.fn(() => false),
+}));
+
 vi.mock('../promptSync.js', async () => {
   const actual = await vi.importActual('../promptSync.js');
   return {

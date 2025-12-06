@@ -1004,8 +1004,32 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
   // Helper function to add a path or glob pattern
   const addPath = (pattern: string, isGlob: boolean = false) => {
     if (isGlob) {
-      const expanded = globbySync(pattern, { onlyFiles: false });
-      pathInfos.push({ pattern, isGlob: true, expandedPaths: expanded });
+      try {
+        const expanded = globbySync(pattern, { onlyFiles: false });
+        pathInfos.push({ pattern, isGlob: true, expandedPaths: expanded });
+      } catch (error) {
+        // Handle permission errors gracefully - log in debug mode only
+        if (
+          error instanceof Error &&
+          'code' in error &&
+          (error.code === 'EACCES' || error.code === 'EPERM')
+        ) {
+          if (isDebug()) {
+            console.log(
+              `Permission denied accessing: ${pattern} (${error.code})`
+            );
+          }
+        } else if (isDebug()) {
+          // Log other unexpected errors in debug mode
+          console.log(
+            `Error expanding glob pattern "${pattern}": ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          );
+        }
+        // Return empty expanded paths - caller handles this gracefully
+        pathInfos.push({ pattern, isGlob: true, expandedPaths: [] });
+      }
     } else {
       pathInfos.push({ pattern, isGlob: false, expandedPaths: [pattern] });
     }
