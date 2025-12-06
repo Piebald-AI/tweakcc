@@ -131,6 +131,7 @@ const migrateUserMessageDisplayToV320 = (readConfig: TweakccConfig) => {
     readConfig.settings.userMessageDisplay.borderColor = 'rgb(255,255,255)';
     readConfig.settings.userMessageDisplay.paddingX = 0;
     readConfig.settings.userMessageDisplay.paddingY = 0;
+    readConfig.settings.userMessageDisplay.fitBoxToContent = false;
   }
 
   // In v3.2.0 padding was split into paddingX and paddingY.
@@ -143,6 +144,14 @@ const migrateUserMessageDisplayToV320 = (readConfig: TweakccConfig) => {
       tmpPreV320UserMessageDisplay.padding || 0;
     readConfig.settings.userMessageDisplay.paddingY = 0;
     delete tmpPreV320UserMessageDisplay.padding; // This will delete it from the readConfig but with type safety.
+  }
+
+  // In v3.2.x fitBoxToContent was added to userMessageDisplay.
+  if (
+    tmpPreV320UserMessageDisplay &&
+    !('fitBoxToContent' in tmpPreV320UserMessageDisplay)
+  ) {
+    readConfig.settings.userMessageDisplay.fitBoxToContent = false;
   }
 };
 

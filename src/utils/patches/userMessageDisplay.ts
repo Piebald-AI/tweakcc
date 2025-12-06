@@ -75,7 +75,8 @@ export const writeUserMessageDisplay = (
   if (backgroundColor === 'default') {
     textAttrs.push('backgroundColor:"userMessageBackground"');
   }
-  const textAttrsObjStr = textAttrs.length > 0 ? `{${textAttrs.join(',')}}` : '{}';
+  const textAttrsObjStr =
+    textAttrs.length > 0 ? `{${textAttrs.join(',')}}` : '{}';
 
   // Build box attributes (border and padding)
   const boxAttrs: string[] = [];

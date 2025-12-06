@@ -908,7 +908,7 @@ describe('config.ts', () => {
           ...DEFAULT_SETTINGS,
           userMessageDisplay: {
             prefix: {
-              format: '>',
+              format: '$',
               styling: ['bold'],
               foregroundColor: 'rgb(255,0,0)',
               backgroundColor: 'rgb(0,0,0)',
@@ -928,7 +928,7 @@ describe('config.ts', () => {
       const result = await config.readConfigFile();
 
       expect(result.settings.userMessageDisplay).toEqual({
-        format: '> {}',
+        format: '${}',
         styling: ['bold', 'italic'],
         foregroundColor: 'rgb(0,255,0)',
         backgroundColor: null,
@@ -936,6 +936,7 @@ describe('config.ts', () => {
         borderColor: 'rgb(255,255,255)',
         paddingX: 0,
         paddingY: 0,
+        fitBoxToContent: false,
       });
     });
 
@@ -949,7 +950,7 @@ describe('config.ts', () => {
           ...DEFAULT_SETTINGS,
           userMessageDisplay: {
             prefix: {
-              format: '> ',
+              format: '#',
               styling: [],
               foregroundColor: 'rgb(0,0,0)',
               backgroundColor: 'rgb(0,0,0)',
@@ -969,7 +970,7 @@ describe('config.ts', () => {
       const result = await config.readConfigFile();
 
       expect(result.settings.userMessageDisplay).toEqual({
-        format: '> {}',
+        format: '#{}',
         styling: [],
         foregroundColor: 'default',
         backgroundColor: null,
@@ -977,6 +978,7 @@ describe('config.ts', () => {
         borderColor: 'rgb(255,255,255)',
         paddingX: 0,
         paddingY: 0,
+        fitBoxToContent: false,
       });
     });
 
@@ -1018,6 +1020,7 @@ describe('config.ts', () => {
         borderColor: 'rgb(255,255,255)',
         paddingX: 0,
         paddingY: 0,
+        fitBoxToContent: false,
       });
     });
 
@@ -1030,7 +1033,7 @@ describe('config.ts', () => {
         settings: {
           ...DEFAULT_SETTINGS,
           userMessageDisplay: {
-            format: '> {}',
+            format: ' > {} ',
             styling: [],
             foregroundColor: 'default',
             backgroundColor: null,
@@ -1038,6 +1041,7 @@ describe('config.ts', () => {
             borderColor: 'rgb(255,255,255)',
             paddingX: 0,
             paddingY: 0,
+            fitBoxToContent: false,
           },
         },
       };
@@ -1047,7 +1051,7 @@ describe('config.ts', () => {
       const result = await config.readConfigFile();
 
       expect(result.settings.userMessageDisplay).toEqual({
-        format: '> {}',
+        format: ' > {} ',
         styling: [],
         foregroundColor: 'default',
         backgroundColor: null,
@@ -1055,6 +1059,48 @@ describe('config.ts', () => {
         borderColor: 'rgb(255,255,255)',
         paddingX: 0,
         paddingY: 0,
+        fitBoxToContent: false,
+      });
+    });
+
+    it('should add fitBoxToContent if missing from new format config', async () => {
+      const configMissingFitBox = {
+        ccVersion: '1.0.0',
+        ccInstallationDir: null,
+        lastModified: '2024-01-01',
+        changesApplied: true,
+        settings: {
+          ...DEFAULT_SETTINGS,
+          userMessageDisplay: {
+            format: ' > {} ',
+            styling: [],
+            foregroundColor: 'default',
+            backgroundColor: null,
+            borderStyle: 'none',
+            borderColor: 'rgb(255,255,255)',
+            paddingX: 0,
+            paddingY: 0,
+            // fitBoxToContent is missing - should be added by migration
+          },
+        },
+      };
+
+      vi.spyOn(fs, 'readFile').mockResolvedValue(
+        JSON.stringify(configMissingFitBox)
+      );
+
+      const result = await config.readConfigFile();
+
+      expect(result.settings.userMessageDisplay).toEqual({
+        format: ' > {} ',
+        styling: [],
+        foregroundColor: 'default',
+        backgroundColor: null,
+        borderStyle: 'none',
+        borderColor: 'rgb(255,255,255)',
+        paddingX: 0,
+        paddingY: 0,
+        fitBoxToContent: false,
       });
     });
   });
