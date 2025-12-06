@@ -1141,3 +1141,10 @@ export const CLIJS_SEARCH_PATH_INFO: SearchPathInfo[] =
 export const CLIJS_SEARCH_PATHS: string[] = CLIJS_SEARCH_PATH_INFO.flatMap(
   info => info.expandedPaths
 );
+
+// Message shown when PATH fallback check is performed (POSIX only)
+// Windows skips PATH-based detection, so this is null on Windows
+export const PATH_CHECK_TEXT: string | null =
+  process.platform === 'win32'
+    ? null
+    : "Also checked for 'claude' executable on PATH using 'which claude'.";

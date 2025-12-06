@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as config from './config.js';
 import {
   ClaudeCodeInstallationInfo,
@@ -49,12 +49,12 @@ const createEnotdir = () => {
 const createSymlinkStats = (): Stats =>
   ({
     isSymbolicLink: () => true,
-  } as unknown as Stats);
+  }) as unknown as Stats;
 
 const createRegularStats = (): Stats =>
   ({
     isSymbolicLink: () => false,
-  } as unknown as Stats);
+  }) as unknown as Stats;
 
 describe('config.ts', () => {
   let originalSearchPathsLength: number;
@@ -383,7 +383,9 @@ describe('config.ts', () => {
       );
 
       lstatSpy.mockImplementation(async filePath => {
-        if (filePath === '/usr/local/share/nvm/versions/node/v23.11.1/bin/claude') {
+        if (
+          filePath === '/usr/local/share/nvm/versions/node/v23.11.1/bin/claude'
+        ) {
           return createSymlinkStats();
         }
         throw createEnoent();
@@ -395,7 +397,8 @@ describe('config.ts', () => {
       vi.spyOn(fs, 'realpath').mockResolvedValue(resolvedCliPath);
 
       // Mock VERSION content in cli.js
-      const mockCliContent = 'VERSION:"2.0.11" VERSION:"2.0.11" VERSION:"2.0.11"';
+      const mockCliContent =
+        'VERSION:"2.0.11" VERSION:"2.0.11" VERSION:"2.0.11"';
       vi.spyOn(fs, 'readFile').mockImplementation(async (p, encoding) => {
         if (p === resolvedCliPath && encoding === 'utf8') {
           return mockCliContent;
@@ -533,8 +536,7 @@ describe('config.ts', () => {
       };
 
       const customCliPath = path.join(customInstallDir, 'cli.js');
-      const mockCliContent =
-        'VERSION:"3.0.0" VERSION:"3.0.0" VERSION:"3.0.0"';
+      const mockCliContent = 'VERSION:"3.0.0" VERSION:"3.0.0" VERSION:"3.0.0"';
 
       // Mock fs.stat to make custom path exist
       vi.spyOn(fs, 'stat').mockImplementation(async p => {
@@ -570,8 +572,7 @@ describe('config.ts', () => {
 
       const customCliPath = path.join(customInstallDir, 'cli.js');
       const standardCliPath = path.join(CLIJS_SEARCH_PATHS[0], 'cli.js');
-      const mockCliContent =
-        'VERSION:"3.5.0" VERSION:"3.5.0" VERSION:"3.5.0"';
+      const mockCliContent = 'VERSION:"3.5.0" VERSION:"3.5.0" VERSION:"3.5.0"';
 
       let checkedCustomFirst = false;
 

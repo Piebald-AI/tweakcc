@@ -8,6 +8,7 @@ import {
   CLIJS_SEARCH_PATH_INFO,
   CONFIG_FILE,
   CONFIG_DIR,
+  PATH_CHECK_TEXT,
 } from './utils/types.js';
 import { startupCheck, readConfigFile } from './utils/config.js';
 import { enableDebug } from './utils/misc.js';
