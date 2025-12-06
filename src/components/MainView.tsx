@@ -13,6 +13,7 @@ interface MainViewProps {
     type: 'success' | 'error' | 'warning' | 'info';
   } | null;
   isNativeInstallation: boolean;
+  configMigrated: boolean;
 }
 
 // prettier-ignore
@@ -71,6 +72,7 @@ export function MainView({
   onSubmit,
   notification,
   isNativeInstallation,
+  configMigrated,
 }: MainViewProps) {
   const filteredSystemMenuItems = isNativeInstallation
     ? systemMenuItems.filter(item => item.name !== MainMenuItem.OPEN_CLI)
@@ -96,6 +98,14 @@ export function MainView({
 
   return (
     <Box flexDirection="column">
+      {configMigrated && (
+        <Box marginBottom={1}>
+          <Text color="blue" bold>
+            INFO: `ccInstallationDir` config is deprecated; migrated to
+            `ccInstallation` which supports npm and native installs.
+          </Text>
+        </Box>
+      )}
       <Box marginBottom={1}>
         <Header>Tweak Claude Code</Header>
       </Box>

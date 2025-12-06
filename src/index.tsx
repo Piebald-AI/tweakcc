@@ -10,7 +10,11 @@ import {
   CONFIG_DIR,
   PATH_CHECK_TEXT,
 } from './utils/types.js';
-import { startupCheck, readConfigFile } from './utils/config.js';
+import {
+  startupCheck,
+  readConfigFile,
+  migrateConfigIfNeeded,
+} from './utils/config.js';
 import { enableDebug } from './utils/misc.js';
 import { applyCustomization } from './utils/patches/index.js';
 import { preloadStringsFile } from './utils/promptSync.js';
@@ -30,7 +34,7 @@ const createExampleConfigIfMissing = async (
         error.code === 'ENOENT'
       ) {
         const exampleConfig = {
-          ccInstallationDir: examplePath,
+          ccInstallation: examplePath + '/cli.js',
         };
         await fs.writeFile(CONFIG_FILE, JSON.stringify(exampleConfig, null, 2));
       }
@@ -56,6 +60,9 @@ const main = async () => {
   if (options.debug) {
     enableDebug();
   }
+
+  // Migrate old ccInstallationDir config to ccInstallation if needed
+  const configMigrated = await migrateConfigIfNeeded();
 
   // Handle --apply flag for non-interactive mode
   if (options.apply) {
@@ -153,7 +160,12 @@ const main = async () => {
       );
     }
 
-    render(<App startupCheckInfo={startupCheckInfo} />);
+    render(
+      <App
+        startupCheckInfo={startupCheckInfo}
+        configMigrated={configMigrated}
+      />
+    );
   } else {
     // Format the search paths to show glob patterns with their expansions
     const formatSearchPaths = () => {
@@ -191,16 +203,14 @@ ${PATH_CHECK_TEXT ? `${PATH_CHECK_TEXT}\n` : ''}
 If you have it installed but it's in a location not listed above, please open an issue at
 https://github.com/piebald-ai/tweakcc/issues and tell us where you have it--we'll add that location
 to our search list and release an update today!  And in the meantime, you can get tweakcc working
-by manually specifying that location in ${CONFIG_FILE} with the "ccInstallationDir" property:
+by manually specifying that location in ${CONFIG_FILE} with the "ccInstallation" property:
 
 {
-  "ccInstallationDir": "${examplePath}"
+  "ccInstallation": "${examplePath}/cli.js"
 }
 
 Notes:
-- Don't include cli.js in the path.
-- Don't specify the path to your Claude Code executable's directory.  It needs to be the path
-  to the folder that contains **cli.js**.
+- Include cli.js in the path (the full path to the cli.js file).
 - Please also open an issue so that we can add your path to the search list for all users!
 `);
     process.exit(1);

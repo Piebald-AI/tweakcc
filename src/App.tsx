@@ -35,21 +35,23 @@ export const SettingsContext = createContext({
 
 export default function App({
   startupCheckInfo,
+  configMigrated,
 }: {
   startupCheckInfo: StartupCheckInfo;
+  configMigrated: boolean;
 }) {
   const [config, setConfig] = useState<TweakccConfig>({
     settings: DEFAULT_SETTINGS,
     changesApplied: false,
     ccVersion: '',
     lastModified: '',
-    ccInstallationDir: null,
   });
 
   // Load the config file.
   useEffect(() => {
     const loadConfig = async () => {
-      setConfig(await readConfigFile());
+      const loadedConfig = await readConfigFile();
+      setConfig(loadedConfig);
     };
     loadConfig();
   }, []);
@@ -194,6 +196,7 @@ Please reapply your changes below.`,
             isNativeInstallation={
               !!startupCheckInfo.ccInstInfo?.nativeInstallationPath
             }
+            configMigrated={configMigrated}
           />
         ) : currentView === MainMenuItem.THEMES ? (
           <ThemesView onBack={handleBack} />
