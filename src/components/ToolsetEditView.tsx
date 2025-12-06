@@ -28,7 +28,7 @@ const AVAILABLE_TOOLS = [
   'SlashCommand',
   'EnterPlanMode',
   'ExitPlanMode',
-  'LSP'
+  'LSP',
 ];
 
 export function ToolsetEditView({
