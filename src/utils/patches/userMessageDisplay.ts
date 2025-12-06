@@ -65,7 +65,6 @@ export const writeUserMessageDisplay = (
     return null;
   }
 
-  let textAttrsObjStr: string;
   let chalkChain: string = '';
 
   // Build Ink attributes for default theme colors (do this ALWAYS, not conditionally)
@@ -76,7 +75,7 @@ export const writeUserMessageDisplay = (
   if (backgroundColor === 'default') {
     textAttrs.push('backgroundColor:"userMessageBackground"');
   }
-  textAttrsObjStr = textAttrs.length > 0 ? `{${textAttrs.join(',')}}` : '{}';
+  const textAttrsObjStr = textAttrs.length > 0 ? `{${textAttrs.join(',')}}` : '{}';
 
   // Build box attributes (border and padding)
   const boxAttrs: string[] = [];

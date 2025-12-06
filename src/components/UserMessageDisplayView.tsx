@@ -879,7 +879,8 @@ export function UserMessageDisplayView({
                 backgroundColor={currentTheme?.colors?.userMessageBackground}
                 color={currentTheme?.colors?.text}
               >
-                {' '}&gt; list the dir{' '}
+                {' '}
+                &gt; list the dir{' '}
               </Text>
             </Box>
             <Box marginLeft={1} marginTop={1}>
