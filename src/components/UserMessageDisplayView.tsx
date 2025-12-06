@@ -1,10 +1,13 @@
-import { useState, useContext, useEffect } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { useState, useContext } from 'react';
+import { Box, BoxProps, Text, useInput } from 'ink';
 import { ColorPicker } from './ColorPicker.js';
 import { SettingsContext } from '../App.js';
-import { DEFAULT_SETTINGS } from '../utils/types.js';
+import { DEFAULT_SETTINGS, UserMessageDisplayConfig } from '../utils/types.js';
 import { getCurrentClaudeCodeTheme } from '../utils/misc.js';
 import Header from './Header.js';
+import { useNonInitialEffect } from '../hooks/useNonInitialEffect.js';
+
+type Writable<T> = { -readonly [P in keyof T]: T[P] };
 
 interface UserMessageDisplayViewProps {
   onBack: () => void;
@@ -18,7 +21,10 @@ const STYLING_OPTIONS = [
   { label: 'inverse', value: 'inverse' },
 ];
 
-const BORDER_STYLE_OPTIONS = [
+const BORDER_STYLE_OPTIONS: Array<{
+  label: string;
+  value: UserMessageDisplayConfig['borderStyle'];
+}> = [
   { label: 'none', value: 'none' },
   { label: 'single', value: 'single' },
   { label: 'double', value: 'double' },
@@ -40,60 +46,65 @@ export function UserMessageDisplayView({
 }: UserMessageDisplayViewProps) {
   const { settings, updateSettings } = useContext(SettingsContext);
 
-  const [selectedOptionIndex, setSelectedOptionIndex] = useState(0);
   const [editingFormat, setEditingFormat] = useState(false);
   const [editingPaddingX, setEditingPaddingX] = useState(false);
   const [editingPaddingY, setEditingPaddingY] = useState(false);
   const [formatInput, setFormatInput] = useState(
     () => settings.userMessageDisplay.format
   );
-  const [paddingXInput, setPaddingXInput] = useState(
-    () => String(settings.userMessageDisplay.paddingX)
+  const [paddingXInput, setPaddingXInput] = useState(() =>
+    String(settings.userMessageDisplay.paddingX)
   );
-  const [paddingYInput, setPaddingYInput] = useState(
-    () => String(settings.userMessageDisplay.paddingY)
+  const [paddingYInput, setPaddingYInput] = useState(() =>
+    String(settings.userMessageDisplay.paddingY)
+  );
+  const [fitBoxToContent, setFitBoxToContent] = useState(
+    settings.userMessageDisplay.fitBoxToContent
   );
   const [stylingIndex, setStylingIndex] = useState(0);
-  const [activeStylings, setActiveStylings] = useState<string[]>(
-    () => [...settings.userMessageDisplay.styling]
-  );
+  const [activeStylings, setActiveStylings] = useState<string[]>(() => [
+    ...settings.userMessageDisplay.styling,
+  ]);
 
   // Foreground color state
-  const [foregroundMode, setForegroundMode] = useState<ColorMode>(
-    () => settings.userMessageDisplay.foregroundColor === 'default' ? 'default' : 'custom'
+  const [foregroundMode, setForegroundMode] = useState<ColorMode>(() =>
+    settings.userMessageDisplay.foregroundColor === 'default'
+      ? 'default'
+      : 'custom'
   );
-  const [foregroundColor, setForegroundColor] = useState(
-    () => settings.userMessageDisplay.foregroundColor === 'default'
+  const [foregroundColor, setForegroundColor] = useState(() =>
+    settings.userMessageDisplay.foregroundColor === 'default'
       ? 'rgb(255,255,255)'
       : settings.userMessageDisplay.foregroundColor
   );
 
   // Background color state
-  const [backgroundMode, setBackgroundMode] = useState<'default' | 'none' | 'custom'>(
-    () => {
-      const bg = settings.userMessageDisplay.backgroundColor;
-      if (bg === null) return 'none';
-      if (bg === 'default') return 'default';
-      return 'custom';
-    }
-  );
-  const [backgroundColor, setBackgroundColor] = useState(
-    () => {
-      const bg = settings.userMessageDisplay.backgroundColor;
-      return (bg === null || bg === 'default') ? 'rgb(0,0,0)' : bg;
-    }
-  );
+  const [backgroundMode, setBackgroundMode] = useState<
+    'default' | 'none' | 'custom'
+  >(() => {
+    const bg = settings.userMessageDisplay.backgroundColor;
+    if (bg === null) return 'none';
+    if (bg === 'default') return 'default';
+    return 'custom';
+  });
+  const [backgroundColor, setBackgroundColor] = useState(() => {
+    const bg = settings.userMessageDisplay.backgroundColor;
+    return bg === null || bg === 'default' ? 'rgb(0,0,0)' : bg;
+  });
 
   // Border state
-  const [borderStyleIndex, setBorderStyleIndex] = useState(
-    () => BORDER_STYLE_OPTIONS.findIndex(opt => opt.value === settings.userMessageDisplay.borderStyle)
+  const [borderStyleIndex, setBorderStyleIndex] = useState(() =>
+    BORDER_STYLE_OPTIONS.findIndex(
+      opt => opt.value === settings.userMessageDisplay.borderStyle
+    )
   );
   const [borderColor, setBorderColor] = useState(
     () => settings.userMessageDisplay.borderColor
   );
 
   // Color picker state
-  const [colorPickerType, setColorPickerType] = useState<ColorPickerType | null>(null);
+  const [colorPickerType, setColorPickerType] =
+    useState<ColorPickerType | null>(null);
   const [originalColor, setOriginalColor] = useState('');
 
   // Get current theme
@@ -104,15 +115,27 @@ export function UserMessageDisplayView({
   // Track which column is active
   const [activeColumn, setActiveColumn] = useState<'text' | 'border'>('text');
 
-  const textOptions = ['format', 'styling', 'foreground', 'background'] as const;
-  const borderOptions = ['borderStyle', 'borderColor', 'paddingX', 'paddingY'] as const;
+  const textOptions = [
+    'format',
+    'styling',
+    'foreground',
+    'background',
+  ] as const;
+  const borderOptions = [
+    'borderStyle',
+    'borderColor',
+    'paddingX',
+    'paddingY',
+    'fitBoxToContent',
+  ] as const;
 
   const [textSelectedIndex, setTextSelectedIndex] = useState(0);
   const [borderSelectedIndex, setBorderSelectedIndex] = useState(0);
 
-  const selectedOption = activeColumn === 'text'
-    ? textOptions[textSelectedIndex]
-    : borderOptions[borderSelectedIndex];
+  const selectedOption =
+    activeColumn === 'text'
+      ? textOptions[textSelectedIndex]
+      : borderOptions[borderSelectedIndex];
 
   // Save to settings
   const saveToSettings = () => {
@@ -122,13 +145,17 @@ export function UserMessageDisplayView({
       settings.userMessageDisplay.foregroundColor =
         foregroundMode === 'default' ? 'default' : foregroundColor;
       settings.userMessageDisplay.backgroundColor =
-        backgroundMode === 'none' ? null :
-        backgroundMode === 'default' ? 'default' :
-        backgroundColor;
-      settings.userMessageDisplay.borderStyle = BORDER_STYLE_OPTIONS[borderStyleIndex].value as any;
+        backgroundMode === 'none'
+          ? null
+          : backgroundMode === 'default'
+            ? 'default'
+            : backgroundColor;
+      settings.userMessageDisplay.borderStyle =
+        BORDER_STYLE_OPTIONS[borderStyleIndex].value;
       settings.userMessageDisplay.borderColor = borderColor;
       settings.userMessageDisplay.paddingX = parseInt(paddingXInput) || 0;
       settings.userMessageDisplay.paddingY = parseInt(paddingYInput) || 0;
+      settings.userMessageDisplay.fitBoxToContent = fitBoxToContent;
     });
   };
 
@@ -140,57 +167,42 @@ export function UserMessageDisplayView({
     setForegroundColor('rgb(255,255,255)');
     setBackgroundMode('none');
     setBackgroundColor('rgb(0,0,0)');
-    setBorderStyleIndex(BORDER_STYLE_OPTIONS.findIndex(opt => opt.value === DEFAULT_SETTINGS.userMessageDisplay.borderStyle));
+    setBorderStyleIndex(
+      BORDER_STYLE_OPTIONS.findIndex(
+        opt => opt.value === DEFAULT_SETTINGS.userMessageDisplay.borderStyle
+      )
+    );
     setBorderColor(DEFAULT_SETTINGS.userMessageDisplay.borderColor);
     setPaddingXInput(String(DEFAULT_SETTINGS.userMessageDisplay.paddingX));
     setPaddingYInput(String(DEFAULT_SETTINGS.userMessageDisplay.paddingY));
+    setFitBoxToContent(DEFAULT_SETTINGS.userMessageDisplay.fitBoxToContent);
 
     updateSettings(settings => {
       settings.userMessageDisplay = { ...DEFAULT_SETTINGS.userMessageDisplay };
     });
   };
 
-  // Load existing configuration when component mounts
-  useEffect(() => {
-    const config = settings.userMessageDisplay;
-    setFormatInput(config.format);
-    setActiveStylings([...config.styling]);
-    setPaddingXInput(String(config.paddingX));
-    setPaddingYInput(String(config.paddingY));
-
-    if (config.foregroundColor === 'default') {
-      setForegroundMode('default');
-      setForegroundColor('rgb(255,255,255)');
-    } else {
-      setForegroundMode('custom');
-      setForegroundColor(config.foregroundColor);
-    }
-
-    if (config.backgroundColor === null) {
-      setBackgroundMode('none');
-      setBackgroundColor('rgb(0,0,0)');
-    } else if (config.backgroundColor === 'default') {
-      setBackgroundMode('default');
-      setBackgroundColor('rgb(0,0,0)');
-    } else {
-      setBackgroundMode('custom');
-      setBackgroundColor(config.backgroundColor);
-    }
-
-    setBorderStyleIndex(BORDER_STYLE_OPTIONS.findIndex(opt => opt.value === config.borderStyle));
-    setBorderColor(config.borderColor);
-  }, []);
-
-  // Save settings when borderStyleIndex changes
-  useEffect(() => {
+  // Auto-save settings when any value changes (skip initial mount)
+  useNonInitialEffect(() => {
     saveToSettings();
-  }, [borderStyleIndex]);
+  }, [
+    formatInput,
+    activeStylings,
+    foregroundMode,
+    foregroundColor,
+    backgroundMode,
+    backgroundColor,
+    borderStyleIndex,
+    borderColor,
+    paddingXInput,
+    paddingYInput,
+    fitBoxToContent,
+  ]);
 
   useInput((input, key) => {
     // Handle format editing
     if (editingFormat) {
       if (key.return) {
-        saveToSettings();
         setEditingFormat(false);
       } else if (key.escape) {
         setFormatInput(settings.userMessageDisplay.format);
@@ -206,7 +218,6 @@ export function UserMessageDisplayView({
     // Handle paddingX editing
     if (editingPaddingX) {
       if (key.return) {
-        saveToSettings();
         setEditingPaddingX(false);
       } else if (key.escape) {
         setPaddingXInput(String(settings.userMessageDisplay.paddingX));
@@ -222,7 +233,6 @@ export function UserMessageDisplayView({
     // Handle paddingY editing
     if (editingPaddingY) {
       if (key.return) {
-        saveToSettings();
         setEditingPaddingY(false);
       } else if (key.escape) {
         setPaddingYInput(String(settings.userMessageDisplay.paddingY));
@@ -245,7 +255,7 @@ export function UserMessageDisplayView({
       restoreToOriginal();
     } else if (key.leftArrow || key.rightArrow) {
       // Switch between columns
-      setActiveColumn(prev => prev === 'text' ? 'border' : 'text');
+      setActiveColumn(prev => (prev === 'text' ? 'border' : 'text'));
     } else if (key.tab) {
       // Navigate within active column
       if (activeColumn === 'text') {
@@ -301,28 +311,35 @@ export function UserMessageDisplayView({
         setForegroundMode(prev => {
           const nextMode = prev === 'default' ? 'custom' : 'default';
           // Ensure foregroundColor has a valid value when switching to custom mode
-          if (nextMode === 'custom' && (!foregroundColor || foregroundColor === '')) {
+          if (
+            nextMode === 'custom' &&
+            (!foregroundColor || foregroundColor === '')
+          ) {
             setForegroundColor('rgb(255,255,255)');
           }
           return nextMode;
         });
-        saveToSettings();
       } else if (selectedOption === 'background') {
         setBackgroundMode(prev => {
-          const nextMode = prev === 'default' ? 'custom' : prev === 'custom' ? 'none' : 'default';
+          const nextMode =
+            prev === 'default'
+              ? 'custom'
+              : prev === 'custom'
+                ? 'none'
+                : 'default';
           // Ensure backgroundColor has a valid value when switching to custom mode
-          if (nextMode === 'custom' && (!backgroundColor || backgroundColor === '')) {
+          if (
+            nextMode === 'custom' &&
+            (!backgroundColor || backgroundColor === '')
+          ) {
             setBackgroundColor('rgb(0,0,0)');
           }
           return nextMode;
         });
-        saveToSettings();
       }
     } else if (key.downArrow) {
       if (selectedOption === 'styling') {
-        setStylingIndex(prev =>
-          Math.min(STYLING_OPTIONS.length - 1, prev + 1)
-        );
+        setStylingIndex(prev => Math.min(STYLING_OPTIONS.length - 1, prev + 1));
       } else if (selectedOption === 'borderStyle') {
         setBorderStyleIndex(prev =>
           prev === BORDER_STYLE_OPTIONS.length - 1 ? 0 : prev + 1
@@ -331,22 +348,31 @@ export function UserMessageDisplayView({
         setForegroundMode(prev => {
           const nextMode = prev === 'default' ? 'custom' : 'default';
           // Ensure foregroundColor has a valid value when switching to custom mode
-          if (nextMode === 'custom' && (!foregroundColor || foregroundColor === '')) {
+          if (
+            nextMode === 'custom' &&
+            (!foregroundColor || foregroundColor === '')
+          ) {
             setForegroundColor('rgb(255,255,255)');
           }
           return nextMode;
         });
-        saveToSettings();
       } else if (selectedOption === 'background') {
         setBackgroundMode(prev => {
-          const nextMode = prev === 'default' ? 'none' : prev === 'none' ? 'custom' : 'default';
+          const nextMode =
+            prev === 'default'
+              ? 'none'
+              : prev === 'none'
+                ? 'custom'
+                : 'default';
           // Ensure backgroundColor has a valid value when switching to custom mode
-          if (nextMode === 'custom' && (!backgroundColor || backgroundColor === '')) {
+          if (
+            nextMode === 'custom' &&
+            (!backgroundColor || backgroundColor === '')
+          ) {
             setBackgroundColor('rgb(0,0,0)');
           }
           return nextMode;
         });
-        saveToSettings();
       }
     } else if (input === ' ') {
       if (selectedOption === 'styling') {
@@ -356,7 +382,8 @@ export function UserMessageDisplayView({
             ? activeStylings.filter(s => s !== option)
             : [...activeStylings, option];
         setActiveStylings(newStylings);
-        saveToSettings();
+      } else if (selectedOption === 'fitBoxToContent') {
+        setFitBoxToContent(prev => !prev);
       }
     }
   });
@@ -365,11 +392,13 @@ export function UserMessageDisplayView({
   const applyStylesToText = (text: string) => {
     const fgColor = foregroundMode === 'default' ? undefined : foregroundColor;
     const bgColor =
-      backgroundMode === 'none' ? undefined :
-      backgroundMode === 'default' ? undefined :
-      backgroundColor;
+      backgroundMode === 'none'
+        ? undefined
+        : backgroundMode === 'default'
+          ? undefined
+          : backgroundColor;
 
-    const borderStyle = BORDER_STYLE_OPTIONS[borderStyleIndex].value as any;
+    const borderStyle = BORDER_STYLE_OPTIONS[borderStyleIndex].value;
     const paddingX = parseInt(paddingXInput) || 0;
     const paddingY = parseInt(paddingYInput) || 0;
 
@@ -388,13 +417,19 @@ export function UserMessageDisplayView({
     );
 
     // Handle custom top/bottom-only borders
-    const isTopBottomBorder = borderStyle === 'topBottomSingle' || borderStyle === 'topBottomDouble' || borderStyle === 'topBottomBold';
+    const isTopBottomBorder =
+      borderStyle === 'topBottomSingle' ||
+      borderStyle === 'topBottomDouble' ||
+      borderStyle === 'topBottomBold';
 
     if (isTopBottomBorder) {
       // Render custom top/bottom borders as text
-      const borderChar = borderStyle === 'topBottomSingle' ? '─' :
-                        borderStyle === 'topBottomDouble' ? '═' :
-                        '━';
+      const borderChar =
+        borderStyle === 'topBottomSingle'
+          ? '─'
+          : borderStyle === 'topBottomDouble'
+            ? '═'
+            : '━';
       const textLength = text.length + paddingX * 2;
       const borderLine = borderChar.repeat(textLength);
 
@@ -402,28 +437,42 @@ export function UserMessageDisplayView({
         <Box flexDirection="column">
           <Text color={borderColor}>{borderLine}</Text>
           {paddingY > 0 && <Box height={paddingY} />}
-          <Box paddingX={paddingX}>
-            {styledText}
-          </Box>
+          <Box paddingX={paddingX}>{styledText}</Box>
           {paddingY > 0 && <Box height={paddingY} />}
           <Text color={borderColor}>{borderLine}</Text>
         </Box>
       );
-    } else if (borderStyle !== 'none' || paddingX > 0 || paddingY > 0) {
-      const content = paddingX > 0 || paddingY > 0 ? (
-        <Box paddingX={paddingX} paddingY={paddingY}>
-          {styledText}
-        </Box>
-      ) : styledText;
+    } else if (
+      borderStyle !== 'none' ||
+      paddingX > 0 ||
+      paddingY > 0 ||
+      fitBoxToContent
+    ) {
+      const content =
+        paddingX > 0 || paddingY > 0 ? (
+          <Box paddingX={paddingX} paddingY={paddingY}>
+            {styledText}
+          </Box>
+        ) : (
+          styledText
+        );
 
-      return borderStyle !== 'none' ? (
-        <Box
-          borderStyle={borderStyle}
-          borderColor={borderColor}
-        >
-          {content}
-        </Box>
-      ) : content;
+      const boxProps: Partial<Writable<BoxProps>> = {};
+      if (borderStyle !== 'none') {
+        boxProps.borderStyle = borderStyle;
+        boxProps.borderColor = borderColor;
+      }
+      if (fitBoxToContent) {
+        boxProps.alignSelf = 'flex-start';
+      } else {
+        boxProps.flexGrow = 1;
+      }
+
+      return borderStyle === 'none' ? (
+        content
+      ) : (
+        <Box {...boxProps}>{content}</Box>
+      );
     } else {
       return styledText;
     }
@@ -450,7 +499,6 @@ export function UserMessageDisplayView({
           } else if (colorPickerType === 'border') {
             setBorderColor(color);
           }
-          saveToSettings();
         }}
         onExit={() => {
           setColorPickerType(null);
@@ -468,9 +516,7 @@ export function UserMessageDisplayView({
         <Text dimColor>
           left/right arrows to switch columns · tab to navigate options
         </Text>
-        <Text dimColor>
-          enter to edit · ctrl+r to reset · esc to go back
-        </Text>
+        <Text dimColor>enter to edit · ctrl+r to reset · esc to go back</Text>
       </Box>
 
       <Box flexDirection="row" gap={1}>
@@ -498,138 +544,140 @@ export function UserMessageDisplayView({
             </Text>
           </Box>
 
-        {selectedOption === 'format' && (
-          <Box marginLeft={2}>
-            <Text dimColor>
-              {editingFormat
-                ? 'enter to save · esc to cancel'
-                : 'enter to edit · use {} as message placeholder'}
+          {selectedOption === 'format' && (
+            <Box marginLeft={2}>
+              <Text dimColor>
+                {editingFormat
+                  ? 'enter to save · esc to cancel'
+                  : 'enter to edit · use {} as message placeholder'}
+              </Text>
+            </Box>
+          )}
+
+          <Box marginLeft={2} marginBottom={1}>
+            <Box
+              borderStyle="round"
+              borderColor={editingFormat ? 'yellow' : 'gray'}
+            >
+              <Text>{formatInput}</Text>
+            </Box>
+          </Box>
+
+          {/* Styling Section */}
+          <Box>
+            <Text
+              color={selectedOption === 'styling' ? 'yellow' : undefined}
+              bold={selectedOption === 'styling'}
+            >
+              {selectedOption === 'styling' ? '❯ ' : '  '}Styling
             </Text>
           </Box>
-        )}
 
-        <Box marginLeft={2} marginBottom={1}>
-          <Box
-            borderStyle="round"
-            borderColor={editingFormat ? 'yellow' : 'gray'}
-          >
-            <Text>{formatInput}</Text>
-          </Box>
-        </Box>
-
-        {/* Styling Section */}
-        <Box>
-          <Text
-            color={selectedOption === 'styling' ? 'yellow' : undefined}
-            bold={selectedOption === 'styling'}
-          >
-            {selectedOption === 'styling' ? '❯ ' : '  '}Styling
-          </Text>
-        </Box>
-
-        {selectedOption === 'styling' && (
-          <Box marginLeft={2}>
-            <Text dimColor>up/down to navigate · space to toggle</Text>
-          </Box>
-        )}
-
-        <Box marginLeft={2} marginBottom={1} flexDirection="column">
-          {STYLING_OPTIONS.map((option, index) => (
-            <Box key={option.value}>
-              <Text
-                color={
-                  selectedOption === 'styling' && stylingIndex === index
-                    ? 'cyan'
-                    : undefined
-                }
-              >
-                {selectedOption === 'styling' && stylingIndex === index
-                  ? '❯ '
-                  : '  '}
-                {activeStylings.includes(option.value) ? '●' : '○'}{' '}
-                {option.label}
-              </Text>
+          {selectedOption === 'styling' && (
+            <Box marginLeft={2}>
+              <Text dimColor>up/down to navigate · space to toggle</Text>
             </Box>
-          ))}
-        </Box>
+          )}
 
-        {/* Foreground & Background Color Section */}
-        <Box flexDirection="row" gap={1} marginBottom={1}>
-          <Box flexDirection="column" width="50%">
-            <Box>
-              <Text
-                color={selectedOption === 'foreground' ? 'yellow' : undefined}
-                bold={selectedOption === 'foreground'}
-              >
-                {selectedOption === 'foreground' ? '❯ ' : '  '}Foreground
-              </Text>
-            </Box>
-
-            {selectedOption === 'foreground' && (
-              <Box marginLeft={2}>
-                <Text dimColor>
-                  up/down · {foregroundMode === 'custom' ? 'enter' : ''}
+          <Box marginLeft={2} marginBottom={1} flexDirection="column">
+            {STYLING_OPTIONS.map((option, index) => (
+              <Box key={option.value}>
+                <Text
+                  color={
+                    selectedOption === 'styling' && stylingIndex === index
+                      ? 'cyan'
+                      : undefined
+                  }
+                >
+                  {selectedOption === 'styling' && stylingIndex === index
+                    ? '❯ '
+                    : '  '}
+                  {activeStylings.includes(option.value) ? '●' : '○'}{' '}
+                  {option.label}
                 </Text>
               </Box>
-            )}
-
-            <Box marginLeft={2} flexDirection="column">
-              <Box>
-                <Text>
-                  {foregroundMode === 'default' ? '● ' : '○ '}Default
-                </Text>
-              </Box>
-              <Box>
-                <Text>
-                  {foregroundMode === 'custom' ? '● ' : '○ '}Custom{foregroundMode === 'custom' && ': '}
-                  {foregroundMode === 'custom' && (
-                    <Text color={foregroundColor}>{foregroundColor}</Text>
-                  )}
-                </Text>
-              </Box>
-            </Box>
+            ))}
           </Box>
 
-          <Box flexDirection="column" width="50%">
-            <Box>
-              <Text
-                color={selectedOption === 'background' ? 'yellow' : undefined}
-                bold={selectedOption === 'background'}
-              >
-                {selectedOption === 'background' ? '❯ ' : '  '}Background
-              </Text>
+          {/* Foreground & Background Color Section */}
+          <Box flexDirection="row" gap={1} marginBottom={1}>
+            <Box flexDirection="column" width="50%">
+              <Box>
+                <Text
+                  color={selectedOption === 'foreground' ? 'yellow' : undefined}
+                  bold={selectedOption === 'foreground'}
+                >
+                  {selectedOption === 'foreground' ? '❯ ' : '  '}Foreground
+                </Text>
+              </Box>
+
+              {selectedOption === 'foreground' && (
+                <Box marginLeft={2}>
+                  <Text dimColor>
+                    up/down · {foregroundMode === 'custom' ? 'enter' : ''}
+                  </Text>
+                </Box>
+              )}
+
+              <Box marginLeft={2} flexDirection="column">
+                <Box>
+                  <Text>
+                    {foregroundMode === 'default' ? '● ' : '○ '}Default
+                  </Text>
+                </Box>
+                <Box>
+                  <Text>
+                    {foregroundMode === 'custom' ? '● ' : '○ '}Custom
+                    {foregroundMode === 'custom' && ': '}
+                    {foregroundMode === 'custom' && (
+                      <Text color={foregroundColor}>{foregroundColor}</Text>
+                    )}
+                  </Text>
+                </Box>
+              </Box>
             </Box>
 
-            {selectedOption === 'background' && (
-              <Box marginLeft={2}>
-                <Text dimColor>
-                  up/down · {backgroundMode === 'custom' ? 'enter' : ''}
+            <Box flexDirection="column" width="50%">
+              <Box>
+                <Text
+                  color={selectedOption === 'background' ? 'yellow' : undefined}
+                  bold={selectedOption === 'background'}
+                >
+                  {selectedOption === 'background' ? '❯ ' : '  '}Background
                 </Text>
               </Box>
-            )}
 
-            <Box marginLeft={2} flexDirection="column">
-              <Box>
-                <Text>
-                  {backgroundMode === 'default' ? '● ' : '○ '}Default
-                </Text>
-              </Box>
-              <Box>
-                <Text>
-                  {backgroundMode === 'none' ? '● ' : '○ '}None
-                </Text>
-              </Box>
-              <Box>
-                <Text>
-                  {backgroundMode === 'custom' ? '● ' : '○ '}Custom{backgroundMode === 'custom' && ': '}
-                  {backgroundMode === 'custom' && (
-                    <Text backgroundColor={backgroundColor}>{backgroundColor}</Text>
-                  )}
-                </Text>
+              {selectedOption === 'background' && (
+                <Box marginLeft={2}>
+                  <Text dimColor>
+                    up/down · {backgroundMode === 'custom' ? 'enter' : ''}
+                  </Text>
+                </Box>
+              )}
+
+              <Box marginLeft={2} flexDirection="column">
+                <Box>
+                  <Text>
+                    {backgroundMode === 'default' ? '● ' : '○ '}Default
+                  </Text>
+                </Box>
+                <Box>
+                  <Text>{backgroundMode === 'none' ? '● ' : '○ '}None</Text>
+                </Box>
+                <Box>
+                  <Text>
+                    {backgroundMode === 'custom' ? '● ' : '○ '}Custom
+                    {backgroundMode === 'custom' && ': '}
+                    {backgroundMode === 'custom' && (
+                      <Text backgroundColor={backgroundColor}>
+                        {backgroundColor}
+                      </Text>
+                    )}
+                  </Text>
+                </Box>
               </Box>
             </Box>
           </Box>
-        </Box>
         </Box>
 
         {/* Border & Padding Column */}
@@ -656,134 +704,158 @@ export function UserMessageDisplayView({
             </Text>
           </Box>
 
-        {selectedOption === 'borderStyle' && (
-          <Box marginLeft={2}>
-            <Text dimColor>up/down to navigate</Text>
-          </Box>
-        )}
+          {selectedOption === 'borderStyle' && (
+            <Box marginLeft={2}>
+              <Text dimColor>up/down to navigate</Text>
+            </Box>
+          )}
 
-        <Box marginLeft={2} marginBottom={1} flexDirection="row">
-          <Box flexDirection="column" width="50%">
-            {BORDER_STYLE_OPTIONS.slice(0, 6).map((option, index) => (
-              <Box key={option.value}>
-                <Text
-                  color={
-                    selectedOption === 'borderStyle' && borderStyleIndex === index
-                      ? 'cyan'
-                      : undefined
-                  }
-                >
-                  {selectedOption === 'borderStyle' && borderStyleIndex === index
-                    ? '❯ '
-                    : '  '}
-                  {borderStyleIndex === index ? '● ' : '○ '}
-                  {option.label}
-                </Text>
-              </Box>
-            ))}
-          </Box>
-          <Box flexDirection="column" width="50%">
-            {BORDER_STYLE_OPTIONS.slice(6).map((option, index) => {
-              const actualIndex = index + 6;
-              return (
+          <Box marginLeft={2} marginBottom={1} flexDirection="row">
+            <Box flexDirection="column" width="50%">
+              {BORDER_STYLE_OPTIONS.slice(0, 6).map((option, index) => (
                 <Box key={option.value}>
                   <Text
                     color={
-                      selectedOption === 'borderStyle' && borderStyleIndex === actualIndex
+                      selectedOption === 'borderStyle' &&
+                      borderStyleIndex === index
                         ? 'cyan'
                         : undefined
                     }
                   >
-                    {selectedOption === 'borderStyle' && borderStyleIndex === actualIndex
+                    {selectedOption === 'borderStyle' &&
+                    borderStyleIndex === index
                       ? '❯ '
                       : '  '}
-                    {borderStyleIndex === actualIndex ? '● ' : '○ '}
+                    {borderStyleIndex === index ? '● ' : '○ '}
                     {option.label}
                   </Text>
                 </Box>
-              );
-            })}
-          </Box>
-        </Box>
-
-        {/* Border Color Section */}
-        <Box>
-          <Text
-            color={selectedOption === 'borderColor' ? 'yellow' : undefined}
-            bold={selectedOption === 'borderColor'}
-          >
-            {selectedOption === 'borderColor' ? '❯ ' : '  '}Border Color
-          </Text>
-        </Box>
-
-        {selectedOption === 'borderColor' && (
-          <Box marginLeft={2}>
-            <Text dimColor>enter to pick color</Text>
-          </Box>
-        )}
-
-        <Box marginLeft={2} marginBottom={1}>
-          <Text color={borderColor}>{borderColor}</Text>
-        </Box>
-
-        {/* Padding X & Y Section */}
-        <Box flexDirection="row" gap={1}>
-          <Box flexDirection="column" width="50%">
-            <Box>
-              <Text
-                color={selectedOption === 'paddingX' ? 'yellow' : undefined}
-                bold={selectedOption === 'paddingX'}
-              >
-                {selectedOption === 'paddingX' ? '❯ ' : '  '}Padding X
-              </Text>
+              ))}
             </Box>
+            <Box flexDirection="column" width="50%">
+              {BORDER_STYLE_OPTIONS.slice(6).map((option, index) => {
+                const actualIndex = index + 6;
+                return (
+                  <Box key={option.value}>
+                    <Text
+                      color={
+                        selectedOption === 'borderStyle' &&
+                        borderStyleIndex === actualIndex
+                          ? 'cyan'
+                          : undefined
+                      }
+                    >
+                      {selectedOption === 'borderStyle' &&
+                      borderStyleIndex === actualIndex
+                        ? '❯ '
+                        : '  '}
+                      {borderStyleIndex === actualIndex ? '● ' : '○ '}
+                      {option.label}
+                    </Text>
+                  </Box>
+                );
+              })}
+            </Box>
+          </Box>
 
-            {selectedOption === 'paddingX' && (
-              <Box marginLeft={2}>
-                <Text dimColor>
-                  {editingPaddingX ? 'enter/esc' : 'enter'}
+          {/* Border Color Section */}
+          <Box>
+            <Text
+              color={selectedOption === 'borderColor' ? 'yellow' : undefined}
+              bold={selectedOption === 'borderColor'}
+            >
+              {selectedOption === 'borderColor' ? '❯ ' : '  '}Border Color
+            </Text>
+          </Box>
+
+          {selectedOption === 'borderColor' && (
+            <Box marginLeft={2}>
+              <Text dimColor>enter to pick color</Text>
+            </Box>
+          )}
+
+          <Box marginLeft={2} marginBottom={1}>
+            <Text color={borderColor}>{borderColor}</Text>
+          </Box>
+
+          {/* Padding X & Y Section */}
+          <Box flexDirection="row" gap={1}>
+            <Box flexDirection="column" width="33%">
+              <Box>
+                <Text
+                  color={selectedOption === 'paddingX' ? 'yellow' : undefined}
+                  bold={selectedOption === 'paddingX'}
+                >
+                  {selectedOption === 'paddingX' ? '❯ ' : '  '}Padding X
                 </Text>
               </Box>
-            )}
 
-            <Box marginLeft={2}>
-              <Box
-                borderStyle="round"
-                borderColor={editingPaddingX ? 'yellow' : 'gray'}
-              >
-                <Text>{paddingXInput}</Text>
+              {selectedOption === 'paddingX' && (
+                <Box marginLeft={2}>
+                  <Text dimColor>
+                    {editingPaddingX ? 'enter/esc' : 'enter'}
+                  </Text>
+                </Box>
+              )}
+
+              <Box marginLeft={2}>
+                <Box
+                  borderStyle="round"
+                  borderColor={editingPaddingX ? 'yellow' : 'gray'}
+                >
+                  <Text>{paddingXInput}</Text>
+                </Box>
               </Box>
             </Box>
-          </Box>
 
-          <Box flexDirection="column" width="50%">
-            <Box>
-              <Text
-                color={selectedOption === 'paddingY' ? 'yellow' : undefined}
-                bold={selectedOption === 'paddingY'}
-              >
-                {selectedOption === 'paddingY' ? '❯ ' : '  '}Padding Y
-              </Text>
-            </Box>
-
-            {selectedOption === 'paddingY' && (
-              <Box marginLeft={2}>
-                <Text dimColor>
-                  {editingPaddingY ? 'enter/esc' : 'enter'}
+            <Box flexDirection="column" width="33%">
+              <Box>
+                <Text
+                  color={selectedOption === 'paddingY' ? 'yellow' : undefined}
+                  bold={selectedOption === 'paddingY'}
+                >
+                  {selectedOption === 'paddingY' ? '❯ ' : '  '}Padding Y
                 </Text>
               </Box>
-            )}
 
-            <Box marginLeft={2}>
-              <Box
-                borderStyle="round"
-                borderColor={editingPaddingY ? 'yellow' : 'gray'}
-              >
-                <Text>{paddingYInput}</Text>
+              {selectedOption === 'paddingY' && (
+                <Box marginLeft={2}>
+                  <Text dimColor>
+                    {editingPaddingY ? 'enter/esc' : 'enter'}
+                  </Text>
+                </Box>
+              )}
+
+              <Box marginLeft={2}>
+                <Box
+                  borderStyle="round"
+                  borderColor={editingPaddingY ? 'yellow' : 'gray'}
+                >
+                  <Text>{paddingYInput}</Text>
+                </Box>
               </Box>
             </Box>
+
+            <Box flexDirection="column" width="33%">
+              <Box>
+                <Text
+                  color={
+                    selectedOption === 'fitBoxToContent' ? 'yellow' : undefined
+                  }
+                  bold={selectedOption === 'fitBoxToContent'}
+                >
+                  {selectedOption === 'fitBoxToContent' ? '❯ ' : '  '}
+                  {fitBoxToContent ? '●' : '○'} Fit box to content
+                </Text>
+              </Box>
+
+              {selectedOption === 'fitBoxToContent' && (
+                <Box marginLeft={2}>
+                  <Text dimColor>space</Text>
+                </Box>
+              )}
+            </Box>
           </Box>
-        </Box>
         </Box>
       </Box>
 
@@ -793,50 +865,52 @@ export function UserMessageDisplayView({
           <Text bold>Preview</Text>
         </Box>
 
-          <Box flexDirection="row" gap={2}>
-            {/* Before (Original) */}
-            <Box flexDirection="column" width="50%">
-              <Box marginBottom={1}>
-                <Text underline>Before (Claude Code default):</Text>
-              </Box>
-              <Box marginLeft={1} marginTop={1}>
-                <Text>
-                  <Text color={currentTheme?.colors?.inactive || '#888888'}>
-                    ●
-                  </Text>
-                  <Text> The directory </Text>
-                  <Text color={currentTheme?.colors?.permission || '#00ff00'}>
-                    C:\Users\user
-                  </Text>
-                  <Text> contains </Text>
-                  <Text bold>123</Text>
-                  <Text> files.</Text>
-                </Text>
-              </Box>
+        <Box flexDirection="row" gap={2}>
+          {/* Before (Original) */}
+          <Box flexDirection="column" width="50%">
+            <Box marginBottom={1}>
+              <Text underline>Before (Claude Code default):</Text>
             </Box>
-
-            {/* After (Customized) */}
-            <Box flexDirection="column" width="50%">
-              <Box marginBottom={1}>
-                <Text underline>After (Your customization):</Text>
-              </Box>
-              <Box marginLeft={1}>{createPreview()}</Box>
-              <Box marginLeft={1} marginTop={1}>
-                <Text>
-                  <Text color={currentTheme?.colors?.inactive || '#888888'}>
-                    ●
-                  </Text>
-                  <Text> The directory </Text>
-                  <Text color={currentTheme?.colors?.permission || '#00ff00'}>
-                    C:\Users\user
-                  </Text>
-                  <Text> contains </Text>
-                  <Text bold>123</Text>
-                  <Text> files.</Text>
+            <Box marginLeft={1} marginTop={1}>
+              <Text>
+                <Text color={currentTheme?.colors?.inactive || '#888888'}>
+                  ●
                 </Text>
-              </Box>
+                <Text> The directory </Text>
+                <Text color={currentTheme?.colors?.permission || '#00ff00'}>
+                  C:\Users\user
+                </Text>
+                <Text> contains </Text>
+                <Text bold>123</Text>
+                <Text> files.</Text>
+              </Text>
             </Box>
           </Box>
+
+          {/* After (Customized) */}
+          <Box flexDirection="column" width="50%">
+            <Box marginBottom={1}>
+              <Text underline>After (Your customization):</Text>
+            </Box>
+            <Box marginLeft={1} flexDirection="row">
+              {createPreview()}
+            </Box>
+            <Box marginLeft={1} marginTop={1}>
+              <Text>
+                <Text color={currentTheme?.colors?.inactive || '#888888'}>
+                  ●
+                </Text>
+                <Text> The directory </Text>
+                <Text color={currentTheme?.colors?.permission || '#00ff00'}>
+                  C:\Users\user
+                </Text>
+                <Text> contains </Text>
+                <Text bold>123</Text>
+                <Text> files.</Text>
+              </Text>
+            </Box>
+          </Box>
+        </Box>
       </Box>
     </Box>
   );

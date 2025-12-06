@@ -1,5 +1,10 @@
 // Please see the note about writing patches in ./index.js.
-import { findChalkVar, LocationResult, showDiff } from './index.js';
+import {
+  findBoxComponent,
+  findChalkVar,
+  LocationResult,
+  showDiff,
+} from './index.js';
 
 const getUserMessageDisplayLocation = (
   oldFile: string
@@ -16,7 +21,11 @@ const getUserMessageDisplayLocation = (
   return {
     startIndex: messageDisplayMatch.index,
     endIndex: messageDisplayMatch.index + messageDisplayMatch[0].length,
-    identifiers: [messageDisplayMatch[1], messageDisplayMatch[2], messageDisplayMatch[3]],
+    identifiers: [
+      messageDisplayMatch[1],
+      messageDisplayMatch[2],
+      messageDisplayMatch[3],
+    ],
   };
 };
 
@@ -33,19 +42,26 @@ export const writeUserMessageDisplay = (
   borderStyle: string = 'none',
   borderColor: string = 'rgb(255,255,255)',
   paddingX: number = 0,
-  paddingY: number = 0
+  paddingY: number = 0,
+  fitBoxToContent: boolean = false
 ): string | null => {
   const location = getUserMessageDisplayLocation(oldFile);
   if (!location) {
     console.error(
-      'patch: userMessageDisplay: getUserMessageDisplayLocation returned null'
+      '^ patch: userMessageDisplay: getUserMessageDisplayLocation returned null'
     );
     return null;
   }
 
   const chalkVar = findChalkVar(oldFile);
   if (!chalkVar) {
-    console.error('patch: userMessageDisplay: failed to find chalk variable');
+    console.error('^ patch: userMessageDisplay: failed to find chalk variable');
+    return null;
+  }
+
+  const boxComponent = findBoxComponent(oldFile);
+  if (!boxComponent) {
+    console.error('^ patch: userMessageDisplay: failed to find box component');
     return null;
   }
 
@@ -59,8 +75,50 @@ export const writeUserMessageDisplay = (
     strikethrough ||
     inverse;
 
-  let attrsObjStr: string;
+  let textAttrsObjStr: string;
   let chalkChain: string = '';
+
+  // Build box attributes (border and padding)
+  const boxAttrs: string[] = [];
+  const isCustomBorder = borderStyle.startsWith('topBottom');
+
+  if (borderStyle !== 'none') {
+    if (isCustomBorder) {
+      // Custom topBottom borders - only show top and bottom
+      let customBorder = '';
+
+      if (borderStyle === 'topBottomSingle') {
+        customBorder =
+          '{top:"─",bottom:"─",left:" ",right:" ",topLeft:" ",topRight:" ",bottomLeft:" ",bottomRight:" "}';
+      } else if (borderStyle === 'topBottomDouble') {
+        customBorder =
+          '{top:"═",bottom:"═",left:" ",right:" ",topLeft:" ",topRight:" ",bottomLeft:" ",bottomRight:" "}';
+      } else if (borderStyle === 'topBottomBold') {
+        customBorder =
+          '{top:"━",bottom:"━",left:" ",right:" ",topLeft:" ",topRight:" ",bottomLeft:" ",bottomRight:" "}';
+      }
+
+      boxAttrs.push(`borderStyle:${customBorder}`);
+    } else {
+      // Standard Ink border styles
+      boxAttrs.push(`borderStyle:"${borderStyle}"`);
+    }
+
+    const borderMatch = borderColor.match(/\d+/g);
+    if (borderMatch) {
+      boxAttrs.push(`borderColor:"rgb(${borderMatch.join(',')})"`);
+    }
+  }
+  if (paddingX > 0) {
+    boxAttrs.push(`paddingX:${paddingX}`);
+  }
+  if (paddingY > 0) {
+    boxAttrs.push(`paddingY:${paddingY}`);
+  }
+  if (fitBoxToContent) {
+    boxAttrs.push(`alignSelf:"flex-start"`);
+  }
+  const boxAttrsObjStr = boxAttrs.length > 0 ? `{${boxAttrs.join(',')}}` : '{}';
 
   if (needsChalk) {
     // Build chalk chain for custom colors and/or styling
@@ -88,62 +146,38 @@ export const writeUserMessageDisplay = (
     if (strikethrough) chalkChain += '.strikethrough';
     if (inverse) chalkChain += '.inverse';
 
-    // Build attributes object with border properties
-    const attrs: string[] = [];
-    // Custom border styles (topBottom*) are not standard Ink styles, so skip them
-    const isCustomBorder = borderStyle.startsWith('topBottom');
-    if (borderStyle !== 'none' && !isCustomBorder) {
-      attrs.push(`borderStyle:"${borderStyle}"`);
-      const borderMatch = borderColor.match(/\d+/g);
-      if (borderMatch) {
-        attrs.push(`borderColor:"rgb(${borderMatch.join(',')})"`);
-      }
-    }
-    if (paddingX > 0) {
-      attrs.push(`paddingX:${paddingX}`);
-    }
-    if (paddingY > 0) {
-      attrs.push(`paddingY:${paddingY}`);
-    }
-
-    attrsObjStr = attrs.length > 0 ? `{${attrs.join(',')}}` : '{}';
+    // No attributes needed for text when using chalk
+    textAttrsObjStr = '{}';
   } else {
-    // Use Ink/React attributes for default colors and border
-    const attrs: string[] = [];
+    // Use Ink/React attributes for default colors
+    const textAttrs: string[] = [];
 
     if (backgroundColor === 'default') {
-      attrs.push('backgroundColor:"userMessageBackground"');
+      textAttrs.push('backgroundColor:"userMessageBackground"');
     }
 
     if (foregroundColor === 'default') {
-      attrs.push('color:"text"');
+      textAttrs.push('color:"text"');
     }
 
-    // Custom border styles (topBottom*) are not standard Ink styles, so skip them
-    const isCustomBorder = borderStyle.startsWith('topBottom');
-    if (borderStyle !== 'none' && !isCustomBorder) {
-      attrs.push(`borderStyle:"${borderStyle}"`);
-      const borderMatch = borderColor.match(/\d+/g);
-      if (borderMatch) {
-        attrs.push(`borderColor:"rgb(${borderMatch.join(',')})"`);
-      }
-    }
-
-    if (paddingX > 0) {
-      attrs.push(`paddingX:${paddingX}`);
-    }
-    if (paddingY > 0) {
-      attrs.push(`paddingY:${paddingY}`);
-    }
-
-    attrsObjStr = attrs.length > 0 ? `{${attrs.join(',')}}` : '{}';
+    textAttrsObjStr = textAttrs.length > 0 ? `{${textAttrs.join(',')}}` : '{}';
   }
 
-  const [reactVar, component, messageVar] = location.identifiers!;
+  const [reactVar, textComponent, messageVar] = location.identifiers!;
   // Replace {} in format string with the message variable
-  const formattedMessage = '"' + format.replace(/\{\}/g, `"+${messageVar}+"`) + '"';
+  const formattedMessage =
+    '"' + format.replace(/\{\}/g, `"+${messageVar}+"`) + '"';
 
-  const newContent = `return ${reactVar}.createElement(${component},${attrsObjStr},${chalkChain}(${formattedMessage}));`;
+  const newContent = `
+return ${reactVar}.createElement(
+  ${boxComponent},
+  ${boxAttrsObjStr},
+  ${reactVar}.createElement(
+    ${textComponent},
+    ${textAttrsObjStr},
+    ${chalkChain}(${formattedMessage})
+  )
+);`;
 
   // Apply modification
   const newFile =
