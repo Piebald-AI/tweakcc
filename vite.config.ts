@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => ({
   build: {
     assetsDir: '',
     target: 'es2023',
-    minify: false,//mode === 'production' ? 'esbuild' : false,
+    minify: mode === 'production' ? 'esbuild' : false,
     sourcemap: mode === 'development' ? 'inline' : false,
     rollupOptions: {
       input: {
