@@ -26,7 +26,9 @@ const AVAILABLE_TOOLS = [
   'AskUserQuestion',
   'Skill',
   'SlashCommand',
+  'EnterPlanMode',
   'ExitPlanMode',
+  'LSP'
 ];
 
 export function ToolsetEditView({
