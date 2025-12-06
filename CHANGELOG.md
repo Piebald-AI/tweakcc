@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Improve user message display (#269) - @bl-ue
 - Ignore permission errors when searching for cli.js (#268) - @bl-ue
 - Support for `~/.claude/tweakcc` configuration directory location (#259) - @bl-ue
 - `TWEAKCC_CONFIG_DIR` environment variable for explicit config location override (#259) - @bl-ue
