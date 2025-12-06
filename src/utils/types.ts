@@ -136,7 +136,8 @@ export interface Settings {
 
 export interface TweakccConfig {
   ccVersion: string;
-  ccInstallationDir: string | null;
+  ccInstallationDir?: string | null; // Deprecated: only used for migration from old configs
+  ccInstallation?: string | null;
   lastModified: string;
   changesApplied: boolean;
   settings: Settings;

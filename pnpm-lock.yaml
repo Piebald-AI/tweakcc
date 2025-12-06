@@ -41,6 +41,9 @@ importers:
       react:
         specifier: ^19.1.1
         version: 19.1.1
+      wasmagic:
+        specifier: ^1.0.7
+        version: 1.0.7
     devDependencies:
       '@eslint/js':
         specifier: ^9.33.0
@@ -2040,6 +2043,10 @@ packages:
         optional: true
       jsdom:
         optional: true
+
+  wasmagic@1.0.7:
+    resolution: {integrity: sha512-c16NV8eoHR9cWAKZEfxImVglsT5qO/NBYPMD3KJu/L9XKRrHWW9GENIhwHyGibLBkt/4DSbIP2XmJALRuYW37g==}
+    engines: {node: '>=16.4.0'}
 
   whatwg-fetch@3.6.20:
     resolution: {integrity: sha512-EqhiFU6daOA8kpjOWTL0olhVOF3i7OrFzSYiGsEMB8GcXS+RrzauAERX65xMeNWVqxA6HXH2m69Z9LaKKdisfg==}
@@ -4165,6 +4172,8 @@ snapshots:
       - terser
       - tsx
       - yaml
+
+  wasmagic@1.0.7: {}
 
   whatwg-fetch@3.6.20: {}
 

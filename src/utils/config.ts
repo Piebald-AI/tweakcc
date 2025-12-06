@@ -6,6 +6,7 @@ import path from 'node:path';
 import { EOL } from 'node:os';
 import { execSync } from 'node:child_process';
 import chalk from 'chalk';
+import { WASMagic } from 'wasmagic';
 import {
   ClaudeCodeInstallationInfo,
   CLIJS_BACKUP_FILE,
@@ -193,7 +194,7 @@ let lastConfig: TweakccConfig | null = null;
 export const readConfigFile = async (): Promise<TweakccConfig> => {
   const config: TweakccConfig = {
     ccVersion: '',
-    ccInstallationDir: null,
+    ccInstallation: null,
     lastModified: new Date().toISOString(),
     changesApplied: true,
     settings: DEFAULT_SETTINGS,
@@ -440,6 +441,15 @@ interface ClaudeExecutablePathInfo {
   isSymlink: boolean;
 }
 
+let magicInstancePromise: Promise<WASMagic> | null = null;
+
+async function getMagicInstance(): Promise<WASMagic> {
+  if (!magicInstancePromise) {
+    magicInstancePromise = WASMagic.create();
+  }
+  return magicInstancePromise!;
+}
+
 /**
  * Finds the claude executable on PATH (POSIX platforms only).
  * Returns the resolved executable info, or null if not found.
@@ -513,6 +523,73 @@ async function findClaudeExecutableOnPath(): Promise<ClaudeExecutablePathInfo | 
   }
 
   return null;
+}
+
+async function readFilePrefix(
+  filePath: string,
+  maxBytes = 4096
+): Promise<Buffer | null> {
+  try {
+    const handle = await fs.open(filePath, 'r');
+    try {
+      const buffer = Buffer.allocUnsafe(maxBytes);
+      const { bytesRead } = await handle.read({
+        buffer,
+        position: 0,
+        length: maxBytes,
+      });
+      if (bytesRead <= 0) {
+        return null;
+      }
+      return buffer.subarray(0, bytesRead);
+    } finally {
+      await handle.close();
+    }
+  } catch (error) {
+    if (isDebug()) {
+      console.log('Failed to read file prefix for WASMagic:', error);
+    }
+    return null;
+  }
+}
+
+async function detectClaudeExecutableKind(
+  exePath: string
+): Promise<'js' | 'binary' | 'other'> {
+  const prefix = await readFilePrefix(exePath);
+  if (!prefix) {
+    return 'other';
+  }
+
+  try {
+    const magic = await getMagicInstance();
+    let mime: string | null = null;
+
+    if (typeof magic.detect === 'function') {
+      mime = magic.detect(prefix) || null;
+    }
+
+    if (!mime) {
+      return 'other';
+    }
+
+    const lower = mime.toLowerCase();
+    if (lower.includes('javascript')) {
+      return 'js';
+    }
+    if (!lower.startsWith('text/')) {
+      return 'binary';
+    }
+    return 'other';
+  } catch (error) {
+    if (isDebug()) {
+      console.log(
+        'WASMagic detection failed, falling back to search paths:',
+        error
+      );
+    }
+    return 'other';
+  }
 }
 
 /**
@@ -626,10 +703,159 @@ async function findClijsFromExecutablePath(
 export const findClaudeCodeInstallation = async (
   config: TweakccConfig
 ): Promise<ClaudeCodeInstallationInfo | null> => {
-  if (config.ccInstallationDir) {
-    CLIJS_SEARCH_PATHS.unshift(config.ccInstallationDir);
+  // Prefer explicit installation path if provided - this takes priority over all other detection methods.
+  // This path may point to either a JS cli.js file or a native binary.
+  if (config.ccInstallation) {
+    const installPath = config.ccInstallation;
+    try {
+      if (!(await doesFileExist(installPath))) {
+        console.warn(
+          `Configured ccInstallation path does not exist: ${installPath}`
+        );
+        console.warn('Falling back to automatic detection...');
+      } else {
+        const kind = await detectClaudeExecutableKind(installPath);
+
+        if (kind === 'js') {
+          if (isDebug()) {
+            console.log(
+              `Using Claude Code cli.js from explicit ccInstallation path: ${installPath}`
+            );
+            console.log(`SHA256 hash: ${await hashFileInChunks(installPath)}`);
+          }
+          const version = await extractVersionFromJsFile(installPath);
+          return {
+            cliPath: installPath,
+            version,
+          };
+        }
+
+        if (kind === 'binary') {
+          if (isDebug()) {
+            console.log(
+              `Using native Claude installation from explicit ccInstallation path: ${installPath}`
+            );
+          }
+
+          const claudeJsBuffer =
+            extractClaudeJsFromNativeInstallation(installPath);
+
+          if (claudeJsBuffer) {
+            const content = claudeJsBuffer.toString('utf8');
+            const version = extractVersionFromContent(content);
+
+            if (version) {
+              if (isDebug()) {
+                console.log(
+                  `Extracted version ${version} from native installation via explicit ccInstallation`
+                );
+              }
+              return {
+                version,
+                nativeInstallationPath: installPath,
+              };
+            }
+          }
+
+          console.warn(
+            `Configured ccInstallation path appears to be a native binary, but version could not be determined: ${installPath}`
+          );
+          console.warn('Falling back to automatic detection...');
+        } else {
+          console.warn(
+            `Configured ccInstallation path is not recognized as JavaScript or a native binary: ${installPath}`
+          );
+          console.warn('Falling back to automatic detection...');
+        }
+      }
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+      ) {
+        console.warn(
+          `Configured ccInstallation path is not accessible: ${installPath}`
+        );
+        console.warn('Falling back to automatic detection...');
+      } else {
+        throw error;
+      }
+    }
   }
 
+  // Next, try to locate `claude` on PATH and use WASMagic to determine
+  // whether it is a JS entrypoint (cli.js) or a native binary.
+  const claudeExePathInfo = await findClaudeExecutableOnPath();
+  if (isDebug()) {
+    console.log(
+      `findClaudeExecutableOnPath() returned: ${claudeExePathInfo?.resolvedPath ?? null}`
+    );
+  }
+
+  if (claudeExePathInfo) {
+    const claudeExePath = claudeExePathInfo.resolvedPath;
+    const kind = await detectClaudeExecutableKind(claudeExePath);
+    if (isDebug()) {
+      console.log(`WASMagic classified claude executable as: ${kind}`);
+      if (kind === 'other') {
+        console.log(
+          'PATH claude executable did not look like JavaScript or a native binary; falling back to CLIJS_SEARCH_PATHS.'
+        );
+      }
+    }
+
+    if (kind === 'js') {
+      if (isDebug()) {
+        console.log(
+          `Treating PATH claude executable as cli.js at: ${claudeExePath}`
+        );
+        console.log(`SHA256 hash: ${await hashFileInChunks(claudeExePath)}`);
+      }
+      const version = await extractVersionFromJsFile(claudeExePath);
+      return {
+        cliPath: claudeExePath,
+        version,
+      };
+    }
+
+    if (kind === 'binary') {
+      if (isDebug()) {
+        console.log(
+          `Treating PATH claude executable as native installation: ${claudeExePath}`
+        );
+      }
+
+      const claudeJsBuffer =
+        extractClaudeJsFromNativeInstallation(claudeExePath);
+
+      if (claudeJsBuffer) {
+        const content = claudeJsBuffer.toString('utf8');
+        const version = extractVersionFromContent(content);
+
+        if (!version) {
+          if (isDebug()) {
+            console.log(
+              'Failed to extract version from native installation via PATH'
+            );
+          }
+        } else {
+          if (isDebug()) {
+            console.log(
+              `Extracted version ${version} from native installation via PATH`
+            );
+          }
+
+          return {
+            version,
+            nativeInstallationPath: claudeExePath,
+          };
+        }
+      }
+    }
+  }
+
+  // Fall back to the hard-coded cli.js detection paths.
   for (const searchPath of CLIJS_SEARCH_PATHS) {
     try {
       if (isDebug()) {
@@ -914,4 +1140,44 @@ export async function startupCheck(): Promise<StartupCheckInfo | null> {
     newVersion: null,
     ccInstInfo,
   };
+}
+
+/**
+ * Migrates old ccInstallationDir config to ccInstallation if needed.
+ * This should be called once at startup before any readConfigFile() calls.
+ * @returns true if migration occurred, false otherwise
+ */
+export async function migrateConfigIfNeeded(): Promise<boolean> {
+  try {
+    const content = await fs.readFile(CONFIG_FILE, 'utf8');
+    const rawConfig = JSON.parse(content) as Record<string, unknown>;
+
+    if (!Object.hasOwn(rawConfig, 'ccInstallationDir')) {
+      return false;
+    }
+
+    // Migrate ccInstallationDir to ccInstallation
+    if (rawConfig.ccInstallationDir && !rawConfig.ccInstallation) {
+      rawConfig.ccInstallation = path.join(
+        rawConfig.ccInstallationDir as string,
+        'cli.js'
+      );
+    }
+
+    // Remove the old key
+    delete rawConfig.ccInstallationDir;
+
+    // Save the migrated config
+    rawConfig.lastModified = new Date().toISOString();
+    await ensureConfigDir();
+    await fs.writeFile(CONFIG_FILE, JSON.stringify(rawConfig, null, 2));
+
+    return true;
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      // Config file doesn't exist, no migration needed
+      return false;
+    }
+    throw error;
+  }
 }
