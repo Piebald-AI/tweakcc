@@ -1,6 +1,6 @@
 {
   "name": "tweakcc",
-  "version": "2.0.3",
+  "version": "3.1.6",
   "type": "module",
   "description": "Command-line tool to customize your Claude Code theme colors, thinking verbs and more.",
   "main": "dist/index.js",
@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "tsc -b && vite build",
+    "build:dev": "vite build --mode development",
     "watch": "vite build --watch --mode development",
     "start": "node dist/index.js",
     "lint": "tsc --noEmit && eslint src",
@@ -27,7 +28,8 @@
     "installation",
     "theme",
     "claude-code-theme",
-    "figlet"
+    "system-prompts",
+    "toolsets"
   ],
   "author": {
     "name": "Piebald LLC",
@@ -57,14 +59,13 @@
   },
   "dependencies": {
     "@babel/parser": "^7.28.4",
-    "@types/figlet": "^1.7.0",
     "chalk": "^5.5.0",
     "commander": "^14.0.0",
-    "figlet": "^1.8.2",
     "globby": "^14.1.0",
     "gray-matter": "^4.0.3",
     "ink": "^6.1.0",
     "ink-link": "^4.1.0",
+    "node-lief": "0.1.6",
     "ollama": "^0.6.0",
     "openai": "^6.3.0",
     "react": "^19.1.1"

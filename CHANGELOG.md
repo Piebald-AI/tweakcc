@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Ignore permission errors when searching for cli.js (#268) - @bl-ue
+- Support for `~/.claude/tweakcc` configuration directory location (#259) - @bl-ue
+- `TWEAKCC_CONFIG_DIR` environment variable for explicit config location override (#259) - @bl-ue
+- Warning when multiple configuration locations are detected  (#259) - @bl-ue
+- Configuration priority order now: `TWEAKCC_CONFIG_DIR` > `~/.tweakcc` (if exists) > `~/.claude/tweakcc` > `XDG_CONFIG_HOME/tweakcc` > `~/.tweakcc` (default) (#259) - @bl-ue
+- Fix Claude Code hanging due to `/title` patches (#265) - @bl-ue
+- Allow disabling `/title` patches via the Misc view (#265) - @bl-ue
+- Add `EnterPlanMode` and `LSP` to the toolset edit view (#266) - @bl-ue
+
+## [v3.1.6](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.6) - 2025-12-05
+
+- Add bunx cache detection and lazy-load node-lief for NixOS compatibility (#255) - @y0usaf
+
+## [v3.1.5](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.5) - 2025-11-30
+
+- Fix `$` variable name replacement in system prompts (#241) - @signadou
+
+## [v3.1.4](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.4) - 2025-11-29
+
+- Allow making a toolset the default for plan mode (#238) - @bl-ue
+
+## [v3.1.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.3) - 2025-11-26
+
+- Add paths for mise npm backend (#234) - @coryzibell
+- Emit a Rust-style error when system prompt markdown files contain unescaped backslashes (#226) - @bl-ue & @mike1858
+
+## [v3.1.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.2) - 2025-11-23
+
+- Fix toolset patching (#224) - @bl-ue
+- Remove the `/cost` patch (#223) - @bl-ue
+- Fix `/title` patching for CC 2.0.49+ (#222) - @bl-ue
+
+## [v3.1.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.1) - 2025-11-17
+
+- Fix Restore menu item to account for native binary too (#208) - @bl-ue
+- Detect the native CC version from the active binary instead of the backup (#207) - @bl-ue
+- Use `require` instead of `import` in patches (`import` doesn't work in Bun) (closes #205) (#206) - @bl-ue
+
+## [v3.1.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.0) - 2025-11-15
+
+- Show the currently-active toolset next to the "accept edits on"/"plan mode on" banner (#200) - @bl-ue
+- Add `/title` and `/rename` slash commands to CC for manual session naming per [CC#2112](https://github.com/anthropics/claude-code/issues/2112) (#199) - @bl-ue
+
+## [v3.0.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.0.2) - 2025-11-13
+
+- Create an example `config.json` if it doesn't exist and cli.js isn't found (#195) - @bl-ue
+- Add `/usr/local/{+ share/}nvm` to the list of search paths (#190) - @bl-ue
+
+## [v3.0.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.0.1) - 2025-11-11
+
+- Fix Mach-O segment alignment for ARM64 binaries (#183) - @signadou
+
+## [v3.0.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.0.0) - 2025-11-10
+
+- Remove the "CLAUDE CODE" figlet ASCII art customization to keep up with Claude Code (#174) - @bl-ue
 - Support slight bun-specific differences in React module accessing, `$` identifier frequency, and unicode escaping (#163) - @bl-ue
 - Enable a toolset to be the default toolset (#161) - @bl-ue
 - Add a misc view - @bl-ue

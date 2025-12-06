@@ -1,6 +1,6 @@
 // Please see the note about writing patches in ./index.ts.
 
-import { LocationResult, showDiff } from './index.js';
+import { escapeIdent, LocationResult, showDiff } from './index.js';
 
 const getOpenDocumentLocation = (oldFile: string): LocationResult | null => {
   // Step 1: Find `ensureServerStarted:[$\w]+`
@@ -33,7 +33,7 @@ const getOpenDocumentLocation = (oldFile: string): LocationResult | null => {
   const searchStart = Math.max(0, ensureMatch.index - 2000);
   const searchChunk = oldFile.slice(searchStart, ensureMatch.index);
   const functionPattern = new RegExp(
-    `async function ${varName.replaceAll('$', '\\$')}\\(([$\\w]+),`,
+    `async function ${escapeIdent(varName)}\\(([$\\w]+),`,
     'g'
   );
   let functionMatch;
@@ -71,7 +71,9 @@ const getOpenDocumentLocation = (oldFile: string): LocationResult | null => {
   const afterSecondLine =
     functionStart + secondLineMatch.index + secondLineMatch[0].length;
   const remainingBody = oldFile.slice(afterSecondLine, ensureMatch.index);
-  const ifReturnPattern = new RegExp(`if\\(!${serverVar}\\)return;`);
+  const ifReturnPattern = new RegExp(
+    `if\\(!${escapeIdent(serverVar)}\\)return;`
+  );
   const ifReturnMatch = remainingBody.match(ifReturnPattern);
 
   if (!ifReturnMatch || ifReturnMatch.index === undefined) {

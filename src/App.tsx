@@ -2,7 +2,6 @@ import { useState, useEffect, createContext, useCallback } from 'react';
 import { Box, useInput } from 'ink';
 import { MainView } from './components/MainView.js';
 import { ThemesView } from './components/ThemesView.js';
-import { LaunchTextView } from './components/LaunchTextView.js';
 import { ThinkingVerbsView } from './components/ThinkingVerbsView.js';
 import { ThinkingStyleView } from './components/ThinkingStyleView.js';
 import { UserMessageDisplayView } from './components/UserMessageDisplayView.js';
@@ -20,6 +19,7 @@ import {
 import {
   readConfigFile,
   restoreClijsFromBackup,
+  restoreNativeBinaryFromBackup,
   updateConfigFile,
 } from './utils/config.js';
 import { openInExplorer, revealFileInExplorer } from './utils/misc.js';
@@ -133,7 +133,6 @@ Please reapply your changes below.`,
         }
         break;
       case MainMenuItem.THEMES:
-      case MainMenuItem.LAUNCH_TEXT:
       case MainMenuItem.THINKING_VERBS:
       case MainMenuItem.THINKING_STYLE:
       case MainMenuItem.USER_MESSAGE_DISPLAY:
@@ -146,7 +145,13 @@ Please reapply your changes below.`,
         break;
       case MainMenuItem.RESTORE_ORIGINAL:
         if (startupCheckInfo.ccInstInfo) {
-          restoreClijsFromBackup(startupCheckInfo.ccInstInfo).then(() => {
+          // Use the appropriate restore function based on installation type
+          const restorePromise = startupCheckInfo.ccInstInfo
+            .nativeInstallationPath
+            ? restoreNativeBinaryFromBackup(startupCheckInfo.ccInstInfo)
+            : restoreClijsFromBackup(startupCheckInfo.ccInstInfo);
+
+          restorePromise.then(() => {
             setNotification({
               message: 'Original Claude Code restored successfully!',
               type: 'success',
@@ -159,7 +164,7 @@ Please reapply your changes below.`,
         revealFileInExplorer(CONFIG_FILE);
         break;
       case MainMenuItem.OPEN_CLI:
-        if (startupCheckInfo.ccInstInfo) {
+        if (startupCheckInfo.ccInstInfo?.cliPath) {
           revealFileInExplorer(startupCheckInfo.ccInstInfo.cliPath);
         }
         break;
@@ -183,11 +188,15 @@ Please reapply your changes below.`,
     >
       <Box flexDirection="column">
         {currentView === null ? (
-          <MainView onSubmit={handleMainSubmit} notification={notification} />
+          <MainView
+            onSubmit={handleMainSubmit}
+            notification={notification}
+            isNativeInstallation={
+              !!startupCheckInfo.ccInstInfo?.nativeInstallationPath
+            }
+          />
         ) : currentView === MainMenuItem.THEMES ? (
           <ThemesView onBack={handleBack} />
-        ) : currentView === MainMenuItem.LAUNCH_TEXT ? (
-          <LaunchTextView onBack={handleBack} />
         ) : currentView === MainMenuItem.THINKING_VERBS ? (
           <ThinkingVerbsView onBack={handleBack} />
         ) : currentView === MainMenuItem.THINKING_STYLE ? (

@@ -213,7 +213,7 @@ export function ThemeEditView({ onBack, themeId }: ThemeEditViewProps) {
     key: keyof typeof currentTheme.colors
   ): string => {
     const descriptions: Record<keyof typeof currentTheme.colors, string> = {
-      autoAccept: 'Auto-accept mode indicator',
+      autoAccept: 'Auto-accept edits mode indicator',
       bashBorder: 'Bash command border',
       claude:
         'Claude branding color.  Used for the Claude logo, the welcome message, and the thinking text.',

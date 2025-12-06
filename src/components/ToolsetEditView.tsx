@@ -26,7 +26,9 @@ const AVAILABLE_TOOLS = [
   'AskUserQuestion',
   'Skill',
   'SlashCommand',
+  'EnterPlanMode',
   'ExitPlanMode',
+  'LSP',
 ];
 
 export function ToolsetEditView({
@@ -47,8 +49,19 @@ export function ToolsetEditView({
   useEffect(() => {
     if (toolset) {
       updateSettings(settings => {
+        const oldName = settings.toolsets[toolsetIndex].name;
         settings.toolsets[toolsetIndex].name = name;
         settings.toolsets[toolsetIndex].allowedTools = allowedTools;
+
+        // Update references if name changed
+        if (oldName !== name) {
+          if (settings.defaultToolset === oldName) {
+            settings.defaultToolset = name;
+          }
+          if (settings.planModeToolset === oldName) {
+            settings.planModeToolset = name;
+          }
+        }
       });
     }
   }, [name, allowedTools]);

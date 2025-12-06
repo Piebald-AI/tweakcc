@@ -2,6 +2,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
 import { globbySync } from 'globby';
+import { isDebug } from './misc.js';
 
 export interface Theme {
   name: string;
@@ -71,13 +72,6 @@ export interface Theme {
   };
 }
 
-export interface LaunchTextConfig {
-  method: 'figlet' | 'custom';
-  figletText: string;
-  figletFont: string;
-  customText: string;
-}
-
 export interface ThinkingVerbsConfig {
   format: string;
   verbs: string[];
@@ -108,6 +102,7 @@ export interface MiscConfig {
   showTweakccVersion: boolean;
   showPatchesApplied: boolean;
   expandThinkingBlocks: boolean;
+  enableConversationTitle: boolean;
 }
 
 export interface Toolset {
@@ -117,7 +112,6 @@ export interface Toolset {
 
 export interface Settings {
   themes: Theme[];
-  launchText: LaunchTextConfig;
   thinkingVerbs: ThinkingVerbsConfig;
   thinkingStyle: ThinkingStyleConfig;
   userMessageDisplay: UserMessageDisplayConfig;
@@ -125,6 +119,7 @@ export interface Settings {
   misc: MiscConfig;
   toolsets: Toolset[];
   defaultToolset: string | null;
+  planModeToolset: string | null;
 }
 
 export interface TweakccConfig {
@@ -136,9 +131,9 @@ export interface TweakccConfig {
 }
 
 export interface ClaudeCodeInstallationInfo {
-  cliPath: string;
-  packageJsonPath: string;
+  cliPath?: string; // Only set for NPM installs; undefined for native installs
   version: string;
+  nativeInstallationPath?: string; // Path to native installation binary
 }
 
 export interface StartupCheckInfo {
@@ -149,17 +144,16 @@ export interface StartupCheckInfo {
 }
 
 export enum MainMenuItem {
-  APPLY_CHANGES = '*Apply customizations to cli.js',
+  APPLY_CHANGES = '*Apply customizations',
   THEMES = 'Themes',
-  LAUNCH_TEXT = 'Launch text',
   THINKING_VERBS = 'Thinking verbs',
   THINKING_STYLE = 'Thinking style',
   USER_MESSAGE_DISPLAY = 'User message display',
   MISC = 'Misc',
   TOOLSETS = 'Toolsets',
   VIEW_SYSTEM_PROMPTS = 'View system prompts',
-  RESTORE_ORIGINAL = 'Restore original Claude Code (preserves tweakcc.json)',
-  OPEN_CONFIG = 'Open tweakcc.json',
+  RESTORE_ORIGINAL = 'Restore original Claude Code (preserves config.json)',
+  OPEN_CONFIG = 'Open config.json',
   OPEN_CLI = "Open Claude Code's cli.js",
   EXIT = 'Exit',
 }
@@ -636,12 +630,6 @@ export const DEFAULT_SETTINGS: Settings = {
       },
     },
   ],
-  launchText: {
-    method: 'figlet',
-    figletText: 'Claude Code',
-    figletFont: 'ANSI Shadow',
-    customText: '',
-  },
   thinkingVerbs: {
     format: '{}… ',
     verbs: [
@@ -917,41 +905,79 @@ export const DEFAULT_SETTINGS: Settings = {
     showTweakccVersion: true,
     showPatchesApplied: true,
     expandThinkingBlocks: true,
+    enableConversationTitle: true,
   },
   toolsets: [],
   defaultToolset: null,
+  planModeToolset: null,
+};
+
+// Helper function to expand ~ in paths
+const expandTilde = (filepath: string): string => {
+  if (filepath.startsWith('~')) {
+    return path.join(os.homedir(), filepath.slice(1));
+  }
+  return filepath;
 };
 
 // Support XDG Base Directory Specification with backward compatibility
 // Priority:
-// 1. If ~/.tweakcc exists, use it (backward compatibility for existing users)
-// 2. Otherwise, if $XDG_CONFIG_HOME is set, use $XDG_CONFIG_HOME/tweakcc
-// 3. Otherwise, use ~/.tweakcc (default for new users without XDG_CONFIG_HOME)
+// 1. If TWEAKCC_CONFIG_DIR env var is set, use it (explicit override)
+// 2. If ~/.tweakcc exists, use it (backward compatibility)
+// 3. If ~/.claude/tweakcc exists, use it (Claude ecosystem alignment)
+// 4. If $XDG_CONFIG_HOME is set, use $XDG_CONFIG_HOME/tweakcc
+// 5. Otherwise, use ~/.tweakcc (default)
 const getConfigDir = (): string => {
-  const legacyDir = path.join(os.homedir(), '.tweakcc');
+  // Check TWEAKCC_CONFIG_DIR first (explicit override)
+  const tweakccConfigDir = process.env.TWEAKCC_CONFIG_DIR?.trim();
+  if (tweakccConfigDir && tweakccConfigDir.length > 0) {
+    return expandTilde(tweakccConfigDir);
+  }
+
+  const defaultDir = path.join(os.homedir(), '.tweakcc');
+  const claudeDir = path.join(os.homedir(), '.claude', 'tweakcc');
   const xdgConfigHome = process.env.XDG_CONFIG_HOME;
 
-  // Check if legacy directory exists - use it for backward compatibility
+  // Check if default directory exists - use it for backward compatibility
   try {
-    if (fs.existsSync(legacyDir)) {
-      return legacyDir;
+    if (fs.existsSync(defaultDir)) {
+      return defaultDir;
     }
-  } catch {
+  } catch (e) {
+    if (isDebug()) {
+      console.log(`Failed to check if ${defaultDir} exists: ${e}`);
+    }
+    // If we can't check, fall through to next location
+  }
+
+  // Check .claude-aligned location next
+  try {
+    if (fs.existsSync(claudeDir)) {
+      return claudeDir;
+    }
+  } catch (e) {
+    if (isDebug()) {
+      console.log(`Failed to check if ${claudeDir} exists: ${e}`);
+    }
     // If we can't check, fall through to XDG logic
   }
 
-  // No legacy directory - use XDG if available
+  // No default or .claude directory - use XDG if available
   if (xdgConfigHome) {
     return path.join(xdgConfigHome, 'tweakcc');
   }
 
   // Default to legacy location
-  return legacyDir;
+  return defaultDir;
 };
 
 export const CONFIG_DIR = getConfigDir();
 export const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 export const CLIJS_BACKUP_FILE = path.join(CONFIG_DIR, 'cli.js.backup');
+export const NATIVE_BINARY_BACKUP_FILE = path.join(
+  CONFIG_DIR,
+  'native-binary.backup'
+);
 export const SYSTEM_PROMPTS_DIR = path.join(CONFIG_DIR, 'system-prompts');
 export const PROMPT_CACHE_DIR = path.join(CONFIG_DIR, 'prompt-data-cache');
 
@@ -973,8 +999,32 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
   // Helper function to add a path or glob pattern
   const addPath = (pattern: string, isGlob: boolean = false) => {
     if (isGlob) {
-      const expanded = globbySync(pattern, { onlyFiles: false });
-      pathInfos.push({ pattern, isGlob: true, expandedPaths: expanded });
+      try {
+        const expanded = globbySync(pattern, { onlyFiles: false });
+        pathInfos.push({ pattern, isGlob: true, expandedPaths: expanded });
+      } catch (error) {
+        // Handle permission errors gracefully - log in debug mode only
+        if (
+          error instanceof Error &&
+          'code' in error &&
+          (error.code === 'EACCES' || error.code === 'EPERM')
+        ) {
+          if (isDebug()) {
+            console.log(
+              `Permission denied accessing: ${pattern} (${error.code})`
+            );
+          }
+        } else if (isDebug()) {
+          // Log other unexpected errors in debug mode
+          console.log(
+            `Error expanding glob pattern "${pattern}": ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          );
+        }
+        // Return empty expanded paths - caller handles this gracefully
+        pathInfos.push({ pattern, isGlob: true, expandedPaths: [] });
+      }
     } else {
       pathInfos.push({ pattern, isGlob: false, expandedPaths: [pattern] });
     }
@@ -1019,12 +1069,21 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
     addPath(`${home}/AppData/Roaming/pnpm-global/${mod}`);
     addPath(`${home}/AppData/Roaming/pnpm-global/*/${mod}`, true);
 
-    // Bun
+    // Bun (global CLI installations)
     addPath(`${home}/.bun/install/global/${mod}`);
+
+    // Bun cache (used by bunx) - both default and XDG locations on Windows
+    addPath(`${home}/.bun/install/cache/@anthropic-ai/claude-code*@@@*`, true);
+    addPath(`${home}/AppData/Local/Bun/install/cache/@anthropic-ai/claude-code*@@@*`, true);
 
     // fnm
     addPath(`${home}/AppData/Local/fnm_multishells/*/node_modules/${mod}`, true);
 
+    // mise (global npm installation)
+    addPath(`${home}/AppData/Local/mise/installs/node/*/${mod}`, true);
+
+    // mise (npm backend) (https://mise.jdx.dev/dev-tools/backends/npm.html)
+    addPath(`${home}/AppData/Local/mise/installs/npm-anthropic-ai-claude-code/*/${mod}`, true);
   } else {
     // macOS-specific paths
     if (process.platform == 'darwin') {
@@ -1032,6 +1091,9 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
       addPath(`${home}/Library/${mod}`);
       // MacPorts
       addPath(`/opt/local/lib/${mod}`);
+      // Bun cache (used by bunx on macOS) - both default and XDG locations
+      addPath(`${home}/.bun/install/cache/@anthropic-ai/claude-code*@@@*`, true);
+      addPath(`${home}/Library/Caches/bun/install/cache/@anthropic-ai/claude-code*@@@*`, true);
     }
 
     // Various user paths
@@ -1068,8 +1130,12 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
     addPath(`${home}/.local/share/pnpm/global/${mod}`);
     addPath(`${home}/.local/share/pnpm/global/*/${mod}`, true);
 
-    // Bun
+    // Bun (global CLI installations)
     addPath(`${home}/.bun/install/global/${mod}`);
+
+    // Bun cache (used by bunx) - both default and XDG locations
+    addPath(`${home}/.bun/install/cache/@anthropic-ai/claude-code*@@@*`, true);
+    addPath(`${home}/.local/share/bun/install/cache/@anthropic-ai/claude-code*@@@*`, true);
 
     // n (https://github.com/tj/n) - system & user
     addPath(`/usr/local/n/versions/node/*/lib/${mod}`, true);
@@ -1085,6 +1151,7 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
 
     // nvm (https://github.com/nvm-sh/nvm) - system & user
     addPath(`/usr/local/nvm/versions/node/*/lib/${mod}`, true);
+    addPath(`/usr/local/share/nvm/versions/node/*/lib/${mod}`, true);
     addPath(`${home}/.nvm/versions/node/*/lib/${mod}`, true);
 
     // nodenv (https://github.com/nodenv/nodenv)
@@ -1101,6 +1168,12 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
       addPath(`${process.env.MISE_DATA_DIR}/installs/node/*/lib/${mod}`, true);
     }
     addPath(`${home}/.local/share/mise/installs/node/*/lib/${mod}`, true);
+
+    // mise (npm backend) (https://mise.jdx.dev/dev-tools/backends/npm.html)
+    if (process.env.MISE_DATA_DIR) {
+      addPath(`${process.env.MISE_DATA_DIR}/installs/npm-anthropic-ai-claude-code/*/lib/${mod}`, true);
+    }
+    addPath(`${home}/.local/share/mise/installs/npm-anthropic-ai-claude-code/*/lib/${mod}`, true);
   }
 
   // After we're done with globby, which required / even on Windows, convert / back to \\ for
@@ -1120,3 +1193,10 @@ export const CLIJS_SEARCH_PATH_INFO: SearchPathInfo[] =
 export const CLIJS_SEARCH_PATHS: string[] = CLIJS_SEARCH_PATH_INFO.flatMap(
   info => info.expandedPaths
 );
+
+// Message shown when PATH fallback check is performed (POSIX only)
+// Windows skips PATH-based detection, so this is null on Windows
+export const PATH_CHECK_TEXT: string | null =
+  process.platform === 'win32'
+    ? null
+    : "Also checked for 'claude' executable on PATH using 'which claude'.";

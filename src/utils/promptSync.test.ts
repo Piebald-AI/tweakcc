@@ -41,6 +41,8 @@ This is the content with \${SETTINGS.preferredName} and \${CONFIG.taskType}.`;
         variables: ['SETTINGS', 'CONFIG'],
         content:
           'This is the content with ${SETTINGS.preferredName} and ${CONFIG.taskType}.',
+        // Line offset as computed from original markdown
+        contentLineOffset: 8,
       });
     });
 
@@ -61,6 +63,8 @@ Simple content.`;
         ccVersion: '1.0.0',
         variables: [],
         content: 'Simple content.',
+        // Line offset as computed from original markdown
+        contentLineOffset: 5,
       });
     });
 
@@ -78,6 +82,8 @@ Content only.`;
         ccVersion: '',
         variables: [],
         content: 'Content only.',
+        // Line offset as computed from original markdown
+        contentLineOffset: 2,
       });
     });
   });
@@ -494,6 +500,7 @@ Content here`;
         ccVersion: '1.0.0',
         variables: [],
         content: 'Content here',
+        contentLineOffset: 5,
       });
     });
   });
@@ -884,6 +891,57 @@ Greet user as \${SETTINGS.preferredName}!`;
       expect(output).toContain('1.0.0');
       expect(output).toContain('2.0.0');
       expect(output).toContain('diff.html');
+    });
+  });
+
+  describe('loadSystemPromptsWithRegex', () => {
+    it('should correctly handle variable names with double dollar signs ($$)', async () => {
+      const mockStringsFile: StringsFile = {
+        version: '1.0.0',
+        prompts: [
+          {
+            id: 'test-prompt',
+            name: 'Test',
+            description: 'Test',
+            version: '1.0.0',
+            pieces: ['Usage: ${', '()} ms'],
+            identifiers: [1],
+            identifierMap: { '1': 'MAX_TIMEOUT' },
+          },
+        ],
+      };
+
+      // Mock the download function to return our test data
+      const { downloadStringsFile } = await import('./download.js');
+      vi.mocked(downloadStringsFile).mockResolvedValue(mockStringsFile);
+
+      // Preload the strings file using the public API
+      await promptSync.preloadStringsFile('1.0.0');
+
+      // Create mock markdown file
+      const mockMarkdown = `<!--
+name: Test
+description: Test
+ccVersion: 1.0.0
+variables:
+  - MAX_TIMEOUT
+-->
+
+Usage: \${MAX_TIMEOUT()} ms`;
+
+      vi.spyOn(fs, 'readFile').mockResolvedValue(mockMarkdown);
+
+      const results = await promptSync.loadSystemPromptsWithRegex('1.0.0');
+      expect(results).toHaveLength(1);
+
+      // Simulate matching with a variable that contains $$
+      // This would come from the actual minified code in cli.js
+      const matchResult = ['full match', 'J$$'] as RegExpMatchArray;
+      const interpolated = results[0].getInterpolatedContent(matchResult);
+
+      // The bug: J$$ should NOT become J$
+      expect(interpolated).toBe('Usage: ${J$$()} ms');
+      expect(interpolated).not.toBe('Usage: ${J$()} ms');
     });
   });
 });

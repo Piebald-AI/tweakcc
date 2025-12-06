@@ -7,6 +7,10 @@ import {
   findBoxComponent,
   getReactVar,
 } from './index.js';
+import {
+  findSlashCommandListEndPosition,
+  writeSlashCommandDefinition as writeSlashCommandDefinitionToArray,
+} from './slashCommands.js';
 import { Toolset } from '../types.js';
 
 // ============================================================================
@@ -79,9 +83,11 @@ export const getMainAppComponentBodyStart = (
 ): number | null => {
   // Pattern matches the main app component function signature with all its props
   const appComponentPattern =
-    /function ([$\w]+)\(\{(?:(?:commands|debug|initialPrompt|initialTools|initialMessages|initialCheckpoints|initialFileHistorySnapshots|mcpClients|dynamicMcpConfig|autoConnectIdeFlag|strictMcpConfig|systemPrompt|appendSystemPrompt|onBeforeQuery|onTurnComplete|disabled):[$\w]+(?:=(?:[^,]+,|[^}]+\})|[,}]))+\)/g;
+    /function ([$\w]+)\(\{(?:(?:commands|debug|initialPrompt|initialTools|initialMessages|initialCheckpoints|initialFileHistorySnapshots|mcpClients|dynamicMcpConfig|mcpCliEndpoint|autoConnectIdeFlag|strictMcpConfig|systemPrompt|appendSystemPrompt|onBeforeQuery|onTurnComplete|disabled):[$\w]+(?:=(?:[^,]+,|[^}]+\})|[,}]))+\)/g;
 
-  const matches = Array.from(fileContents.matchAll(appComponentPattern));
+  const allMatches = Array.from(fileContents.matchAll(appComponentPattern));
+  // Filter to only matches that contain 'commands:' - unique to main app component
+  const matches = allMatches.filter(m => m[0].includes('commands:'));
   if (matches.length === 0) {
     console.error(
       'patch: getMainAppComponentBodyStart: failed to find appComponentPattern'
@@ -151,6 +157,7 @@ export const getToolFetchingUseMemoLocation = (
   reactVarName: string;
   toolFilterFunction: string;
   toolPermissionContextVar: string;
+  needsSemicolonPrefix: boolean;
 } | null => {
   const bodyStart = getMainAppComponentBodyStart(fileContents);
   if (bodyStart === null) {
@@ -160,12 +167,13 @@ export const getToolFetchingUseMemoLocation = (
     return null;
   }
 
-  // Look at the next 300 chars
-  const chunk = fileContents.slice(bodyStart, bodyStart + 300);
+  // Look at the next 2000 chars
+  const chunk = fileContents.slice(bodyStart, bodyStart + 2000);
 
-  // Pattern to match: let outputVar=reactVar.useMemo(()=>filterFunc(contextVar),[contextVar])
+  // Pattern to match: outputVar=reactVar.useMemo(()=>filterFunc(contextVar),[contextVar])
+  // Note: may be comma-separated (,v=...) or let-prefixed (let v=...)
   const useMemoPattern =
-    /let ([$\w]+)=([$\w]+)\.useMemo\(\(\)=>([$\w]+)\(([$\w]+)\),\[\4\]\)/;
+    /(?:let |,)([$\w]+)=([$\w]+)\.useMemo\(\(\)=>([$\w]+)\(([$\w]+)\),\[\4\]\)/;
   const match = chunk.match(useMemoPattern);
 
   if (!match || match.index === undefined) {
@@ -178,6 +186,10 @@ export const getToolFetchingUseMemoLocation = (
   const absoluteStart = bodyStart + match.index;
   const absoluteEnd = absoluteStart + match[0].length;
 
+  // Check if match started with comma (needs semicolon prefix in replacement)
+  const matchedText = match[0];
+  const needsSemicolonPrefix = matchedText.startsWith(',');
+
   return {
     startIndex: absoluteStart,
     endIndex: absoluteEnd,
@@ -185,55 +197,8 @@ export const getToolFetchingUseMemoLocation = (
     reactVarName: match[2],
     toolFilterFunction: match[3],
     toolPermissionContextVar: match[4],
+    needsSemicolonPrefix,
   };
-};
-
-/**
- * Find the end position of the slash command array using stack machine
- */
-export const findSlashCommandListEndPosition = (
-  fileContents: string
-): number | null => {
-  // Find the array with 30+ elements (slash commands list)
-  const arrayStartPattern = /=>\[([$a-zA-Z_][$\w]{1,2},){30}/;
-  const match = fileContents.match(arrayStartPattern);
-
-  if (!match || match.index === undefined) {
-    console.error(
-      'patch: findSlashCommandListEndPosition: failed to find arrayStartPattern'
-    );
-    return null;
-  }
-
-  // Find the '[' in the match
-  const bracketIndex = fileContents.indexOf('[', match.index);
-  if (bracketIndex === -1) {
-    console.error(
-      'patch: findSlashCommandListEndPosition: failed to find bracketIndex'
-    );
-    return null;
-  }
-
-  // Use stack machine to find the matching ']'
-  let level = 1; // We're already inside the array
-  let i = bracketIndex + 1;
-
-  while (i < fileContents.length && level > 0) {
-    if (fileContents[i] === '[') {
-      level++;
-    } else if (fileContents[i] === ']') {
-      level--;
-      if (level === 0) {
-        return i; // This is the end of the array
-      }
-    }
-    i++;
-  }
-
-  console.error(
-    'patch: findSlashCommandListEndPosition: failed to find matching closing-bracket'
-  );
-  return null;
 };
 
 /**
@@ -386,6 +351,7 @@ export const writeToolFetchingUseMemo = (
     reactVarName,
     toolFilterFunction,
     toolPermissionContextVar,
+    needsSemicolonPrefix,
   } = useMemoLoc;
 
   // Create toolsets mapping: { "toolset-name": ["tool1", "tool2", ...] }
@@ -399,7 +365,9 @@ export const writeToolFetchingUseMemo = (
   );
 
   // Generate the new useMemo code
-  const newUseMemo = `let ${outputVarName} = ${reactVarName}.useMemo(() => {
+  // Use semicolon prefix when replacing comma-separated declaration to properly terminate previous statement
+  const prefix = needsSemicolonPrefix ? ';' : '';
+  const newUseMemo = `${prefix}let ${outputVarName} = ${reactVarName}.useMemo(() => {
     const toolsets = ${toolsetsJSON};
     if (toolsets.hasOwnProperty(${appStateVar}.toolset)) {
       const allowedTools = toolsets[${appStateVar}.toolset];
@@ -577,17 +545,173 @@ export const writeToolsetComponentDefinition = (
 };
 
 /**
- * Sub-patch 4: Add the slash command definition
+ * Find where to insert the app state variable getter in the status line component
  */
-export const writeSlashCommandDefinition = (oldFile: string): string | null => {
-  const arrayEnd = findSlashCommandListEndPosition(oldFile);
-  if (arrayEnd === null) {
+export const findShiftTabAppStateVarInsertionPoint = (
+  oldFile: string
+): number | null => {
+  // Search for the bash mode indicator
+  const bashModePattern = /\{color:"bashBorder"\},"! for bash mode"/;
+  const match = oldFile.match(bashModePattern);
+
+  if (!match || match.index === undefined) {
     console.error(
-      'patch: toolsets: failed to find slash command array end position'
+      'patch: toolsets: findShiftTabAppStateVarInsertionPoint: failed to find bash mode pattern'
     );
     return null;
   }
 
+  // Get 500 chars before the match
+  const lookbackStart = Math.max(0, match.index - 500);
+  const chunk = oldFile.slice(lookbackStart, match.index);
+
+  // Find the function declaration pattern: function NAME({...}){
+  const functionPattern = /function ([$\w]+)\(\{[^}]+\}\)\{/g;
+  const matches = Array.from(chunk.matchAll(functionPattern));
+
+  if (matches.length === 0) {
+    console.error(
+      'patch: toolsets: findShiftTabAppStateVarInsertionPoint: failed to find function pattern'
+    );
+    return null;
+  }
+
+  // Take the last match (closest to the bash mode indicator)
+  const lastMatch = matches[matches.length - 1];
+  if (lastMatch.index === undefined) {
+    console.error(
+      'patch: toolsets: findShiftTabAppStateVarInsertionPoint: match has no index'
+    );
+    return null;
+  }
+
+  // Return position AFTER the opening brace
+  return lookbackStart + lastMatch.index + lastMatch[0].length;
+};
+
+/**
+ * Insert the state getter variable at the start of the status line component
+ */
+export const insertShiftTabAppStateVar = (oldFile: string): string | null => {
+  const insertionPoint = findShiftTabAppStateVarInsertionPoint(oldFile);
+  if (insertionPoint === null) {
+    console.error(
+      'patch: toolsets: insertShiftTabAppStateVar: failed to find insertion point'
+    );
+    return null;
+  }
+
+  const stateInfo = getAppStateVarAndGetterFunction(oldFile);
+  if (!stateInfo) {
+    console.error(
+      'patch: toolsets: insertShiftTabAppStateVar: failed to find app state getter'
+    );
+    return null;
+  }
+
+  const { appStateGetterFunction } = stateInfo;
+  const codeToInsert = `let[state]=${appStateGetterFunction}();`;
+
+  const newFile =
+    oldFile.slice(0, insertionPoint) +
+    codeToInsert +
+    oldFile.slice(insertionPoint);
+
+  showDiff(oldFile, newFile, codeToInsert, insertionPoint, insertionPoint);
+
+  return newFile;
+};
+
+/**
+ * Append the toolset name to the mode display text
+ */
+export const appendToolsetToModeDisplay = (oldFile: string): string | null => {
+  // Find the pattern where mode text is rendered
+  // Looking for: tl(Y).toLowerCase(), " on"
+  // We want to change it to: tl(Y).toLowerCase(), " on: ", state.toolset || "undefined"
+
+  const modeDisplayPattern = /([$\w]+)\((\w+)\)\.toLowerCase\(\)," on"/;
+  const match = oldFile.match(modeDisplayPattern);
+
+  if (!match || match.index === undefined) {
+    console.error(
+      'patch: toolsets: appendToolsetToModeDisplay: failed to find mode display pattern'
+    );
+    return null;
+  }
+
+  const tlFunction = match[1];
+  const modeVar = match[2];
+
+  // Replace with the new pattern that includes toolset
+  const oldText = match[0];
+  const newText = `${tlFunction}(${modeVar}).toLowerCase()," on [",state.toolset||"undefined","]"`;
+
+  const newFile = oldFile.replace(oldText, newText);
+
+  if (newFile === oldFile) {
+    console.error(
+      'patch: toolsets: appendToolsetToModeDisplay: failed to modify mode display'
+    );
+    return null;
+  }
+
+  showDiff(
+    oldFile,
+    newFile,
+    newText,
+    match.index,
+    match.index + oldText.length
+  );
+
+  return newFile;
+};
+
+/**
+ * Append the toolset name to the "? for shortcuts" display
+ */
+export const appendToolsetToShortcutsDisplay = (
+  oldFile: string
+): string | null => {
+  const shortcutsPattern = /"\? for shortcuts"/g;
+  const matches = Array.from(oldFile.matchAll(shortcutsPattern));
+
+  // Use the last match (there are two in 2.0.37, 1 in .41).
+  const match = matches.at(-1);
+  if (!match || match.index === undefined) {
+    console.error(
+      "patch: toolsets: appendToolsetToShortcutsDisplay: could not find '? for shortcuts'"
+    );
+    return null;
+  }
+
+  // Replace with the new pattern that includes toolset
+  const oldText = match[0];
+  const newText = `"? for shortcuts [",state.toolset||"undefined","]"`;
+
+  const newFile = oldFile.replace(oldText, newText);
+  if (newFile === oldFile) {
+    console.error(
+      'patch: toolsets: appendToolsetToModeDisplay: failed to modify mode display'
+    );
+    return null;
+  }
+
+  showDiff(
+    oldFile,
+    newFile,
+    newText,
+    match.index,
+    match.index + oldText.length
+  );
+
+  return newFile;
+};
+
+/**
+ * Sub-patch 4: Add the slash command definition
+ */
+export const writeSlashCommandDefinition = (oldFile: string): string | null => {
   const reactVar = getReactVar(oldFile);
   if (!reactVar) {
     console.error('patch: toolsets: failed to find React variable');
@@ -611,11 +735,114 @@ export const writeSlashCommandDefinition = (oldFile: string): string | null => {
   }
 }`;
 
-  // Insert before the closing ']'
-  const newFile =
-    oldFile.slice(0, arrayEnd) + commandDef + oldFile.slice(arrayEnd);
+  // Use the imported function to write the command definition
+  return writeSlashCommandDefinitionToArray(oldFile, commandDef);
+};
 
-  showDiff(oldFile, newFile, commandDef, arrayEnd, arrayEnd);
+// ============================================================================
+// MODE CHANGE TOOLSET FUNCTIONS
+// ============================================================================
+
+/**
+ * Find the tool change component scope
+ * Pattern: X(Y,function(Z){W("tengu_ext_at_mentioned",{});
+ * Returns the start index
+ */
+export const findToolChangeComponentScope = (
+  fileContents: string
+): number | null => {
+  const pattern =
+    /[\w$]+\([\w$]+,function\([\w$]+\)\{[\w$]+\("tengu_ext_at_mentioned",\{\}\);/;
+  const match = fileContents.match(pattern);
+
+  if (!match || match.index === undefined) {
+    console.error(
+      'patch: findToolChangeComponentScope: failed to find tool change component scope'
+    );
+    return null;
+  }
+
+  return match.index;
+};
+
+/**
+ * Add setState function access at the tool change component scope
+ * Injects: const [state, setState] = appStateGetterFn();
+ */
+export const addSetStateFnAccessAtToolChangeComponentScope = (
+  oldFile: string
+): string | null => {
+  const scopeIndex = findToolChangeComponentScope(oldFile);
+  if (scopeIndex === null) {
+    return null;
+  }
+
+  const stateInfo = getAppStateVarAndGetterFunction(oldFile);
+  if (!stateInfo) {
+    console.error(
+      'patch: addSetStateFnAccessAtToolChangeComponentScope: failed to get app state getter function'
+    );
+    return null;
+  }
+
+  const { appStateGetterFunction } = stateInfo;
+
+  // Inject the setState access right at the start of the component scope
+  const injectionCode = `const [state, setState] = ${appStateGetterFunction}();`;
+
+  const newFile =
+    oldFile.slice(0, scopeIndex) + injectionCode + oldFile.slice(scopeIndex);
+
+  return newFile;
+};
+
+/**
+ * Find the mode change location in the code
+ * Pattern: let X=Y(Z,{type:"setMode",mode:W,destination:"session"});
+ * Returns the start index and the mode variable (W)
+ */
+export const findModeChange = (
+  fileContents: string
+): { index: number; modeVar: string } | null => {
+  const pattern =
+    /let [\w$]+=[\w$]+\([\w$]+,\{type:"setMode",mode:([\w$]+),destination:"session"\}\);/;
+  const match = fileContents.match(pattern);
+
+  if (!match || match.index === undefined) {
+    console.error('patch: findModeChange: failed to find mode change location');
+    return null;
+  }
+
+  return {
+    index: match.index,
+    modeVar: match[1],
+  };
+};
+
+/**
+ * Write the mode change toolset update code
+ * This injects code before the mode change to automatically switch toolsets
+ */
+export const writeModeChangeUpdateToolset = (
+  oldFile: string,
+  planModeToolset: string,
+  defaultToolset: string
+): string | null => {
+  const modeChangeResult = findModeChange(oldFile);
+  if (!modeChangeResult) {
+    return null;
+  }
+
+  const { index: modeChangeIndex, modeVar } = modeChangeResult;
+
+  // Build the injection code using setState directly
+  const injectionCode = `if(${modeVar}==="plan"){setState((prev)=>({...prev,toolset:${JSON.stringify(planModeToolset)}}));}else{setState((prev)=>({...prev,toolset:${JSON.stringify(defaultToolset)}}));}`;
+
+  // Inject right before the mode change
+  const newFile =
+    oldFile.slice(0, modeChangeIndex) +
+    injectionCode +
+    oldFile.slice(modeChangeIndex);
 
   return newFile;
 };
@@ -669,6 +896,31 @@ export const writeToolsets = (
   if (!result) {
     console.error(
       'patch: toolsets: step 4 failed (writeSlashCommandDefinition)'
+    );
+    return null;
+  }
+
+  // Step 5: Insert state getter in status line component
+  result = insertShiftTabAppStateVar(result);
+  if (!result) {
+    console.error('patch: toolsets: step 5 failed (insertShiftTabAppStateVar)');
+    return null;
+  }
+
+  // Step 6: Append toolset name to mode display
+  result = appendToolsetToModeDisplay(result);
+  if (!result) {
+    console.error(
+      'patch: toolsets: step 6 failed (appendToolsetToModeDisplay)'
+    );
+    return null;
+  }
+
+  // Step 7: Append toolset name to shortcuts display
+  result = appendToolsetToShortcutsDisplay(result);
+  if (!result) {
+    console.error(
+      'patch: toolsets: step 7 failed (appendToolsetToShortcutsDisplay)'
     );
     return null;
   }

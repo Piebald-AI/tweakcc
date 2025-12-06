@@ -1,8 +1,22 @@
-import figlet from 'figlet';
 import * as fs from 'node:fs/promises';
-import { restoreClijsFromBackup, updateConfigFile } from '../config.js';
-import { ClaudeCodeInstallationInfo, TweakccConfig } from '../types.js';
+import * as fsSync from 'node:fs';
+import * as path from 'node:path';
+import {
+  restoreClijsFromBackup,
+  restoreNativeBinaryFromBackup,
+  updateConfigFile,
+} from '../config.js';
+import {
+  ClaudeCodeInstallationInfo,
+  TweakccConfig,
+  NATIVE_BINARY_BACKUP_FILE,
+  CONFIG_DIR,
+} from '../types.js';
 import { isDebug, replaceFileBreakingHardLinks } from '../misc.js';
+import {
+  extractClaudeJsFromNativeInstallation,
+  repackNativeInstallation,
+} from '../nativeInstallation.js';
 
 // Notes to patch-writers:
 //
@@ -22,7 +36,6 @@ import { writeShowMoreItemsInSelectMenus } from './showMoreItemsInSelectMenus.js
 import { writeThemes } from './themes.js';
 import { writeContextLimit } from './contextLimit.js';
 import { writeInputBoxBorder } from './inputBorderBox.js';
-import { writeSigninBannerText } from './signinBannerText.js';
 import { writeSpinnerNoFreeze } from './spinnerNoFreeze.js';
 import { writeThinkerFormat } from './thinkerFormat.js';
 import { writeThinkerSymbolMirrorOption } from './thinkerMirrorOption.js';
@@ -33,12 +46,16 @@ import { writeThinkerVerbs } from './thinkerVerbs.js';
 import { writeUserMessageDisplay } from './userMessageDisplay.js';
 import { writeVerboseProperty } from './verboseProperty.js';
 import { writeModelCustomizations } from './modelSelector.js';
-import { writeIgnoreMaxSubscription } from './ignoreMaxSubscription.js';
 import { writeThinkingVisibility } from './thinkingVisibility.js';
 import { writePatchesAppliedIndication } from './patchesAppliedIndication.js';
 import { applySystemPrompts } from './systemPrompts.js';
 import { writeFixLspSupport } from './fixLspSupport.js';
-import { writeToolsets } from './toolsets.js';
+import {
+  writeToolsets,
+  writeModeChangeUpdateToolset,
+  addSetStateFnAccessAtToolChangeComponentScope,
+} from './toolsets.js';
+import { writeConversationTitle } from './conversationTitle.js';
 
 export interface LocationResult {
   startIndex: number;
@@ -65,6 +82,10 @@ export const showDiff = (
   startIndex: number,
   endIndex: number
 ): void => {
+  if (!isDebug()) {
+    return;
+  }
+
   const contextStart = Math.max(0, startIndex - 20);
   const contextEndOld = Math.min(oldFileContents.length, endIndex + 20);
   const contextEndNew = Math.min(
@@ -86,12 +107,16 @@ export const showDiff = (
     contextEndNew
   );
 
-  if (isDebug() && oldChanged !== newChanged) {
+  if (oldChanged !== newChanged) {
     console.log('\n--- Diff ---');
     console.log('OLD:', oldBefore + `\x1b[31m${oldChanged}\x1b[0m` + oldAfter);
     console.log('NEW:', newBefore + `\x1b[32m${newChanged}\x1b[0m` + newAfter);
     console.log('--- End Diff ---\n');
   }
+};
+
+export const escapeIdent = (ident: string): string => {
+  return ident.replace(/\$/g, '\\$');
 };
 
 export const findChalkVar = (fileContents: string): string | undefined => {
@@ -186,12 +211,12 @@ export const getReactModuleFunctionBun = (
 
   // Pattern: var X=Y((Z,W)=>{W.exports=reactModuleNameNonBun()
   const pattern = new RegExp(
-    `var ([$\\w]+)=[$\\w]+\\(\\([$\\w]+,[$\\w]+\\)=>\\{[$\\w]+\\.exports=${reactModuleNameNonBun}\\(\\)`
+    `var ([$\\w]+)=[$\\w]+\\(\\([$\\w]+,[$\\w]+\\)=>\\{[$\\w]+\\.exports=${escapeIdent(reactModuleNameNonBun)}\\(\\)`
   );
   const match = fileContents.match(pattern);
   if (!match) {
     console.log(
-      'patch: getReactModuleFunctionBun: failed to find React module function (Bun)'
+      `patch: getReactModuleFunctionBun: failed to find React module function (Bun) (reactModuleNameNonBun=${reactModuleNameNonBun})`
     );
     return undefined;
   }
@@ -200,6 +225,9 @@ export const getReactModuleFunctionBun = (
 
 // Cache for React variable to avoid recomputing
 let reactVarCache: string | undefined | null = null;
+
+// Cache for require function name to avoid recomputing
+let requireFuncNameCache: string | null = null;
 
 /**
  * Get the React variable name (cached)
@@ -227,7 +255,7 @@ export const getReactVar = (fileContents: string): string | undefined => {
 
   // Pattern: X=moduleLoader(reactModule,1)
   const nonBunPattern = new RegExp(
-    `\\b([$\\w]+)=${moduleLoader}\\(${reactModuleVarNonBun}\\(\\),1\\)`
+    `\\b([$\\w]+)=${escapeIdent(moduleLoader)}\\(${escapeIdent(reactModuleVarNonBun)}\\(\\),1\\)`
   );
   const nonBunMatch = fileContents.match(nonBunPattern);
   if (nonBunMatch) {
@@ -247,7 +275,7 @@ export const getReactVar = (fileContents: string): string | undefined => {
   // \b([$\w]+)=T\(fH\(\),1\)
   // Pattern: X=moduleLoader(reactModuleBun,1)
   const bunPattern = new RegExp(
-    `\\b([$\\w]+)=${moduleLoader}\\(${reactModuleFunctionBun}\\(\\),1\\)`
+    `\\b([$\\w]+)=${escapeIdent(moduleLoader)}\\(${escapeIdent(reactModuleFunctionBun)}\\(\\),1\\)`
   );
   const bunMatch = fileContents.match(bunPattern);
   if (!bunMatch) {
@@ -267,6 +295,87 @@ export const getReactVar = (fileContents: string): string | undefined => {
  */
 export const clearReactVarCache = (): void => {
   reactVarCache = null;
+};
+
+/**
+ * Find the require function variable name (no caching)
+ *
+ * This finds the variable name used to call require() in esbuild-bundled code.
+ * Bun uses "require" directly, but esbuild uses a variable that points to
+ * the result of createRequire(import.meta.url).
+ *
+ * Steps:
+ * 1. Find the createRequire import: import{createRequire as X}from"node:module";
+ * 2. Find the variable that calls it: var Y=X(import.meta.url)
+ * 3. Return Y (the require function variable)
+ */
+export const findRequireFunc = (fileContents: string): string | undefined => {
+  // Step 1: Find createRequire import
+  // Pattern: import{createRequire as X}from"node:module";
+  const createRequirePattern =
+    /import\{createRequire as ([$\w]+)\}from"node:module";/;
+  const createRequireMatch = fileContents.match(createRequirePattern);
+  if (!createRequireMatch) {
+    // If this is not found it's not necessarily a bug because we use its absence to detect Bun...
+    // console.log(
+    //   'patch: findRequireFunc: failed to find createRequire import'
+    // );
+    return undefined;
+  }
+  const createRequireVar = createRequireMatch[1];
+
+  // Step 2: Find the variable that calls createRequire
+  // Pattern: var X=createRequireVar(import.meta.url)
+  const requireFuncPattern = new RegExp(
+    `var ([$\\w]+)=${escapeIdent(createRequireVar)}\\(import\\.meta\\.url\\)`
+  );
+  const requireFuncMatch = fileContents.match(requireFuncPattern);
+  if (!requireFuncMatch) {
+    console.log(
+      `patch: findRequireFunc: failed to find require function variable (createRequireVar=${createRequireVar})`
+    );
+    return undefined;
+  }
+
+  return requireFuncMatch[1];
+};
+
+/**
+ * Get the appropriate require function name for the current environment (cached)
+ *
+ * - Bun native installations use "require" directly
+ * - esbuild-bundled code uses a variable that points to createRequire(import.meta.url)
+ *
+ * This function detects which environment we're in and returns the correct name.
+ *
+ * @param fileContents The file content to analyze
+ * @returns "require" for Bun, or the require function variable name for esbuild
+ */
+export const getRequireFuncName = (fileContents: string): string => {
+  // Return cached value if available
+  if (requireFuncNameCache != null) {
+    return requireFuncNameCache;
+  }
+
+  // Try to find the esbuild-style require function
+  const requireFunc = findRequireFunc(fileContents);
+
+  // If we found it, we're in esbuild environment
+  if (requireFunc) {
+    requireFuncNameCache = requireFunc;
+    return requireFuncNameCache;
+  }
+
+  // Otherwise, assume Bun environment which uses "require" directly
+  requireFuncNameCache = 'require';
+  return requireFuncNameCache;
+};
+
+/**
+ * Clear the require func name cache (useful for testing or multiple runs)
+ */
+export const clearRequireFuncNameCache = (): void => {
+  requireFuncNameCache = null;
 };
 
 /**
@@ -300,11 +409,16 @@ export const findBoxComponent = (fileContents: string): string | undefined => {
   const boxOrigCompName = boxDisplayNameMatch[1];
 
   // 2. Search for the variable that equals the original Box component
-  const boxVarPattern = new RegExp(`\\b([$\\w]+)=${boxOrigCompName}\\b`);
+  const boxVarPattern = new RegExp(
+    // /[^$\w]/ = /\b/ but considering dollar signs word characters.
+    // Normally /$\b/ does NOT match "$}" but this does.
+    // Because once boxOrigCompName was `LK$` so `_=LK$}` wasn't matching.
+    `\\b([$\\w]+)=${escapeIdent(boxOrigCompName)}[^$\\w]`
+  );
   const boxVarMatch = fileContents.match(boxVarPattern);
   if (!boxVarMatch) {
     console.error(
-      'patch: findBoxComponent: failed to find Box component variable'
+      `patch: findBoxComponent: failed to find Box component variable (boxOrigCompName=${boxOrigCompName})`
     );
     return undefined;
   }
@@ -316,55 +430,83 @@ export const applyCustomization = async (
   config: TweakccConfig,
   ccInstInfo: ClaudeCodeInstallationInfo
 ): Promise<TweakccConfig> => {
-  // Clean up any existing customizations, which will likely break the heuristics, by restoring the
-  // original file from the backup.
-  await restoreClijsFromBackup(ccInstInfo);
+  let content: string;
 
-  let content = await fs.readFile(ccInstInfo.cliPath, { encoding: 'utf8' });
+  if (ccInstInfo.nativeInstallationPath) {
+    // For native installations: restore the binary, then extract to memory
+    await restoreNativeBinaryFromBackup(ccInstInfo);
+
+    // Extract from backup if it exists, otherwise from the native installation
+    let backupExists = false;
+    try {
+      await fs.stat(NATIVE_BINARY_BACKUP_FILE);
+      backupExists = true;
+    } catch {
+      // Backup doesn't exist, extract from native installation
+    }
+
+    const pathToExtractFrom = backupExists
+      ? NATIVE_BINARY_BACKUP_FILE
+      : ccInstInfo.nativeInstallationPath;
+
+    if (isDebug()) {
+      console.log(
+        `Extracting claude.js from ${backupExists ? 'backup' : 'native installation'}: ${pathToExtractFrom}`
+      );
+    }
+
+    const claudeJsBuffer =
+      extractClaudeJsFromNativeInstallation(pathToExtractFrom);
+
+    if (!claudeJsBuffer) {
+      throw new Error('Failed to extract claude.js from native installation');
+    }
+
+    // Save original extracted JS for debugging
+    const origPath = path.join(CONFIG_DIR, 'native-claudejs-orig.js');
+    fsSync.writeFileSync(origPath, claudeJsBuffer);
+    if (isDebug()) {
+      console.log(`Saved original extracted JS from native to: ${origPath}`);
+    }
+
+    content = claudeJsBuffer.toString('utf8');
+  } else {
+    // For NPM installations: restore cli.js from backup, then read it
+    await restoreClijsFromBackup(ccInstInfo);
+
+    if (!ccInstInfo.cliPath) {
+      throw new Error('cliPath is required for NPM installations');
+    }
+
+    content = await fs.readFile(ccInstInfo.cliPath, { encoding: 'utf8' });
+  }
 
   const items: string[] = [];
 
-  // Apply themes
+  // Apply system prompt customizations
+  const systemPromptsResult = await applySystemPrompts(
+    content,
+    ccInstInfo.version
+  );
+  content = systemPromptsResult.newContent;
+  items.push(...systemPromptsResult.items);
+
   let result: string | null = null;
-  // if (config.settings.themes && config.settings.themes.length > 0) {
-  //   if ((result = writeThemes(content, config.settings.themes)))
-  //     content = result;
-  // }
 
-  // // Apply launch text
-  // if (config.settings.launchText) {
-  //   const c = config.settings.launchText;
-  //   let textToApply = '';
-  //   if (c.method === 'custom' && c.customText) {
-  //     textToApply = c.customText;
-  //   } else if (c.method === 'figlet' && c.figletText) {
-  //     textToApply = await new Promise<string>(resolve =>
-  //       figlet.text(
-  //         c.figletText.replace('\n', ' '),
-  //         c.figletFont as unknown as figlet.Fonts,
-  //         (err, data) => {
-  //           if (err) {
-  //             console.error('patch: figlet: failed to generate text', err);
-  //             resolve('');
-  //           } else {
-  //             resolve(data || '');
-  //           }
-  //         }
-  //       )
-  //     );
-  //   }
-  //   if ((result = writeSigninBannerText(content, textToApply)))
-  //     content = result;
-  // }
+  // Apply themes
+  if (config.settings.themes && config.settings.themes.length > 0) {
+    if ((result = writeThemes(content, config.settings.themes)))
+      content = result;
+  }
 
-  // // Apply thinking verbs
-  // // prettier-ignore
-  // if (config.settings.thinkingVerbs) {
-  //   if ((result = writeThinkerVerbs(content, config.settings.thinkingVerbs.verbs)))
-  //     content = result;
-  //   if ((result = writeThinkerFormat(content, config.settings.thinkingVerbs.format)))
-  //     content = result;
-  // }
+  // Apply thinking verbs
+  // prettier-ignore
+  if (config.settings.thinkingVerbs) {
+    if ((result = writeThinkerVerbs(content, config.settings.thinkingVerbs.verbs)))
+      content = result;
+    if ((result = writeThinkerFormat(content, config.settings.thinkingVerbs.format)))
+      content = result;
+  }
 
   // // Apply thinking style
   // // prettier-ignore
@@ -432,33 +574,22 @@ export const applyCustomization = async (
   // // Apply show more items in select menus patch (always enabled)
   // if ((result = writeShowMoreItemsInSelectMenus(content, 25))) content = result;
 
-  // // Disable Max subscription gating for cost tool (always enabled)
-  // if ((result = writeIgnoreMaxSubscription(content))) content = result;
+  // Apply thinking visibility patch (always enabled)
+  if ((result = writeThinkingVisibility(content))) content = result;
 
-  // // Apply thinking visibility patch (always enabled)
-  // if ((result = writeThinkingVisibility(content))) content = result;
-
-  // // Apply system prompt customizations
-  // const systemPromptsResult = await applySystemPrompts(
-  //   content,
-  //   ccInstInfo.version
-  // );
-  // content = systemPromptsResult.newContent;
-  // items.push(...systemPromptsResult.items);
-
-  // // Apply patches applied indication
-  // const showTweakccVersion = config.settings.misc?.showTweakccVersion ?? true;
-  // const showPatchesApplied = config.settings.misc?.showPatchesApplied ?? true;
-  // if (
-  //   (result = writePatchesAppliedIndication(
-  //     content,
-  //     '2.0.3',
-  //     items,
-  //     showTweakccVersion,
-  //     showPatchesApplied
-  //   ))
-  // )
-  //   content = result;
+  // Apply patches applied indication
+  const showTweakccVersion = config.settings.misc?.showTweakccVersion ?? true;
+  const showPatchesApplied = config.settings.misc?.showPatchesApplied ?? true;
+  if (
+    (result = writePatchesAppliedIndication(
+      content,
+      '3.1.6',
+      items,
+      showTweakccVersion,
+      showPatchesApplied
+    ))
+  )
+    content = result;
 
   // // Apply LSP support fixes (always enabled)
   // if ((result = writeFixLspSupport(content))) content = result;
@@ -475,8 +606,58 @@ export const applyCustomization = async (
   //     content = result;
   // }
 
-  // Replace the file, breaking hard links and preserving permissions
-  await replaceFileBreakingHardLinks(ccInstInfo.cliPath, content, 'patch');
+  // Apply mode-change toolset switching (if both toolsets are configured)
+  if (config.settings.planModeToolset && config.settings.defaultToolset) {
+    // First, add setState access at the tool change component scope
+    if ((result = addSetStateFnAccessAtToolChangeComponentScope(content)))
+      content = result;
+
+    // Then, inject the mode change toolset switching code
+    if (
+      (result = writeModeChangeUpdateToolset(
+        content,
+        config.settings.planModeToolset,
+        config.settings.defaultToolset
+      ))
+    )
+      content = result;
+  }
+
+  // Apply conversation title management (if enabled)
+  if (config.settings.misc?.enableConversationTitle ?? true) {
+    if ((result = writeConversationTitle(content))) content = result;
+  }
+
+  // Write the modified content back
+  if (ccInstInfo.nativeInstallationPath) {
+    // For native installations: repack the modified claude.js back into the binary
+    if (isDebug()) {
+      console.log(
+        `Repacking modified claude.js into native installation: ${ccInstInfo.nativeInstallationPath}`
+      );
+    }
+
+    // Save patched JS for debugging
+    const patchedPath = path.join(CONFIG_DIR, 'native-claudejs-patched.js');
+    fsSync.writeFileSync(patchedPath, content, 'utf8');
+    if (isDebug()) {
+      console.log(`Saved patched JS from native to: ${patchedPath}`);
+    }
+
+    const modifiedBuffer = Buffer.from(content, 'utf8');
+    repackNativeInstallation(
+      ccInstInfo.nativeInstallationPath,
+      modifiedBuffer,
+      ccInstInfo.nativeInstallationPath
+    );
+  } else {
+    // For NPM installations: replace the cli.js file
+    if (!ccInstInfo.cliPath) {
+      throw new Error('cliPath is required for NPM installations');
+    }
+
+    await replaceFileBreakingHardLinks(ccInstInfo.cliPath, content, 'patch');
+  }
 
   return await updateConfigFile(config => {
     config.changesApplied = true;

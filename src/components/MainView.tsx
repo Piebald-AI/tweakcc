@@ -12,6 +12,7 @@ interface MainViewProps {
     message: string;
     type: 'success' | 'error' | 'warning' | 'info';
   } | null;
+  isNativeInstallation: boolean;
 }
 
 // prettier-ignore
@@ -19,10 +20,6 @@ const baseMenuItems: SelectItem[] = [
   {
     name: MainMenuItem.THEMES,
     desc: "Modify Claude Code's built-in themes or create your own",
-  },
-  {
-    name: MainMenuItem.LAUNCH_TEXT,
-    desc: 'Change the "CLAUDE CODE" banner text that\'s shown when you sign in to Claude Code',
   },
   {
     name: MainMenuItem.THINKING_VERBS,
@@ -70,21 +67,29 @@ const systemMenuItems: SelectItem[] = [
   },
 ];
 
-export function MainView({ onSubmit, notification }: MainViewProps) {
+export function MainView({
+  onSubmit,
+  notification,
+  isNativeInstallation,
+}: MainViewProps) {
+  const filteredSystemMenuItems = isNativeInstallation
+    ? systemMenuItems.filter(item => item.name !== MainMenuItem.OPEN_CLI)
+    : systemMenuItems;
+
   const menuItems: SelectItem[] = [
     ...(useContext(SettingsContext).changesApplied
       ? []
       : [
           {
             name: MainMenuItem.APPLY_CHANGES,
-            desc: "Required: Updates Claude Code's cli.js in-place with your changes",
+            desc: 'Required: Updates Claude Code in-place with your changes',
             selectedStyles: {
               color: 'green',
             },
           },
         ]),
     ...baseMenuItems,
-    ...systemMenuItems,
+    ...filteredSystemMenuItems,
   ];
 
   const [selectedIndex, setSelectedIndex] = useState(0);

@@ -2,12 +2,43 @@
 import { render } from 'ink';
 import { Command } from 'commander';
 import chalk from 'chalk';
+import fs from 'node:fs/promises';
 import App from './App.js';
-import { CLIJS_SEARCH_PATH_INFO, CONFIG_FILE } from './utils/types.js';
+import {
+  CLIJS_SEARCH_PATH_INFO,
+  CONFIG_FILE,
+  CONFIG_DIR,
+  PATH_CHECK_TEXT,
+} from './utils/types.js';
 import { startupCheck, readConfigFile } from './utils/config.js';
 import { enableDebug } from './utils/misc.js';
 import { applyCustomization } from './utils/patches/index.js';
 import { preloadStringsFile } from './utils/promptSync.js';
+
+const createExampleConfigIfMissing = async (
+  examplePath: string
+): Promise<void> => {
+  try {
+    await fs.mkdir(CONFIG_DIR, { recursive: true });
+    // Only create if config file doesn't exist
+    try {
+      await fs.stat(CONFIG_FILE);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ) {
+        const exampleConfig = {
+          ccInstallationDir: examplePath,
+        };
+        await fs.writeFile(CONFIG_FILE, JSON.stringify(exampleConfig, null, 2));
+      }
+    }
+  } catch {
+    // Silently fail if we can't write the config file
+  }
+};
 
 const main = async () => {
   const program = new Command();
@@ -16,7 +47,7 @@ const main = async () => {
     .description(
       'Command-line tool to customize your Claude Code theme colors, thinking verbs and more.'
     )
-    .version('2.0.3')
+    .version('3.1.6')
     .option('-d, --debug', 'enable debug mode')
     .option('-a, --apply', 'apply saved customizations without interactive UI');
   program.parse();
@@ -43,8 +74,15 @@ const main = async () => {
     const startupCheckInfo = await startupCheck();
 
     if (!startupCheckInfo || !startupCheckInfo.ccInstInfo) {
+      const examplePath =
+        process.platform == 'win32'
+          ? 'C:\\absolute\\path\\to\\node_modules\\@anthropic-ai\\claude-code'
+          : '/absolute/path/to/node_modules/@anthropic-ai/claude-code';
+
+      await createExampleConfigIfMissing(examplePath);
+
       console.error(`Cannot find Claude Code's cli.js`);
-      console.error('Searched at the following locations:');
+      console.error('Searched for cli.js at the following locations:');
       CLIJS_SEARCH_PATH_INFO.forEach(info => {
         if (info.isGlob) {
           if (info.expandedPaths.length === 0) {
@@ -59,10 +97,21 @@ const main = async () => {
           console.error(`  - ${info.pattern}`);
         }
       });
+      if (PATH_CHECK_TEXT) {
+        console.error(`\n${PATH_CHECK_TEXT}`);
+      }
       process.exit(1);
     }
 
-    console.log(`Found Claude Code at: ${startupCheckInfo.ccInstInfo.cliPath}`);
+    if (startupCheckInfo.ccInstInfo.nativeInstallationPath) {
+      console.log(
+        `Found Claude Code (native installation): ${startupCheckInfo.ccInstInfo.nativeInstallationPath}`
+      );
+    } else {
+      console.log(
+        `Found Claude Code at: ${startupCheckInfo.ccInstInfo.cliPath}`
+      );
+    }
     console.log(`Version: ${startupCheckInfo.ccInstInfo.version}`);
 
     // Preload strings file for system prompts
@@ -125,10 +174,19 @@ const main = async () => {
       }).join('\n');
     };
 
+    const examplePath =
+      process.platform == 'win32'
+        ? 'C:\\absolute\\path\\to\\node_modules\\@anthropic-ai\\claude-code'
+        : '/absolute/path/to/node_modules/@anthropic-ai/claude-code';
+
+    await createExampleConfigIfMissing(examplePath);
+
     console.error(`Cannot find Claude Code's cli.js -- do you have Claude Code installed?
 
-Searched at the following locations:
+Searched for cli.js at the following locations:
 ${formatSearchPaths()}
+
+${PATH_CHECK_TEXT ? `${PATH_CHECK_TEXT}\n` : ''}
 
 If you have it installed but it's in a location not listed above, please open an issue at
 https://github.com/piebald-ai/tweakcc/issues and tell us where you have it--we'll add that location
@@ -136,11 +194,7 @@ to our search list and release an update today!  And in the meantime, you can ge
 by manually specifying that location in ${CONFIG_FILE} with the "ccInstallationDir" property:
 
 {
-  "ccInstallationDir": "${
-    process.platform == 'win32'
-      ? 'C:\\\\absolute\\\\path\\\\to\\\\node_modules\\\\@anthropic-ai\\\\claude-code'
-      : '/absolute/path/to/node_modules/@anthropic-ai/claude-code'
-  }"
+  "ccInstallationDir": "${examplePath}"
 }
 
 Notes:

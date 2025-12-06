@@ -4,6 +4,9 @@ import { showDiff, PatchApplied } from './index.js';
 import {
   loadSystemPromptsWithRegex,
   reconstructContentFromPieces,
+  findUnescapedBackticks,
+  formatBacktickError,
+  getPromptFilePath,
 } from '../promptSync.js';
 import { setAppliedHash, computeMD5Hash } from '../systemPromptHashIndex.js';
 
@@ -75,6 +78,26 @@ export const applySystemPrompts = async (
       // Generate the interpolated content using the actual variables from the match
       const interpolatedContent = getInterpolatedContent(match);
 
+      // Check for unescaped backticks that would break the template literal
+      const unescapedBackticks = findUnescapedBackticks(interpolatedContent);
+      if (unescapedBackticks.size > 0) {
+        const filePath = getPromptFilePath(promptId);
+        const contentLines = prompt.content.split('\n');
+
+        for (const [lineNum, columns] of unescapedBackticks) {
+          // lineNum is relative to prompt.content; adjust to absolute file line
+          // number by accounting for any frontmatter/comment lines.
+          const absoluteLineNum = lineNum + (prompt.contentLineOffset || 0);
+          const lineText = contentLines[lineNum - 1] || '';
+          console.log(
+            formatBacktickError(filePath, absoluteLineNum, lineText, columns)
+          );
+          console.log();
+        }
+
+        continue; // Skip this prompt
+      }
+
       // Calculate character counts for this prompt (both with human-readable placeholders)
       // Note: trim() to match how markdown files are parsed (parsed.content.trim() in parseMarkdownPrompt)
       const originalBaselineContent = reconstructContentFromPieces(
@@ -120,7 +143,8 @@ export const applySystemPrompts = async (
       const matchLength = match[0].length;
 
       // Replace the matched content with the interpolated content from the markdown file
-      content = content.replace(pattern, interpolatedContent);
+      // Use a replacer function to avoid special replacement pattern interpretation (e.g., $$ -> $), see #237
+      content = content.replace(pattern, () => interpolatedContent);
 
       // Store the hash of the applied prompt content
       const appliedHash = computeMD5Hash(prompt.content);
