@@ -65,18 +65,18 @@ export const writeUserMessageDisplay = (
     return null;
   }
 
-  // Determine if we need chalk styling (custom RGB colors or text styling)
-  const needsChalk =
-    foregroundColor !== 'default' ||
-    (backgroundColor !== 'default' && backgroundColor !== null) ||
-    bold ||
-    italic ||
-    underline ||
-    strikethrough ||
-    inverse;
-
   let textAttrsObjStr: string;
   let chalkChain: string = '';
+
+  // Build Ink attributes for default theme colors (do this ALWAYS, not conditionally)
+  const textAttrs: string[] = [];
+  if (foregroundColor === 'default') {
+    textAttrs.push('color:"text"');
+  }
+  if (backgroundColor === 'default') {
+    textAttrs.push('backgroundColor:"userMessageBackground"');
+  }
+  textAttrsObjStr = textAttrs.length > 0 ? `{${textAttrs.join(',')}}` : '{}';
 
   // Build box attributes (border and padding)
   const boxAttrs: string[] = [];
@@ -120,6 +120,16 @@ export const writeUserMessageDisplay = (
   }
   const boxAttrsObjStr = boxAttrs.length > 0 ? `{${boxAttrs.join(',')}}` : '{}';
 
+  // Determine if we need chalk styling (custom RGB colors or text styling)
+  const needsChalk =
+    foregroundColor !== 'default' ||
+    (backgroundColor !== 'default' && backgroundColor !== null) ||
+    bold ||
+    italic ||
+    underline ||
+    strikethrough ||
+    inverse;
+
   if (needsChalk) {
     // Build chalk chain for custom colors and/or styling
     chalkChain = chalkVar;
@@ -145,22 +155,6 @@ export const writeUserMessageDisplay = (
     if (underline) chalkChain += '.underline';
     if (strikethrough) chalkChain += '.strikethrough';
     if (inverse) chalkChain += '.inverse';
-
-    // No attributes needed for text when using chalk
-    textAttrsObjStr = '{}';
-  } else {
-    // Use Ink/React attributes for default colors
-    const textAttrs: string[] = [];
-
-    if (backgroundColor === 'default') {
-      textAttrs.push('backgroundColor:"userMessageBackground"');
-    }
-
-    if (foregroundColor === 'default') {
-      textAttrs.push('color:"text"');
-    }
-
-    textAttrsObjStr = textAttrs.length > 0 ? `{${textAttrs.join(',')}}` : '{}';
   }
 
   const [reactVar, textComponent, messageVar] = location.identifiers!;
@@ -175,7 +169,7 @@ return ${reactVar}.createElement(
   ${reactVar}.createElement(
     ${textComponent},
     ${textAttrsObjStr},
-    ${chalkChain}(${formattedMessage})
+    ${needsChalk ? chalkChain + '(' : ''}${formattedMessage}${needsChalk ? ')' : ''}
   )
 );`;
 

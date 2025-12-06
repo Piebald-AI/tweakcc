@@ -390,12 +390,15 @@ export function UserMessageDisplayView({
 
   // Apply styling to preview text
   const applyStylesToText = (text: string) => {
-    const fgColor = foregroundMode === 'default' ? undefined : foregroundColor;
+    const fgColor =
+      foregroundMode === 'default'
+        ? currentTheme?.colors?.text
+        : foregroundColor;
     const bgColor =
       backgroundMode === 'none'
         ? undefined
         : backgroundMode === 'default'
-          ? undefined
+          ? currentTheme?.colors?.userMessageBackground
           : backgroundColor;
 
     const borderStyle = BORDER_STYLE_OPTIONS[borderStyleIndex].value;
@@ -870,6 +873,14 @@ export function UserMessageDisplayView({
           <Box flexDirection="column" width="50%">
             <Box marginBottom={1}>
               <Text underline>Before (Claude Code default):</Text>
+            </Box>
+            <Box marginLeft={1}>
+              <Text
+                backgroundColor={currentTheme?.colors?.userMessageBackground}
+                color={currentTheme?.colors?.text}
+              >
+                {' '}&gt; list the dir{' '}
+              </Text>
             </Box>
             <Box marginLeft={1} marginTop={1}>
               <Text>
