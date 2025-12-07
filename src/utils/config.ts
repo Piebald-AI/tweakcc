@@ -746,7 +746,8 @@ export const findClaudeCodeInstallation = async (
       );
     }
 
-    const claudeJsBuffer = await extractClaudeJsFromNativeInstallation(resolvedPath);
+    const claudeJsBuffer =
+      await extractClaudeJsFromNativeInstallation(resolvedPath);
 
     if (claudeJsBuffer) {
       // Successfully extracted claude.js from native installation
