@@ -30,8 +30,8 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0(ink@6.1.0(@types/react@18.3.23)(react-devtools-core@4.19.1)(react@19.1.1))
       node-lief:
-        specifier: 0.1.6
-        version: 0.1.6
+        specifier: ^0.1.7
+        version: 0.1.7
       ollama:
         specifier: ^0.6.0
         version: 0.6.0
@@ -1475,8 +1475,8 @@ packages:
     resolution: {integrity: sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ==}
     hasBin: true
 
-  node-lief@0.1.6:
-    resolution: {integrity: sha512-eiP1WkgTEp3p/eytOq76lRCJeaMk+CP5oU8tQpq0a39rQ8YVCiUefsaFADxAfWyVjCKQG27CnkbgaQIU9JPc8A==}
+  node-lief@0.1.7:
+    resolution: {integrity: sha512-lNh8oKpBWwXiZOeYK21FR6lj6MDMS4+wfjnghoNlEjzSFZtO78CsYkRVvH+Kl8yJK+HnTbxdAYrXMT5dN3J7KQ==}
 
   object-assign@4.1.1:
     resolution: {integrity: sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==}
@@ -3537,7 +3537,7 @@ snapshots:
 
   node-gyp-build@4.8.4: {}
 
-  node-lief@0.1.6:
+  node-lief@0.1.7:
     dependencies:
       node-addon-api: 8.5.0
       node-gyp-build: 4.8.4

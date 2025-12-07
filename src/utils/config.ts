@@ -31,7 +31,7 @@ import {
   hasUnappliedSystemPromptChanges,
   clearAllAppliedHashes,
 } from './systemPromptHashIndex.js';
-import { extractClaudeJsFromNativeInstallation } from './nativeInstallation.js';
+import { extractClaudeJsFromNativeInstallation } from './nativeInstallationLoader.js';
 
 /**
  * Checks for multiple config locations and warns user
@@ -746,7 +746,7 @@ export const findClaudeCodeInstallation = async (
       );
     }
 
-    const claudeJsBuffer = extractClaudeJsFromNativeInstallation(resolvedPath);
+    const claudeJsBuffer = await extractClaudeJsFromNativeInstallation(resolvedPath);
 
     if (claudeJsBuffer) {
       // Successfully extracted claude.js from native installation

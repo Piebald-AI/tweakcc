@@ -1,4 +1,0 @@
-onlyBuiltDependencies:
-  - esbuild
-  - lief
-  - node-lief

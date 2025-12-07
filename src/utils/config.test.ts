@@ -14,11 +14,11 @@ import path from 'node:path';
 import * as misc from './misc.js';
 import * as systemPromptHashIndex from './systemPromptHashIndex.js';
 import { execSync } from 'node:child_process';
-import * as nativeInstallation from './nativeInstallation.js';
+import * as nativeInstallation from './nativeInstallationLoader.js';
 
 vi.mock('node:fs/promises');
 vi.mock('node:child_process');
-vi.mock('./nativeInstallation.js', () => ({
+vi.mock('./nativeInstallationLoader.js', () => ({
   extractClaudeJsFromNativeInstallation: vi.fn(),
   repackNativeInstallation: vi.fn(),
 }));
@@ -781,7 +781,7 @@ describe('config.ts', () => {
       // Mock extractClaudeJsFromNativeInstallation to return content without VERSION
       vi.mocked(
         nativeInstallation.extractClaudeJsFromNativeInstallation
-      ).mockReturnValue(Buffer.from('no version here'));
+      ).mockResolvedValue(Buffer.from('no version here'));
 
       const result = await config.findClaudeCodeInstallation(mockConfig);
 
@@ -817,7 +817,7 @@ describe('config.ts', () => {
       // Mock extractClaudeJsFromNativeInstallation to return null (extraction failed)
       vi.mocked(
         nativeInstallation.extractClaudeJsFromNativeInstallation
-      ).mockReturnValue(null);
+      ).mockResolvedValue(null);
 
       const result = await config.findClaudeCodeInstallation(mockConfig);
 
