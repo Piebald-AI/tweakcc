@@ -16,7 +16,7 @@ import { isDebug, replaceFileBreakingHardLinks } from '../misc.js';
 import {
   extractClaudeJsFromNativeInstallation,
   repackNativeInstallation,
-} from '../nativeInstallation.js';
+} from '../nativeInstallationLoader.js';
 
 // Notes to patch-writers:
 //
@@ -456,7 +456,7 @@ export const applyCustomization = async (
     }
 
     const claudeJsBuffer =
-      extractClaudeJsFromNativeInstallation(pathToExtractFrom);
+      await extractClaudeJsFromNativeInstallation(pathToExtractFrom);
 
     if (!claudeJsBuffer) {
       throw new Error('Failed to extract claude.js from native installation');
@@ -646,7 +646,7 @@ export const applyCustomization = async (
     }
 
     const modifiedBuffer = Buffer.from(content, 'utf8');
-    repackNativeInstallation(
+    await repackNativeInstallation(
       ccInstInfo.nativeInstallationPath,
       modifiedBuffer,
       ccInstInfo.nativeInstallationPath
