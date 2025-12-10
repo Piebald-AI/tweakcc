@@ -126,7 +126,7 @@ describe('config.ts', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       // Mock multiple locations existing
-      vi.spyOn(fsSync, 'existsSync').mockImplesmentation(p => {
+      vi.spyOn(fsSync, 'existsSync').mockImplementation(p => {
         const pathStr = p.toString();
         // CONFIG_DIR is one location, simulate another exists
         return pathStr.includes('.tweakcc') || pathStr.includes('.claude');
@@ -469,7 +469,7 @@ describe('config.ts', () => {
       vi.spyOn(
         nativeInstallation,
         'extractClaudeJsFromNativeInstallation'
-      ).mockReturnValue(mockJsBuffer);
+      ).mockResolvedValue(mockJsBuffer);
 
       const result = await config.findClaudeCodeInstallation(mockConfig);
 
@@ -599,7 +599,7 @@ describe('config.ts', () => {
       vi.spyOn(
         nativeInstallation,
         'extractClaudeJsFromNativeInstallation'
-      ).mockReturnValue(mockJsBuffer);
+      ).mockResolvedValue(mockJsBuffer);
 
       const result = await config.findClaudeCodeInstallation(mockConfig);
 
@@ -998,7 +998,7 @@ describe('config.ts', () => {
       vi.spyOn(
         nativeInstallation,
         'extractClaudeJsFromNativeInstallation'
-      ).mockReturnValue(null);
+      ).mockResolvedValue(null);
 
       vi.spyOn(fs, 'readFile').mockRejectedValue(createEnoent());
 

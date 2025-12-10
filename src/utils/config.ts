@@ -738,7 +738,7 @@ export const findClaudeCodeInstallation = async (
           }
 
           const claudeJsBuffer =
-            extractClaudeJsFromNativeInstallation(installPath);
+            await extractClaudeJsFromNativeInstallation(installPath);
 
           if (claudeJsBuffer) {
             const content = claudeJsBuffer.toString('utf8');
@@ -827,7 +827,7 @@ export const findClaudeCodeInstallation = async (
       }
 
       const claudeJsBuffer =
-        extractClaudeJsFromNativeInstallation(claudeExePath);
+        await extractClaudeJsFromNativeInstallation(claudeExePath);
 
       if (claudeJsBuffer) {
         const content = claudeJsBuffer.toString('utf8');
