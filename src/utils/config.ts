@@ -194,7 +194,7 @@ let lastConfig: TweakccConfig | null = null;
 export const readConfigFile = async (): Promise<TweakccConfig> => {
   const config: TweakccConfig = {
     ccVersion: '',
-    ccInstallation: null,
+    ccInstallationPath: null,
     lastModified: new Date().toISOString(),
     changesApplied: true,
     settings: DEFAULT_SETTINGS,
@@ -705,12 +705,12 @@ export const findClaudeCodeInstallation = async (
 ): Promise<ClaudeCodeInstallationInfo | null> => {
   // Prefer explicit installation path if provided - this takes priority over all other detection methods.
   // This path may point to either a JS cli.js file or a native binary.
-  if (config.ccInstallation) {
-    const installPath = config.ccInstallation;
+  if (config.ccInstallationPath) {
+    const installPath = config.ccInstallationPath;
     try {
       if (!(await doesFileExist(installPath))) {
         console.warn(
-          `Configured ccInstallation path does not exist: ${installPath}`
+          `Configured ccInstallationPath does not exist: ${installPath}`
         );
         console.warn('Falling back to automatic detection...');
       } else {
@@ -719,7 +719,7 @@ export const findClaudeCodeInstallation = async (
         if (kind === 'js') {
           if (isDebug()) {
             console.log(
-              `Using Claude Code cli.js from explicit ccInstallation path: ${installPath}`
+              `Using Claude Code cli.js from explicit ccInstallationPath: ${installPath}`
             );
             console.log(`SHA256 hash: ${await hashFileInChunks(installPath)}`);
           }
@@ -733,7 +733,7 @@ export const findClaudeCodeInstallation = async (
         if (kind === 'binary') {
           if (isDebug()) {
             console.log(
-              `Using native Claude installation from explicit ccInstallation path: ${installPath}`
+              `Using native Claude installation from explicit ccInstallationPath: ${installPath}`
             );
           }
 
@@ -747,7 +747,7 @@ export const findClaudeCodeInstallation = async (
             if (version) {
               if (isDebug()) {
                 console.log(
-                  `Extracted version ${version} from native installation via explicit ccInstallation`
+                  `Extracted version ${version} from native installation via explicit ccInstallationPath`
                 );
               }
               return {
@@ -758,12 +758,12 @@ export const findClaudeCodeInstallation = async (
           }
 
           console.warn(
-            `Configured ccInstallation path appears to be a native binary, but version could not be determined: ${installPath}`
+            `Configured ccInstallationPath appears to be a native binary, but version could not be determined: ${installPath}`
           );
           console.warn('Falling back to automatic detection...');
         } else {
           console.warn(
-            `Configured ccInstallation path is not recognized as JavaScript or a native binary: ${installPath}`
+            `Configured ccInstallationPath is not recognized as JavaScript or a native binary: ${installPath}`
           );
           console.warn('Falling back to automatic detection...');
         }
@@ -775,7 +775,7 @@ export const findClaudeCodeInstallation = async (
         (error.code === 'ENOENT' || error.code === 'ENOTDIR')
       ) {
         console.warn(
-          `Configured ccInstallation path is not accessible: ${installPath}`
+          `Configured ccInstallationPath is not accessible: ${installPath}`
         );
         console.warn('Falling back to automatic detection...');
       } else {
@@ -1144,7 +1144,7 @@ export async function startupCheck(): Promise<StartupCheckInfo | null> {
 }
 
 /**
- * Migrates old ccInstallationDir config to ccInstallation if needed.
+ * Migrates old ccInstallationDir config to ccInstallationPath if needed.
  * This should be called once at startup before any readConfigFile() calls.
  * @returns true if migration occurred, false otherwise
  */
@@ -1157,9 +1157,9 @@ export async function migrateConfigIfNeeded(): Promise<boolean> {
       return false;
     }
 
-    // Migrate ccInstallationDir to ccInstallation
-    if (rawConfig.ccInstallationDir && !rawConfig.ccInstallation) {
-      rawConfig.ccInstallation = path.join(
+    // Migrate ccInstallationDir to ccInstallationPath
+    if (rawConfig.ccInstallationDir && !rawConfig.ccInstallationPath) {
+      rawConfig.ccInstallationPath = path.join(
         rawConfig.ccInstallationDir as string,
         'cli.js'
       );

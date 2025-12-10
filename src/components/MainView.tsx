@@ -102,7 +102,7 @@ export function MainView({
         <Box marginBottom={1}>
           <Text color="blue" bold>
             INFO: `ccInstallationDir` config is deprecated; migrated to
-            `ccInstallation` which supports npm and native installs.
+            `ccInstallationPath` which supports npm and native installs.
           </Text>
         </Box>
       )}

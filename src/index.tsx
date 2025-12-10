@@ -34,7 +34,7 @@ const createExampleConfigIfMissing = async (
         error.code === 'ENOENT'
       ) {
         const exampleConfig = {
-          ccInstallation: examplePath + '/cli.js',
+          ccInstallationPath: examplePath + '/cli.js',
         };
         await fs.writeFile(CONFIG_FILE, JSON.stringify(exampleConfig, null, 2));
       }
@@ -61,7 +61,7 @@ const main = async () => {
     enableDebug();
   }
 
-  // Migrate old ccInstallationDir config to ccInstallation if needed
+  // Migrate old ccInstallationDir config to ccInstallationPath if needed
   const configMigrated = await migrateConfigIfNeeded();
 
   // Handle --apply flag for non-interactive mode
@@ -203,10 +203,10 @@ ${PATH_CHECK_TEXT ? `${PATH_CHECK_TEXT}\n` : ''}
 If you have it installed but it's in a location not listed above, please open an issue at
 https://github.com/piebald-ai/tweakcc/issues and tell us where you have it--we'll add that location
 to our search list and release an update today!  And in the meantime, you can get tweakcc working
-by manually specifying that location in ${CONFIG_FILE} with the "ccInstallation" property:
+by manually specifying that location in ${CONFIG_FILE} with the "ccInstallationPath" property:
 
 {
-  "ccInstallation": "${examplePath}/cli.js"
+  "ccInstallationPath": "${examplePath}/cli.js"
 }
 
 Notes:

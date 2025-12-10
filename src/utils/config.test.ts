@@ -171,7 +171,7 @@ describe('config.ts', () => {
       const result = await config.readConfigFile();
       expect(result).toEqual({
         ccVersion: '',
-        ccInstallation: null,
+        ccInstallationPath: null,
         lastModified: expect.any(String),
         changesApplied: true,
         settings: DEFAULT_SETTINGS,
@@ -187,7 +187,7 @@ describe('config.ts', () => {
   });
 
   describe('migrateConfigIfNeeded', () => {
-    it('should migrate ccInstallationDir to ccInstallation and return true', async () => {
+    it('should migrate ccInstallationDir to ccInstallationPath and return true', async () => {
       const mockConfig = { ccInstallationDir: '/some/path', settings: {} };
       vi.spyOn(fs, 'readFile').mockResolvedValue(JSON.stringify(mockConfig));
       const writeSpy = vi.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
@@ -197,16 +197,19 @@ describe('config.ts', () => {
       expect(result).toBe(true);
       expect(writeSpy).toHaveBeenCalled();
 
-      // Verify the written config has ccInstallation and not ccInstallationDir
+      // Verify the written config has ccInstallationPath and not ccInstallationDir
       const writtenConfig = JSON.parse(writeSpy.mock.calls[0][1] as string);
-      expect(writtenConfig.ccInstallation).toBe(
+      expect(writtenConfig.ccInstallationPath).toBe(
         path.join('/some/path', 'cli.js')
       );
       expect(writtenConfig.ccInstallationDir).toBeUndefined();
     });
 
     it('should return false if no migration needed', async () => {
-      const mockConfig = { ccInstallation: '/some/path/cli.js', settings: {} };
+      const mockConfig = {
+        ccInstallationPath: '/some/path/cli.js',
+        settings: {},
+      };
       vi.spyOn(fs, 'readFile').mockResolvedValue(JSON.stringify(mockConfig));
       const writeSpy = vi.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
 
@@ -227,7 +230,7 @@ describe('config.ts', () => {
     it('should be idempotent - second call returns false after migration', async () => {
       const mockConfig = { ccInstallationDir: '/some/path', settings: {} };
       const migratedConfig = {
-        ccInstallation: path.join('/some/path', 'cli.js'),
+        ccInstallationPath: path.join('/some/path', 'cli.js'),
         settings: {},
         lastModified: expect.any(String),
       };
@@ -334,7 +337,7 @@ describe('config.ts', () => {
 
     it('should find the installation and return the correct info', async () => {
       const mockConfig = {
-        ccInstallation: null,
+        ccInstallationPath: null,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
@@ -371,7 +374,7 @@ describe('config.ts', () => {
 
     it('should treat PATH claude executable as cli.js when WASMagic detects JS', async () => {
       const mockConfig = {
-        ccInstallation: null,
+        ccInstallationPath: null,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
@@ -426,7 +429,7 @@ describe('config.ts', () => {
 
     it('should treat PATH claude executable as native installation when WASMagic detects binary', async () => {
       const mockConfig = {
-        ccInstallation: null,
+        ccInstallationPath: null,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
@@ -479,11 +482,11 @@ describe('config.ts', () => {
       });
     });
 
-    it('should use ccInstallation over PATH when both are available', async () => {
+    it('should use ccInstallationPath over PATH when both are available', async () => {
       const mockCliPath = '/custom/explicit/cli.js';
       const mockPathExe = '/usr/local/bin/claude';
       const mockConfig = {
-        ccInstallation: mockCliPath,
+        ccInstallationPath: mockCliPath,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
@@ -522,17 +525,17 @@ describe('config.ts', () => {
 
       const result = await config.findClaudeCodeInstallation(mockConfig);
 
-      // Should use the explicit ccInstallation path, not the PATH executable
+      // Should use the explicit ccInstallationPath, not the PATH executable
       expect(result).toEqual({
         cliPath: mockCliPath,
         version: '1.1.1', // Version from explicit path, not PATH
       });
     });
 
-    it('should use ccInstallation path as cli.js when WASMagic detects JS', async () => {
+    it('should use ccInstallationPath as cli.js when WASMagic detects JS', async () => {
       const mockCliPath = '/custom/path/cli.js';
       const mockConfig = {
-        ccInstallation: mockCliPath,
+        ccInstallationPath: mockCliPath,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
@@ -569,10 +572,10 @@ describe('config.ts', () => {
       });
     });
 
-    it('should use ccInstallation path as native installation when WASMagic detects binary', async () => {
+    it('should use ccInstallationPath as native installation when WASMagic detects binary', async () => {
       const mockNativePath = '/custom/path/claude-native';
       const mockConfig = {
-        ccInstallation: mockNativePath,
+        ccInstallationPath: mockNativePath,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
@@ -611,7 +614,7 @@ describe('config.ts', () => {
 
     it('should return null if the installation is not found', async () => {
       const mockConfig = {
-        ccInstallation: null,
+        ccInstallationPath: null,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
@@ -629,7 +632,7 @@ describe('config.ts', () => {
 
     it('should gracefully skip paths with ENOTDIR errors', async () => {
       const mockConfig = {
-        ccInstallation: null,
+        ccInstallationPath: null,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
@@ -672,7 +675,7 @@ describe('config.ts', () => {
 
     it('should gracefully skip paths with EACCES permission errors', async () => {
       const mockConfig = {
-        ccInstallation: null,
+        ccInstallationPath: null,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
@@ -715,7 +718,7 @@ describe('config.ts', () => {
 
     it('should gracefully skip paths with EPERM permission errors', async () => {
       const mockConfig = {
-        ccInstallation: null,
+        ccInstallationPath: null,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
@@ -758,7 +761,7 @@ describe('config.ts', () => {
 
     it('should handle symlink resolution when which claude resolves to cli.js', async () => {
       const mockConfig = {
-        ccInstallation: null,
+        ccInstallationPath: null,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
@@ -821,7 +824,7 @@ describe('config.ts', () => {
 
     it('should detect cli.js path from symlink and treat as NPM installation', async () => {
       const mockConfig = {
-        ccInstallation: null,
+        ccInstallationPath: null,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
@@ -882,7 +885,7 @@ describe('config.ts', () => {
 
     it('should derive cli.js from a symlink target that resides inside the claude-code package', async () => {
       const mockConfig = {
-        ccInstallation: null,
+        ccInstallationPath: null,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
@@ -930,7 +933,7 @@ describe('config.ts', () => {
 
     it('should skip PATH fallback checks on Windows platforms', async () => {
       const mockConfig = {
-        ccInstallation: null,
+        ccInstallationPath: null,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
@@ -956,7 +959,7 @@ describe('config.ts', () => {
 
     it('should fall back to native installation extraction if symlink does not end with cli.js', async () => {
       const mockConfig = {
-        ccInstallation: null,
+        ccInstallationPath: null,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
@@ -1008,11 +1011,11 @@ describe('config.ts', () => {
       expect(result).toBe(null);
     });
 
-    // HIGH PRIORITY: Test ccInstallation override
-    it('should prioritize ccInstallation when specified in config', async () => {
+    // HIGH PRIORITY: Test ccInstallationPath override
+    it('should prioritize ccInstallationPath when specified in config', async () => {
       const customCliPath = '/custom/claude/installation/cli.js';
       const mockConfig = {
-        ccInstallation: customCliPath,
+        ccInstallationPath: customCliPath,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
@@ -1056,10 +1059,10 @@ describe('config.ts', () => {
       expect(result!.version).toBe('3.0.0');
     });
 
-    it('should use ccInstallation before falling back to standard paths', async () => {
+    it('should use ccInstallationPath before falling back to standard paths', async () => {
       const customCliPath = '/custom/claude/installation/cli.js';
       const mockConfig = {
-        ccInstallation: customCliPath,
+        ccInstallationPath: customCliPath,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
@@ -1110,7 +1113,7 @@ describe('config.ts', () => {
 
     it('should return null if native extraction fails to find version', async () => {
       const mockConfig = {
-        ccInstallation: null,
+        ccInstallationPath: null,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
@@ -1146,7 +1149,7 @@ describe('config.ts', () => {
 
     it('should return null if native extraction returns null', async () => {
       const mockConfig = {
-        ccInstallation: null,
+        ccInstallationPath: null,
         changesApplied: false,
         ccVersion: '',
         lastModified: '',
