@@ -7,7 +7,7 @@
 
 <div align="left">
 
-### Piebald is released!
+### Announcement: Piebald is released!
 We've released **Piebald**, the ultimate agentic AI developer experience. \
 Download it and try it out for free!  **https://piebald.ai/**
 
@@ -20,7 +20,7 @@ Download it and try it out for free!  **https://piebald.ai/**
 </div>
 
 <div align="left">
-<a href="https://piebald.ai"><img src="https://github.com/user-attachments/assets/25cb5df8-cf15-4cae-9c1e-e88645f06ee1"></a>
+<a href="https://piebald.ai"><img width="600" src="https://github.com/user-attachments/assets/25cb5df8-cf15-4cae-9c1e-e88645f06ee1"></a>
 </div>
 
 # tweakcc
@@ -29,7 +29,7 @@ Download it and try it out for free!  **https://piebald.ai/**
 [![Mentioned in Awesome Claude Code](https://awesome.re/mentioned-badge.svg)](https://github.com/hesreallyhim/awesome-claude-code)
 [![ClaudeLog - A comprehensive knowledge base for Claude.](https://claudelog.com/img/claude_log_badge.svg)](https://claudelog.com/)
 
-tweakcc is a CLI tool that upgrades your Claude Code experience.  Customize its system prompts, add custom themes, create toolsets, and personalize the UI.  From the team behind [Piebald.](https://piebald.ai/)
+**tweakcc is a CLI tool that upgrades your Claude Code experience.**  Customize its system prompts, add custom themes, create toolsets, and personalize the UI.  From the team behind [<img src="https://github.com/Piebald-AI/piebald/raw/main/assets/logo.svg" width="15"> **Piebald.**](https://piebald.ai/)
 
 <!--
 > [!note]
