@@ -1,8 +1,6 @@
 <div>
-
 <div align="right">
-  <a href="https://piebald.ai"><img width="200" top="20" align="right" src="https://github.com/Piebald-AI/.github/raw/main/Wordmark.svg"></a>
-  <!--<a href="https://piebald.ai"><img width="300" align="right" src="https://github.com/user-attachments/assets/25cb5df8-cf15-4cae-9c1e-e88645f06ee1"></a>-->
+<a href="https://piebald.ai"><img width="200" top="20" align="right" src="https://github.com/Piebald-AI/.github/raw/main/Wordmark.svg"></a>
 </div>
 
 <div align="left">
@@ -11,12 +9,9 @@
 We've released **Piebald**, the ultimate agentic AI developer experience. \
 Download it and try it out for free!  **https://piebald.ai/**
 
-<sub>[Scroll down for tweakcc.](https://github.com/Piebald-AI/tweakcc#tweakcc) :point_down: </sub>
+<sub>[Scroll down for tweakcc.](https://github.com/Piebald-AI/tweakcc#tweakcc) :point_down:</sub>
 
 </div>
-
-
-
 </div>
 
 <div align="left">
@@ -40,7 +35,7 @@ Download it and try it out for free!  **https://piebald.ai/**
 
 With tweakcc, you can
 
-- Customize all of Claude Code's **system prompts** (**NEW:** also see [**Claude Code System Prompts**](https://github.com/Piebald-AI/claude-code-system-prompts))
+- Customize all of Claude Code's **system prompts** (**NEW:** also see all of [**Claude Code's system prompts**](https://github.com/Piebald-AI/claude-code-system-prompts))
 - Create custom **toolsets** that can be used in Claude Code with the new **`/toolset`** command
 - Manually name **sessions** in Claude Code with `/title my chat name` or `/rename` (see [**our blog post**](https://piebald.ai/blog/messages-as-commits-claude-codes-git-like-dag-of-conversations) for implementation details)
 - Create **custom themes** with a graphical HSL/RGB color picker
