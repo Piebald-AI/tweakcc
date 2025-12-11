@@ -1,25 +1,47 @@
+<div>
+<div align="right">
+<a href="https://piebald.ai"><img width="200" top="20" align="right" src="https://github.com/Piebald-AI/.github/raw/main/Wordmark.svg"></a>
+</div>
+
+<div align="left">
+
+### Announcement: Piebald is released!
+We've released **Piebald**, the ultimate agentic AI developer experience. \
+Download it and try it out for free!  **https://piebald.ai/**
+
+<sub>[Scroll down for tweakcc.](https://github.com/Piebald-AI/tweakcc#tweakcc) :point_down:</sub>
+
+</div>
+</div>
+
+<div align="left">
+<a href="https://piebald.ai">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/79c18689-e2f0-4008-a13f-61c80756286a">
+  <source media="(prefers-color-scheme: light)" srcset="https://github.com/user-attachments/assets/25cb5df8-cf15-4cae-9c1e-e88645f06ee1">
+  <img alt="hero" width="600" src="https://github.com/user-attachments/assets/25cb5df8-cf15-4cae-9c1e-e88645f06ee1">
+</picture>
+</a>
+</div>
+
 # tweakcc
 
 [![tweakcc on npm](https://img.shields.io/npm/v/tweakcc?color)](https://www.npmjs.com/package/tweakcc)
 [![Mentioned in Awesome Claude Code](https://awesome.re/mentioned-badge.svg)](https://github.com/hesreallyhim/awesome-claude-code)
 [![ClaudeLog - A comprehensive knowledge base for Claude.](https://claudelog.com/img/claude_log_badge.svg)](https://claudelog.com/)
 
-tweakcc is a CLI tool that upgrades your Claude Code experience.  Customize its system prompts, add custom themes, create toolsets, and personalize the UI.
+**tweakcc is a CLI tool that upgrades your Claude Code experience.**  Customize its system prompts, add custom themes, create toolsets, and personalize the UI.  From the team behind [<img src="https://github.com/Piebald-AI/piebald/raw/main/assets/logo.svg" width="15"> **Piebald.**](https://piebald.ai/)
 
-> [!important]
-> **NEW in 3.1.0:** tweakcc now enables you to manually name your Claude Code sessions&mdash;run `npx tweakcc --apply` now to get a `/title my chat title` slash command (or `/rename`)!
-
-> [!tip]
-> **NEW in 3.0.0:** tweakcc now supports Claude Code native installations!  It also adds a new feature to CC called **toolsets**&mdash;try them out in Claude Code with the `/toolsets` command after you create them in tweakcc.  Lastly it makes [Claude Code's native LSP server support work.](https://www.reddit.com/r/ClaudeAI/comments/1otdfo9/lsp_is_coming_to_claude_code_and_you_can_try_it/)
-
+<!--
 > [!note]
 > ⭐ **If you find tweakcc useful, please consider [starring the repository](https://github.com/Piebald-AI/tweakcc) to show your support!** ⭐
+-->
 
 <img src="./assets/demo.gif" alt="Animated GIF demonstrating running `npx tweakcc`, creating a new theme, changing all of Claude Code's UI colors to purple, changing the thinking format from '<verb>ing...' to 'Claude is <verb>ing', changing the generating spinner style to a 50m glow animation, applying the changes, running Claude, and using '/config' to switch to the new theme, and sending a message to see the new thinking verb format." width="800">
 
 With tweakcc, you can
 
-- Customize all of Claude Code's **system prompts** (**NEW:** also see [**Claude Code System Prompts**](https://github.com/Piebald-AI/claude-code-system-prompts))
+- Customize all of Claude Code's **system prompts** (**NEW:** also see all of [**Claude Code's system prompts**](https://github.com/Piebald-AI/claude-code-system-prompts))
 - Create custom **toolsets** that can be used in Claude Code with the new **`/toolset`** command
 - Manually name **sessions** in Claude Code with `/title my chat name` or `/rename` (see [**our blog post**](https://piebald.ai/blog/messages-as-commits-claude-codes-git-like-dag-of-conversations) for implementation details)
 - Create **custom themes** with a graphical HSL/RGB color picker

@@ -1,10 +1,19 @@
 import { defineConfig } from 'vite';
+import { fileURLToPath } from 'url';
+import path from 'path';
 
 import react from '@vitejs/plugin-react-oxc';
 import nodeExternals from 'rollup-plugin-node-externals';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 export default defineConfig(({ mode }) => ({
   appType: 'custom',
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   build: {
     assetsDir: '',
     target: 'es2023',

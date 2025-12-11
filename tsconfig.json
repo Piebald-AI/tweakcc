@@ -14,7 +14,11 @@
     "sourceMap": true,
     "resolveJsonModule": true,
     "jsx": "react-jsx",
-    "moduleResolution": "node16"
+    "moduleResolution": "node16",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

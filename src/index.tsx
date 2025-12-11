@@ -2,43 +2,15 @@
 import { render } from 'ink';
 import { Command } from 'commander';
 import chalk from 'chalk';
-import fs from 'node:fs/promises';
-import App from './App.js';
-import {
-  CLIJS_SEARCH_PATH_INFO,
-  CONFIG_FILE,
-  CONFIG_DIR,
-  PATH_CHECK_TEXT,
-} from './utils/types.js';
-import { startupCheck, readConfigFile } from './utils/config.js';
-import { enableDebug } from './utils/misc.js';
-import { applyCustomization } from './utils/patches/index.js';
-import { preloadStringsFile } from './utils/promptSync.js';
-
-const createExampleConfigIfMissing = async (
-  examplePath: string
-): Promise<void> => {
-  try {
-    await fs.mkdir(CONFIG_DIR, { recursive: true });
-    // Only create if config file doesn't exist
-    try {
-      await fs.stat(CONFIG_FILE);
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        error.code === 'ENOENT'
-      ) {
-        const exampleConfig = {
-          ccInstallationDir: examplePath,
-        };
-        await fs.writeFile(CONFIG_FILE, JSON.stringify(exampleConfig, null, 2));
-      }
-    }
-  } catch {
-    // Silently fail if we can't write the config file
-  }
-};
+import App from './ui/App.js';
+import { CONFIG_FILE, readConfigFile } from './config.js';
+import { enableDebug } from './utils.js';
+import { applyCustomization } from './patches/index.js';
+import { preloadStringsFile } from './systemPromptSync.js';
+import { migrateConfigIfNeeded } from './migration.js';
+import { createExampleConfigIfMissing, startupCheck } from './startup.js';
+import { PATH_CHECK_TEXT } from './installationDetection.js';
+import { CLIJS_SEARCH_PATH_INFO } from './installationPaths.js';
 
 const main = async () => {
   const program = new Command();
@@ -56,6 +28,9 @@ const main = async () => {
   if (options.debug) {
     enableDebug();
   }
+
+  // Migrate old ccInstallationDir config to ccInstallationPath if needed
+  const configMigrated = await migrateConfigIfNeeded();
 
   // Handle --apply flag for non-interactive mode
   if (options.apply) {
@@ -153,7 +128,12 @@ const main = async () => {
       );
     }
 
-    render(<App startupCheckInfo={startupCheckInfo} />);
+    render(
+      <App
+        startupCheckInfo={startupCheckInfo}
+        configMigrated={configMigrated}
+      />
+    );
   } else {
     // Format the search paths to show glob patterns with their expansions
     const formatSearchPaths = () => {
@@ -191,16 +171,14 @@ ${PATH_CHECK_TEXT ? `${PATH_CHECK_TEXT}\n` : ''}
 If you have it installed but it's in a location not listed above, please open an issue at
 https://github.com/piebald-ai/tweakcc/issues and tell us where you have it--we'll add that location
 to our search list and release an update today!  And in the meantime, you can get tweakcc working
-by manually specifying that location in ${CONFIG_FILE} with the "ccInstallationDir" property:
+by manually specifying that location in ${CONFIG_FILE} with the "ccInstallationPath" property:
 
 {
-  "ccInstallationDir": "${examplePath}"
+  "ccInstallationPath": "${examplePath}/cli.js"
 }
 
 Notes:
-- Don't include cli.js in the path.
-- Don't specify the path to your Claude Code executable's directory.  It needs to be the path
-  to the folder that contains **cli.js**.
+- Include cli.js in the path (the full path to the cli.js file).
 - Please also open an issue so that we can add your path to the search list for all users!
 `);
     process.exit(1);
