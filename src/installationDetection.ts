@@ -4,7 +4,7 @@ import path from 'path';
 
 import { WASMagic } from 'wasmagic';
 
-import { debug, hashFileInChunks } from './utils.js';
+import { debug, hashFileInChunks, isDebug } from './utils.js';
 import { extractClaudeJsFromNativeInstallation } from './nativeInstallationLoader.js';
 import fs from 'node:fs/promises';
 import { ClaudeCodeInstallationInfo, TweakccConfig } from './types.js';
@@ -261,7 +261,9 @@ export const findClaudeCodeInstallation = async (
           debug(
             `Using Claude Code cli.js from explicit ccInstallationPath: ${installPath}`
           );
-          debug(`SHA256 hash: ${await hashFileInChunks(installPath)}`);
+          if (isDebug()) {
+            debug(`SHA256 hash: ${await hashFileInChunks(installPath)}`);
+          }
           const version = await extractVersionFromJsFile(installPath);
           return {
             cliPath: installPath,
@@ -338,7 +340,9 @@ export const findClaudeCodeInstallation = async (
 
     if (kind === 'js') {
       debug(`Treating PATH claude executable as cli.js at: ${claudeExePath}`);
-      debug(`SHA256 hash: ${await hashFileInChunks(claudeExePath)}`);
+      if (isDebug()) {
+        debug(`SHA256 hash: ${await hashFileInChunks(claudeExePath)}`);
+      }
 
       const version = await extractVersionFromJsFile(claudeExePath);
       return {
@@ -386,7 +390,9 @@ export const findClaudeCodeInstallation = async (
         continue;
       }
       debug(`Found Claude Code cli.js file at ${searchPath}; checking hash...`);
-      debug(`SHA256 hash: ${await hashFileInChunks(cliPath)}`);
+      if (isDebug()) {
+        debug(`SHA256 hash: ${await hashFileInChunks(cliPath)}`);
+      }
 
       // Extract version from the cli.js file itself
       const version = await extractVersionFromJsFile(cliPath);
