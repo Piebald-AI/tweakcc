@@ -1039,13 +1039,19 @@ const escapeNonAsciiChars = (text: string): string => {
 
 const buildSearchRegexFromPieces = (
   pieces: string[],
-  ccVersion: string
+  ccVersion: string,
+  buildTime?: string
 ): string => {
   let pattern = '';
 
   for (let i = 0; i < pieces.length; i++) {
     // Replace <<CCVERSION>> with actual version before escaping
-    const piece = pieces[i].replace(/<<CCVERSION>>/g, ccVersion);
+    let piece = pieces[i].replace(/<<CCVERSION>>/g, ccVersion);
+
+    // Replace <<BUILD_TIME>> with actual build time if provided
+    if (buildTime) {
+      piece = piece.replace(/<<BUILD_TIME>>/g, buildTime);
+    }
 
     // Escape special regex characters in the text piece
     const escapedPiece = piece.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1247,7 +1253,8 @@ const applyIdentifierMapping = (
   identifierMap: Record<string, string>,
   extractedVars: string[],
   ccVersion: string,
-  escapeNonAscii = false
+  escapeNonAscii = false,
+  buildTime?: string
 ): string => {
   // Build reverse map: HUMAN_NAME -> actual minified var from cli.js
   const reverseMap: Record<string, string> = {};
@@ -1279,6 +1286,11 @@ const applyIdentifierMapping = (
   // Replace <<CCVERSION>> with the actual Claude Code version
   result = result.replace(/<<CCVERSION>>/g, ccVersion);
 
+  // Replace <<BUILD_TIME>> with the actual build timestamp if provided
+  if (buildTime) {
+    result = result.replace(/<<BUILD_TIME>>/g, buildTime);
+  }
+
   // Escape non-ASCII characters if requested (for Bun native executables)
   if (escapeNonAscii) {
     result = escapeNonAsciiChars(result);
@@ -1302,7 +1314,8 @@ const applyIdentifierMapping = (
  */
 export const loadSystemPromptsWithRegex = async (
   ccVersion: string,
-  escapeNonAscii = false
+  escapeNonAscii = false,
+  buildTime?: string
 ): Promise<
   Array<{
     promptId: string;
@@ -1334,7 +1347,11 @@ export const loadSystemPromptsWithRegex = async (
   // For each prompt in strings.json
   for (const jsonPrompt of stringsJson.prompts) {
     // Build the search regex from pieces array
-    const regex = buildSearchRegexFromPieces(jsonPrompt.pieces, ccVersion);
+    const regex = buildSearchRegexFromPieces(
+      jsonPrompt.pieces,
+      ccVersion,
+      buildTime
+    );
 
     // Try to read the corresponding markdown file for REPLACEMENT content
     const mdPath = path.join(SYSTEM_PROMPTS_DIR, `${jsonPrompt.id}.md`);
@@ -1360,7 +1377,8 @@ export const loadSystemPromptsWithRegex = async (
         jsonPrompt.identifierMap,
         extractedVars,
         ccVersion,
-        escapeNonAscii
+        escapeNonAscii,
+        buildTime
       );
     };
 

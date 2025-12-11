@@ -419,16 +419,32 @@ if (require.main === module) {
     return str.replace(new RegExp(escapedVersion, 'g'), '<<CCVERSION>>');
   };
 
-  const replaceVersionInPrompts = (data, versionStr) => {
-    if (!versionStr) return data;
+  // Helper function to replace BUILD_TIME timestamps with placeholder
+  // BUILD_TIME is an ISO 8601 timestamp like "2025-12-09T19:43:43Z"
+  const replaceBuildTimeInString = str => {
+    // Match ISO 8601 timestamps in the format YYYY-MM-DDTHH:MM:SSZ
+    // Only match when preceded by BUILD_TIME:" to avoid false positives
+    return str.replace(
+      /BUILD_TIME:"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)"/g,
+      'BUILD_TIME:"<<BUILD_TIME>>"'
+    );
+  };
 
+  const replaceVersionInPrompts = (data, versionStr) => {
     return {
       ...data,
       prompts: data.prompts.map(prompt => ({
         ...prompt,
-        pieces: prompt.pieces.map(piece =>
-          replaceVersionInString(piece, versionStr)
-        ),
+        pieces: prompt.pieces.map(piece => {
+          let result = piece;
+          // Replace BUILD_TIME first (always)
+          result = replaceBuildTimeInString(result);
+          // Then replace version if provided
+          if (versionStr) {
+            result = replaceVersionInString(result, versionStr);
+          }
+          return result;
+        }),
       })),
     };
   };

@@ -21,6 +21,17 @@ const detectUnicodeEscaping = (content: string): boolean => {
   return unicodeEscapePattern.test(content);
 };
 
+/**
+ * Extracts the BUILD_TIME value from cli.js content.
+ * BUILD_TIME is an ISO 8601 timestamp like "2025-12-09T19:43:43Z"
+ */
+const extractBuildTime = (content: string): string | undefined => {
+  const match = content.match(
+    /\bBUILD_TIME:"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)"/
+  );
+  return match ? match[1] : undefined;
+};
+
 const stringifyRegex = (regex: RegExp): string => {
   const str = regex.toString();
   const pattern = JSON.stringify(str.substring(1, str.length - 1));
@@ -49,10 +60,17 @@ export const applySystemPrompts = async (
     );
   }
 
+  // Extract BUILD_TIME from cli.js content
+  const buildTime = extractBuildTime(content);
+  if (buildTime) {
+    debug(`Extracted BUILD_TIME from cli.js: ${buildTime}`);
+  }
+
   // Load system prompts and generate regexes
   const systemPrompts = await loadSystemPromptsWithRegex(
     version,
-    shouldEscapeNonAscii
+    shouldEscapeNonAscii,
+    buildTime
   );
   debug(`Loaded ${systemPrompts.length} system prompts with regexes`);
 

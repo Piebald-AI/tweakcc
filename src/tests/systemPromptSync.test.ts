@@ -953,5 +953,72 @@ Usage: \${MAX_TIMEOUT()} ms`;
       expect(interpolated).toBe('Usage: ${J$$()} ms');
       expect(interpolated).not.toBe('Usage: ${J$()} ms');
     });
+
+    it('should correctly handle <<BUILD_TIME>> placeholder', async () => {
+      const mockStringsFile: StringsFile = {
+        version: '1.0.0',
+        prompts: [
+          {
+            id: 'test-prompt',
+            name: 'Test',
+            description: 'Test',
+            version: '1.0.0',
+            pieces: [
+              'Version: <<CCVERSION>>, BUILD_TIME:"<<BUILD_TIME>>"',
+            ],
+            identifiers: [],
+            identifierMap: {},
+          },
+        ],
+      };
+
+      // Mock the download function to return our test data
+      const { downloadStringsFile } = await import(
+        '../systemPromptDownload.js'
+      );
+      vi.mocked(downloadStringsFile).mockResolvedValue(mockStringsFile);
+
+      // Preload the strings file using the public API
+      await promptSync.preloadStringsFile('1.0.0');
+
+      // Create mock markdown file with placeholders
+      const mockMarkdown = `<!--
+name: Test
+description: Test
+ccVersion: 1.0.0
+-->
+
+Version: <<CCVERSION>>, BUILD_TIME:"<<BUILD_TIME>>"`;
+
+      vi.spyOn(fs, 'readFile').mockResolvedValue(mockMarkdown);
+
+      // Pass buildTime to loadSystemPromptsWithRegex (simulating extraction from cli.js)
+      const buildTime = '2025-12-09T19:43:43Z';
+      const results = await promptSync.loadSystemPromptsWithRegex(
+        '1.0.0',
+        false,
+        buildTime
+      );
+      expect(results).toHaveLength(1);
+
+      // The regex should match the actual content in cli.js
+      const testCliContent =
+        'Version: 1.0.0, BUILD_TIME:"2025-12-09T19:43:43Z"';
+      const regex = new RegExp(results[0].regex);
+      const match = testCliContent.match(regex);
+
+      expect(match).not.toBeNull();
+
+      // Simulate matching - the interpolated content should have both placeholders replaced
+      const matchResult = [
+        'Version: 1.0.0, BUILD_TIME:"2025-12-09T19:43:43Z"',
+      ] as RegExpMatchArray;
+      const interpolated = results[0].getInterpolatedContent(matchResult);
+
+      // Should replace <<CCVERSION>> with 1.0.0 and <<BUILD_TIME>> with the provided buildTime
+      expect(interpolated).toBe(
+        'Version: 1.0.0, BUILD_TIME:"2025-12-09T19:43:43Z"'
+      );
+    });
   });
 });
