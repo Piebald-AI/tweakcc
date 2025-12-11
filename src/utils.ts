@@ -14,6 +14,12 @@ export const isDebug = (): boolean => {
 export const enableDebug = (): void => {
   isDebugModeOn = true;
 };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const debug = (message: string, ...optionalParams: any[]) => {
+  if (isDebug()) {
+    console.log(message, ...optionalParams);
+  }
+};
 
 export function getCurrentClaudeCodeTheme(): string {
   try {
@@ -304,31 +310,23 @@ export async function replaceFileBreakingHardLinks(
   try {
     const stats = await fs.stat(filePath);
     originalMode = stats.mode;
-    if (isDebug()) {
-      console.log(
-        `[${operation}] Original file mode for ${filePath}: ${(originalMode & parseInt('777', 8)).toString(8)}`
-      );
-    }
+    debug(
+      `[${operation}] Original file mode for ${filePath}: ${(originalMode & parseInt('777', 8)).toString(8)}`
+    );
   } catch (error) {
     // File might not exist, use default
-    if (isDebug()) {
-      console.log(
-        `[${operation}] Could not stat ${filePath} (error: ${error}), using default mode 755`
-      );
-    }
+    debug(
+      `[${operation}] Could not stat ${filePath} (error: ${error}), using default mode 755`
+    );
   }
 
   // Unlink the file first to break any hard links
   try {
     await fs.unlink(filePath);
-    if (isDebug()) {
-      console.log(`[${operation}] Unlinked ${filePath} to break hard links`);
-    }
+    debug(`[${operation}] Unlinked ${filePath} to break hard links`);
   } catch (error) {
     // File might not exist, which is fine
-    if (isDebug()) {
-      console.log(`[${operation}] Could not unlink ${filePath}: ${error}`);
-    }
+    debug(`[${operation}] Could not unlink ${filePath}: ${error}`);
   }
 
   // Write the new content
@@ -336,11 +334,9 @@ export async function replaceFileBreakingHardLinks(
 
   // Restore the original permissions
   await fs.chmod(filePath, originalMode);
-  if (isDebug()) {
-    console.log(
-      `[${operation}] Restored permissions to ${(originalMode & parseInt('777', 8)).toString(8)}`
-    );
-  }
+  debug(
+    `[${operation}] Restored permissions to ${(originalMode & parseInt('777', 8)).toString(8)}`
+  );
 }
 
 export async function doesFileExist(filePath: string): Promise<boolean> {

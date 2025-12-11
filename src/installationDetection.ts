@@ -4,7 +4,7 @@ import path from 'path';
 
 import { WASMagic } from 'wasmagic';
 
-import { isDebug, hashFileInChunks } from './utils.js';
+import { debug, hashFileInChunks } from './utils.js';
 import { extractClaudeJsFromNativeInstallation } from './nativeInstallationLoader.js';
 import fs from 'node:fs/promises';
 import { ClaudeCodeInstallationInfo, TweakccConfig } from './types.js';
@@ -39,20 +39,16 @@ async function getMagicInstance(): Promise<WASMagic> {
  */
 async function findClaudeExecutableOnPath(): Promise<ClaudeExecutablePathInfo | null> {
   if (process.platform === 'win32') {
-    if (isDebug()) {
-      console.log(
-        'Skipping PATH-based claude executable lookup on Windows; symlink fallback is POSIX-only.'
-      );
-    }
+    debug(
+      'Skipping PATH-based claude executable lookup on Windows; symlink fallback is POSIX-only.'
+    );
     return null;
   }
 
   try {
     const command = 'which claude';
 
-    if (isDebug()) {
-      console.log(`Looking for claude executable using: ${command}`);
-    }
+    debug(`Looking for claude executable using: ${command}`);
 
     const result = execSync(command, { encoding: 'utf8' }).trim();
     const firstPath = result.split('\n')[0]?.trim();
@@ -65,9 +61,7 @@ async function findClaudeExecutableOnPath(): Promise<ClaudeExecutablePathInfo | 
     try {
       stats = await fs.lstat(firstPath);
     } catch (error) {
-      if (isDebug()) {
-        console.log('lstat failed for claude executable path:', error);
-      }
+      debug('lstat failed for claude executable path:', error);
       return null;
     }
 
@@ -75,13 +69,11 @@ async function findClaudeExecutableOnPath(): Promise<ClaudeExecutablePathInfo | 
 
     try {
       const realPath = await fs.realpath(firstPath);
-      if (isDebug()) {
-        if (isSymlink && realPath !== firstPath) {
-          console.log(`Found claude executable at: ${firstPath} (symlink)`);
-          console.log(`Resolved to: ${realPath}`);
-        } else {
-          console.log(`Found claude executable at: ${realPath}`);
-        }
+      if (isSymlink && realPath !== firstPath) {
+        debug(`Found claude executable at: ${firstPath} (symlink)`);
+        debug(`Resolved to: ${realPath}`);
+      } else {
+        debug(`Found claude executable at: ${realPath}`);
       }
 
       return {
@@ -90,9 +82,7 @@ async function findClaudeExecutableOnPath(): Promise<ClaudeExecutablePathInfo | 
         isSymlink,
       };
     } catch (error) {
-      if (isDebug()) {
-        console.log('Could not resolve symlink, using original path:', error);
-      }
+      debug('Could not resolve symlink, using original path:', error);
       return {
         commandPath: firstPath,
         resolvedPath: firstPath,
@@ -100,9 +90,7 @@ async function findClaudeExecutableOnPath(): Promise<ClaudeExecutablePathInfo | 
       };
     }
   } catch (error) {
-    if (isDebug()) {
-      console.log('Could not find claude executable on PATH:', error);
-    }
+    debug('Could not find claude executable on PATH:', error);
   }
 
   return null;
@@ -129,9 +117,7 @@ async function readFilePrefix(
       await handle.close();
     }
   } catch (error) {
-    if (isDebug()) {
-      console.log('Failed to read file prefix for WASMagic:', error);
-    }
+    debug('Failed to read file prefix for WASMagic:', error);
     return null;
   }
 }
@@ -165,12 +151,7 @@ async function detectClaudeExecutableKind(
     }
     return 'other';
   } catch (error) {
-    if (isDebug()) {
-      console.log(
-        'WASMagic detection failed, falling back to search paths:',
-        error
-      );
-    }
+    debug('WASMagic detection failed, falling back to search paths:', error);
     return 'other';
   }
 }
@@ -198,19 +179,15 @@ function extractVersionFromContent(content: string): string | null {
   let mostCommonVersion: string | undefined;
 
   for (const [version, count] of versionCounts.entries()) {
-    if (isDebug()) {
-      console.log(`Found version ${version} with ${count} occurrences`);
-    }
+    debug(`Found version ${version} with ${count} occurrences`);
     if (count > maxCount) {
       maxCount = count;
       mostCommonVersion = version;
     }
   }
 
-  if (isDebug() && mostCommonVersion) {
-    console.log(
-      `Extracted version ${mostCommonVersion} (${maxCount} occurrences)`
-    );
+  if (mostCommonVersion) {
+    debug(`Extracted version ${mostCommonVersion} (${maxCount} occurrences)`);
   }
 
   return mostCommonVersion || null;
@@ -281,12 +258,10 @@ export const findClaudeCodeInstallation = async (
         const kind = await detectClaudeExecutableKind(installPath);
 
         if (kind === 'js') {
-          if (isDebug()) {
-            console.log(
-              `Using Claude Code cli.js from explicit ccInstallationPath: ${installPath}`
-            );
-            console.log(`SHA256 hash: ${await hashFileInChunks(installPath)}`);
-          }
+          debug(
+            `Using Claude Code cli.js from explicit ccInstallationPath: ${installPath}`
+          );
+          debug(`SHA256 hash: ${await hashFileInChunks(installPath)}`);
           const version = await extractVersionFromJsFile(installPath);
           return {
             cliPath: installPath,
@@ -295,11 +270,9 @@ export const findClaudeCodeInstallation = async (
         }
 
         if (kind === 'binary') {
-          if (isDebug()) {
-            console.log(
-              `Using native Claude installation from explicit ccInstallationPath: ${installPath}`
-            );
-          }
+          debug(
+            `Using native Claude installation from explicit ccInstallationPath: ${installPath}`
+          );
 
           const claudeJsBuffer =
             await extractClaudeJsFromNativeInstallation(installPath);
@@ -309,11 +282,9 @@ export const findClaudeCodeInstallation = async (
             const version = extractVersionFromContent(content);
 
             if (version) {
-              if (isDebug()) {
-                console.log(
-                  `Extracted version ${version} from native installation via explicit ccInstallationPath`
-                );
-              }
+              debug(
+                `Extracted version ${version} from native installation via explicit ccInstallationPath`
+              );
               return {
                 version,
                 nativeInstallationPath: installPath,
@@ -351,31 +322,24 @@ export const findClaudeCodeInstallation = async (
   // Next, try to locate `claude` on PATH and use WASMagic to determine
   // whether it is a JS entrypoint (cli.js) or a native binary.
   const claudeExePathInfo = await findClaudeExecutableOnPath();
-  if (isDebug()) {
-    console.log(
-      `findClaudeExecutableOnPath() returned: ${claudeExePathInfo?.resolvedPath ?? null}`
-    );
-  }
+  debug(
+    `findClaudeExecutableOnPath() returned: ${claudeExePathInfo?.resolvedPath ?? null}`
+  );
 
   if (claudeExePathInfo) {
     const claudeExePath = claudeExePathInfo.resolvedPath;
     const kind = await detectClaudeExecutableKind(claudeExePath);
-    if (isDebug()) {
-      console.log(`WASMagic classified claude executable as: ${kind}`);
-      if (kind === 'other') {
-        console.log(
-          'PATH claude executable did not look like JavaScript or a native binary; falling back to CLIJS_SEARCH_PATHS.'
-        );
-      }
+    debug(`WASMagic classified claude executable as: ${kind}`);
+    if (kind === 'other') {
+      debug(
+        'PATH claude executable did not look like JavaScript or a native binary; falling back to CLIJS_SEARCH_PATHS.'
+      );
     }
 
     if (kind === 'js') {
-      if (isDebug()) {
-        console.log(
-          `Treating PATH claude executable as cli.js at: ${claudeExePath}`
-        );
-        console.log(`SHA256 hash: ${await hashFileInChunks(claudeExePath)}`);
-      }
+      debug(`Treating PATH claude executable as cli.js at: ${claudeExePath}`);
+      debug(`SHA256 hash: ${await hashFileInChunks(claudeExePath)}`);
+
       const version = await extractVersionFromJsFile(claudeExePath);
       return {
         cliPath: claudeExePath,
@@ -384,11 +348,9 @@ export const findClaudeCodeInstallation = async (
     }
 
     if (kind === 'binary') {
-      if (isDebug()) {
-        console.log(
-          `Treating PATH claude executable as native installation: ${claudeExePath}`
-        );
-      }
+      debug(
+        `Treating PATH claude executable as native installation: ${claudeExePath}`
+      );
 
       const claudeJsBuffer =
         await extractClaudeJsFromNativeInstallation(claudeExePath);
@@ -398,17 +360,11 @@ export const findClaudeCodeInstallation = async (
         const version = extractVersionFromContent(content);
 
         if (!version) {
-          if (isDebug()) {
-            console.log(
-              'Failed to extract version from native installation via PATH'
-            );
-          }
+          debug('Failed to extract version from native installation via PATH');
         } else {
-          if (isDebug()) {
-            console.log(
-              `Extracted version ${version} from native installation via PATH`
-            );
-          }
+          debug(
+            `Extracted version ${version} from native installation via PATH`
+          );
 
           return {
             version,
@@ -422,21 +378,15 @@ export const findClaudeCodeInstallation = async (
   // Fall back to the hard-coded cli.js detection paths.
   for (const searchPath of CLIJS_SEARCH_PATHS) {
     try {
-      if (isDebug()) {
-        console.log(`Searching for Claude Code cli.js file at ${searchPath}`);
-      }
+      debug(`Searching for Claude Code cli.js file at ${searchPath}`);
 
       // Check for cli.js
       const cliPath = path.join(searchPath, 'cli.js');
       if (!(await doesFileExist(cliPath))) {
         continue;
       }
-      if (isDebug()) {
-        console.log(
-          `Found Claude Code cli.js file at ${searchPath}; checking hash...`
-        );
-        console.log(`SHA256 hash: ${await hashFileInChunks(cliPath)}`);
-      }
+      debug(`Found Claude Code cli.js file at ${searchPath}; checking hash...`);
+      debug(`SHA256 hash: ${await hashFileInChunks(cliPath)}`);
 
       // Extract version from the cli.js file itself
       const version = await extractVersionFromJsFile(cliPath);
@@ -460,20 +410,16 @@ export const findClaudeCodeInstallation = async (
   }
 
   // If we didn't find cli.js in the usual locations, try extracting from native installation
-  if (isDebug()) {
-    console.log(
-      'Could not find cli.js in standard locations, trying native installation method...'
-    );
-  }
+  debug(
+    'Could not find cli.js in standard locations, trying native installation method...'
+  );
 
   const claudeExeInfo = await findClaudeExecutableOnPath();
-  if (isDebug()) {
-    console.log(
-      `findClaudeExecutableOnPath() returned: ${
-        claudeExeInfo ? claudeExeInfo.resolvedPath : null
-      }`
-    );
-  }
+  debug(
+    `findClaudeExecutableOnPath() returned: ${
+      claudeExeInfo ? claudeExeInfo.resolvedPath : null
+    }`
+  );
 
   if (claudeExeInfo) {
     const { resolvedPath, isSymlink } = claudeExeInfo;
@@ -482,23 +428,19 @@ export const findClaudeCodeInstallation = async (
 
     if (resolvedPath.endsWith('cli.js')) {
       derivedCliJsPath = resolvedPath;
-      if (isDebug()) {
-        console.log(
-          'Resolved PATH executable already points at cli.js; treating as NPM installation.'
-        );
-      }
+      debug(
+        'Resolved PATH executable already points at cli.js; treating as NPM installation.'
+      );
     } else if (isSymlink) {
       derivedCliJsPath = await findClijsFromExecutablePath(resolvedPath);
-      if (isDebug()) {
-        if (derivedCliJsPath) {
-          console.log(
-            `Symlink target resides inside Claude Code package; derived cli.js at ${derivedCliJsPath}`
-          );
-        } else {
-          console.log(
-            'Symlink target did not contain cli.js; attempting native extraction instead.'
-          );
-        }
+      if (derivedCliJsPath) {
+        debug(
+          `Symlink target resides inside Claude Code package; derived cli.js at ${derivedCliJsPath}`
+        );
+      } else {
+        debug(
+          'Symlink target did not contain cli.js; attempting native extraction instead.'
+        );
       }
     }
 
@@ -506,23 +448,19 @@ export const findClaudeCodeInstallation = async (
       try {
         const version = await extractVersionFromJsFile(derivedCliJsPath);
 
-        if (isDebug()) {
-          console.log(
-            `Found Claude Code via symlink-derived cli.js at: ${derivedCliJsPath}`
-          );
-        }
+        debug(
+          `Found Claude Code via symlink-derived cli.js at: ${derivedCliJsPath}`
+        );
 
         return {
           cliPath: derivedCliJsPath,
           version,
         };
       } catch (error) {
-        if (isDebug()) {
-          console.log(
-            'Failed to extract version from cli.js found via symlink:',
-            error
-          );
-        }
+        debug(
+          'Failed to extract version from cli.js found via symlink:',
+          error
+        );
         // Fall through to try native installation method
       }
     }
@@ -530,11 +468,9 @@ export const findClaudeCodeInstallation = async (
     // Treat any found executable as a potential native installation
     // Always extract from the actual binary to get the correct version
     // (The backup is only used when applying modifications, not for version detection)
-    if (isDebug()) {
-      console.log(
-        `Attempting to extract claude.js from native installation: ${resolvedPath}`
-      );
-    }
+    debug(
+      `Attempting to extract claude.js from native installation: ${resolvedPath}`
+    );
 
     const claudeJsBuffer =
       await extractClaudeJsFromNativeInstallation(resolvedPath);
@@ -546,15 +482,11 @@ export const findClaudeCodeInstallation = async (
       const version = extractVersionFromContent(content);
 
       if (!version) {
-        if (isDebug()) {
-          console.log('Failed to extract version from native installation');
-        }
+        debug('Failed to extract version from native installation');
         return null;
       }
 
-      if (isDebug()) {
-        console.log(`Extracted version ${version} from native installation`);
-      }
+      debug(`Extracted version ${version} from native installation`);
 
       return {
         // cliPath is undefined for native installs - no file on disk

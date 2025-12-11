@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import { execSync } from 'node:child_process';
 import LIEF from 'node-lief';
-import { isDebug } from './utils.js';
+import { isDebug, debug } from './utils.js';
 
 /**
  * Constants for Bun trailer and serialized layout sizes.
@@ -184,20 +184,12 @@ function parseBunDataBlob(bunDataContent: Buffer): {
   const trailerStart = bunDataContent.length - BUN_TRAILER.length;
   const trailerBytes = bunDataContent.subarray(trailerStart);
 
-  if (isDebug()) {
-    console.log(
-      `parseBunDataBlob: Expected trailer: ${BUN_TRAILER.toString('hex')}`
-    );
-    console.log(
-      `parseBunDataBlob: Got trailer: ${trailerBytes.toString('hex')}`
-    );
-  }
+  debug(`parseBunDataBlob: Expected trailer: ${BUN_TRAILER.toString('hex')}`);
+  debug(`parseBunDataBlob: Got trailer: ${trailerBytes.toString('hex')}`);
 
   if (!trailerBytes.equals(BUN_TRAILER)) {
-    if (isDebug()) {
-      console.log(`Expected: ${BUN_TRAILER.toString('hex')}`);
-      console.log(`Got: ${trailerBytes.toString('hex')}`);
-    }
+    debug(`Expected: ${BUN_TRAILER.toString('hex')}`);
+    debug(`Got: ${trailerBytes.toString('hex')}`);
     throw new Error('BUN trailer bytes do not match trailer');
   }
 
@@ -226,27 +218,17 @@ function extractBunDataFromSection(sectionData: Buffer): BunData {
     throw new Error('Section data too small');
   }
 
-  if (isDebug()) {
-    console.log(
-      `extractBunDataFromSection: sectionData.length=${sectionData.length}`
-    );
-  }
+  debug(`extractBunDataFromSection: sectionData.length=${sectionData.length}`);
 
   const bunDataSize = sectionData.readUInt32LE(0);
 
-  if (isDebug()) {
-    console.log(
-      `extractBunDataFromSection: bunDataSize from header=${bunDataSize}`
-    );
-  }
+  debug(`extractBunDataFromSection: bunDataSize from header=${bunDataSize}`);
 
   const bunDataContent = sectionData.subarray(4, 4 + bunDataSize);
 
-  if (isDebug()) {
-    console.log(
-      `extractBunDataFromSection: bunDataContent.length=${bunDataContent.length}`
-    );
-  }
+  debug(
+    `extractBunDataFromSection: bunDataContent.length=${bunDataContent.length}`
+  );
 
   const { bunOffsets, bunData } = parseBunDataBlob(bunDataContent);
 
@@ -266,11 +248,9 @@ function extractBunDataFromELFOverlay(elfBinary: LIEF.ELF.Binary): BunData {
   }
 
   const overlayData = elfBinary.overlay;
-  if (isDebug()) {
-    console.log(
-      `extractBunDataFromELFOverlay: Overlay size=${overlayData.length} bytes`
-    );
-  }
+  debug(
+    `extractBunDataFromELFOverlay: Overlay size=${overlayData.length} bytes`
+  );
 
   if (overlayData.length < BUN_TRAILER.length + 8 + SIZEOF_OFFSETS) {
     throw new Error('ELF overlay data is too small');
@@ -278,11 +258,9 @@ function extractBunDataFromELFOverlay(elfBinary: LIEF.ELF.Binary): BunData {
 
   // Read totalByteCount from last 8 bytes
   const totalByteCount = overlayData.readBigUInt64LE(overlayData.length - 8);
-  if (isDebug()) {
-    console.log(
-      `extractBunDataFromELFOverlay: Total byte count from tail=${totalByteCount}`
-    );
-  }
+  debug(
+    `extractBunDataFromELFOverlay: Total byte count from tail=${totalByteCount}`
+  );
 
   if (totalByteCount < 4096n || totalByteCount > 2n ** 32n - 1n) {
     throw new Error(`ELF total byte count is out of range: ${totalByteCount}`);
@@ -295,14 +273,12 @@ function extractBunDataFromELFOverlay(elfBinary: LIEF.ELF.Binary): BunData {
     overlayData.length - 8
   );
 
-  if (isDebug()) {
-    console.log(
-      `extractBunDataFromELFOverlay: Expected trailer: ${BUN_TRAILER.toString('hex')}`
-    );
-    console.log(
-      `extractBunDataFromELFOverlay: Got trailer: ${trailerBytes.toString('hex')}`
-    );
-  }
+  debug(
+    `extractBunDataFromELFOverlay: Expected trailer: ${BUN_TRAILER.toString('hex')}`
+  );
+  debug(
+    `extractBunDataFromELFOverlay: Got trailer: ${trailerBytes.toString('hex')}`
+  );
 
   if (!trailerBytes.equals(BUN_TRAILER)) {
     throw new Error('BUN trailer bytes do not match trailer');
@@ -317,11 +293,9 @@ function extractBunDataFromELFOverlay(elfBinary: LIEF.ELF.Binary): BunData {
   );
   const bunOffsets = parseOffsets(offsetsBytes);
 
-  if (isDebug()) {
-    console.log(
-      `extractBunDataFromELFOverlay: Offsets.byteCount=${bunOffsets.byteCount}`
-    );
-  }
+  debug(
+    `extractBunDataFromELFOverlay: Offsets.byteCount=${bunOffsets.byteCount}`
+  );
 
   // Validate byteCount from Offsets structure
   const byteCount =
@@ -341,11 +315,9 @@ function extractBunDataFromELFOverlay(elfBinary: LIEF.ELF.Binary): BunData {
     overlayData.length - tailDataLen
   );
 
-  if (isDebug()) {
-    console.log(
-      `extractBunDataFromELFOverlay: Extracted ${dataRegion.length} bytes of data`
-    );
-  }
+  debug(
+    `extractBunDataFromELFOverlay: Extracted ${dataRegion.length} bytes of data`
+  );
 
   // Reconstruct full blob [data][offsets][trailer] to match other formats
   const bunDataBlob = Buffer.concat([dataRegion, offsetsBytes, trailerBytes]);
@@ -391,9 +363,7 @@ function extractBunDataFromPE(peBinary: LIEF.PE.Binary): BunData {
 }
 
 function getBunData(binary: LIEF.Abstract.Binary): BunData {
-  if (isDebug()) {
-    console.log(`getBunData: Binary format detected as ${binary.format}`);
-  }
+  debug(`getBunData: Binary format detected as ${binary.format}`);
 
   switch (binary.format) {
     case 'MachO':
@@ -419,21 +389,17 @@ export function extractClaudeJsFromNativeInstallation(
     const binary = LIEF.parse(nativeInstallationPath);
     const { bunOffsets, bunData } = getBunData(binary);
 
-    if (isDebug()) {
-      console.log(
-        `extractClaudeJsFromNativeInstallation: Got bunData, size=${bunData.length} bytes`
-      );
-    }
+    debug(
+      `extractClaudeJsFromNativeInstallation: Got bunData, size=${bunData.length} bytes`
+    );
 
     const result = mapModules(
       bunData,
       bunOffsets,
       (module, moduleName, index) => {
-        if (isDebug()) {
-          console.log(
-            `extractClaudeJsFromNativeInstallation: Module ${index}: ${moduleName}`
-          );
-        }
+        debug(
+          `extractClaudeJsFromNativeInstallation: Module ${index}: ${moduleName}`
+        );
 
         // Module name is typically:
         // - Unix/macOS: /$bunfs/root/claude
@@ -445,11 +411,9 @@ export function extractClaudeJsFromNativeInstallation(
           module.contents
         );
 
-        if (isDebug()) {
-          console.log(
-            `extractClaudeJsFromNativeInstallation: Found claude module, contents length=${moduleContents.length}`
-          );
-        }
+        debug(
+          `extractClaudeJsFromNativeInstallation: Found claude module, contents length=${moduleContents.length}`
+        );
 
         return moduleContents.length > 0 ? moduleContents : undefined;
       }
@@ -459,20 +423,16 @@ export function extractClaudeJsFromNativeInstallation(
       return result;
     }
 
-    if (isDebug()) {
-      console.log(
-        'extractClaudeJsFromNativeInstallation: claude module not found in any module'
-      );
-    }
+    debug(
+      'extractClaudeJsFromNativeInstallation: claude module not found in any module'
+    );
 
     return null;
   } catch (error) {
-    if (isDebug()) {
-      console.log(
-        'extractClaudeJsFromNativeInstallation: Error during extraction:',
-        error
-      );
-    }
+    debug(
+      'extractClaudeJsFromNativeInstallation: Error during extraction:',
+      error
+    );
 
     return null;
   }
@@ -741,15 +701,9 @@ function repackMachO(
 ): void {
   try {
     // CRITICAL: Remove code signature first - it will be invalidated by modifications
-    if (isDebug()) {
-      console.log(
-        `repackMachO: Has code signature: ${machoBinary.hasCodeSignature}`
-      );
-    }
+    debug(`repackMachO: Has code signature: ${machoBinary.hasCodeSignature}`);
     if (machoBinary.hasCodeSignature) {
-      if (isDebug()) {
-        console.log('repackMachO: Removing code signature...');
-      }
+      debug('repackMachO: Removing code signature...');
       machoBinary.removeSignature();
     }
 
@@ -766,16 +720,12 @@ function repackMachO(
 
     const newSectionData = buildSectionData(newBunBuffer);
 
-    if (isDebug()) {
-      console.log(`repackMachO: Original section size: ${bunSection.size}`);
-      console.log(
-        `repackMachO: Original segment fileSize: ${bunSegment.fileSize}`
-      );
-      console.log(
-        `repackMachO: Original segment virtualSize: ${bunSegment.virtualSize}`
-      );
-      console.log(`repackMachO: New data size: ${newSectionData.length}`);
-    }
+    debug(`repackMachO: Original section size: ${bunSection.size}`);
+    debug(`repackMachO: Original segment fileSize: ${bunSegment.fileSize}`);
+    debug(
+      `repackMachO: Original segment virtualSize: ${bunSegment.virtualSize}`
+    );
+    debug(`repackMachO: New data size: ${newSectionData.length}`);
 
     // Calculate how much we need to expand
     const sizeDiff = newSectionData.length - Number(bunSection.size);
@@ -792,59 +742,45 @@ function repackMachO(
       const PAGE_SIZE = isARM64 ? 16384 : 4096;
       const alignedSizeDiff = Math.ceil(sizeDiff / PAGE_SIZE) * PAGE_SIZE;
 
-      if (isDebug()) {
-        console.log(`repackMachO: CPU type: ${isARM64 ? 'ARM64' : 'x86_64'}`);
-        console.log(`repackMachO: Page size: ${PAGE_SIZE} bytes`);
-        console.log(`repackMachO: Need to expand by ${sizeDiff} bytes`);
-        console.log(
-          `repackMachO: Rounding up to page-aligned: ${alignedSizeDiff} bytes`
-        );
-      }
+      debug(`repackMachO: CPU type: ${isARM64 ? 'ARM64' : 'x86_64'}`);
+      debug(`repackMachO: Page size: ${PAGE_SIZE} bytes`);
+      debug(`repackMachO: Need to expand by ${sizeDiff} bytes`);
+      debug(
+        `repackMachO: Rounding up to page-aligned: ${alignedSizeDiff} bytes`
+      );
 
       const success = machoBinary.extendSegment(bunSegment, alignedSizeDiff);
-      if (isDebug()) {
-        console.log(`repackMachO: extendSegment returned: ${success}`);
-      }
+      debug(`repackMachO: extendSegment returned: ${success}`);
 
       if (!success) {
         throw new Error('Failed to extend __BUN segment');
       }
 
-      if (isDebug()) {
-        console.log(
-          `repackMachO: Section size after extend: ${bunSection.size}`
-        );
-        console.log(
-          `repackMachO: Segment fileSize after extend: ${bunSegment.fileSize}`
-        );
-        console.log(
-          `repackMachO: Segment virtualSize after extend: ${bunSegment.virtualSize}`
-        );
-      }
+      debug(`repackMachO: Section size after extend: ${bunSection.size}`);
+      debug(
+        `repackMachO: Segment fileSize after extend: ${bunSegment.fileSize}`
+      );
+      debug(
+        `repackMachO: Segment virtualSize after extend: ${bunSegment.virtualSize}`
+      );
     }
 
     // Update section content
     bunSection.content = newSectionData;
     bunSection.size = BigInt(newSectionData.length);
 
-    if (isDebug()) {
-      console.log(`repackMachO: Final section size: ${bunSection.size}`);
-      console.log(`repackMachO: Writing modified binary to ${outputPath}...`);
-    }
+    debug(`repackMachO: Final section size: ${bunSection.size}`);
+    debug(`repackMachO: Writing modified binary to ${outputPath}...`);
 
     atomicWriteBinary(machoBinary, outputPath, binPath);
 
     // Re-sign the binary with an ad-hoc signature
     try {
-      if (isDebug()) {
-        console.log(`repackMachO: Re-signing binary with ad-hoc signature...`);
-      }
+      debug(`repackMachO: Re-signing binary with ad-hoc signature...`);
       execSync(`codesign -s - -f "${outputPath}"`, {
         stdio: isDebug() ? 'inherit' : 'ignore',
       });
-      if (isDebug()) {
-        console.log('repackMachO: Code signing completed successfully');
-      }
+      debug('repackMachO: Code signing completed successfully');
     } catch (codesignError) {
       console.warn(
         'Warning: Failed to re-sign binary. The binary may not run correctly on macOS:',
@@ -852,9 +788,7 @@ function repackMachO(
       );
     }
 
-    if (isDebug()) {
-      console.log('repackMachO: Write completed successfully');
-    }
+    debug('repackMachO: Write completed successfully');
   } catch (error) {
     console.error('repackMachO failed:', error);
     throw error;
@@ -875,12 +809,10 @@ function repackPE(
 
     const newSectionData = buildSectionData(newBunBuffer);
 
-    if (isDebug()) {
-      console.log(
-        `repackPE: Original section size: ${bunSection.size}, virtual size: ${bunSection.virtualSize}`
-      );
-      console.log(`repackPE: New data size: ${newSectionData.length}`);
-    }
+    debug(
+      `repackPE: Original section size: ${bunSection.size}, virtual size: ${bunSection.virtualSize}`
+    );
+    debug(`repackPE: New data size: ${newSectionData.length}`);
 
     // Update section content
     bunSection.content = newSectionData;
@@ -892,13 +824,9 @@ function repackPE(
     bunSection.virtualSize = BigInt(newSectionData.length);
     bunSection.size = BigInt(newSectionData.length);
 
-    if (isDebug()) {
-      console.log(`repackPE: Writing modified binary to ${outputPath}...`);
-    }
+    debug(`repackPE: Writing modified binary to ${outputPath}...`);
     atomicWriteBinary(peBinary, outputPath, binPath, false);
-    if (isDebug()) {
-      console.log('repackPE: Write completed successfully');
-    }
+    debug('repackPE: Write completed successfully');
   } catch (error) {
     console.error('repackPE failed:', error);
     throw error;
@@ -921,20 +849,13 @@ function repackELF(
       newBunBuffer.length
     );
 
-    if (isDebug()) {
-      console.log(
-        `repackELF: Setting overlay data (${newOverlay.length} bytes)`
-      );
-    }
+    debug(`repackELF: Setting overlay data (${newOverlay.length} bytes)`);
 
     elfBinary.overlay = newOverlay;
-    if (isDebug()) {
-      console.log(`repackELF: Writing modified binary to ${outputPath}...`);
-    }
+    debug(`repackELF: Writing modified binary to ${outputPath}...`);
+
     atomicWriteBinary(elfBinary, outputPath, binPath);
-    if (isDebug()) {
-      console.log('repackELF: Write completed successfully');
-    }
+    debug('repackELF: Write completed successfully');
   } catch (error) {
     console.error('repackELF failed:', error);
     throw error;

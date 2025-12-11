@@ -7,26 +7,18 @@ import {
   updateConfigFile,
 } from './config.js';
 import { clearAllAppliedHashes } from './systemPromptHashIndex.js';
-import {
-  isDebug,
-  replaceFileBreakingHardLinks,
-  doesFileExist,
-} from './utils.js';
+import { debug, replaceFileBreakingHardLinks, doesFileExist } from './utils.js';
 import { ClaudeCodeInstallationInfo } from './types.js';
 
 export const backupClijs = async (ccInstInfo: ClaudeCodeInstallationInfo) => {
   // Only backup cli.js for NPM installs (when cliPath is set)
   if (!ccInstInfo.cliPath) {
-    if (isDebug()) {
-      console.log('backupClijs: Skipping for native installation (no cliPath)');
-    }
+    debug('backupClijs: Skipping for native installation (no cliPath)');
     return;
   }
 
   await ensureConfigDir();
-  if (isDebug()) {
-    console.log(`Backing up cli.js to ${CLIJS_BACKUP_FILE}`);
-  }
+  debug(`Backing up cli.js to ${CLIJS_BACKUP_FILE}`);
   await fs.copyFile(ccInstInfo.cliPath, CLIJS_BACKUP_FILE);
   await updateConfigFile(config => {
     config.changesApplied = false;
@@ -45,9 +37,7 @@ export const backupNativeBinary = async (
   }
 
   await ensureConfigDir();
-  if (isDebug()) {
-    console.log(`Backing up native binary to ${NATIVE_BINARY_BACKUP_FILE}`);
-  }
+  debug(`Backing up native binary to ${NATIVE_BINARY_BACKUP_FILE}`);
   await fs.copyFile(
     ccInstInfo.nativeInstallationPath,
     NATIVE_BINARY_BACKUP_FILE
@@ -67,17 +57,13 @@ export const restoreClijsFromBackup = async (
 ): Promise<boolean> => {
   // Only restore cli.js for NPM installs (when cliPath is set)
   if (!ccInstInfo.cliPath) {
-    if (isDebug()) {
-      console.log(
-        'restoreClijsFromBackup: Skipping for native installation (no cliPath)'
-      );
-    }
+    debug(
+      'restoreClijsFromBackup: Skipping for native installation (no cliPath)'
+    );
     return false;
   }
 
-  if (isDebug()) {
-    console.log(`Restoring cli.js from backup to ${ccInstInfo.cliPath}`);
-  }
+  debug(`Restoring cli.js from backup to ${ccInstInfo.cliPath}`);
 
   // Read the backup content
   const backupContent = await fs.readFile(CLIJS_BACKUP_FILE);
@@ -108,28 +94,20 @@ export const restoreNativeBinaryFromBackup = async (
   ccInstInfo: ClaudeCodeInstallationInfo
 ): Promise<boolean> => {
   if (!ccInstInfo.nativeInstallationPath) {
-    if (isDebug()) {
-      console.log(
-        'restoreNativeBinaryFromBackup: No native installation path, skipping'
-      );
-    }
+    debug(
+      'restoreNativeBinaryFromBackup: No native installation path, skipping'
+    );
     return false;
   }
 
   if (!(await doesFileExist(NATIVE_BINARY_BACKUP_FILE))) {
-    if (isDebug()) {
-      console.log(
-        'restoreNativeBinaryFromBackup: No backup file exists, skipping'
-      );
-    }
+    debug('restoreNativeBinaryFromBackup: No backup file exists, skipping');
     return false;
   }
 
-  if (isDebug()) {
-    console.log(
-      `Restoring native binary from backup to ${ccInstInfo.nativeInstallationPath}`
-    );
-  }
+  debug(
+    `Restoring native binary from backup to ${ccInstInfo.nativeInstallationPath}`
+  );
 
   // Read the backup content
   const backupContent = await fs.readFile(NATIVE_BINARY_BACKUP_FILE);

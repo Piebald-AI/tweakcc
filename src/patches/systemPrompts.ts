@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { isDebug } from '../utils.js';
+import { debug } from '../utils.js';
 import { showDiff, PatchApplied } from './index.js';
 import {
   loadSystemPromptsWithRegex,
@@ -43,8 +43,8 @@ export const applySystemPrompts = async (
   // Auto-detect if we should escape non-ASCII characters based on cli.js content
   const shouldEscapeNonAscii = escapeNonAscii ?? detectUnicodeEscaping(content);
 
-  if (isDebug() && shouldEscapeNonAscii) {
-    console.log(
+  if (shouldEscapeNonAscii) {
+    debug(
       'Detected Unicode escaping in cli.js - will escape non-ASCII characters in prompts'
     );
   }
@@ -54,9 +54,7 @@ export const applySystemPrompts = async (
     version,
     shouldEscapeNonAscii
   );
-  if (isDebug()) {
-    console.log(`Loaded ${systemPrompts.length} system prompts with regexes`);
-  }
+  debug(`Loaded ${systemPrompts.length} system prompts with regexes`);
 
   let totalOriginalChars = 0;
   let totalNewChars = 0;
@@ -110,33 +108,29 @@ export const applySystemPrompts = async (
       totalOriginalChars += originalLength;
       totalNewChars += newLength;
 
-      if (isDebug() && originalLength !== newLength) {
-        console.log(`\n  Character count difference for ${prompt.name}:`);
-        console.log(`    Original baseline: ${originalLength} chars`);
-        console.log(`    User's version: ${newLength} chars`);
-        console.log(`    Difference: ${originalLength - newLength} chars`);
+      if (originalLength !== newLength) {
+        debug(`\n  Character count difference for ${prompt.name}:`);
+        debug(`    Original baseline: ${originalLength} chars`);
+        debug(`    User's version: ${newLength} chars`);
+        debug(`    Difference: ${originalLength - newLength} chars`);
         if (Math.abs(originalLength - newLength) < 200) {
-          console.log(
-            `\n    Original baseline content:\n${originalBaselineContent}`
-          );
-          console.log(`\n    User's content:\n${prompt.content}`);
+          debug(`\n    Original baseline content:\n${originalBaselineContent}`);
+          debug(`\n    User's content:\n${prompt.content}`);
         }
       }
 
-      if (isDebug()) {
-        console.log(`\nFound match for prompt: ${prompt.name}`);
-        console.log(
-          `  Match location: index ${match.index}, length ${match[0].length}`
-        );
-        console.log(
-          `  Original content (first 100 chars): ${match[0].substring(0, 100)}...`
-        );
-        console.log(
-          `  Replacement content (first 100 chars): ${interpolatedContent.substring(0, 100)}...`
-        );
-        console.log(`  Captured variables: ${match.slice(1).join(', ')}`);
-        console.log(`  Content identical: ${match[0] === interpolatedContent}`);
-      }
+      debug(`\nFound match for prompt: ${prompt.name}`);
+      debug(
+        `  Match location: index ${match.index}, length ${match[0].length}`
+      );
+      debug(
+        `  Original content (first 100 chars): ${match[0].substring(0, 100)}...`
+      );
+      debug(
+        `  Replacement content (first 100 chars): ${interpolatedContent.substring(0, 100)}...`
+      );
+      debug(`  Captured variables: ${match.slice(1).join(', ')}`);
+      debug(`  Content identical: ${match[0] === interpolatedContent}`);
 
       const oldContent = content;
       const matchIndex = match.index;
@@ -151,15 +145,13 @@ export const applySystemPrompts = async (
       await setAppliedHash(promptId, appliedHash);
 
       // Show diff in debug mode
-      if (isDebug()) {
-        showDiff(
-          oldContent,
-          content,
-          interpolatedContent,
-          matchIndex,
-          matchIndex + matchLength
-        );
-      }
+      showDiff(
+        oldContent,
+        content,
+        interpolatedContent,
+        matchIndex,
+        matchIndex + matchLength
+      );
     } else {
       console.log(
         chalk.yellow(
@@ -167,17 +159,13 @@ export const applySystemPrompts = async (
         )
       );
 
-      if (isDebug()) {
-        console.log(`\n  Debug info for ${prompt.name}:`);
-        console.log(
-          `  Regex pattern (first 200 chars): ${regex.substring(0, 200)}...`
-        );
-        console.log(`  Trying to match pattern in cli.js...`);
-        const testMatch = content.match(new RegExp(regex.substring(0, 100)));
-        console.log(
-          `  Partial match result: ${testMatch ? 'found partial' : 'no match'}`
-        );
-      }
+      debug(`\n  Debug info for ${prompt.name}:`);
+      debug(`  Regex pattern (first 200 chars): ${regex.substring(0, 200)}...`);
+      debug(`  Trying to match pattern in cli.js...`);
+      const testMatch = content.match(new RegExp(regex.substring(0, 100)));
+      debug(
+        `  Partial match result: ${testMatch ? 'found partial' : 'no match'}`
+      );
     }
   }
 

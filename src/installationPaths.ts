@@ -1,6 +1,6 @@
 import { globbySync } from 'globby';
 import os from 'node:os';
-import { isDebug } from './utils.js';
+import { debug } from './utils.js';
 
 export interface SearchPathInfo {
   pattern: string;
@@ -30,14 +30,10 @@ const getClijsSearchPathsWithInfo = (): SearchPathInfo[] => {
           'code' in error &&
           (error.code === 'EACCES' || error.code === 'EPERM')
         ) {
-          if (isDebug()) {
-            console.log(
-              `Permission denied accessing: ${pattern} (${error.code})`
-            );
-          }
-        } else if (isDebug()) {
+          debug(`Permission denied accessing: ${pattern} (${error.code})`);
+        } else {
           // Log other unexpected errors in debug mode
-          console.log(
+          debug(
             `Error expanding glob pattern "${pattern}": ${
               error instanceof Error ? error.message : String(error)
             }`

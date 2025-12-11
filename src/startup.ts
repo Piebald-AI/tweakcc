@@ -9,7 +9,7 @@ import {
   NATIVE_BINARY_BACKUP_FILE,
   readConfigFile,
 } from './config.js';
-import { isDebug } from './utils.js';
+import { debug } from './utils.js';
 import { displaySyncResults, syncSystemPrompts } from './systemPromptSync.js';
 import { StartupCheckInfo } from './types.js';
 import { backupClijs, backupNativeBinary } from './installationBackup.js';
@@ -43,11 +43,7 @@ export async function startupCheck(): Promise<StartupCheckInfo | null> {
   // Backup cli.js if we don't have any backup yet.
   let hasBackedUp = false;
   if (!(await doesFileExist(CLIJS_BACKUP_FILE))) {
-    if (isDebug()) {
-      console.log(
-        `startupCheck: ${CLIJS_BACKUP_FILE} not found; backing up cli.js`
-      );
-    }
+    debug(`startupCheck: ${CLIJS_BACKUP_FILE} not found; backing up cli.js`);
     await backupClijs(ccInstInfo);
     hasBackedUp = true;
   }
@@ -58,11 +54,9 @@ export async function startupCheck(): Promise<StartupCheckInfo | null> {
     ccInstInfo.nativeInstallationPath &&
     !(await doesFileExist(NATIVE_BINARY_BACKUP_FILE))
   ) {
-    if (isDebug()) {
-      console.log(
-        `startupCheck: ${NATIVE_BINARY_BACKUP_FILE} not found; backing up native binary`
-      );
-    }
+    debug(
+      `startupCheck: ${NATIVE_BINARY_BACKUP_FILE} not found; backing up native binary`
+    );
     await backupNativeBinary(ccInstInfo);
     hasBackedUpNativeBinary = true;
   }
@@ -74,22 +68,18 @@ export async function startupCheck(): Promise<StartupCheckInfo | null> {
     // updated CC, so we should back up the new version.  If the backup didn't even exist until we
     // copied in there above, though, we shouldn't back it up twice.
     if (!hasBackedUp) {
-      if (isDebug()) {
-        console.log(
-          `startupCheck: real version (${realVersion}) != backed up version (${backedUpVersion}); backing up cli.js`
-        );
-      }
+      debug(
+        `startupCheck: real version (${realVersion}) != backed up version (${backedUpVersion}); backing up cli.js`
+      );
       await fs.unlink(CLIJS_BACKUP_FILE);
       await backupClijs(ccInstInfo);
     }
 
     // Also backup native binary if version changed
     if (ccInstInfo.nativeInstallationPath && !hasBackedUpNativeBinary) {
-      if (isDebug()) {
-        console.log(
-          `startupCheck: real version (${realVersion}) != backed up version (${backedUpVersion}); backing up native binary`
-        );
-      }
+      debug(
+        `startupCheck: real version (${realVersion}) != backed up version (${backedUpVersion}); backing up native binary`
+      );
       if (await doesFileExist(NATIVE_BINARY_BACKUP_FILE)) {
         await fs.unlink(NATIVE_BINARY_BACKUP_FILE);
       }

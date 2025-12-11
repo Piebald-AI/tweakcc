@@ -7,7 +7,7 @@ import {
   updateConfigFile,
 } from '../config.js';
 import { ClaudeCodeInstallationInfo, TweakccConfig } from '../types.js';
-import { isDebug, replaceFileBreakingHardLinks } from '../utils.js';
+import { isDebug, debug, replaceFileBreakingHardLinks } from '../utils.js';
 import {
   extractClaudeJsFromNativeInstallation,
   repackNativeInstallation,
@@ -448,11 +448,9 @@ export const applyCustomization = async (
       ? NATIVE_BINARY_BACKUP_FILE
       : ccInstInfo.nativeInstallationPath;
 
-    if (isDebug()) {
-      console.log(
-        `Extracting claude.js from ${backupExists ? 'backup' : 'native installation'}: ${pathToExtractFrom}`
-      );
-    }
+    debug(
+      `Extracting claude.js from ${backupExists ? 'backup' : 'native installation'}: ${pathToExtractFrom}`
+    );
 
     const claudeJsBuffer =
       await extractClaudeJsFromNativeInstallation(pathToExtractFrom);
@@ -464,9 +462,7 @@ export const applyCustomization = async (
     // Save original extracted JS for debugging
     const origPath = path.join(CONFIG_DIR, 'native-claudejs-orig.js');
     fsSync.writeFileSync(origPath, claudeJsBuffer);
-    if (isDebug()) {
-      console.log(`Saved original extracted JS from native to: ${origPath}`);
-    }
+    debug(`Saved original extracted JS from native to: ${origPath}`);
 
     content = claudeJsBuffer.toString('utf8');
   } else {
@@ -631,18 +627,14 @@ export const applyCustomization = async (
   // Write the modified content back
   if (ccInstInfo.nativeInstallationPath) {
     // For native installations: repack the modified claude.js back into the binary
-    if (isDebug()) {
-      console.log(
-        `Repacking modified claude.js into native installation: ${ccInstInfo.nativeInstallationPath}`
-      );
-    }
+    debug(
+      `Repacking modified claude.js into native installation: ${ccInstInfo.nativeInstallationPath}`
+    );
 
     // Save patched JS for debugging
     const patchedPath = path.join(CONFIG_DIR, 'native-claudejs-patched.js');
     fsSync.writeFileSync(patchedPath, content, 'utf8');
-    if (isDebug()) {
-      console.log(`Saved patched JS from native to: ${patchedPath}`);
-    }
+    debug(`Saved patched JS from native to: ${patchedPath}`);
 
     const modifiedBuffer = Buffer.from(content, 'utf8');
     await repackNativeInstallation(

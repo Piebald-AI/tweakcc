@@ -11,7 +11,7 @@ import {
   ThinkingVerbsConfig,
   TweakccConfig,
 } from './types.js';
-import { expandTilde, isDebug } from './utils.js';
+import { debug, expandTilde } from './utils.js';
 import { hasUnappliedSystemPromptChanges } from './systemPromptHashIndex.js';
 import { migrateUserMessageDisplayToV320 } from './migration.js';
 import { DEFAULT_SETTINGS } from './defaultSettings.js';
@@ -40,9 +40,7 @@ export const getConfigDir = (): string => {
       return defaultDir;
     }
   } catch (e) {
-    if (isDebug()) {
-      console.log(`Failed to check if ${defaultDir} exists: ${e}`);
-    }
+    debug(`Failed to check if ${defaultDir} exists: ${e}`);
     // If we can't check, fall through to next location
   }
 
@@ -52,9 +50,7 @@ export const getConfigDir = (): string => {
       return claudeDir;
     }
   } catch (e) {
-    if (isDebug()) {
-      console.log(`Failed to check if ${claudeDir} exists: ${e}`);
-    }
+    debug(`Failed to check if ${claudeDir} exists: ${e}`);
     // If we can't check, fall through to XDG logic
   }
 
@@ -162,9 +158,7 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
     settings: DEFAULT_SETTINGS,
   };
   try {
-    if (isDebug()) {
-      console.log(`Reading config at ${CONFIG_FILE}`);
-    }
+    debug(`Reading config at ${CONFIG_FILE}`);
 
     // Check for multiple configs and warn user
     warnAboutMultipleConfigs();
@@ -284,9 +278,8 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
 export const updateConfigFile = async (
   updateFn: (config: TweakccConfig) => void
 ): Promise<TweakccConfig> => {
-  if (isDebug()) {
-    console.log(`Updating config at ${CONFIG_FILE}`);
-  }
+  debug(`Updating config at ${CONFIG_FILE}`);
+
   // Ensure lastConfig is initialized
   if (!lastConfig) {
     lastConfig = await readConfigFile();
