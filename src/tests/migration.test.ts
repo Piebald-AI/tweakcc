@@ -220,9 +220,9 @@ describe('migrateConfigIfNeeded', () => {
     const mockConfig = { ccInstallationDir: '/some/path', settings: {} };
     vi.spyOn(fs, 'readFile').mockResolvedValue(JSON.stringify(mockConfig));
     vi.spyOn(fs, 'mkdir').mockResolvedValue(undefined);
-    vi.spyOn(fs, 'stat').mockResolvedValue({} as Awaited<
-      ReturnType<typeof fs.stat>
-    >);
+    vi.spyOn(fs, 'stat').mockResolvedValue(
+      {} as Awaited<ReturnType<typeof fs.stat>>
+    );
     const writeSpy = vi.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
 
     const result = await migrateConfigIfNeeded();
