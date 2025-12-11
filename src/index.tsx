@@ -2,47 +2,15 @@
 import { render } from 'ink';
 import { Command } from 'commander';
 import chalk from 'chalk';
-import fs from 'node:fs/promises';
-import App from './App.js';
-import {
-  CLIJS_SEARCH_PATH_INFO,
-  CONFIG_FILE,
-  CONFIG_DIR,
-  PATH_CHECK_TEXT,
-} from './utils/types.js';
-import {
-  startupCheck,
-  readConfigFile,
-  migrateConfigIfNeeded,
-} from './utils/config.js';
-import { enableDebug } from './utils/misc.js';
-import { applyCustomization } from './utils/patches/index.js';
-import { preloadStringsFile } from './utils/promptSync.js';
-
-const createExampleConfigIfMissing = async (
-  examplePath: string
-): Promise<void> => {
-  try {
-    await fs.mkdir(CONFIG_DIR, { recursive: true });
-    // Only create if config file doesn't exist
-    try {
-      await fs.stat(CONFIG_FILE);
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        error.code === 'ENOENT'
-      ) {
-        const exampleConfig = {
-          ccInstallationPath: examplePath + '/cli.js',
-        };
-        await fs.writeFile(CONFIG_FILE, JSON.stringify(exampleConfig, null, 2));
-      }
-    }
-  } catch {
-    // Silently fail if we can't write the config file
-  }
-};
+import App from './ui/App.js';
+import { CONFIG_FILE, readConfigFile } from './config.js';
+import { enableDebug } from './utils.js';
+import { applyCustomization } from './patches/index.js';
+import { preloadStringsFile } from './systemPromptSync.js';
+import { migrateConfigIfNeeded } from './migration.js';
+import { createExampleConfigIfMissing, startupCheck } from './startup.js';
+import { PATH_CHECK_TEXT } from './installationDetection.js';
+import { CLIJS_SEARCH_PATH_INFO } from './installationPaths.js';
 
 const main = async () => {
   const program = new Command();
