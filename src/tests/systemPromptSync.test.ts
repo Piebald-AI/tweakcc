@@ -963,9 +963,7 @@ Usage: \${MAX_TIMEOUT()} ms`;
             name: 'Test',
             description: 'Test',
             version: '1.0.0',
-            pieces: [
-              'Version: <<CCVERSION>>, BUILD_TIME:"<<BUILD_TIME>>"',
-            ],
+            pieces: ['Version: <<CCVERSION>>, BUILD_TIME:"<<BUILD_TIME>>"'],
             identifiers: [],
             identifierMap: {},
           },
