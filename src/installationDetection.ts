@@ -239,6 +239,32 @@ async function findClijsFromExecutablePath(
 }
 
 /**
+ * Extracts version from a bunx cache path string.
+ * Bunx cache paths follow the pattern: .../@anthropic-ai/claude-code@VERSION@@@HASH
+ * Returns [major, minor, patch] as numbers or null if pattern not found.
+ */
+function extractVersionFromPath(pathStr: string): [number, number, number] | null {
+  const match = pathStr.match(/@anthropic-ai[\\\/]claude-code@(\d+)\.(\d+)\.(\d+)/);
+  if (match) {
+    return [parseInt(match[1], 10), parseInt(match[2], 10), parseInt(match[3], 10)];
+  }
+  return null;
+}
+
+/**
+ * Compares two semantic versions.
+ * Returns: positive if a > b, negative if a < b, 0 if equal
+ */
+function compareVersions(
+  a: [number, number, number],
+  b: [number, number, number]
+): number {
+  if (a[0] !== b[0]) return a[0] - b[0];
+  if (a[1] !== b[1]) return a[1] - b[1];
+  return a[2] - b[2];
+}
+
+/**
  * Searches for the Claude Code installation in the default locations.
  */
 export const findClaudeCodeInstallation = async (
@@ -380,7 +406,26 @@ export const findClaudeCodeInstallation = async (
   }
 
   // Fall back to the hard-coded cli.js detection paths.
-  for (const searchPath of CLIJS_SEARCH_PATHS) {
+  // Sort paths so bunx cache entries are checked in descending version order.
+  // This ensures that if multiple bunx cache versions exist, the latest is patched.
+  const sortedSearchPaths = [...CLIJS_SEARCH_PATHS].sort((a, b) => {
+    const versionA = extractVersionFromPath(a);
+    const versionB = extractVersionFromPath(b);
+
+    // If both are versioned paths (bunx cache), sort descending (newest first)
+    if (versionA && versionB) {
+      return compareVersions(versionB, versionA);
+    }
+
+    // Unversioned paths (non-bunx) come after versioned paths
+    if (versionA) return -1;
+    if (versionB) return 1;
+
+    // Maintain original order for non-versioned paths
+    return 0;
+  });
+
+  for (const searchPath of sortedSearchPaths) {
     try {
       debug(`Searching for Claude Code cli.js file at ${searchPath}`);
 
