@@ -1,4 +1,4 @@
-import { Box, BoxProps, Text } from 'ink';
+import { Box, Text } from 'ink';
 import Link from 'ink-link';
 
 // Generated with `chafa <path> -f symbols -s 20 --bg=#ff8400`.
@@ -45,7 +45,7 @@ const PiebaldAnnouncement = () => (
       </Text>
       <Text> </Text>
       <Text>
-        We've released <Text bold>Piebald</Text>, the ultimate agentic AI
+        We&apos;ve released <Text bold>Piebald</Text>, the ultimate agentic AI
         developer experience.
       </Text>
       <Text>
@@ -56,7 +56,7 @@ const PiebaldAnnouncement = () => (
       </Text>
       <Text> </Text>
       <Text dimColor color="gray">
-        press 'h' to hide
+        press &apos;h&apos; to hide
       </Text>
     </Box>
     <Box width={22} flexShrink={0} flexDirection="column" alignItems="center">
