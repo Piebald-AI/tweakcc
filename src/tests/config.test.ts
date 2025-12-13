@@ -1,9 +1,7 @@
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
-import * as childProcess from 'node:child_process';
 import type { Stats } from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { WASMagic } from 'wasmagic';
@@ -64,7 +62,6 @@ import {
   createSymlinkStats,
   createRegularStats,
 } from './testHelpers.js';
-import source from 'chalk';
 
 describe('config.ts', () => {
   let originalSearchPathsLength: number;

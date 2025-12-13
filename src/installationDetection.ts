@@ -331,7 +331,7 @@ async function collectCandidates(): Promise<InstallationCandidate[]> {
     compareSemverVersions(a.version, b.version)
   );
 
-  return candidates;
+  return sortedCandidates;
 }
 
 // ============================================================================
