@@ -210,3 +210,60 @@ export const CLIJS_SEARCH_PATH_INFO: SearchPathInfo[] =
 export const CLIJS_SEARCH_PATHS: string[] = CLIJS_SEARCH_PATH_INFO.flatMap(
   info => info.expandedPaths
 );
+
+const getNativeSearchPathsWithInfo = (): SearchPathInfo[] => {
+  const home =
+    process.platform === 'win32'
+      ? os.homedir().replace(/\\/g, '/')
+      : os.homedir();
+  const pathInfos: SearchPathInfo[] = [];
+
+  // Helper function to add a path or glob pattern (same as cli.js version)
+  const addPath = (pattern: string, isGlob: boolean = false) => {
+    if (isGlob) {
+      try {
+        const expanded = globbySync(pattern, { onlyFiles: true });
+        pathInfos.push({ pattern, isGlob: true, expandedPaths: expanded });
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          'code' in error &&
+          (error.code === 'EACCES' || error.code === 'EPERM')
+        ) {
+          debug(`Permission denied accessing: ${pattern} (${error.code})`);
+        } else {
+          debug(
+            `Error expanding glob pattern "${pattern}": ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          );
+        }
+        pathInfos.push({ pattern, isGlob: true, expandedPaths: [] });
+      }
+    } else {
+      pathInfos.push({ pattern, isGlob: false, expandedPaths: [pattern] });
+    }
+  };
+
+  // Direct binary path
+  addPath(`${home}/.local/bin/claude`);
+
+  // Versioned binaries (filenames are versions like 2.0.65)
+  addPath(`${home}/.local/share/claude/versions/*`, true);
+
+  // Convert to backslashes on Windows
+  if (process.platform === 'win32') {
+    pathInfos.forEach(info => {
+      info.pattern = info.pattern.replace(/\//g, '\\');
+      info.expandedPaths = info.expandedPaths.map(p => p.replace(/\//g, '\\'));
+    });
+  }
+
+  return pathInfos;
+};
+
+export const NATIVE_SEARCH_PATH_INFO: SearchPathInfo[] =
+  getNativeSearchPathsWithInfo();
+export const NATIVE_SEARCH_PATHS: string[] = NATIVE_SEARCH_PATH_INFO.flatMap(
+  info => info.expandedPaths
+);

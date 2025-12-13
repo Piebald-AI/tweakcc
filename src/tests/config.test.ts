@@ -36,6 +36,11 @@ vi.mock('../nativeInstallationLoader.js', () => ({
   repackNativeInstallation: vi.fn(),
 }));
 vi.mock('node:fs');
+vi.mock('which', () => ({
+  default: vi.fn(),
+}));
+
+import whichMock from 'which';
 
 const mockMagicInstance: { detect: ReturnType<typeof vi.fn> } = {
   detect: vi.fn(),
@@ -59,6 +64,7 @@ import {
   createSymlinkStats,
   createRegularStats,
 } from './testHelpers.js';
+import source from 'chalk';
 
 describe('config.ts', () => {
   let originalSearchPathsLength: number;
@@ -80,11 +86,7 @@ describe('config.ts', () => {
     originalSearchPathsLength = CLIJS_SEARCH_PATHS.length;
 
     // By default, pretend there is no `claude` executable on PATH.
-    (
-      childProcess.execSync as unknown as ReturnType<typeof vi.fn>
-    ).mockImplementation(() => {
-      throw new Error('claude not found');
-    });
+    vi.mocked(whichMock).mockRejectedValue(new Error('not found'));
 
     mockMagicInstance.detect.mockReset();
     (WASMagic.create as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
@@ -277,10 +279,13 @@ describe('config.ts', () => {
         throw new Error('File not found');
       });
 
-      const result = await findClaudeCodeInstallation(mockConfig);
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
 
       expect(result).toEqual({
         cliPath: mockCliPath,
+        source: 'search-paths',
         version: '1.2.3',
       });
     });
@@ -299,9 +304,7 @@ describe('config.ts', () => {
         'some code VERSION:"3.4.5" more code VERSION:"3.4.5" and VERSION:"3.4.5"';
 
       // Make PATH lookup succeed.
-      (
-        childProcess.execSync as unknown as ReturnType<typeof vi.fn>
-      ).mockImplementation(() => `${mockExePath}\n`);
+      vi.mocked(whichMock).mockResolvedValue(mockExePath);
 
       // Make only the PATH executable exist, not CLIJS_SEARCH_PATHS entries
       vi.spyOn(fs, 'stat').mockImplementation(async p => {
@@ -332,10 +335,13 @@ describe('config.ts', () => {
         throw new Error('File not found');
       });
 
-      const result = await findClaudeCodeInstallation(mockConfig);
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
 
       expect(result).toEqual({
         cliPath: mockExePath,
+        source: 'path',
         version: '3.4.5',
       });
     });
@@ -356,9 +362,7 @@ describe('config.ts', () => {
       );
 
       // Make PATH lookup succeed.
-      (
-        childProcess.execSync as unknown as ReturnType<typeof vi.fn>
-      ).mockImplementation(() => `${mockExePath}\n`);
+      vi.mocked(whichMock).mockResolvedValue(mockExePath);
 
       // Make only the PATH executable exist, not CLIJS_SEARCH_PATHS entries
       vi.spyOn(fs, 'stat').mockImplementation(async p => {
@@ -387,10 +391,13 @@ describe('config.ts', () => {
         'extractClaudeJsFromNativeInstallation'
       ).mockResolvedValue(mockJsBuffer);
 
-      const result = await findClaudeCodeInstallation(mockConfig);
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
 
       expect(result).toEqual({
         version: '4.5.6',
+        source: 'path',
         nativeInstallationPath: mockExePath,
       });
     });
@@ -406,14 +413,13 @@ describe('config.ts', () => {
         settings: DEFAULT_SETTINGS,
       };
 
-      // Make PATH lookup succeed (this should be ignored)
-      (
-        childProcess.execSync as unknown as ReturnType<typeof vi.fn>
-      ).mockImplementation(() => `${mockPathExe}\n`);
+      // Make PATH lookup succeed (this should be ignored since ccInstallationPath is set)
+      vi.mocked(whichMock).mockResolvedValue(mockPathExe);
 
       // Make both paths exist
       vi.spyOn(fs, 'stat').mockResolvedValue({} as Stats);
-      vi.spyOn(fs, 'realpath').mockResolvedValue(mockPathExe);
+      // realpath should return the path it was given
+      vi.spyOn(fs, 'realpath').mockImplementation(async p => p.toString());
       vi.spyOn(fs, 'open').mockResolvedValue({
         read: async ({ buffer }: { buffer: Buffer }) => {
           const contentBuffer = Buffer.from('fake js content');
@@ -436,11 +442,14 @@ describe('config.ts', () => {
         throw createEnoent();
       });
 
-      const result = await findClaudeCodeInstallation(mockConfig);
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
 
       // Should use the explicit ccInstallationPath, not the PATH executable
       expect(result).toEqual({
         cliPath: mockCliPath,
+        source: 'config',
         version: '1.1.1', // Version from explicit path, not PATH
       });
     });
@@ -459,6 +468,7 @@ describe('config.ts', () => {
         'some code VERSION:"7.8.9" more code VERSION:"7.8.9" and VERSION:"7.8.9"';
 
       vi.spyOn(fs, 'stat').mockResolvedValue({} as Stats);
+      vi.spyOn(fs, 'realpath').mockImplementation(async p => p.toString());
       vi.spyOn(fs, 'open').mockResolvedValue({
         read: async ({ buffer }: { buffer: Buffer }) => {
           const contentBuffer = Buffer.from('fake js content');
@@ -477,10 +487,13 @@ describe('config.ts', () => {
         throw createEnoent();
       });
 
-      const result = await findClaudeCodeInstallation(mockConfig);
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
 
       expect(result).toEqual({
         cliPath: mockCliPath,
+        source: 'config',
         version: '7.8.9',
       });
     });
@@ -501,6 +514,7 @@ describe('config.ts', () => {
       );
 
       vi.spyOn(fs, 'stat').mockResolvedValue({} as Stats);
+      vi.spyOn(fs, 'realpath').mockImplementation(async p => p.toString());
       vi.spyOn(fs, 'open').mockResolvedValue({
         read: async ({ buffer }: { buffer: Buffer }) => {
           const contentBuffer = Buffer.from('fake binary content');
@@ -517,10 +531,13 @@ describe('config.ts', () => {
         'extractClaudeJsFromNativeInstallation'
       ).mockResolvedValue(mockJsBuffer);
 
-      const result = await findClaudeCodeInstallation(mockConfig);
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
 
       expect(result).toEqual({
         version: '9.8.7',
+        source: 'config',
         nativeInstallationPath: mockNativePath,
       });
     });
@@ -538,7 +555,9 @@ describe('config.ts', () => {
       vi.spyOn(fs, 'stat').mockRejectedValue(createEnoent());
       vi.spyOn(fs, 'readFile').mockRejectedValue(new Error('File not found'));
 
-      const result = await findClaudeCodeInstallation(mockConfig);
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
 
       expect(result).toBe(null);
     });
@@ -578,10 +597,13 @@ describe('config.ts', () => {
         throw new Error('File not found');
       });
 
-      const result = await findClaudeCodeInstallation(mockConfig);
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
 
       expect(result).toEqual({
         cliPath: mockSecondCliPath,
+        source: 'search-paths',
         version: '1.2.3',
       });
     });
@@ -621,10 +643,13 @@ describe('config.ts', () => {
         throw new Error('File not found');
       });
 
-      const result = await findClaudeCodeInstallation(mockConfig);
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
 
       expect(result).toEqual({
         cliPath: mockSecondCliPath,
+        source: 'search-paths',
         version: '1.2.3',
       });
     });
@@ -664,10 +689,13 @@ describe('config.ts', () => {
         throw new Error('File not found');
       });
 
-      const result = await findClaudeCodeInstallation(mockConfig);
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
 
       expect(result).toEqual({
         cliPath: mockSecondCliPath,
+        source: 'search-paths',
         version: '1.2.3',
       });
     });
@@ -705,7 +733,7 @@ describe('config.ts', () => {
       });
 
       // Mock which claude command
-      vi.mocked(execSync).mockReturnValue(mockSymlinkPath + '\n');
+      vi.mocked(whichMock).mockResolvedValue(mockSymlinkPath);
 
       lstatSpy.mockImplementation(async filePath => {
         if (filePath === mockSymlinkPath) {
@@ -717,6 +745,18 @@ describe('config.ts', () => {
       // Mock fs.realpath to resolve symlink
       vi.spyOn(fs, 'realpath').mockResolvedValue(mockResolvedPath);
 
+      // Mock fs.open for WASMagic detection
+      vi.spyOn(fs, 'open').mockResolvedValue({
+        read: async ({ buffer }: { buffer: Buffer }) => {
+          const contentBuffer = Buffer.from('fake js content');
+          contentBuffer.copy(buffer);
+          return { bytesRead: contentBuffer.length, buffer };
+        },
+        close: async () => {},
+      } as unknown as fs.FileHandle);
+
+      mockMagicInstance.detect.mockReturnValue('application/javascript');
+
       // Mock cli.js content
       const mockCliContent =
         'some code VERSION:"2.0.11" more code VERSION:"2.0.11" and VERSION:"2.0.11"';
@@ -727,10 +767,13 @@ describe('config.ts', () => {
         throw createEnoent();
       });
 
-      const result = await findClaudeCodeInstallation(mockConfig);
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
 
       expect(result).toEqual({
         cliPath: mockResolvedPath,
+        source: 'path',
         version: '2.0.11',
       });
     });
@@ -744,14 +787,14 @@ describe('config.ts', () => {
         settings: DEFAULT_SETTINGS,
       };
 
+      const resolvedCliPath =
+        '/usr/local/share/nvm/versions/node/v23.11.1/lib/node_modules/@anthropic-ai/claude-code/cli.js';
+
       // All standard paths fail
       vi.spyOn(fs, 'stat').mockImplementation(async filePath => {
         const fileStr = filePath.toString();
         if (fileStr.includes('node_modules') && fileStr.endsWith('cli.js')) {
-          if (
-            fileStr ===
-            '/usr/local/share/nvm/versions/node/v23.11.1/lib/node_modules/@anthropic-ai/claude-code/cli.js'
-          ) {
+          if (fileStr === resolvedCliPath) {
             return {} as Stats;
           }
         }
@@ -759,8 +802,8 @@ describe('config.ts', () => {
       });
 
       // Mock which command
-      vi.mocked(execSync).mockReturnValue(
-        '/usr/local/share/nvm/versions/node/v23.11.1/bin/claude\n'
+      vi.mocked(whichMock).mockResolvedValue(
+        '/usr/local/share/nvm/versions/node/v23.11.1/bin/claude'
       );
 
       lstatSpy.mockImplementation(async filePath => {
@@ -773,9 +816,19 @@ describe('config.ts', () => {
       });
 
       // Symlink resolves to cli.js (NPM installation)
-      const resolvedCliPath =
-        '/usr/local/share/nvm/versions/node/v23.11.1/lib/node_modules/@anthropic-ai/claude-code/cli.js';
       vi.spyOn(fs, 'realpath').mockResolvedValue(resolvedCliPath);
+
+      // Mock fs.open for WASMagic detection
+      vi.spyOn(fs, 'open').mockResolvedValue({
+        read: async ({ buffer }: { buffer: Buffer }) => {
+          const contentBuffer = Buffer.from('fake js content');
+          contentBuffer.copy(buffer);
+          return { bytesRead: contentBuffer.length, buffer };
+        },
+        close: async () => {},
+      } as unknown as fs.FileHandle);
+
+      mockMagicInstance.detect.mockReturnValue('application/javascript');
 
       // Mock VERSION content in cli.js
       const mockCliContent =
@@ -787,7 +840,9 @@ describe('config.ts', () => {
         throw createEnoent();
       });
 
-      const result = await findClaudeCodeInstallation(mockConfig);
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
 
       // Should detect it as NPM install with cliPath set
       expect(result).not.toBe(null);
@@ -796,7 +851,7 @@ describe('config.ts', () => {
       expect(result!.nativeInstallationPath).toBeUndefined();
     });
 
-    it('should derive cli.js from a symlink target that resides inside the claude-code package', async () => {
+    it('should handle symlink to binary inside claude-code package as native installation', async () => {
       const mockConfig = {
         ccInstallationPath: null,
         changesApplied: false,
@@ -810,25 +865,20 @@ describe('config.ts', () => {
       const resolvedBinaryPath = `${packageRoot}/dist/bin/claude`;
       const symlinkPath =
         '/usr/local/share/nvm/versions/node/v23.11.1/bin/claude';
-      const expectedCliPath = path.join(packageRoot, 'cli.js');
-      const mockCliContent =
-        'VERSION:"2.0.12" more text VERSION:"2.0.12" even more VERSION:"2.0.12"';
+
+      const mockJsBuffer = Buffer.from(
+        'VERSION:"2.0.12" more text VERSION:"2.0.12" even more VERSION:"2.0.12"',
+        'utf8'
+      );
 
       vi.spyOn(fs, 'stat').mockImplementation(async filePath => {
-        if (filePath === expectedCliPath) {
+        if (filePath === resolvedBinaryPath || filePath === symlinkPath) {
           return {} as Stats;
         }
         throw createEnoent();
       });
 
-      vi.spyOn(fs, 'readFile').mockImplementation(async (p, encoding) => {
-        if (p === expectedCliPath && encoding === 'utf8') {
-          return mockCliContent;
-        }
-        throw createEnoent();
-      });
-
-      vi.mocked(execSync).mockReturnValue(`${symlinkPath}\n`);
+      vi.mocked(whichMock).mockResolvedValue(symlinkPath);
       lstatSpy.mockImplementation(async filePath => {
         if (filePath === symlinkPath) {
           return createSymlinkStats();
@@ -837,14 +887,33 @@ describe('config.ts', () => {
       });
       vi.spyOn(fs, 'realpath').mockResolvedValue(resolvedBinaryPath);
 
-      const result = await findClaudeCodeInstallation(mockConfig);
+      // Mock fs.open for WASMagic detection - return binary content
+      vi.spyOn(fs, 'open').mockResolvedValue({
+        read: async ({ buffer }: { buffer: Buffer }) => {
+          const contentBuffer = Buffer.from('fake binary content');
+          contentBuffer.copy(buffer);
+          return { bytesRead: contentBuffer.length, buffer };
+        },
+        close: async () => {},
+      } as unknown as fs.FileHandle);
+
+      mockMagicInstance.detect.mockReturnValue('application/octet-stream');
+
+      vi.spyOn(
+        nativeInstallation,
+        'extractClaudeJsFromNativeInstallation'
+      ).mockResolvedValue(mockJsBuffer);
+
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
 
       expect(result).not.toBe(null);
-      expect(result!.cliPath).toBe(expectedCliPath);
+      expect(result!.nativeInstallationPath).toBe(resolvedBinaryPath);
       expect(result!.version).toBe('2.0.12');
     });
 
-    it('should skip PATH fallback checks on Windows platforms', async () => {
+    it('should use which package on Windows platforms', async () => {
       const mockConfig = {
         ccInstallationPath: null,
         changesApplied: false,
@@ -861,16 +930,19 @@ describe('config.ts', () => {
         .mockReturnValue('win32');
 
       try {
-        const result = await findClaudeCodeInstallation(mockConfig);
+        const result = await findClaudeCodeInstallation(mockConfig, {
+          interactive: true,
+        });
 
-        expect(execSync).not.toHaveBeenCalled();
+        // which package should be called even on Windows
+        expect(whichMock).toHaveBeenCalled();
         expect(result).toBe(null);
       } finally {
         platformSpy.mockRestore();
       }
     });
 
-    it('should fall back to native installation extraction if symlink does not end with cli.js', async () => {
+    it('should throw error when native installation extraction fails', async () => {
       const mockConfig = {
         ccInstallationPath: null,
         changesApplied: false,
@@ -880,12 +952,15 @@ describe('config.ts', () => {
       };
 
       // All standard paths fail
-      vi.spyOn(fs, 'stat').mockImplementation(async () => {
+      vi.spyOn(fs, 'stat').mockImplementation(async filePath => {
+        if (filePath === '/usr/local/bin/claude') {
+          return {} as Stats;
+        }
         throw createEnoent();
       });
 
       // Mock which command
-      vi.mocked(execSync).mockReturnValue('/usr/local/bin/claude\n');
+      vi.mocked(whichMock).mockResolvedValue('/usr/local/bin/claude');
 
       // Symlink resolves to actual binary (not cli.js)
       const resolvedBinaryPath = '/opt/claude-code/bin/claude';
@@ -918,10 +993,10 @@ describe('config.ts', () => {
 
       vi.spyOn(fs, 'readFile').mockRejectedValue(createEnoent());
 
-      const result = await findClaudeCodeInstallation(mockConfig);
-
-      // Should return null since native extraction failed
-      expect(result).toBe(null);
+      // Should throw error since native extraction failed
+      await expect(
+        findClaudeCodeInstallation(mockConfig, { interactive: true })
+      ).rejects.toThrow('Could not extract JS from native binary');
     });
 
     // HIGH PRIORITY: Test ccInstallationPath override
@@ -945,6 +1020,9 @@ describe('config.ts', () => {
         throw createEnoent();
       });
 
+      // Mock fs.realpath
+      vi.spyOn(fs, 'realpath').mockImplementation(async p => p.toString());
+
       // Mock fs.open for WASMagic detection
       vi.spyOn(fs, 'open').mockResolvedValue({
         read: async ({ buffer }: { buffer: Buffer }) => {
@@ -965,14 +1043,16 @@ describe('config.ts', () => {
         throw createEnoent();
       });
 
-      const result = await findClaudeCodeInstallation(mockConfig);
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
 
       expect(result).not.toBe(null);
       expect(result!.cliPath).toBe(customCliPath);
       expect(result!.version).toBe('3.0.0');
     });
 
-    it('should use ccInstallationPath before falling back to standard paths', async () => {
+    it('should throw error when ccInstallationPath is set but does not exist', async () => {
       const customCliPath = '/custom/claude/installation/cli.js';
       const mockConfig = {
         ccInstallationPath: customCliPath,
@@ -982,49 +1062,27 @@ describe('config.ts', () => {
         settings: DEFAULT_SETTINGS,
       };
 
-      const standardCliPath = path.join(CLIJS_SEARCH_PATHS[0], 'cli.js');
-      const mockCliContent = 'VERSION:"3.5.0" VERSION:"3.5.0" VERSION:"3.5.0"';
-
-      let checkedCustomFirst = false;
-
-      // Mock fs.stat to fail custom path, then succeed on standard path
+      // Mock fs.stat to fail custom path
       vi.spyOn(fs, 'stat').mockImplementation(async p => {
         if (p === customCliPath) {
-          checkedCustomFirst = true;
           throw createEnoent(); // Custom path doesn't exist
         }
-        if (p === standardCliPath) {
-          // Verify custom path was checked first
-          expect(checkedCustomFirst).toBe(true);
-          return {} as Stats;
-        }
         throw createEnoent();
       });
 
-      vi.spyOn(fs, 'readFile').mockImplementation(async (p, encoding) => {
-        if (p === standardCliPath && encoding === 'utf8') {
-          return mockCliContent;
-        }
-        throw createEnoent();
-      });
-
-      // Mock execSync to ensure it doesn't find anything on PATH
-      vi.mocked(execSync).mockImplementation(() => {
-        throw new Error('command not found');
-      });
-
-      const result = await findClaudeCodeInstallation(mockConfig);
-
-      expect(result).not.toBe(null);
-      expect(result!.cliPath).toBe(standardCliPath);
-      expect(result!.version).toBe('3.5.0');
+      // Should throw error since ccInstallationPath doesn't exist
+      await expect(
+        findClaudeCodeInstallation(mockConfig, { interactive: true })
+      ).rejects.toThrow(
+        "ccInstallationPath is set to '/custom/claude/installation/cli.js' but file does not exist"
+      );
     });
 
     // Note: Native installation success tests are difficult to mock properly due to ESM module import hoisting.
     // The actual native installation logic is tested implicitly through integration tests.
     // We test the failure cases below which provide good coverage of the error handling paths.
 
-    it('should return null if native extraction fails to find version', async () => {
+    it('should throw error if native extraction fails to find version', async () => {
       const mockConfig = {
         ccInstallationPath: null,
         changesApplied: false,
@@ -1036,12 +1094,15 @@ describe('config.ts', () => {
       const nativeBinaryPath = '/usr/local/bin/claude';
 
       // All NPM search paths fail
-      vi.spyOn(fs, 'stat').mockImplementation(async () => {
+      vi.spyOn(fs, 'stat').mockImplementation(async filePath => {
+        if (filePath === nativeBinaryPath) {
+          return {} as Stats;
+        }
         throw createEnoent();
       });
 
       // Mock which command
-      vi.mocked(execSync).mockReturnValue(nativeBinaryPath + '\n');
+      vi.mocked(whichMock).mockResolvedValue(nativeBinaryPath);
       lstatSpy.mockImplementation(async filePath => {
         if (filePath === nativeBinaryPath) {
           return createRegularStats();
@@ -1049,18 +1110,31 @@ describe('config.ts', () => {
         throw createEnoent();
       });
       vi.spyOn(fs, 'realpath').mockResolvedValue(nativeBinaryPath);
+
+      // Mock fs.open for WASMagic detection
+      vi.spyOn(fs, 'open').mockResolvedValue({
+        read: async ({ buffer }: { buffer: Buffer }) => {
+          const contentBuffer = Buffer.from('fake binary content');
+          contentBuffer.copy(buffer);
+          return { bytesRead: contentBuffer.length, buffer };
+        },
+        close: async () => {},
+      } as unknown as fs.FileHandle);
+
+      mockMagicInstance.detect.mockReturnValue('application/octet-stream');
 
       // Mock extractClaudeJsFromNativeInstallation to return content without VERSION
       vi.mocked(
         nativeInstallation.extractClaudeJsFromNativeInstallation
       ).mockResolvedValue(Buffer.from('no version here'));
 
-      const result = await findClaudeCodeInstallation(mockConfig);
-
-      expect(result).toBe(null);
+      // Should throw error since no VERSION found
+      await expect(
+        findClaudeCodeInstallation(mockConfig, { interactive: true })
+      ).rejects.toThrow('No VERSION strings found');
     });
 
-    it('should return null if native extraction returns null', async () => {
+    it('should throw error if native extraction returns null', async () => {
       const mockConfig = {
         ccInstallationPath: null,
         changesApplied: false,
@@ -1072,12 +1146,15 @@ describe('config.ts', () => {
       const nativeBinaryPath = '/usr/local/bin/claude';
 
       // All NPM search paths fail
-      vi.spyOn(fs, 'stat').mockImplementation(async () => {
+      vi.spyOn(fs, 'stat').mockImplementation(async filePath => {
+        if (filePath === nativeBinaryPath) {
+          return {} as Stats;
+        }
         throw createEnoent();
       });
 
       // Mock which command
-      vi.mocked(execSync).mockReturnValue(nativeBinaryPath + '\n');
+      vi.mocked(whichMock).mockResolvedValue(nativeBinaryPath);
       lstatSpy.mockImplementation(async filePath => {
         if (filePath === nativeBinaryPath) {
           return createRegularStats();
@@ -1086,14 +1163,27 @@ describe('config.ts', () => {
       });
       vi.spyOn(fs, 'realpath').mockResolvedValue(nativeBinaryPath);
 
+      // Mock fs.open for WASMagic detection
+      vi.spyOn(fs, 'open').mockResolvedValue({
+        read: async ({ buffer }: { buffer: Buffer }) => {
+          const contentBuffer = Buffer.from('fake binary content');
+          contentBuffer.copy(buffer);
+          return { bytesRead: contentBuffer.length, buffer };
+        },
+        close: async () => {},
+      } as unknown as fs.FileHandle);
+
+      mockMagicInstance.detect.mockReturnValue('application/octet-stream');
+
       // Mock extractClaudeJsFromNativeInstallation to return null (extraction failed)
       vi.mocked(
         nativeInstallation.extractClaudeJsFromNativeInstallation
       ).mockResolvedValue(null);
 
-      const result = await findClaudeCodeInstallation(mockConfig);
-
-      expect(result).toBe(null);
+      // Should throw error since extraction failed
+      await expect(
+        findClaudeCodeInstallation(mockConfig, { interactive: true })
+      ).rejects.toThrow('Could not extract JS from native binary');
     });
   });
 
@@ -1126,7 +1216,7 @@ describe('config.ts', () => {
       });
       vi.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
 
-      await startupCheck();
+      await startupCheck({ interactive: true });
 
       expect(copyFileSpy).toHaveBeenCalled();
     });
@@ -1160,12 +1250,12 @@ describe('config.ts', () => {
       });
       vi.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
 
-      const result = await startupCheck();
+      const result = await startupCheck({ interactive: true });
 
       expect(unlinkSpy).toHaveBeenCalled();
       expect(copyFileSpy).toHaveBeenCalled();
       expect(result).not.toBe(null);
-      expect(result!.wasUpdated).toBe(true);
+      expect(result!.startupCheckInfo?.wasUpdated).toBe(true);
     });
   });
 });

@@ -138,10 +138,29 @@ export interface TweakccConfig {
   hidePiebaldAnnouncement?: boolean;
 }
 
+export type InstallationKind = 'npm-based' | 'native-binary';
+
+export type InstallationSource =
+  | 'env-var'        // TWEAKCC_CC_INSTALLATION_PATH
+  | 'config'         // ccInstallationPath in config.json
+  | 'path'           // `claude` found via PATH
+  | 'search-paths';  // Found via hardcoded search paths
+
+export interface InstallationCandidate {
+  path: string;
+  kind: InstallationKind;
+  version: string;
+}
+
+export interface FindInstallationOptions {
+  interactive: boolean; // false for --apply, true for TTY UI
+}
+
 export interface ClaudeCodeInstallationInfo {
   cliPath?: string; // Only set for NPM installs; undefined for native installs
   version: string;
   nativeInstallationPath?: string; // Path to native installation binary
+  source: InstallationSource; // How the installation was found
 }
 
 export interface StartupCheckInfo {

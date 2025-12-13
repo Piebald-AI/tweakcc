@@ -370,11 +370,16 @@ export const expandTilde = (filepath: string): string => {
  * Compares two semantic versions.
  * Returns: positive if a > b, negative if a < b, 0 if equal
  */
-export const compareSemverVersions = (
-  a: [number, number, number],
-  b: [number, number, number]
-): number => {
-  if (a[0] !== b[0]) return a[0] - b[0];
-  if (a[1] !== b[1]) return a[1] - b[1];
-  return a[2] - b[2];
+export const compareSemverVersions = (a: string, b: string): number => {
+  const parseVersion = (v: string): [number, number, number] => {
+    const parts = v.split('.').map(Number);
+    return [parts[0] || 0, parts[1] || 0, parts[2] || 0];
+  };
+
+  const aParts = parseVersion(a);
+  const bParts = parseVersion(b);
+
+  if (aParts[0] !== bParts[0]) return aParts[0] - bParts[0];
+  if (aParts[1] !== bParts[1]) return aParts[1] - bParts[1];
+  return aParts[2] - bParts[2];
 };

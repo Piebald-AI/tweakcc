@@ -1,33 +1,53 @@
-import { execSync } from 'child_process';
-import { Stats } from 'fs';
 import path from 'path';
-
+import fs from 'node:fs/promises';
+import which from 'which';
 import { WASMagic } from 'wasmagic';
 
 import {
-  compareSemverVersions,
   debug,
-  hashFileInChunks,
   isDebug,
+  hashFileInChunks,
+  doesFileExist,
+  compareSemverVersions,
 } from './utils.js';
 import { extractClaudeJsFromNativeInstallation } from './nativeInstallationLoader.js';
-import fs from 'node:fs/promises';
-import { ClaudeCodeInstallationInfo, TweakccConfig } from './types.js';
-import { doesFileExist } from './utils.js';
-import { CLIJS_SEARCH_PATHS } from './installationPaths.js';
+import {
+  CLIJS_SEARCH_PATHS,
+  NATIVE_SEARCH_PATHS,
+} from './installationPaths.js';
+import { CONFIG_FILE, updateConfigFile } from './config.js';
+import {
+  ClaudeCodeInstallationInfo,
+  FindInstallationOptions,
+  InstallationCandidate,
+  InstallationKind,
+  InstallationSource,
+  TweakccConfig,
+} from './types.js';
 
-interface ClaudeExecutablePathInfo {
-  commandPath: string;
+// ============================================================================
+// Types
+// ============================================================================
+
+interface ResolvedInstallation {
+  kind: InstallationKind;
   resolvedPath: string;
-  isSymlink: boolean;
 }
 
-// Message shown when PATH fallback check is performed (POSIX only)
-// Windows skips PATH-based detection, so this is null on Windows
-export const PATH_CHECK_TEXT: string | null =
-  process.platform === 'win32'
-    ? null
-    : "Also checked for 'claude' executable on PATH using 'which claude'.";
+// ============================================================================
+// Error classes
+// ============================================================================
+
+export class InstallationDetectionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InstallationDetectionError';
+  }
+}
+
+// ============================================================================
+// WASMagic singleton
+// ============================================================================
 
 let magicInstancePromise: Promise<WASMagic> | null = null;
 
@@ -35,72 +55,16 @@ async function getMagicInstance(): Promise<WASMagic> {
   if (!magicInstancePromise) {
     magicInstancePromise = WASMagic.create();
   }
-  return magicInstancePromise!;
+  return magicInstancePromise;
 }
+
+// ============================================================================
+// Core detection functions
+// ============================================================================
 
 /**
- * Finds the claude executable on PATH (POSIX platforms only).
- * Returns the resolved executable info, or null if not found.
+ * Reads the first bytes of a file for magic detection.
  */
-async function findClaudeExecutableOnPath(): Promise<ClaudeExecutablePathInfo | null> {
-  if (process.platform === 'win32') {
-    debug(
-      'Skipping PATH-based claude executable lookup on Windows; symlink fallback is POSIX-only.'
-    );
-    return null;
-  }
-
-  try {
-    const command = 'which claude';
-
-    debug(`Looking for claude executable using: ${command}`);
-
-    const result = execSync(command, { encoding: 'utf8' }).trim();
-    const firstPath = result.split('\n')[0]?.trim();
-
-    if (!firstPath) {
-      return null;
-    }
-
-    let stats: Stats | null = null;
-    try {
-      stats = await fs.lstat(firstPath);
-    } catch (error) {
-      debug('lstat failed for claude executable path:', error);
-      return null;
-    }
-
-    const isSymlink = stats?.isSymbolicLink() ?? false;
-
-    try {
-      const realPath = await fs.realpath(firstPath);
-      if (isSymlink && realPath !== firstPath) {
-        debug(`Found claude executable at: ${firstPath} (symlink)`);
-        debug(`Resolved to: ${realPath}`);
-      } else {
-        debug(`Found claude executable at: ${realPath}`);
-      }
-
-      return {
-        commandPath: firstPath,
-        resolvedPath: realPath,
-        isSymlink,
-      };
-    } catch (error) {
-      debug('Could not resolve symlink, using original path:', error);
-      return {
-        commandPath: firstPath,
-        resolvedPath: firstPath,
-        isSymlink,
-      };
-    }
-  } catch (error) {
-    debug('Could not find claude executable on PATH:', error);
-  }
-
-  return null;
-}
-
 async function readFilePrefix(
   filePath: string,
   maxBytes = 4096
@@ -122,20 +86,32 @@ async function readFilePrefix(
       await handle.close();
     }
   } catch (error) {
-    debug('Failed to read file prefix for WASMagic:', error);
+    debug('Failed to read file prefix:', error);
     return null;
   }
 }
 
-async function detectClaudeExecutableKind(
-  exePath: string
-): Promise<'js' | 'binary' | 'other'> {
-  const prefix = await readFilePrefix(exePath);
-  if (!prefix) {
-    return 'other';
-  }
-
+/**
+ * Resolves a path to its installation type.
+ * Handles symlinks by resolving to target.
+ * Returns the kind and resolved path, or null if unrecognized.
+ */
+export async function resolvePathToInstallationType(
+  filePath: string
+): Promise<ResolvedInstallation | null> {
   try {
+    // Resolve symlinks to get the actual file
+    const resolvedPath = await fs.realpath(filePath);
+    debug(`resolvePathToInstallationType: ${filePath} -> ${resolvedPath}`);
+
+    // Read first bytes for magic detection
+    const prefix = await readFilePrefix(resolvedPath);
+    if (!prefix) {
+      debug('resolvePathToInstallationType: Could not read file prefix');
+      return null;
+    }
+
+    // Use WASMagic to detect file type
     const magic = await getMagicInstance();
     let mime: string | null = null;
 
@@ -144,22 +120,47 @@ async function detectClaudeExecutableKind(
     }
 
     if (!mime) {
-      return 'other';
+      debug('resolvePathToInstallationType: WASMagic returned no mime type');
+      return null;
     }
 
     const lower = mime.toLowerCase();
+    debug(`resolvePathToInstallationType: Detected mime type: ${lower}`);
+
     if (lower.includes('javascript')) {
-      return 'js';
+      return { kind: 'npm-based', resolvedPath };
     }
+
     if (!lower.startsWith('text/')) {
-      return 'binary';
+      return { kind: 'native-binary', resolvedPath };
     }
-    return 'other';
+
+    debug('resolvePathToInstallationType: Unrecognized file type');
+    return null;
   } catch (error) {
-    debug('WASMagic detection failed, falling back to search paths:', error);
-    return 'other';
+    debug('resolvePathToInstallationType: Error:', error);
+    return null;
   }
 }
+
+/**
+ * Finds the claude executable on PATH using the `which` package.
+ * Cross-platform: works on Windows, macOS, and Linux.
+ */
+async function getClaudeFromPath(): Promise<string | null> {
+  try {
+    const claudePath = await which('claude');
+    debug(`getClaudeFromPath: Found claude at ${claudePath}`);
+    return claudePath;
+  } catch {
+    debug('getClaudeFromPath: claude not found on PATH');
+    return null;
+  }
+}
+
+// ============================================================================
+// Version extraction
+// ============================================================================
 
 /**
  * Extracts version from claude.js content.
@@ -179,7 +180,6 @@ function extractVersionFromContent(content: string): string | null {
     return null;
   }
 
-  // Find the version with the most occurrences
   let maxCount = 0;
   let mostCommonVersion: string | undefined;
 
@@ -198,11 +198,8 @@ function extractVersionFromContent(content: string): string | null {
   return mostCommonVersion || null;
 }
 
-const CLAUDE_PACKAGE_SEGMENT = `${path.sep}@anthropic-ai${path.sep}claude-code`;
-
 /**
- * Extracts the Claude Code version from the minified JS file.
- * @throws {Error} If the file cannot be read or no VERSION strings are found
+ * Extracts version from a cli.js file.
  */
 async function extractVersionFromJsFile(cliPath: string): Promise<string> {
   const content = await fs.readFile(cliPath, 'utf8');
@@ -216,336 +213,417 @@ async function extractVersionFromJsFile(cliPath: string): Promise<string> {
 }
 
 /**
- * Attempts to derive the package root path for @anthropic-ai/claude-code from a resolved executable
- * path (typically the target of a symlink returned by `which claude`).  Returns the cli.js path if
- * it exists under that package root.
+ * Extracts version from a native binary by extracting the embedded JS.
  */
-async function findClijsFromExecutablePath(
-  resolvedExecutablePath: string
-): Promise<string | null> {
-  const normalizedPath = path.normalize(resolvedExecutablePath);
-  const segmentIndex = normalizedPath.lastIndexOf(CLAUDE_PACKAGE_SEGMENT);
+async function extractVersionFromNativeBinary(
+  binaryPath: string
+): Promise<string> {
+  const claudeJsBuffer =
+    await extractClaudeJsFromNativeInstallation(binaryPath);
 
-  if (segmentIndex === -1) {
-    return null;
+  if (!claudeJsBuffer) {
+    throw new Error(`Could not extract JS from native binary: ${binaryPath}`);
   }
 
-  const packageRoot = normalizedPath.slice(
-    0,
-    segmentIndex + CLAUDE_PACKAGE_SEGMENT.length
-  );
-  const potentialCliJs = path.join(packageRoot, 'cli.js');
+  const content = claudeJsBuffer.toString('utf8');
+  const version = extractVersionFromContent(content);
 
-  if (await doesFileExist(potentialCliJs)) {
-    return potentialCliJs;
+  if (!version) {
+    throw new Error(
+      `No VERSION strings found in extracted JS from: ${binaryPath}`
+    );
   }
 
-  return null;
+  return version;
 }
 
 /**
- * Extracts version from a bunx cache path string.
- * Bunx cache paths follow the pattern: .../@anthropic-ai/claude-code@VERSION@@@HASH
- * Returns [major, minor, patch] as numbers or null if pattern not found.
+ * Extracts version from filename for versioned binary paths.
+ * e.g., ~/.local/share/claude/versions/2.0.65 -> "2.0.65"
  */
-export function extractVersionFromPath(
-  pathStr: string
-): [number, number, number] | null {
-  const match = pathStr.match(
-    /@anthropic-ai[\\/]claude-code@(\d+)\.(\d+)\.(\d+)/
-  );
-  if (match) {
-    return [
-      parseInt(match[1], 10),
-      parseInt(match[2], 10),
-      parseInt(match[3], 10),
-    ];
-  }
-  return null;
+function extractVersionFromFilename(filePath: string): string | null {
+  const filename = path.basename(filePath);
+  // Match semver-like patterns (major.minor.patch)
+  const match = filename.match(/^(\d+\.\d+\.\d+)$/);
+  return match ? match[1] : null;
 }
 
 /**
- * Searches for the Claude Code installation in the default locations.
+ * Extracts version from an installation based on its kind.
  */
-export const findClaudeCodeInstallation = async (
-  config: TweakccConfig
-): Promise<ClaudeCodeInstallationInfo | null> => {
-  // Prefer explicit installation path if provided - this takes priority over all other detection methods.
-  // This path may point to either a JS cli.js file or a native binary.
-  if (config.ccInstallationPath) {
-    const installPath = config.ccInstallationPath;
+async function extractVersion(
+  filePath: string,
+  kind: InstallationKind
+): Promise<string> {
+  // First, try extracting version from filename (for versioned paths)
+  const filenameVersion = extractVersionFromFilename(filePath);
+  if (filenameVersion) {
+    debug(`extractVersion: Got version ${filenameVersion} from filename`);
+    return filenameVersion;
+  }
+
+  // Otherwise, extract from file contents
+  if (kind === 'npm-based') {
+    return extractVersionFromJsFile(filePath);
+  } else {
+    return extractVersionFromNativeBinary(filePath);
+  }
+}
+
+// ============================================================================
+// Candidate collection
+// ============================================================================
+
+/**
+ * Collects all installation candidates from hardcoded search paths.
+ */
+async function collectCandidates(): Promise<InstallationCandidate[]> {
+  const candidates: InstallationCandidate[] = [];
+
+  const seenPaths = new Set<string>();
+
+  // Collect cli.js candidates
+  for (const searchPath of CLIJS_SEARCH_PATHS) {
+    const cliPath = path.join(searchPath, 'cli.js');
+    if (seenPaths.has(cliPath)) {
+      continue;
+    }
     try {
-      if (!(await doesFileExist(config.ccInstallationPath))) {
-        console.warn(
-          `Configured ccInstallationPath does not exist: ${config.ccInstallationPath}`
-        );
-        console.warn('Falling back to automatic detection...');
-      } else {
-        const kind = await detectClaudeExecutableKind(installPath);
-
-        if (kind === 'js') {
-          debug(
-            `Using Claude Code cli.js from explicit ccInstallationPath: ${installPath}`
-          );
-          if (isDebug()) {
-            debug(`SHA256 hash: ${await hashFileInChunks(installPath)}`);
-          }
-          const version = await extractVersionFromJsFile(installPath);
-          return {
-            cliPath: installPath,
-            version,
-          };
-        }
-
-        if (kind === 'binary') {
-          debug(
-            `Using native Claude installation from explicit ccInstallationPath: ${installPath}`
-          );
-
-          const claudeJsBuffer =
-            await extractClaudeJsFromNativeInstallation(installPath);
-
-          if (claudeJsBuffer) {
-            const content = claudeJsBuffer.toString('utf8');
-            const version = extractVersionFromContent(content);
-
-            if (version) {
-              debug(
-                `Extracted version ${version} from native installation via explicit ccInstallationPath`
-              );
-              return {
-                version,
-                nativeInstallationPath: installPath,
-              };
-            }
-          }
-
-          console.warn(
-            `Configured ccInstallationPath appears to be a native binary, but version could not be determined: ${installPath}`
-          );
-          console.warn('Falling back to automatic detection...');
-        } else {
-          console.warn(
-            `Configured ccInstallationPath is not recognized as JavaScript or a native binary: ${installPath}`
-          );
-          console.warn('Falling back to automatic detection...');
-        }
+      if (await doesFileExist(cliPath)) {
+        debug(`collectCandidates: Found cli.js at ${cliPath}`);
+        const version = await extractVersionFromJsFile(cliPath);
+        candidates.push({
+          path: cliPath,
+          kind: 'npm-based',
+          version,
+        });
+        seenPaths.add(cliPath);
       }
     } catch (error) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        (error.code === 'ENOENT' || error.code === 'ENOTDIR')
-      ) {
-        console.warn(
-          `Configured ccInstallationPath is not accessible: ${installPath}`
-        );
-        console.warn('Falling back to automatic detection...');
-      } else {
-        throw error;
-      }
+      debug(`collectCandidates: Error checking ${cliPath}:`, error);
     }
   }
 
-  // Next, try to locate `claude` on PATH and use WASMagic to determine
-  // whether it is a JS entrypoint (cli.js) or a native binary.
-  const claudeExePathInfo = await findClaudeExecutableOnPath();
-  debug(
-    `findClaudeExecutableOnPath() returned: ${claudeExePathInfo?.resolvedPath ?? null}`
-  );
-
-  if (claudeExePathInfo) {
-    const claudeExePath = claudeExePathInfo.resolvedPath;
-    const kind = await detectClaudeExecutableKind(claudeExePath);
-    debug(`WASMagic classified claude executable as: ${kind}`);
-    if (kind === 'other') {
-      debug(
-        'PATH claude executable did not look like JavaScript or a native binary; falling back to CLIJS_SEARCH_PATHS.'
-      );
+  // Collect native binary candidates
+  for (const nativePath of NATIVE_SEARCH_PATHS) {
+    if (seenPaths.has(nativePath)) {
+      continue;
     }
-
-    if (kind === 'js') {
-      debug(`Treating PATH claude executable as cli.js at: ${claudeExePath}`);
-      if (isDebug()) {
-        debug(`SHA256 hash: ${await hashFileInChunks(claudeExePath)}`);
+    try {
+      if (await doesFileExist(nativePath)) {
+        debug(`collectCandidates: Found native binary at ${nativePath}`);
+        const version = await extractVersion(nativePath, 'native-binary');
+        candidates.push({
+          path: nativePath,
+          kind: 'native-binary',
+          version,
+        });
+        seenPaths.add(nativePath);
       }
-
-      const version = await extractVersionFromJsFile(claudeExePath);
-      return {
-        cliPath: claudeExePath,
-        version,
-      };
-    }
-
-    if (kind === 'binary') {
-      debug(
-        `Treating PATH claude executable as native installation: ${claudeExePath}`
-      );
-
-      const claudeJsBuffer =
-        await extractClaudeJsFromNativeInstallation(claudeExePath);
-
-      if (claudeJsBuffer) {
-        const content = claudeJsBuffer.toString('utf8');
-        const version = extractVersionFromContent(content);
-
-        if (!version) {
-          debug('Failed to extract version from native installation via PATH');
-        } else {
-          debug(
-            `Extracted version ${version} from native installation via PATH`
-          );
-
-          return {
-            version,
-            nativeInstallationPath: claudeExePath,
-          };
-        }
-      }
+    } catch (error) {
+      debug(`collectCandidates: Error checking ${nativePath}:`, error);
     }
   }
 
-  // Fall back to the hard-coded cli.js detection paths.
   // Sort paths so bunx cache entries are checked in descending version order.
   // This ensures that if multiple bunx cache versions exist, the latest is patched.
-  const sortedSearchPaths = [...CLIJS_SEARCH_PATHS].sort((a, b) => {
-    const versionA = extractVersionFromPath(a);
-    const versionB = extractVersionFromPath(b);
+  const sortedCandidates = [...candidates].sort((a, b) =>
+    compareSemverVersions(a.version, b.version)
+  );
 
-    // If both are versioned paths (bunx cache), sort descending (newest first)
-    if (versionA && versionB) {
-      return compareSemverVersions(versionB, versionA);
+  return candidates;
+}
+
+// ============================================================================
+// Error message formatting
+// ============================================================================
+
+function formatCandidateList(candidates: InstallationCandidate[]): string {
+  return candidates
+    .map(c => `  • ${c.path} (${c.kind}, v${c.version})`)
+    .join('\n');
+}
+
+function getConfigExample(examplePath: string): string {
+  return `  2. Set ccInstallationPath in your config file (${CONFIG_FILE}):
+
+     {
+       "ccInstallationPath": "${examplePath}"
+     }`;
+}
+
+function getEnvVarExample(examplePath: string): string {
+  return `  1. Set the TWEAKCC_CC_INSTALLATION_PATH environment variable:
+
+     export TWEAKCC_CC_INSTALLATION_PATH="${examplePath}"`;
+}
+
+function getMultipleCandidatesError(
+  candidates: InstallationCandidate[]
+): string {
+  const examplePath = candidates[0]?.path || '/path/to/claude';
+
+  return `Multiple Claude Code installations found.
+
+Found installations:
+${formatCandidateList(candidates)}
+
+To specify which installation to use, either:
+
+${getEnvVarExample(examplePath)}
+
+${getConfigExample(examplePath)}`;
+}
+
+function getNotFoundError(): string {
+  return `Could not find Claude Code installation.
+
+To fix this, either:
+
+${getEnvVarExample('/path/to/claude')}
+
+${getConfigExample('/path/to/claude')}
+
+  3. Install Claude Code:
+     • npm install -g @anthropic-ai/claude-code
+     • Or download from https://claude.ai/download`;
+}
+
+// ============================================================================
+// Main detection function
+// ============================================================================
+
+/**
+ * Converts a resolved installation to ClaudeCodeInstallationInfo.
+ */
+function toInstallationInfo(
+  resolvedPath: string,
+  kind: InstallationKind,
+  version: string,
+  source: InstallationSource
+): ClaudeCodeInstallationInfo {
+  if (kind === 'npm-based') {
+    return { cliPath: resolvedPath, version, source };
+  } else {
+    return { nativeInstallationPath: resolvedPath, version, source };
+  }
+}
+
+/**
+ * Finds the Claude Code installation.
+ *
+ * Priority order:
+ * 1. TWEAKCC_CC_INSTALLATION_PATH environment variable
+ * 2. ccInstallationPath from config
+ * 3. `claude` on PATH (via `which` package)
+ * 4. Hardcoded search paths (with interactive selection if multiple found)
+ *
+ * @throws InstallationDetectionError if detection fails or requires user input in non-interactive mode
+ */
+export async function findClaudeCodeInstallation(
+  config: TweakccConfig,
+  options: FindInstallationOptions
+): Promise<ClaudeCodeInstallationInfo | null> {
+  // 1. Check TWEAKCC_CC_INSTALLATION_PATH environment variable
+  const envPath = process.env.TWEAKCC_CC_INSTALLATION_PATH?.trim();
+  if (envPath && envPath.length > 0) {
+    debug(`Checking TWEAKCC_CC_INSTALLATION_PATH: ${envPath}`);
+
+    if (!(await doesFileExist(envPath))) {
+      throw new InstallationDetectionError(
+        `TWEAKCC_CC_INSTALLATION_PATH is set to '${envPath}' but file does not exist.`
+      );
     }
 
-    // Unversioned paths (non-bunx) come after versioned paths
-    if (versionA) return -1;
-    if (versionB) return 1;
+    const resolved = await resolvePathToInstallationType(envPath);
+    if (!resolved) {
+      throw new InstallationDetectionError(
+        `Unable to detect installation type from TWEAKCC_CC_INSTALLATION_PATH value '${envPath}'.\n` +
+          `Expected a Claude Code cli.js file or native binary.`
+      );
+    }
 
-    // Maintain original order for non-versioned paths
-    return 0;
+    const version = await extractVersion(resolved.resolvedPath, resolved.kind);
+    if (isDebug() && resolved.kind === 'npm-based') {
+      debug(`SHA256 hash: ${await hashFileInChunks(resolved.resolvedPath)}`);
+    }
+
+    debug(
+      `Using Claude Code from TWEAKCC_CC_INSTALLATION_PATH: ${resolved.resolvedPath} (${resolved.kind}, v${version})`
+    );
+    return toInstallationInfo(
+      resolved.resolvedPath,
+      resolved.kind,
+      version,
+      'env-var'
+    );
+  }
+
+  // 2. Check ccInstallationPath from config
+  if (config.ccInstallationPath) {
+    const configPath = config.ccInstallationPath;
+    debug(`Checking ccInstallationPath: ${configPath}`);
+
+    if (!(await doesFileExist(configPath))) {
+      throw new InstallationDetectionError(
+        `ccInstallationPath is set to '${configPath}' but file does not exist.`
+      );
+    }
+
+    const resolved = await resolvePathToInstallationType(configPath);
+    if (!resolved) {
+      throw new InstallationDetectionError(
+        `Unable to detect installation type from configured ccInstallationPath '${configPath}'.\n` +
+          `Expected a Claude Code cli.js file or native binary.`
+      );
+    }
+
+    const version = await extractVersion(resolved.resolvedPath, resolved.kind);
+    if (isDebug() && resolved.kind === 'npm-based') {
+      debug(`SHA256 hash: ${await hashFileInChunks(resolved.resolvedPath)}`);
+    }
+
+    debug(
+      `Using Claude Code from ccInstallationPath: ${resolved.resolvedPath} (${resolved.kind}, v${version})`
+    );
+    return toInstallationInfo(
+      resolved.resolvedPath,
+      resolved.kind,
+      version,
+      'config'
+    );
+  }
+
+  // 3. Check PATH via `which` package
+  const pathClaudeExe = await getClaudeFromPath();
+  if (pathClaudeExe) {
+    debug(`Checking claude on PATH: ${pathClaudeExe}`);
+
+    const resolved = await resolvePathToInstallationType(pathClaudeExe);
+    if (!resolved) {
+      throw new InstallationDetectionError(
+        `Unable to detect installation type from 'claude' on PATH (${pathClaudeExe}).\n` +
+          `Expected a Claude Code cli.js file or native binary.`
+      );
+    }
+
+    const version = await extractVersion(resolved.resolvedPath, resolved.kind);
+    if (isDebug() && resolved.kind === 'npm-based') {
+      debug(`SHA256 hash: ${await hashFileInChunks(resolved.resolvedPath)}`);
+    }
+
+    debug(
+      `Using Claude Code from PATH: ${resolved.resolvedPath} (${resolved.kind}, v${version})`
+    );
+    return toInstallationInfo(
+      resolved.resolvedPath,
+      resolved.kind,
+      version,
+      'path'
+    );
+  }
+
+  // 4. Fall back to hardcoded search paths
+  debug('Collecting candidates from hardcoded search paths...');
+  const candidates = await collectCandidates();
+
+  if (candidates.length === 0) {
+    if (options.interactive) {
+      // Return null to let the UI handle displaying the error
+      return null;
+    }
+    throw new InstallationDetectionError(getNotFoundError());
+  }
+
+  if (candidates.length === 1) {
+    const candidate = candidates[0];
+    debug(
+      `Using single candidate: ${candidate.path} (${candidate.kind}, v${candidate.version})`
+    );
+    return toInstallationInfo(
+      candidate.path,
+      candidate.kind,
+      candidate.version,
+      'search-paths'
+    );
+  }
+
+  // Multiple candidates found
+  if (!options.interactive) {
+    throw new InstallationDetectionError(
+      getMultipleCandidatesError(candidates)
+    );
+  }
+
+  // Interactive mode: return candidates for UI to handle
+  // The UI will call selectAndSaveInstallation() after user picks one
+  return {
+    // Return a special marker that indicates selection is needed
+    // This is a workaround since we can't return candidates directly
+    version: '',
+    source: 'search-paths', // Will be updated when selection is made
+    _pendingCandidates: candidates,
+  } as ClaudeCodeInstallationInfo & {
+    _pendingCandidates: InstallationCandidate[];
+  };
+}
+
+/**
+ * Returns candidates for interactive selection.
+ * Called by the UI when findClaudeCodeInstallation returns _pendingCandidates.
+ */
+export function getPendingCandidates(
+  info: ClaudeCodeInstallationInfo
+): InstallationCandidate[] | null {
+  const extended = info as ClaudeCodeInstallationInfo & {
+    _pendingCandidates?: InstallationCandidate[];
+  };
+  return extended._pendingCandidates || null;
+}
+
+/**
+ * Saves the user's installation selection to config and returns the installation info.
+ */
+export async function selectAndSaveInstallation(
+  candidate: InstallationCandidate
+): Promise<ClaudeCodeInstallationInfo> {
+  debug(`Saving selected installation to config: ${candidate.path}`);
+
+  await updateConfigFile(config => {
+    config.ccInstallationPath = candidate.path;
   });
 
-  for (const searchPath of sortedSearchPaths) {
-    try {
-      debug(`Searching for Claude Code cli.js file at ${searchPath}`);
-
-      // Check for cli.js
-      const cliPath = path.join(searchPath, 'cli.js');
-      if (!(await doesFileExist(cliPath))) {
-        continue;
-      }
-      debug(`Found Claude Code cli.js file at ${searchPath}; checking hash...`);
-      if (isDebug()) {
-        debug(`SHA256 hash: ${await hashFileInChunks(cliPath)}`);
-      }
-
-      // Extract version from the cli.js file itself
-      const version = await extractVersionFromJsFile(cliPath);
-
-      return {
-        cliPath: cliPath,
-        version,
-      };
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        (error.code === 'ENOENT' || error.code === 'ENOTDIR')
-      ) {
-        // Continue searching if this path fails or is not a directory.
-        continue;
-      } else {
-        throw error;
-      }
-    }
-  }
-
-  // If we didn't find cli.js in the usual locations, try extracting from native installation
-  debug(
-    'Could not find cli.js in standard locations, trying native installation method...'
+  // After selection, the source becomes 'config' since we saved it to ccInstallationPath
+  return toInstallationInfo(
+    candidate.path,
+    candidate.kind,
+    candidate.version,
+    'config'
   );
+}
 
-  const claudeExeInfo = await findClaudeExecutableOnPath();
-  debug(
-    `findClaudeExecutableOnPath() returned: ${
-      claudeExeInfo ? claudeExeInfo.resolvedPath : null
-    }`
-  );
+/**
+ * Gets candidates for display in non-interactive error messages.
+ * This re-collects candidates, used when we need to show what was found.
+ */
+export async function getCandidatesForError(): Promise<
+  InstallationCandidate[]
+> {
+  return collectCandidates();
+}
 
-  if (claudeExeInfo) {
-    const { resolvedPath, isSymlink } = claudeExeInfo;
+/**
+ * Formats the "not found" error message for display.
+ */
+export function formatNotFoundError(): string {
+  return getNotFoundError();
+}
 
-    let derivedCliJsPath: string | null = null;
-
-    if (resolvedPath.endsWith('cli.js')) {
-      derivedCliJsPath = resolvedPath;
-      debug(
-        'Resolved PATH executable already points at cli.js; treating as NPM installation.'
-      );
-    } else if (isSymlink) {
-      derivedCliJsPath = await findClijsFromExecutablePath(resolvedPath);
-      if (derivedCliJsPath) {
-        debug(
-          `Symlink target resides inside Claude Code package; derived cli.js at ${derivedCliJsPath}`
-        );
-      } else {
-        debug(
-          'Symlink target did not contain cli.js; attempting native extraction instead.'
-        );
-      }
-    }
-
-    if (derivedCliJsPath) {
-      try {
-        const version = await extractVersionFromJsFile(derivedCliJsPath);
-
-        debug(
-          `Found Claude Code via symlink-derived cli.js at: ${derivedCliJsPath}`
-        );
-
-        return {
-          cliPath: derivedCliJsPath,
-          version,
-        };
-      } catch (error) {
-        debug(
-          'Failed to extract version from cli.js found via symlink:',
-          error
-        );
-        // Fall through to try native installation method
-      }
-    }
-
-    // Treat any found executable as a potential native installation
-    // Always extract from the actual binary to get the correct version
-    // (The backup is only used when applying modifications, not for version detection)
-    debug(
-      `Attempting to extract claude.js from native installation: ${resolvedPath}`
-    );
-
-    const claudeJsBuffer =
-      await extractClaudeJsFromNativeInstallation(resolvedPath);
-
-    if (claudeJsBuffer) {
-      // Successfully extracted claude.js from native installation
-      // Extract version from the buffer content
-      const content = claudeJsBuffer.toString('utf8');
-      const version = extractVersionFromContent(content);
-
-      if (!version) {
-        debug('Failed to extract version from native installation');
-        return null;
-      }
-
-      debug(`Extracted version ${version} from native installation`);
-
-      return {
-        // cliPath is undefined for native installs - no file on disk
-        version,
-        nativeInstallationPath: resolvedPath,
-      };
-    }
-  }
-
-  return null;
-};
+/**
+ * Formats the "multiple candidates" error message for display.
+ */
+export function formatMultipleCandidatesError(
+  candidates: InstallationCandidate[]
+): string {
+  return getMultipleCandidatesError(candidates);
+}

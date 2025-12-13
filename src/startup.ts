@@ -1,6 +1,9 @@
 import fs from 'node:fs/promises';
 
-import { findClaudeCodeInstallation } from './installationDetection.js';
+import {
+  findClaudeCodeInstallation,
+  getPendingCandidates,
+} from './installationDetection.js';
 import { doesFileExist } from './utils.js';
 import {
   CLIJS_BACKUP_FILE,
@@ -11,17 +14,57 @@ import {
 } from './config.js';
 import { debug } from './utils.js';
 import { displaySyncResults, syncSystemPrompts } from './systemPromptSync.js';
-import { StartupCheckInfo } from './types.js';
+import {
+  ClaudeCodeInstallationInfo,
+  FindInstallationOptions,
+  InstallationCandidate,
+  StartupCheckInfo,
+  TweakccConfig,
+} from './types.js';
 import { backupClijs, backupNativeBinary } from './installationBackup.js';
+
+export interface StartupCheckResult {
+  startupCheckInfo: StartupCheckInfo | null;
+  pendingCandidates: InstallationCandidate[] | null;
+}
 
 /**
  * Performs startup checking: finding Claude Code, creating a backup if necessary, checking if
- * it's been updated.  If true, an update is required.
+ * it's been updated.
+ *
+ * @param options - Options for installation detection (interactive mode flag)
+ * @returns StartupCheckResult with either startupCheckInfo or pendingCandidates for UI selection
  */
-export async function startupCheck(): Promise<StartupCheckInfo | null> {
+export async function startupCheck(
+  options: FindInstallationOptions
+): Promise<StartupCheckResult> {
   const config = await readConfigFile();
 
-  const ccInstInfo = await findClaudeCodeInstallation(config);
+  const ccInstInfo = await findClaudeCodeInstallation(config, options);
+  if (!ccInstInfo) {
+    return { startupCheckInfo: null, pendingCandidates: null };
+  }
+
+  // Check if we have pending candidates that need user selection
+  const pendingCandidates = getPendingCandidates(ccInstInfo);
+  if (pendingCandidates) {
+    return { startupCheckInfo: null, pendingCandidates };
+  }
+
+  return {
+    startupCheckInfo: await completeStartupCheck(config, ccInstInfo),
+    pendingCandidates: null,
+  };
+}
+
+/**
+ * Completes the startup check after installation is resolved.
+ * Called directly when no selection needed, or after user selects an installation.
+ */
+export async function completeStartupCheck(
+  config: TweakccConfig,
+  ccInstInfo: ClaudeCodeInstallationInfo
+): Promise<StartupCheckInfo | null> {
   if (!ccInstInfo) {
     return null;
   }
