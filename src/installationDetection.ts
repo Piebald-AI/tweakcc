@@ -244,7 +244,7 @@ async function findClijsFromExecutablePath(
  * Returns [major, minor, patch] as numbers or null if pattern not found.
  */
 function extractVersionFromPath(pathStr: string): [number, number, number] | null {
-  const match = pathStr.match(/@anthropic-ai[\\\/]claude-code@(\d+)\.(\d+)\.(\d+)/);
+  const match = pathStr.match(/@anthropic-ai[\\/]claude-code@(\d+)\.(\d+)\.(\d+)/);
   if (match) {
     return [parseInt(match[1], 10), parseInt(match[2], 10), parseInt(match[3], 10)];
   }
