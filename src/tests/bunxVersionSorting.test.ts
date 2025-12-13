@@ -17,7 +17,9 @@ describe('extractVersionFromPath', () => {
 
   it('should return null for non-bunx paths', () => {
     expect(
-      extractVersionFromPath('/usr/local/lib/node_modules/@anthropic-ai/claude-code')
+      extractVersionFromPath(
+        '/usr/local/lib/node_modules/@anthropic-ai/claude-code'
+      )
     ).toBeNull();
   });
 
