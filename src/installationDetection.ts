@@ -4,7 +4,12 @@ import path from 'path';
 
 import { WASMagic } from 'wasmagic';
 
-import { debug, hashFileInChunks, isDebug } from './utils.js';
+import {
+  compareSemverVersions,
+  debug,
+  hashFileInChunks,
+  isDebug,
+} from './utils.js';
 import { extractClaudeJsFromNativeInstallation } from './nativeInstallationLoader.js';
 import fs from 'node:fs/promises';
 import { ClaudeCodeInstallationInfo, TweakccConfig } from './types.js';
@@ -243,7 +248,7 @@ async function findClijsFromExecutablePath(
  * Bunx cache paths follow the pattern: .../@anthropic-ai/claude-code@VERSION@@@HASH
  * Returns [major, minor, patch] as numbers or null if pattern not found.
  */
-function extractVersionFromPath(
+export function extractVersionFromPath(
   pathStr: string
 ): [number, number, number] | null {
   const match = pathStr.match(
@@ -257,19 +262,6 @@ function extractVersionFromPath(
     ];
   }
   return null;
-}
-
-/**
- * Compares two semantic versions.
- * Returns: positive if a > b, negative if a < b, 0 if equal
- */
-function compareVersions(
-  a: [number, number, number],
-  b: [number, number, number]
-): number {
-  if (a[0] !== b[0]) return a[0] - b[0];
-  if (a[1] !== b[1]) return a[1] - b[1];
-  return a[2] - b[2];
 }
 
 /**
@@ -422,7 +414,7 @@ export const findClaudeCodeInstallation = async (
 
     // If both are versioned paths (bunx cache), sort descending (newest first)
     if (versionA && versionB) {
-      return compareVersions(versionB, versionA);
+      return compareSemverVersions(versionB, versionA);
     }
 
     // Unversioned paths (non-bunx) come after versioned paths

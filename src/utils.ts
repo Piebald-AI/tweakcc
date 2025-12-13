@@ -365,3 +365,16 @@ export const expandTilde = (filepath: string): string => {
   }
   return filepath;
 };
+
+/**
+ * Compares two semantic versions.
+ * Returns: positive if a > b, negative if a < b, 0 if equal
+ */
+export const compareSemverVersions = (
+  a: [number, number, number],
+  b: [number, number, number]
+): number => {
+  if (a[0] !== b[0]) return a[0] - b[0];
+  if (a[1] !== b[1]) return a[1] - b[1];
+  return a[2] - b[2];
+};
