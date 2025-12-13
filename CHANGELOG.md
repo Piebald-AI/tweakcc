@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-- Improve user message display (#269) - @bl-ue
-- Ignore permission errors when searching for cli.js (#268) - @bl-ue
 - Support for `~/.claude/tweakcc` configuration directory location (#259) - @bl-ue
 - `TWEAKCC_CONFIG_DIR` environment variable for explicit config location override (#259) - @bl-ue
 - Warning when multiple configuration locations are detected  (#259) - @bl-ue
@@ -16,8 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix Claude Code hanging due to `/title` patches (#265) - @bl-ue
 - Allow disabling `/title` patches via the Misc view (#265) - @bl-ue
 - Add `EnterPlanMode` and `LSP` to the toolset edit view (#266) - @bl-ue
+- Ignore permission errors when searching for cli.js (#268) - @bl-ue
+- Improve user message display (#269) - @bl-ue
 - Add support for explicitly setting the native install path (#270) - @signadou
 - Load `node-lief` using dynamic `import()` (#272) - @signadou
+- Prefer latest bunx cached claude-code version when patching (#282) - @y0usaf
+- Show a Piebald announcement (#284) - @bl-ue
 
 ## [v3.1.6](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.6) - 2025-12-05
 
