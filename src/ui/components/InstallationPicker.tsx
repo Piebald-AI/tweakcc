@@ -60,7 +60,9 @@ export function InstallationPicker({
         .
       </Text>
       <Text> </Text>
-      <Text dimColor>Use ↑↓ arrows to navigate, Enter to select, Esc to quit</Text>
+      <Text dimColor>
+        Use ↑↓ arrows to navigate, Enter to select, Esc to quit
+      </Text>
     </Box>
   );
 }

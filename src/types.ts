@@ -141,10 +141,10 @@ export interface TweakccConfig {
 export type InstallationKind = 'npm-based' | 'native-binary';
 
 export type InstallationSource =
-  | 'env-var'        // TWEAKCC_CC_INSTALLATION_PATH
-  | 'config'         // ccInstallationPath in config.json
-  | 'path'           // `claude` found via PATH
-  | 'search-paths';  // Found via hardcoded search paths
+  | 'env-var' // TWEAKCC_CC_INSTALLATION_PATH
+  | 'config' // ccInstallationPath in config.json
+  | 'path' // `claude` found via PATH
+  | 'search-paths'; // Found via hardcoded search paths
 
 export interface InstallationCandidate {
   path: string;
