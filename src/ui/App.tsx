@@ -48,12 +48,15 @@ export default function App({
     ccVersion: '',
     lastModified: '',
   });
+  const [showPiebaldAnnouncement, setShowPiebaldAnnouncement] = useState(false);
 
   // Load the config file.
   useEffect(() => {
     const loadConfig = async () => {
       const loadedConfig = await readConfigFile();
       setConfig(loadedConfig);
+      // Show the Piebald announcement only if not hidden in config
+      setShowPiebaldAnnouncement(!loadedConfig.hidePiebaldAnnouncement);
     };
     loadConfig();
   }, []);
@@ -103,14 +106,21 @@ Please reapply your changes below.`,
     }
   }, []);
 
-  // Ctrl+C/Escape/Q to exit.
+  // Ctrl+C/Escape/Q to exit. Escape first hides the Piebald announcement if showing.
   useInput(
     (input, key) => {
-      if (
-        (key.ctrl && input === 'c') ||
-        ((input === 'q' || key.escape) && !currentView)
-      ) {
+      if (key.ctrl && input === 'c') {
         process.exit(0);
+      }
+      if ((input === 'q' || key.escape) && !currentView) {
+        process.exit(0);
+      }
+      if (input === 'h' && !currentView && showPiebaldAnnouncement) {
+        setShowPiebaldAnnouncement(false);
+        // Save the hide preference to config
+        updateConfigFile(cfg => {
+          cfg.hidePiebaldAnnouncement = true;
+        });
       }
     },
     { isActive: !currentView }
@@ -195,10 +205,8 @@ Please reapply your changes below.`,
           <MainView
             onSubmit={handleMainSubmit}
             notification={notification}
-            isNativeInstallation={
-              !!startupCheckInfo.ccInstInfo?.nativeInstallationPath
-            }
             configMigrated={configMigrated}
+            showPiebaldAnnouncement={showPiebaldAnnouncement}
           />
         ) : currentView === MainMenuItem.THEMES ? (
           <ThemesView onBack={handleBack} />

@@ -135,6 +135,7 @@ export interface TweakccConfig {
   lastModified: string;
   changesApplied: boolean;
   settings: Settings;
+  hidePiebaldAnnouncement?: boolean;
 }
 
 export interface ClaudeCodeInstallationInfo {
