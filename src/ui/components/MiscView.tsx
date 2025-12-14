@@ -1,5 +1,5 @@
 import { Box, Text, useInput } from 'ink';
-import { useContext, useState } from 'react';
+import { useContext, useState, useMemo } from 'react';
 import { SettingsContext } from '../App.js';
 import Header from './Header.js';
 
@@ -7,76 +7,171 @@ interface MiscViewProps {
   onSubmit: () => void;
 }
 
+interface MiscItem {
+  id: string;
+  title: string;
+  description: string;
+  getValue: () => boolean;
+  toggle: () => void;
+}
+
+const ITEMS_PER_PAGE = 4;
+
 export function MiscView({ onSubmit }: MiscViewProps) {
   const { settings, updateSettings } = useContext(SettingsContext);
 
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const handleRemoveBorderToggle = () => {
-    updateSettings(settings => {
-      if (!settings.inputBox) {
-        settings.inputBox = { removeBorder: false };
-      }
-      settings.inputBox.removeBorder = !settings.inputBox.removeBorder;
-    });
+  const defaultMisc = {
+    showTweakccVersion: true,
+    showPatchesApplied: true,
+    expandThinkingBlocks: true,
+    enableConversationTitle: true,
+    hideStartupBanner: false,
+    hideCtrlGToEditPrompt: false,
+    hideStartupClawd: false,
   };
 
-  const handleShowVersionToggle = () => {
-    updateSettings(settings => {
-      if (!settings.misc) {
-        settings.misc = {
-          showTweakccVersion: true,
-          showPatchesApplied: true,
-          expandThinkingBlocks: true,
-          enableConversationTitle: true,
-        };
-      }
-      settings.misc.showTweakccVersion = !settings.misc.showTweakccVersion;
-    });
+  const ensureMisc = () => {
+    if (!settings.misc) {
+      settings.misc = { ...defaultMisc };
+    }
   };
 
-  const handleShowPatchesToggle = () => {
-    updateSettings(settings => {
-      if (!settings.misc) {
-        settings.misc = {
-          showTweakccVersion: true,
-          showPatchesApplied: true,
-          expandThinkingBlocks: true,
-          enableConversationTitle: true,
-        };
-      }
-      settings.misc.showPatchesApplied = !settings.misc.showPatchesApplied;
-    });
-  };
+  const items: MiscItem[] = useMemo(
+    () => [
+      {
+        id: 'removeBorder',
+        title: 'Remove input box border',
+        description:
+          'Removes the rounded border around the input box for a cleaner look.',
+        getValue: () => settings.inputBox?.removeBorder ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            if (!settings.inputBox) {
+              settings.inputBox = { removeBorder: false };
+            }
+            settings.inputBox.removeBorder = !settings.inputBox.removeBorder;
+          });
+        },
+      },
+      {
+        id: 'showVersion',
+        title: 'Show tweakcc version at startup',
+        description:
+          'Shows the blue "+ tweakcc v<VERSION>" message when starting Claude Code.',
+        getValue: () => settings.misc?.showTweakccVersion ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.showTweakccVersion =
+              !settings.misc!.showTweakccVersion;
+          });
+        },
+      },
+      {
+        id: 'showPatches',
+        title: 'Show patches applied indicator at startup',
+        description:
+          'Shows the green "tweakcc patches are applied" indicator when starting Claude Code.',
+        getValue: () => settings.misc?.showPatchesApplied ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.showPatchesApplied =
+              !settings.misc!.showPatchesApplied;
+          });
+        },
+      },
+      {
+        id: 'expandThinking',
+        title: 'Expand thinking blocks',
+        description:
+          'Makes thinking blocks always expanded by default instead of collapsed.',
+        getValue: () => settings.misc?.expandThinkingBlocks ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.expandThinkingBlocks =
+              !settings.misc!.expandThinkingBlocks;
+          });
+        },
+      },
+      {
+        id: 'conversationTitle',
+        title: 'Allow renaming sessions via /title',
+        description:
+          'Enables /title and /rename commands for manually naming conversations.',
+        getValue: () => settings.misc?.enableConversationTitle ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableConversationTitle =
+              !settings.misc!.enableConversationTitle;
+          });
+        },
+      },
+      {
+        id: 'hideStartupBanner',
+        title: 'Hide startup banner',
+        description:
+          'Hides the startup banner message displayed before first prompt.',
+        getValue: () => settings.misc?.hideStartupBanner ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.hideStartupBanner =
+              !settings.misc!.hideStartupBanner;
+          });
+        },
+      },
+      {
+        id: 'hideCtrlG',
+        title: 'Hide ctrl-g to edit prompt hint',
+        description:
+          'Hides the "ctrl-g to edit prompt" hint shown during streaming.',
+        getValue: () => settings.misc?.hideCtrlGToEditPrompt ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.hideCtrlGToEditPrompt =
+              !settings.misc!.hideCtrlGToEditPrompt;
+          });
+        },
+      },
+      {
+        id: 'hideClawd',
+        title: 'Hide startup Clawd ASCII art',
+        description: 'Hides the Clawd ASCII art character shown at startup.',
+        getValue: () => settings.misc?.hideStartupClawd ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.hideStartupClawd = !settings.misc!.hideStartupClawd;
+          });
+        },
+      },
+    ],
+    [settings, updateSettings]
+  );
 
-  const handleExpandThinkingToggle = () => {
-    updateSettings(settings => {
-      if (!settings.misc) {
-        settings.misc = {
-          showTweakccVersion: true,
-          showPatchesApplied: true,
-          expandThinkingBlocks: true,
-          enableConversationTitle: true,
-        };
-      }
-      settings.misc.expandThinkingBlocks = !settings.misc.expandThinkingBlocks;
-    });
-  };
+  const totalItems = items.length;
+  const maxIndex = totalItems - 1;
 
-  const handleEnableConversationTitleToggle = () => {
-    updateSettings(settings => {
-      if (!settings.misc) {
-        settings.misc = {
-          showTweakccVersion: true,
-          showPatchesApplied: true,
-          expandThinkingBlocks: true,
-          enableConversationTitle: true,
-        };
-      }
-      settings.misc.enableConversationTitle =
-        !settings.misc.enableConversationTitle;
-    });
-  };
+  // Calculate scroll offset to keep selected item visible
+  const scrollOffset = useMemo(() => {
+    if (selectedIndex < ITEMS_PER_PAGE) {
+      return 0;
+    }
+    return Math.min(
+      selectedIndex - ITEMS_PER_PAGE + 1,
+      totalItems - ITEMS_PER_PAGE
+    );
+  }, [selectedIndex, totalItems]);
+
+  const visibleItems = items.slice(scrollOffset, scrollOffset + ITEMS_PER_PAGE);
+  const hasMoreAbove = scrollOffset > 0;
+  const hasMoreBelow = scrollOffset + ITEMS_PER_PAGE < totalItems;
 
   useInput((input, key) => {
     if (key.return || key.escape) {
@@ -84,30 +179,11 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     } else if (key.upArrow) {
       setSelectedIndex(prev => Math.max(0, prev - 1));
     } else if (key.downArrow) {
-      setSelectedIndex(prev => Math.min(4, prev + 1));
+      setSelectedIndex(prev => Math.min(maxIndex, prev + 1));
     } else if (input === ' ') {
-      if (selectedIndex === 0) {
-        handleRemoveBorderToggle();
-      } else if (selectedIndex === 1) {
-        handleShowVersionToggle();
-      } else if (selectedIndex === 2) {
-        handleShowPatchesToggle();
-      } else if (selectedIndex === 3) {
-        handleExpandThinkingToggle();
-      } else if (selectedIndex === 4) {
-        handleEnableConversationTitleToggle();
-      }
+      items[selectedIndex]?.toggle();
     }
   });
-
-  const removeBorderCheckbox = settings.inputBox?.removeBorder ? '☑' : '☐';
-  const showVersionCheckbox = settings.misc?.showTweakccVersion ? '☑' : '☐';
-  const showPatchesCheckbox = settings.misc?.showPatchesApplied ? '☑' : '☐';
-  const expandThinkingCheckbox = settings.misc?.expandThinkingBlocks
-    ? '☑'
-    : '☐';
-  const enableConversationTitleCheckbox =
-    (settings.misc?.enableConversationTitle ?? true) ? '☑' : '☐';
 
   return (
     <Box flexDirection="column">
@@ -116,143 +192,68 @@ export function MiscView({ onSubmit }: MiscViewProps) {
       </Box>
 
       <Box marginBottom={1}>
-        <Text color="gray">
+        <Text dimColor>
+          Various tweaks and customizations. Press space to toggle settings,
+          enter to go back.
+        </Text>
+      </Box>
+
+      {/* Scroll indicator - more above */}
+      {hasMoreAbove && (
+        <Box>
+          <Text dimColor> ↑ {scrollOffset} more above</Text>
+        </Box>
+      )}
+
+      {/* Visible items */}
+      {visibleItems.map((item, i) => {
+        const actualIndex = scrollOffset + i;
+        const isSelected = actualIndex === selectedIndex;
+        const checkbox = item.getValue() ? '☑' : '☐';
+
+        return (
+          <Box key={item.id} flexDirection="column">
+            <Box>
+              <Text>
+                <Text color={isSelected ? 'cyan' : undefined}>
+                  {isSelected ? '❯ ' : '  '}
+                </Text>
+                <Text bold color={isSelected ? 'cyan' : undefined}>
+                  {item.title}
+                </Text>
+              </Text>
+            </Box>
+
+            <Box>
+              <Text dimColor>
+                {'  '}
+                {item.description}
+              </Text>
+            </Box>
+
+            <Box marginLeft={4} marginBottom={1}>
+              <Text>
+                {checkbox} {item.getValue() ? 'Enabled' : 'Disabled'}
+              </Text>
+            </Box>
+          </Box>
+        );
+      })}
+
+      {/* Scroll indicator - more below */}
+      {hasMoreBelow && (
+        <Box>
           <Text dimColor>
-            Various tweaks and customizations. Press space to toggle settings,
-            enter to go back.
+            {' '}
+            ↓ {totalItems - scrollOffset - ITEMS_PER_PAGE} more below
           </Text>
-        </Text>
-      </Box>
+        </Box>
+      )}
 
-      {/* Remove Border Option */}
-      <Box>
-        <Text>
-          <Text color={selectedIndex === 0 ? 'cyan' : undefined}>
-            {selectedIndex === 0 ? '❯ ' : '  '}
-          </Text>
-          <Text bold color={selectedIndex === 0 ? 'cyan' : undefined}>
-            Remove input box border
-          </Text>
-        </Text>
-      </Box>
-
-      <Box flexDirection="column">
+      {/* Page indicator */}
+      <Box marginTop={1}>
         <Text dimColor>
-          {'  '}Removes the rounded border around the input box for a cleaner
-          look.
-        </Text>
-      </Box>
-
-      <Box marginLeft={4} marginBottom={1}>
-        <Text>
-          {removeBorderCheckbox}{' '}
-          {settings.inputBox?.removeBorder ? 'Enabled' : 'Disabled'}
-        </Text>
-      </Box>
-
-      {/* Show tweakcc Version Option */}
-      <Box>
-        <Text>
-          <Text color={selectedIndex === 1 ? 'cyan' : undefined}>
-            {selectedIndex === 1 ? '❯ ' : '  '}
-          </Text>
-          <Text bold color={selectedIndex === 1 ? 'cyan' : undefined}>
-            Show tweakcc version at startup
-          </Text>
-        </Text>
-      </Box>
-
-      <Box flexDirection="column">
-        <Text dimColor>
-          {'  '}Shows the blue &quot;+ tweakcc v&lt;VERSION&gt;&quot; message
-          when starting Claude Code.
-        </Text>
-      </Box>
-
-      <Box marginLeft={4} marginBottom={1}>
-        <Text>
-          {showVersionCheckbox}{' '}
-          {settings.misc?.showTweakccVersion ? 'Enabled' : 'Disabled'}
-        </Text>
-      </Box>
-
-      {/* Show Patches Applied Option */}
-      <Box>
-        <Text>
-          <Text color={selectedIndex === 2 ? 'cyan' : undefined}>
-            {selectedIndex === 2 ? '❯ ' : '  '}
-          </Text>
-          <Text bold color={selectedIndex === 2 ? 'cyan' : undefined}>
-            Show patches applied indicator at startup
-          </Text>
-        </Text>
-      </Box>
-
-      <Box flexDirection="column">
-        <Text dimColor>
-          {'  '}Shows the green &quot;tweakcc patches are applied&quot;
-          indicator when starting Claude Code.
-        </Text>
-      </Box>
-
-      <Box marginLeft={4} marginBottom={1}>
-        <Text>
-          {showPatchesCheckbox}{' '}
-          {settings.misc?.showPatchesApplied ? 'Enabled' : 'Disabled'}
-        </Text>
-      </Box>
-
-      {/* Expand Thinking Blocks Option */}
-      <Box>
-        <Text>
-          <Text color={selectedIndex === 3 ? 'cyan' : undefined}>
-            {selectedIndex === 3 ? '❯ ' : '  '}
-          </Text>
-          <Text bold color={selectedIndex === 3 ? 'cyan' : undefined}>
-            Expand thinking blocks
-          </Text>
-        </Text>
-      </Box>
-
-      <Box flexDirection="column">
-        <Text dimColor>
-          {'  '}Makes thinking blocks always expanded by default instead of
-          collapsed.
-        </Text>
-      </Box>
-
-      <Box marginLeft={4} marginBottom={1}>
-        <Text>
-          {expandThinkingCheckbox}{' '}
-          {settings.misc?.expandThinkingBlocks ? 'Enabled' : 'Disabled'}
-        </Text>
-      </Box>
-
-      {/* Enable Conversation Title Option */}
-      <Box>
-        <Text>
-          <Text color={selectedIndex === 4 ? 'cyan' : undefined}>
-            {selectedIndex === 4 ? '❯ ' : '  '}
-          </Text>
-          <Text bold color={selectedIndex === 4 ? 'cyan' : undefined}>
-            Allow renaming sessions via /title
-          </Text>
-        </Text>
-      </Box>
-
-      <Box flexDirection="column">
-        <Text dimColor>
-          {'  '}Enables /title and /rename commands for manually naming
-          conversations.
-        </Text>
-      </Box>
-
-      <Box marginLeft={4} marginBottom={1}>
-        <Text>
-          {enableConversationTitleCheckbox}{' '}
-          {(settings.misc?.enableConversationTitle ?? true)
-            ? 'Enabled'
-            : 'Disabled'}
+          Item {selectedIndex + 1} of {totalItems}
         </Text>
       </Box>
     </Box>

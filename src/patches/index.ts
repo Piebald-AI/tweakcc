@@ -51,6 +51,9 @@ import {
   addSetStateFnAccessAtToolChangeComponentScope,
 } from './toolsets.js';
 import { writeConversationTitle } from './conversationTitle.js';
+import { writeHideStartupBanner } from './hideStartupBanner.js';
+import { writeHideCtrlGToEditPrompt } from './hideCtrlGToEditPrompt.js';
+import { writeHideStartupClawd } from './hideStartupClawd.js';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -626,6 +629,21 @@ export const applyCustomization = async (
     ccInstInfo.version && compareVersions(ccInstInfo.version, '2.0.64') < 0;
   if (enableConvTitle && isVersionBelow2064) {
     if ((result = writeConversationTitle(content))) content = result;
+  }
+
+  // Apply hide startup banner patch (if enabled)
+  if (config.settings.misc?.hideStartupBanner) {
+    if ((result = writeHideStartupBanner(content))) content = result;
+  }
+
+  // Apply hide ctrl-g to edit prompt patch (if enabled)
+  if (config.settings.misc?.hideCtrlGToEditPrompt) {
+    if ((result = writeHideCtrlGToEditPrompt(content))) content = result;
+  }
+
+  // Apply hide startup clawd patch (if enabled)
+  if (config.settings.misc?.hideStartupClawd) {
+    if ((result = writeHideStartupClawd(content))) content = result;
   }
 
   // Write the modified content back

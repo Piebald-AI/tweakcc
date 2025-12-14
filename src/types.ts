@@ -109,6 +109,9 @@ export interface MiscConfig {
   showPatchesApplied: boolean;
   expandThinkingBlocks: boolean;
   enableConversationTitle: boolean;
+  hideStartupBanner: boolean;
+  hideCtrlGToEditPrompt: boolean;
+  hideStartupClawd: boolean;
 }
 
 export interface Toolset {
