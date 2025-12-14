@@ -69,11 +69,11 @@ export function getSelectedModel(): string {
     const model = settings?.model || 'default';
 
     if (model === 'opus') {
-      return 'Opus 4.1';
+      return 'Opus 4.5';
     }
 
     // Check against CUSTOM_MODELS list
-    const customModel = CUSTOM_MODELS.find(m => m.slug === model);
+    const customModel = CUSTOM_MODELS.find(m => m.value === model);
     if (customModel) {
       return customModel.label;
     }
@@ -81,7 +81,7 @@ export function getSelectedModel(): string {
     // File not found or invalid JSON, use default
   }
 
-  return 'Sonnet 4.5';
+  return 'Opus 4.5';
 }
 
 export function getColorKeys(theme: Theme): string[] {

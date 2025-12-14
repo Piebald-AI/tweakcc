@@ -55,6 +55,7 @@ import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
 } from '../installationBackup.js';
+import { compareVersions } from '../systemPromptSync.js';
 
 export interface LocationResult {
   startIndex: number;
@@ -168,9 +169,9 @@ export const getModuleLoaderFunction = (
 export const getReactModuleNameNonBun = (
   fileContents: string
 ): string | undefined => {
-  // Pattern: var X=Y((Z)=>{var W=Symbol.for("react.element")
+  // Pattern: var X=Y((Z)=>{var W=Symbol.for("react.element") or "react.transitional.element"
   const pattern =
-    /var ([$\w]+)=[$\w]+\(\([$\w]+\)=>\{var [$\w]+=Symbol\.for\("react\.element"\)/;
+    /var ([$\w]+)=[$\w]+\(\([$\w]+\)=>\{var [$\w]+=Symbol\.for\("react\.(transitional\.)?element"\)/;
   const match = fileContents.match(pattern);
   if (!match) {
     console.log(
@@ -619,8 +620,10 @@ export const applyCustomization = async (
       content = result;
   }
 
-  // Apply conversation title management (if enabled)
-  if (config.settings.misc?.enableConversationTitle ?? true) {
+  // Apply conversation title management (if enabled and CC version < 2.0.64)
+  const enableConvTitle = config.settings.misc?.enableConversationTitle ?? true;
+  const isVersionBelow2064 = ccInstInfo.version && compareVersions(ccInstInfo.version, '2.0.64') < 0;
+  if (enableConvTitle && isVersionBelow2064) {
     if ((result = writeConversationTitle(content))) content = result;
   }
 

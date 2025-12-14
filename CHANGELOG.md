@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Prefer latest bunx cached claude-code version when patching (#282) - @y0usaf
 - Show a Piebald announcement (#284) - @bl-ue
 - Rework logic to find claude: `TWEAKCC_CC_INSTALLATION_DIR`, `ccInstallationPath`, `claude` from PATH, search dirs, user selection (#285) - @bl-ue
+- Brought up to speed with CC 2.0.69 (#286) - @bl-ue
 
 ## [v3.1.6](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.6) - 2025-12-05
 

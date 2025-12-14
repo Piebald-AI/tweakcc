@@ -255,8 +255,8 @@ const findPatchesListLocation = (
     return null;
   }
 
-  // 2. Go back 500 chars from the match start
-  const lookbackStart = Math.max(0, match.index - 500);
+  // 2. Go back 1500 chars from the match start
+  const lookbackStart = Math.max(0, match.index - 1500);
   const lookbackSubstring = fileContents.slice(lookbackStart, match.index);
 
   // 3. Take the last `}function ([$\w]+)\(`

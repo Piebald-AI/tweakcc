@@ -6,7 +6,7 @@ const getContextLimitLocation = (oldFile: string): number | null => {
   // Pattern: function funcName(paramName){if(paramName.includes("[1m]"))return 1e6;return 200000}
   // Or: function funcName(paramName){return 200000}
   const pattern =
-    /function ([$\w]+)\(([$\w]*)\)\{((?:if\([$\w]+\.includes\("\[1m\]"\)\)return 1e6;)?return 200000)\}/;
+    /function ([$\w]+)\(([$\w]*)\)\{((?:if\([$\w]+\.includes\("\[2m\]"\)\)return 2000000;)?(?:if\([$\w]+\.includes\("\[1m\]"\)\)return 1e6;)?return 200000)\}/;
   const match = oldFile.match(pattern);
 
   if (!match || match.index === undefined) {
