@@ -14,7 +14,8 @@
     "start": "node dist/index.js",
     "lint": "tsc --noEmit && eslint src",
     "test": "vitest",
-    "format": "prettier --write src"
+    "format": "prettier --write src",
+    "prepare": "husky"
   },
   "keywords": [
     "cli",
@@ -50,6 +51,8 @@
     "eslint": "^9.33.0",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^16.3.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "prettier": "^3.6.2",
     "rollup-plugin-node-externals": "^8.0.1",
     "tsx": "^4.20.3",
@@ -57,6 +60,10 @@
     "typescript-eslint": "^8.39.0",
     "vite": "npm:rolldown-vite@^7.1.0",
     "vitest": "^3.2.4"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": "prettier --write",
+    "*.{json,md}": "prettier --write"
   },
   "dependencies": {
     "@babel/parser": "^7.28.4",
