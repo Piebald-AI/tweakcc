@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Support for `~/.claude/tweakcc` configuration directory location (#259) - @bl-ue
 - `TWEAKCC_CONFIG_DIR` environment variable for explicit config location override (#259) - @bl-ue
-- Warning when multiple configuration locations are detected  (#259) - @bl-ue
+- Warning when multiple configuration locations are detected (#259) - @bl-ue
 - Configuration priority order now: `TWEAKCC_CONFIG_DIR` > `~/.tweakcc` (if exists) > `~/.claude/tweakcc` > `XDG_CONFIG_HOME/tweakcc` > `~/.tweakcc` (default) (#259) - @bl-ue
 - Fix Claude Code hanging due to `/title` patches (#265) - @bl-ue
 - Allow disabling `/title` patches via the Misc view (#265) - @bl-ue
@@ -19,9 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add support for explicitly setting the native install path (#270) - @signadou
 - Load `node-lief` using dynamic `import()` (#272) - @signadou
 - Prefer latest bunx cached claude-code version when patching (#282) - @y0usaf
+- Support `<<BUILD_TIME>>` in newer CC prompts (#281) - @mike1858
 - Show a Piebald announcement (#284) - @bl-ue
 - Rework logic to find claude: `TWEAKCC_CC_INSTALLATION_DIR`, `ccInstallationPath`, `claude` from PATH, search dirs, user selection (#285) - @bl-ue
 - Brought up to speed with CC 2.0.69 (#286) - @bl-ue
+- Add new options to hide the Clawd logo, the whole startup banner, and the `ctrl-g to edit prompt` text (#287) - @bl-ue
 
 ## [v3.1.6](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.1.6) - 2025-12-05
 
@@ -175,7 +177,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **New:** feat: add welcome message customization to replace 'Claude Code' with custom text (#39) - @patrickjaja
 - fix(patching): include $ in matched identifier names (#43) - @bl-ue
-- feat(search): support local installation, fix ~/.npm* paths (#44) - @bl-ue
+- feat(search): support local installation, fix ~/.npm\* paths (#44) - @bl-ue
 
 ## [v1.2.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v1.2.0) - 2025-08-25
 
