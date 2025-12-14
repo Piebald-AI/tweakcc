@@ -622,7 +622,8 @@ export const applyCustomization = async (
 
   // Apply conversation title management (if enabled and CC version < 2.0.64)
   const enableConvTitle = config.settings.misc?.enableConversationTitle ?? true;
-  const isVersionBelow2064 = ccInstInfo.version && compareVersions(ccInstInfo.version, '2.0.64') < 0;
+  const isVersionBelow2064 =
+    ccInstInfo.version && compareVersions(ccInstInfo.version, '2.0.64') < 0;
   if (enableConvTitle && isVersionBelow2064) {
     if ((result = writeConversationTitle(content))) content = result;
   }
