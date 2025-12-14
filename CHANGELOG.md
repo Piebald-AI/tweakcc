@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v3.2.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.2.0) - 2025-12-14
+
 - Support for `~/.claude/tweakcc` configuration directory location (#259) - @bl-ue
 - `TWEAKCC_CONFIG_DIR` environment variable for explicit config location override (#259) - @bl-ue
 - Warning when multiple configuration locations are detected (#259) - @bl-ue
