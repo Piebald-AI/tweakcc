@@ -968,6 +968,31 @@
       "version": "2.0.71"
     },
     {
+      "name": "System Prompt: Git status",
+      "id": "system-prompt-git-status",
+      "description": "System prompt for displaying the current git status at the start of the conversation",
+      "pieces": [
+        "This is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.\nCurrent branch: ${",
+        "}\n\nMain branch (you will usually use this for PRs): ${",
+        "}\n\nStatus:\n${",
+        "||\"(clean)\"}\n\nRecent commits:\n${",
+        "}"
+      ],
+      "identifiers": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "identifierMap": {
+        "0": "CURRENT_BRANCH",
+        "1": "MAIN_BRANCH",
+        "2": "GIT_STATUS",
+        "3": "RECENT_COMMITS"
+      },
+      "version": "2.0.72"
+    },
+    {
       "name": "Tool Description: Computer",
       "id": "tool-description-computer",
       "description": "Main description for the Chrome browser computer automation tool",
