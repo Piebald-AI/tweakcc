@@ -1058,7 +1058,14 @@ const buildSearchRegexFromPieces = (
 
     // Handle non-ASCII characters by creating alternation patterns
     const withNonAsciiHandling = escapeNonAsciiForRegex(escapedPiece);
-    pattern += withNonAsciiHandling;
+
+    // Handle newlines: match both actual newlines (template literals) and literal \n (string literals)
+    // In regex pattern: \n matches newline, \\n matches literal backslash-n
+    const withNewlineHandling = withNonAsciiHandling.replace(
+      /\n/g,
+      '(?:\n|\\\\n)'
+    );
+    pattern += withNewlineHandling;
 
     // Add capture group for the variable if this isn't the last piece
     if (i < pieces.length - 1) {

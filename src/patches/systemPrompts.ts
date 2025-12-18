@@ -94,24 +94,31 @@ export const applySystemPrompts = async (
       // Generate the interpolated content using the actual variables from the match
       const interpolatedContent = getInterpolatedContent(match);
 
-      // Check for unescaped backticks that would break the template literal
-      const unescapedBackticks = findUnescapedBackticks(interpolatedContent);
-      if (unescapedBackticks.size > 0) {
-        const filePath = getPromptFilePath(promptId);
-        const contentLines = prompt.content.split('\n');
+      // Check the delimiter character before the match to determine string type
+      const matchIndex = match.index;
+      const delimiter = matchIndex > 0 ? content[matchIndex - 1] : '';
 
-        for (const [lineNum, columns] of unescapedBackticks) {
-          // lineNum is relative to prompt.content; adjust to absolute file line
-          // number by accounting for any frontmatter/comment lines.
-          const absoluteLineNum = lineNum + (prompt.contentLineOffset || 0);
-          const lineText = contentLines[lineNum - 1] || '';
-          console.log(
-            formatBacktickError(filePath, absoluteLineNum, lineText, columns)
-          );
-          console.log();
+      // Only check for unescaped backticks if the original uses template literals
+      // String literals (single/double quotes) don't need backticks escaped
+      if (delimiter === '`') {
+        const unescapedBackticks = findUnescapedBackticks(interpolatedContent);
+        if (unescapedBackticks.size > 0) {
+          const filePath = getPromptFilePath(promptId);
+          const contentLines = prompt.content.split('\n');
+
+          for (const [lineNum, columns] of unescapedBackticks) {
+            // lineNum is relative to prompt.content; adjust to absolute file line
+            // number by accounting for any frontmatter/comment lines.
+            const absoluteLineNum = lineNum + (prompt.contentLineOffset || 0);
+            const lineText = contentLines[lineNum - 1] || '';
+            console.log(
+              formatBacktickError(filePath, absoluteLineNum, lineText, columns)
+            );
+            console.log();
+          }
+
+          continue; // Skip this prompt
         }
-
-        continue; // Skip this prompt
       }
 
       // Calculate character counts for this prompt (both with human-readable placeholders)
@@ -151,12 +158,24 @@ export const applySystemPrompts = async (
       debug(`  Content identical: ${match[0] === interpolatedContent}`);
 
       const oldContent = content;
-      const matchIndex = match.index;
       const matchLength = match[0].length;
+
+      // delimiter was already determined above for backtick check
+      let replacementContent = interpolatedContent;
+
+      // If it's a string literal (double or single quote), convert actual newlines to \n
+      // and escape the delimiter character. Template literals can have actual newlines.
+      if (delimiter === '"') {
+        replacementContent = replacementContent.replace(/\n/g, '\\n');
+        replacementContent = replacementContent.replace(/"/g, '\\"');
+      } else if (delimiter === "'") {
+        replacementContent = replacementContent.replace(/\n/g, '\\n');
+        replacementContent = replacementContent.replace(/'/g, "\\'");
+      }
 
       // Replace the matched content with the interpolated content from the markdown file
       // Use a replacer function to avoid special replacement pattern interpretation (e.g., $$ -> $), see #237
-      content = content.replace(pattern, () => interpolatedContent);
+      content = content.replace(pattern, () => replacementContent);
 
       // Store the hash of the applied prompt content
       const appliedHash = computeMD5Hash(prompt.content);
@@ -166,7 +185,7 @@ export const applySystemPrompts = async (
       showDiff(
         oldContent,
         content,
-        interpolatedContent,
+        replacementContent,
         matchIndex,
         matchIndex + matchLength
       );
@@ -178,12 +197,18 @@ export const applySystemPrompts = async (
       );
 
       debug(`\n  Debug info for ${prompt.name}:`);
-      debug(`  Regex pattern (first 200 chars): ${regex.substring(0, 200)}...`);
-      debug(`  Trying to match pattern in cli.js...`);
-      const testMatch = content.match(new RegExp(regex.substring(0, 100)));
       debug(
-        `  Partial match result: ${testMatch ? 'found partial' : 'no match'}`
+        `  Regex pattern (first 200 chars): ${regex.substring(0, 200).replace(/\n/g, '\\n')}...`
       );
+      debug(`  Trying to match pattern in cli.js...`);
+      try {
+        const testMatch = content.match(new RegExp(regex.substring(0, 100)));
+        debug(
+          `  Partial match result: ${testMatch ? 'found partial' : 'no match'}`
+        );
+      } catch {
+        debug(`  Partial match failed (regex truncation issue)`);
+      }
     }
   }
 
