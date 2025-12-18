@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Remove the patch to hide the thinking banner - the banner itself was removed in CC 2.0.70 (#298) - @basekevin
+
 ## [v3.2.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.2.0) - 2025-12-14
 
 - Support for `~/.claude/tweakcc` configuration directory location (#259) - @bl-ue
