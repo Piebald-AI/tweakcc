@@ -15,7 +15,7 @@ const getThinkingVisibilityLocation = (
   // case "thinking":
   //  if (!H && !G)
   //    return null;
-  //  return b5.createElement(mn2, {addMargin: Q, param: A, isTranscriptMode: H,verbose: G });
+  //  return b5.createElement(mn2, {addMargin: Q, param: A, isTranscriptMode: H, verbose: G });
   // ```
   // we need to remove the if and the return.
   const visibilityPattern =
