@@ -1018,5 +1018,53 @@ Version: <<CCVERSION>>, BUILD_TIME:"<<BUILD_TIME>>"`;
         'Version: 1.0.0, BUILD_TIME:"2025-12-09T19:43:43Z"'
       );
     });
+
+    it('should generate regex that matches both actual newlines and literal \\n', async () => {
+      const mockStringsFile: StringsFile = {
+        version: '1.0.0',
+        prompts: [
+          {
+            id: 'test-prompt',
+            name: 'Test',
+            description: 'Test',
+            version: '1.0.0',
+            pieces: ['Hello\nWorld'], // actual newline after JSON parse
+            identifiers: [],
+            identifierMap: {},
+          },
+        ],
+      };
+
+      const { downloadStringsFile } = await import(
+        '../systemPromptDownload.js'
+      );
+      vi.mocked(downloadStringsFile).mockResolvedValue(mockStringsFile);
+
+      await promptSync.preloadStringsFile('1.0.0');
+
+      const mockMarkdown = `<!--
+name: Test
+description: Test
+ccVersion: 1.0.0
+-->
+
+Hello
+World`;
+
+      vi.spyOn(fs, 'readFile').mockResolvedValue(mockMarkdown);
+
+      const results = await promptSync.loadSystemPromptsWithRegex('1.0.0');
+      expect(results).toHaveLength(1);
+
+      const regex = new RegExp(results[0].regex, 'si');
+
+      // Should match actual newline (template literal style)
+      const templateLiteralContent = 'Hello\nWorld';
+      expect(templateLiteralContent.match(regex)).not.toBeNull();
+
+      // Should match literal \n (string literal style)
+      const stringLiteralContent = 'Hello\\nWorld';
+      expect(stringLiteralContent.match(regex)).not.toBeNull();
+    });
   });
 });

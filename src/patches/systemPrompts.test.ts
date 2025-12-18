@@ -102,5 +102,133 @@ describe('systemPrompts.ts', () => {
       expect(result.newContent).not.toContain('${A$}');
       expect(result.newContent).not.toContain('${B$}');
     });
+
+    it('should convert newlines to \\n for double-quoted string literals', async () => {
+      const mockPromptData = {
+        promptId: 'test-prompt',
+        prompt: {
+          name: 'Test Prompt',
+          description: 'Test',
+          ccVersion: '1.0.0',
+          variables: [],
+          content: 'Hello\nWorld', // actual newline from markdown
+          contentLineOffset: 0,
+        },
+        regex: 'Hello(?:\n|\\\\n)World', // matches both formats
+        getInterpolatedContent: () => 'Hello\nWorld', // actual newline
+        pieces: ['Hello\nWorld'],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      vi.mocked(promptSync.loadSystemPromptsWithRegex).mockResolvedValue([
+        mockPromptData,
+      ]);
+      vi.mocked(systemPromptHashIndex.setAppliedHash).mockResolvedValue();
+
+      // cli.js with double-quoted string literal containing literal \n
+      const cliContent = 'description:"Hello\\nWorld"';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      // Should convert actual newline to \n for string literal
+      expect(result.newContent).toBe('description:"Hello\\nWorld"');
+    });
+
+    it('should keep actual newlines for backtick template literals', async () => {
+      const mockPromptData = {
+        promptId: 'test-prompt',
+        prompt: {
+          name: 'Test Prompt',
+          description: 'Test',
+          ccVersion: '1.0.0',
+          variables: [],
+          content: 'Hello\nWorld', // actual newline from markdown
+          contentLineOffset: 0,
+        },
+        regex: 'Hello(?:\n|\\\\n)World', // matches both formats
+        getInterpolatedContent: () => 'Hello\nWorld', // actual newline
+        pieces: ['Hello\nWorld'],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      vi.mocked(promptSync.loadSystemPromptsWithRegex).mockResolvedValue([
+        mockPromptData,
+      ]);
+      vi.mocked(systemPromptHashIndex.setAppliedHash).mockResolvedValue();
+
+      // cli.js with backtick template literal containing actual newline
+      const cliContent = 'description:`Hello\nWorld`';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      // Should keep actual newline for template literal
+      expect(result.newContent).toBe('description:`Hello\nWorld`');
+    });
+
+    it('should escape double quotes in double-quoted string literals', async () => {
+      const mockPromptData = {
+        promptId: 'test-prompt',
+        prompt: {
+          name: 'Test Prompt',
+          description: 'Test',
+          ccVersion: '1.0.0',
+          variables: [],
+          content: 'Say "Hello"', // contains quotes
+          contentLineOffset: 0,
+        },
+        regex: 'Say "Hello"',
+        getInterpolatedContent: () => 'Say "Hello"',
+        pieces: ['Say "Hello"'],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      vi.mocked(promptSync.loadSystemPromptsWithRegex).mockResolvedValue([
+        mockPromptData,
+      ]);
+      vi.mocked(systemPromptHashIndex.setAppliedHash).mockResolvedValue();
+
+      // cli.js with double-quoted string
+      const cliContent = 'msg:"Say "Hello""';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      // Should escape quotes
+      expect(result.newContent).toBe('msg:"Say \\"Hello\\""');
+    });
+
+    it('should escape single quotes in single-quoted string literals', async () => {
+      const mockPromptData = {
+        promptId: 'test-prompt',
+        prompt: {
+          name: 'Test Prompt',
+          description: 'Test',
+          ccVersion: '1.0.0',
+          variables: [],
+          content: "It's working", // contains single quote
+          contentLineOffset: 0,
+        },
+        regex: "It's working",
+        getInterpolatedContent: () => "It's working",
+        pieces: ["It's working"],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      vi.mocked(promptSync.loadSystemPromptsWithRegex).mockResolvedValue([
+        mockPromptData,
+      ]);
+      vi.mocked(systemPromptHashIndex.setAppliedHash).mockResolvedValue();
+
+      // cli.js with single-quoted string
+      const cliContent = "msg:'It's working'";
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      // Should escape single quotes
+      expect(result.newContent).toBe("msg:'It\\'s working'");
+    });
   });
 });
