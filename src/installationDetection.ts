@@ -501,26 +501,29 @@ export async function findClaudeCodeInstallation(
 
     const resolved = await resolvePathToInstallationType(pathClaudeExe);
     if (!resolved) {
-      throw new InstallationDetectionError(
-        `Unable to detect installation type from 'claude' on PATH (${pathClaudeExe}).\n` +
-          `Expected a Claude Code cli.js file or native binary.`
+      debug(
+        `Unable to detect installation type from 'claude' on PATH (${pathClaudeExe}). ` +
+          `Falling back to hardcoded search paths.`
+      );
+    } else {
+      const version = await extractVersion(
+        resolved.resolvedPath,
+        resolved.kind
+      );
+      if (isDebug() && resolved.kind === 'npm-based') {
+        debug(`SHA256 hash: ${await hashFileInChunks(resolved.resolvedPath)}`);
+      }
+
+      debug(
+        `Using Claude Code from PATH: ${resolved.resolvedPath} (${resolved.kind}, v${version})`
+      );
+      return toInstallationInfo(
+        resolved.resolvedPath,
+        resolved.kind,
+        version,
+        'path'
       );
     }
-
-    const version = await extractVersion(resolved.resolvedPath, resolved.kind);
-    if (isDebug() && resolved.kind === 'npm-based') {
-      debug(`SHA256 hash: ${await hashFileInChunks(resolved.resolvedPath)}`);
-    }
-
-    debug(
-      `Using Claude Code from PATH: ${resolved.resolvedPath} (${resolved.kind}, v${version})`
-    );
-    return toInstallationInfo(
-      resolved.resolvedPath,
-      resolved.kind,
-      version,
-      'path'
-    );
   }
 
   // 4. Fall back to hardcoded search paths
