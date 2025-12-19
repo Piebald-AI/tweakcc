@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v3.2.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.2.1) - 2025-12-19
+
 - Remove the patch to hide the thinking banner - the banner itself was removed in CC 2.0.70 (#298) - @basekevin
 - Fallback instead of error when claude is in PATH but not cli.js/binary (#307) - @bl-ue
 

@@ -96,9 +96,9 @@ export const MainView = ({
     {configMigrated && (
       <Box>
         <Text color="blue" bold>
-          Note that in tweakcc v3.2.0, `ccInstallationDir` config is deprecated.
-          You are now migrated to `ccInstallationPath` which supports npm and
-          native installs.
+          Note that in tweakcc v3.2.0+, `ccInstallationDir` config is
+          deprecated. You are now migrated to `ccInstallationPath` which
+          supports npm and native installs.
         </Text>
       </Box>
     )}
