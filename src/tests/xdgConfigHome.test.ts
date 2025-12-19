@@ -102,7 +102,7 @@ describe('XDG_CONFIG_HOME support with migration', () => {
     const result = getConfigDir(false); // legacy dir doesn't exist
 
     // Should be "tweakcc", not ".tweakcc"
-    expect(result).toBe('/test/config/tweakcc');
+    expect(result).toBe(path.join('/test/config', 'tweakcc'));
     expect(result).not.toContain('.tweakcc');
   });
 
@@ -113,7 +113,9 @@ describe('XDG_CONFIG_HOME support with migration', () => {
     const configDir = getConfigDir(false); // legacy dir doesn't exist
     const configFile = path.join(configDir, 'config.json');
 
-    expect(configFile).toBe('/test/config/tweakcc/config.json');
+    expect(configFile).toBe(
+      path.join('/test/config', 'tweakcc', 'config.json')
+    );
   });
 
   it('should construct correct CLIJS_BACKUP_FILE path with XDG', () => {
@@ -122,7 +124,9 @@ describe('XDG_CONFIG_HOME support with migration', () => {
     const configDir = getConfigDir(false); // legacy dir doesn't exist
     const backupFile = path.join(configDir, 'cli.js.backup');
 
-    expect(backupFile).toBe('/test/config/tweakcc/cli.js.backup');
+    expect(backupFile).toBe(
+      path.join('/test/config', 'tweakcc', 'cli.js.backup')
+    );
   });
 
   it('should construct correct SYSTEM_PROMPTS_DIR path with XDG', () => {
@@ -131,6 +135,8 @@ describe('XDG_CONFIG_HOME support with migration', () => {
     const configDir = getConfigDir(false); // legacy dir doesn't exist
     const systemPromptsDir = path.join(configDir, 'system-prompts');
 
-    expect(systemPromptsDir).toBe('/test/config/tweakcc/system-prompts');
+    expect(systemPromptsDir).toBe(
+      path.join('/test/config', 'tweakcc', 'system-prompts')
+    );
   });
 });

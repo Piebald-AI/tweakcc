@@ -134,7 +134,7 @@ describe('TWEAKCC_CONFIG_DIR and ~/.claude/tweakcc support', () => {
 
       // Test xdg wins when legacy and claude don't exist
       result = testGetConfigDir(undefined, false, false, '/xdg');
-      expect(result).toBe('/xdg/tweakcc');
+      expect(result).toBe(path.join('/xdg', 'tweakcc'));
 
       // Test default fallback
       result = testGetConfigDir(undefined, false, false, undefined);
