@@ -910,6 +910,115 @@ describe('config.ts', () => {
       expect(result!.version).toBe('2.0.12');
     });
 
+    it('should fall back to hardcoded paths when PATH claude cannot be detected (e.g., .cmd shim)', async () => {
+      const mockConfig = {
+        ccInstallationPath: null,
+        changesApplied: false,
+        ccVersion: '',
+        lastModified: '',
+        settings: DEFAULT_SETTINGS,
+      };
+
+      const mockCmdPath =
+        'C:\\Users\\test\\AppData\\Local\\Volta\\tools\\image\\node\\22.19.0\\claude.CMD';
+      const mockCliPath = path.join(CLIJS_SEARCH_PATHS[0], 'cli.js');
+      const mockCliContent =
+        'some code VERSION:"1.2.3" more code VERSION:"1.2.3" and VERSION:"1.2.3"';
+
+      // Make PATH lookup succeed with a .cmd file
+      vi.mocked(whichMock).mockResolvedValue(mockCmdPath);
+
+      // Mock realpath to return the .cmd file itself (not a symlink)
+      vi.spyOn(fs, 'realpath').mockImplementation(async p => p.toString());
+
+      // Mock fs.open for WASMagic detection - return batch script content
+      vi.spyOn(fs, 'open').mockResolvedValue({
+        read: async ({ buffer }: { buffer: Buffer }) => {
+          // Batch script content - starts with @echo off or similar
+          const contentBuffer = Buffer.from(
+            '@echo off\r\nnode "%~dp0\\..\\cli.js" %*'
+          );
+          contentBuffer.copy(buffer);
+          return { bytesRead: contentBuffer.length, buffer };
+        },
+        close: async () => {},
+      } as unknown as fs.FileHandle);
+
+      // WASMagic reports text/plain for .cmd files (not JavaScript, not binary)
+      mockMagicInstance.detect.mockReturnValue('text/plain');
+
+      // Mock fs.stat - .cmd exists, and cli.js in search paths exists
+      vi.spyOn(fs, 'stat').mockImplementation(async p => {
+        if (p === mockCmdPath || p === mockCliPath) {
+          return {} as Stats;
+        }
+        throw createEnoent();
+      });
+
+      vi.spyOn(fs, 'readFile').mockImplementation(async (p, encoding) => {
+        if (p === mockCliPath && encoding === 'utf8') {
+          return mockCliContent;
+        }
+        throw new Error('File not found');
+      });
+
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
+
+      // Should fall back to hardcoded search paths, NOT throw an error
+      expect(result).toEqual({
+        cliPath: mockCliPath,
+        source: 'search-paths',
+        version: '1.2.3',
+      });
+    });
+
+    it('should return null when PATH claude cannot be detected and no hardcoded paths exist', async () => {
+      const mockConfig = {
+        ccInstallationPath: null,
+        changesApplied: false,
+        ccVersion: '',
+        lastModified: '',
+        settings: DEFAULT_SETTINGS,
+      };
+
+      const mockCmdPath =
+        'C:\\Users\\test\\AppData\\Local\\Volta\\tools\\image\\node\\22.19.0\\claude.CMD';
+
+      // Make PATH lookup succeed with a .cmd file
+      vi.mocked(whichMock).mockResolvedValue(mockCmdPath);
+
+      // Mock realpath to return the .cmd file itself
+      vi.spyOn(fs, 'realpath').mockImplementation(async p => p.toString());
+
+      // Mock fs.open for WASMagic detection
+      vi.spyOn(fs, 'open').mockResolvedValue({
+        read: async ({ buffer }: { buffer: Buffer }) => {
+          const contentBuffer = Buffer.from(
+            '@echo off\r\nnode "%~dp0\\..\\cli.js" %*'
+          );
+          contentBuffer.copy(buffer);
+          return { bytesRead: contentBuffer.length, buffer };
+        },
+        close: async () => {},
+      } as unknown as fs.FileHandle);
+
+      // WASMagic reports text/plain for .cmd files
+      mockMagicInstance.detect.mockReturnValue('text/plain');
+
+      // No files exist (neither .cmd resolves nor hardcoded paths)
+      vi.spyOn(fs, 'stat').mockRejectedValue(createEnoent());
+      vi.spyOn(fs, 'readFile').mockRejectedValue(new Error('File not found'));
+
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
+
+      // Should return null (no installation found), NOT throw
+      expect(result).toBe(null);
+    });
+
     it('should use which package on Windows platforms', async () => {
       const mockConfig = {
         ccInstallationPath: null,
