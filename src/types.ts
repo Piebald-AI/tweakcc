@@ -112,6 +112,7 @@ export interface MiscConfig {
   hideStartupBanner: boolean;
   hideCtrlGToEditPrompt: boolean;
   hideStartupClawd: boolean;
+  increaseFileReadLimit: boolean;
 }
 
 export interface Toolset {

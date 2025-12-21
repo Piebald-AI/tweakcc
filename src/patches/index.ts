@@ -54,6 +54,7 @@ import { writeConversationTitle } from './conversationTitle.js';
 import { writeHideStartupBanner } from './hideStartupBanner.js';
 import { writeHideCtrlGToEditPrompt } from './hideCtrlGToEditPrompt.js';
 import { writeHideStartupClawd } from './hideStartupClawd.js';
+import { writeIncreaseFileReadLimit } from './increaseFileReadLimit.js';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -644,6 +645,11 @@ export const applyCustomization = async (
   // Apply hide startup clawd patch (if enabled)
   if (config.settings.misc?.hideStartupClawd) {
     if ((result = writeHideStartupClawd(content))) content = result;
+  }
+
+  // Apply increase file read limit patch (if enabled)
+  if (config.settings.misc?.increaseFileReadLimit) {
+    if ((result = writeIncreaseFileReadLimit(content))) content = result;
   }
 
   // Write the modified content back

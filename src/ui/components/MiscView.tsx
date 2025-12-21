@@ -30,6 +30,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     hideStartupBanner: false,
     hideCtrlGToEditPrompt: false,
     hideStartupClawd: false,
+    increaseFileReadLimit: false,
   };
 
   const ensureMisc = () => {
@@ -148,6 +149,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
           updateSettings(settings => {
             ensureMisc();
             settings.misc!.hideStartupClawd = !settings.misc!.hideStartupClawd;
+          });
+        },
+      },
+      {
+        id: 'increaseFileReadLimit',
+        title: 'Increase file read token limit',
+        description:
+          'Increases the maximum file read limit from 25,000 to 1,000,000 tokens.',
+        getValue: () => settings.misc?.increaseFileReadLimit ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.increaseFileReadLimit =
+              !settings.misc!.increaseFileReadLimit;
           });
         },
       },

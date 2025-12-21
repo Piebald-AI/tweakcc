@@ -752,6 +752,7 @@ export const DEFAULT_SETTINGS: Settings = {
     hideStartupBanner: false,
     hideCtrlGToEditPrompt: false,
     hideStartupClawd: false,
+    increaseFileReadLimit: false,
   },
   toolsets: [],
   defaultToolset: null,
