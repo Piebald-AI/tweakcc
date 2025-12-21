@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Add an option to increase tokens that can be read in a single file (#314) - @mike1858
+
 ## [v3.2.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.2.1) - 2025-12-19
 
 - Remove the patch to hide the thinking banner - the banner itself was removed in CC 2.0.70 (#298) - @basekevin
