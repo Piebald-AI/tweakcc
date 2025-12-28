@@ -12,10 +12,10 @@ const getThinkerFormatLocation = (oldFile: string): LocationResult | null => {
     return null;
   }
 
-  // Search within a range of 600 characters
+  // Search within a range of 1000 characters to support CC 2.0.76+
   const searchSection = oldFile.slice(
     approxAreaMatch.index,
-    approxAreaMatch.index + 600
+    approxAreaMatch.index + 1000
   );
 
   // New nullish format: N=(Y??C?.activeForm??L)+"…"
