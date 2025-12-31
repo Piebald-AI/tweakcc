@@ -7,7 +7,12 @@ import {
   updateConfigFile,
 } from '../config.js';
 import { ClaudeCodeInstallationInfo, TweakccConfig } from '../types.js';
-import { isDebug, debug, replaceFileBreakingHardLinks } from '../utils.js';
+import {
+  isVerbose,
+  verbose,
+  debug,
+  replaceFileBreakingHardLinks,
+} from '../utils.js';
 import {
   extractClaudeJsFromNativeInstallation,
   repackNativeInstallation,
@@ -78,7 +83,7 @@ export interface PatchApplied {
   items: string[];
 }
 
-// Debug function for showing diffs (currently disabled)
+// Debug function for showing diffs (requires --verbose flag)
 export const showDiff = (
   oldFileContents: string,
   newFileContents: string,
@@ -86,7 +91,7 @@ export const showDiff = (
   startIndex: number,
   endIndex: number
 ): void => {
-  if (!isDebug()) {
+  if (!isVerbose()) {
     return;
   }
 
@@ -112,10 +117,10 @@ export const showDiff = (
   );
 
   if (oldChanged !== newChanged) {
-    console.log('\n--- Diff ---');
-    console.log('OLD:', oldBefore + `\x1b[31m${oldChanged}\x1b[0m` + oldAfter);
-    console.log('NEW:', newBefore + `\x1b[32m${newChanged}\x1b[0m` + newAfter);
-    console.log('--- End Diff ---\n');
+    verbose('\n--- Diff ---');
+    verbose('OLD:', oldBefore + `\x1b[31m${oldChanged}\x1b[0m` + oldAfter);
+    verbose('NEW:', newBefore + `\x1b[32m${newChanged}\x1b[0m` + newAfter);
+    verbose('--- End Diff ---\n');
   }
 };
 

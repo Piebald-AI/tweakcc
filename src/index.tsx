@@ -5,7 +5,7 @@ import chalk from 'chalk';
 
 import App from './ui/App.js';
 import { CONFIG_FILE, readConfigFile } from './config.js';
-import { enableDebug } from './utils.js';
+import { enableDebug, enableVerbose } from './utils.js';
 import { applyCustomization } from './patches/index.js';
 import { preloadStringsFile } from './systemPromptSync.js';
 import { migrateConfigIfNeeded } from './migration.js';
@@ -27,11 +27,14 @@ const main = async () => {
     )
     .version('3.2.2')
     .option('-d, --debug', 'enable debug mode')
+    .option('-v, --verbose', 'enable verbose debug mode (includes diffs)')
     .option('-a, --apply', 'apply saved customizations without interactive UI');
   program.parse();
   const options = program.opts();
 
-  if (options.debug) {
+  if (options.verbose) {
+    enableVerbose();
+  } else if (options.debug) {
     enableDebug();
   }
 

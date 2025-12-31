@@ -8,15 +8,30 @@ import { Theme } from './types.js';
 import { CUSTOM_MODELS } from './patches/modelSelector.js';
 
 let isDebugModeOn = false;
+let isVerboseModeOn = false;
+
 export const isDebug = (): boolean => {
   return isDebugModeOn;
+};
+export const isVerbose = (): boolean => {
+  return isVerboseModeOn;
 };
 export const enableDebug = (): void => {
   isDebugModeOn = true;
 };
+export const enableVerbose = (): void => {
+  isVerboseModeOn = true;
+  isDebugModeOn = true; // Verbose implies debug
+};
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const debug = (message: string, ...optionalParams: any[]) => {
   if (isDebug()) {
+    console.log(message, ...optionalParams);
+  }
+};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const verbose = (message: string, ...optionalParams: any[]) => {
+  if (isVerbose()) {
     console.log(message, ...optionalParams);
   }
 };

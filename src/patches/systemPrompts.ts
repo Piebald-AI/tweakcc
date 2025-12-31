@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { debug } from '../utils.js';
+import { debug, verbose } from '../utils.js';
 import { showDiff, PatchApplied } from './index.js';
 import {
   loadSystemPromptsWithRegex,
@@ -134,28 +134,30 @@ export const applySystemPrompts = async (
       totalNewChars += newLength;
 
       if (originalLength !== newLength) {
-        debug(`\n  Character count difference for ${prompt.name}:`);
-        debug(`    Original baseline: ${originalLength} chars`);
-        debug(`    User's version: ${newLength} chars`);
-        debug(`    Difference: ${originalLength - newLength} chars`);
+        verbose(`\n  Character count difference for ${prompt.name}:`);
+        verbose(`    Original baseline: ${originalLength} chars`);
+        verbose(`    User's version: ${newLength} chars`);
+        verbose(`    Difference: ${originalLength - newLength} chars`);
         if (Math.abs(originalLength - newLength) < 200) {
-          debug(`\n    Original baseline content:\n${originalBaselineContent}`);
-          debug(`\n    User's content:\n${prompt.content}`);
+          verbose(
+            `\n    Original baseline content:\n${originalBaselineContent}`
+          );
+          verbose(`\n    User's content:\n${prompt.content}`);
         }
       }
 
-      debug(`\nFound match for prompt: ${prompt.name}`);
-      debug(
+      verbose(`\nFound match for prompt: ${prompt.name}`);
+      verbose(
         `  Match location: index ${match.index}, length ${match[0].length}`
       );
-      debug(
+      verbose(
         `  Original content (first 100 chars): ${match[0].substring(0, 100)}...`
       );
-      debug(
+      verbose(
         `  Replacement content (first 100 chars): ${interpolatedContent.substring(0, 100)}...`
       );
-      debug(`  Captured variables: ${match.slice(1).join(', ')}`);
-      debug(`  Content identical: ${match[0] === interpolatedContent}`);
+      verbose(`  Captured variables: ${match.slice(1).join(', ')}`);
+      verbose(`  Content identical: ${match[0] === interpolatedContent}`);
 
       const oldContent = content;
       const matchLength = match[0].length;
@@ -196,18 +198,18 @@ export const applySystemPrompts = async (
         )
       );
 
-      debug(`\n  Debug info for ${prompt.name}:`);
-      debug(
+      verbose(`\n  Debug info for ${prompt.name}:`);
+      verbose(
         `  Regex pattern (first 200 chars): ${regex.substring(0, 200).replace(/\n/g, '\\n')}...`
       );
-      debug(`  Trying to match pattern in cli.js...`);
+      verbose(`  Trying to match pattern in cli.js...`);
       try {
         const testMatch = content.match(new RegExp(regex.substring(0, 100)));
-        debug(
+        verbose(
           `  Partial match result: ${testMatch ? 'found partial' : 'no match'}`
         );
       } catch {
-        debug(`  Partial match failed (regex truncation issue)`);
+        verbose(`  Partial match failed (regex truncation issue)`);
       }
     }
   }
