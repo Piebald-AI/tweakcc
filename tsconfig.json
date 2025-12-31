@@ -9,13 +9,12 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "declaration": true,
-    "declarationMap": true,
     "sourceMap": true,
     "resolveJsonModule": true,
     "jsx": "react-jsx",
     "moduleResolution": "node16",
     "baseUrl": ".",
+    "noEmit": true,
     "paths": {
       "@/*": ["src/*"]
     }

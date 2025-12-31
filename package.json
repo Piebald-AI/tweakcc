@@ -8,7 +8,7 @@
     "tweakcc": "./dist/index.mjs"
   },
   "scripts": {
-    "build": "tsc -b && tsdown --minify src/index.tsx",
+    "build": "tsc --noEmit && tsdown --minify src/index.tsx",
     "build:dev": "tsdown src/index.tsx",
     "watch": "tsdown --watch src/index.tsx",
     "start": "node dist/index.mjs",
