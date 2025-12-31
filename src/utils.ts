@@ -24,13 +24,13 @@ export const enableVerbose = (): void => {
   isDebugModeOn = true; // Verbose implies debug
 };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const debug = (message: string, ...optionalParams: any[]) => {
+export const debug = (message: any, ...optionalParams: any[]) => {
   if (isDebug()) {
     console.log(message, ...optionalParams);
   }
 };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const verbose = (message: string, ...optionalParams: any[]) => {
+export const verbose = (message: any, ...optionalParams: any[]) => {
   if (isVerbose()) {
     console.log(message, ...optionalParams);
   }

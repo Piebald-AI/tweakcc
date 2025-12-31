@@ -11,6 +11,8 @@ import type {
   repackNativeInstallation as RepackFn,
 } from './nativeInstallation.js';
 
+import { debug } from './utils.js';
+
 interface NativeInstallationModule {
   extractClaudeJsFromNativeInstallation: typeof ExtractFn;
   repackNativeInstallation: typeof RepackFn;
@@ -33,7 +35,13 @@ async function tryLoadNativeInstallationModule(): Promise<NativeInstallationModu
     // If it is, dynamically import the module that uses it
     cachedModule = await import('./nativeInstallation.js');
     return cachedModule;
-  } catch {
+  } catch (err) {
+    debug(
+      `Error loading native installation module: ${err instanceof Error ? err.message : String(err)}`
+    );
+    if (err instanceof Error) {
+      debug(err);
+    }
     // node-lief not available
     return null;
   }
