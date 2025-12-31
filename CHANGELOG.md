@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Add `--verbose` flag (#320) - @signadou
+
 ## [v3.2.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.2.2) - 2025-12-21
 
 - Add an option to increase tokens that can be read in a single file (#314) - @mike1858
