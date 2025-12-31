@@ -3,17 +3,18 @@
   "version": "3.2.2",
   "type": "module",
   "description": "Command-line tool to customize your Claude Code theme colors, thinking verbs and more.",
-  "main": "dist/index.js",
+  "main": "dist/index.mjs",
   "bin": {
-    "tweakcc": "./dist/index.js"
+    "tweakcc": "./dist/index.mjs"
   },
   "scripts": {
-    "build": "tsc -b && vite build",
-    "build:dev": "vite build --mode development",
-    "watch": "vite build --watch --mode development",
-    "start": "node dist/index.js",
+    "build": "tsc -b && tsdown --minify src/index.tsx",
+    "build:dev": "tsdown src/index.tsx",
+    "watch": "tsdown --watch src/index.tsx",
+    "start": "node dist/index.mjs",
     "lint": "tsc --noEmit && eslint src",
-    "test": "vitest",
+    "test": "vitest run",
+    "test:dev": "vitest",
     "format": "prettier --write src",
     "prepare": "husky"
   },
@@ -47,7 +48,6 @@
     "@types/node": "^20.19.10",
     "@types/react": "^18.3.23",
     "@types/which": "^3.0.4",
-    "@vitejs/plugin-react-oxc": "^0.3.0",
     "eslint": "^9.33.0",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^16.3.0",
@@ -55,10 +55,10 @@
     "lint-staged": "^16.2.7",
     "prettier": "^3.6.2",
     "rollup-plugin-node-externals": "^8.0.1",
+    "tsdown": "^0.18.4",
     "tsx": "^4.20.3",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.39.0",
-    "vite": "npm:rolldown-vite@^7.1.0",
     "vitest": "^3.2.4"
   },
   "lint-staged": {
@@ -80,5 +80,8 @@
     "react": "^19.1.1",
     "wasmagic": "^1.0.7",
     "which": "^6.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }
