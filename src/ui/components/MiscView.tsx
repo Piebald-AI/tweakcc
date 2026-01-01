@@ -172,7 +172,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         title: 'Suppress line numbers in file reads/edits',
         description:
           'Removes line number prefixes from file content to reduce token usage.',
-        getValue: () => settings.misc?.suppressLineNumbers ?? false,
+        getValue: () => settings.misc?.suppressLineNumbers ?? true,
         toggle: () => {
           updateSettings(settings => {
             ensureMisc();
