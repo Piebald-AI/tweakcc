@@ -60,6 +60,7 @@ import { writeHideStartupBanner } from './hideStartupBanner.js';
 import { writeHideCtrlGToEditPrompt } from './hideCtrlGToEditPrompt.js';
 import { writeHideStartupClawd } from './hideStartupClawd.js';
 import { writeIncreaseFileReadLimit } from './increaseFileReadLimit.js';
+import { writeSuppressLineNumbers } from './suppressLineNumbers.js';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -655,6 +656,11 @@ export const applyCustomization = async (
   // Apply increase file read limit patch (if enabled)
   if (config.settings.misc?.increaseFileReadLimit) {
     if ((result = writeIncreaseFileReadLimit(content))) content = result;
+  }
+
+  // Apply suppress line number patch (if enabled)
+  if (config.settings.misc?.suppressLineNumbers) {
+    if ((result = writeSuppressLineNumbers(content))) content = result;
   }
 
   // Write the modified content back

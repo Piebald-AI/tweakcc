@@ -113,6 +113,7 @@ export interface MiscConfig {
   hideCtrlGToEditPrompt: boolean;
   hideStartupClawd: boolean;
   increaseFileReadLimit: boolean;
+  suppressLineNumbers: boolean;
 }
 
 export interface Toolset {

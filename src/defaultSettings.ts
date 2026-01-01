@@ -753,6 +753,7 @@ export const DEFAULT_SETTINGS: Settings = {
     hideCtrlGToEditPrompt: false,
     hideStartupClawd: false,
     increaseFileReadLimit: false,
+    suppressLineNumbers: true,
   },
   toolsets: [],
   defaultToolset: null,
