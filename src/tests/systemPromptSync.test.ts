@@ -4,7 +4,7 @@ import * as promptSync from '../systemPromptSync';
 import type { StringsPrompt, StringsFile } from '../systemPromptSync';
 
 vi.mock('node:fs/promises');
-vi.mock('../systemPromptDownload.js');
+vi.mock('../systemPromptDownload');
 
 const createEnoent = () => {
   const error: NodeJS.ErrnoException = new Error(
