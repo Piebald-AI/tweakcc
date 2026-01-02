@@ -1,4 +1,4 @@
-// Please see the note about writing patches in ./index.js.
+// Please see the note about writing patches in ./index.
 
 import { Theme } from '../types';
 import { LocationResult, showDiff } from './index';

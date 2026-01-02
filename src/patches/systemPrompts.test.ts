@@ -3,16 +3,16 @@ import { applySystemPrompts } from './systemPrompts';
 import * as promptSync from '../systemPromptSync';
 import * as systemPromptHashIndex from '../systemPromptHashIndex';
 
-vi.mock('../systemPromptSync.js', async () => {
-  const actual = await vi.importActual('../systemPromptSync.js');
+vi.mock('../systemPromptSync', async () => {
+  const actual = await vi.importActual('../systemPromptSync');
   return {
     ...actual,
     loadSystemPromptsWithRegex: vi.fn(),
   };
 });
 
-vi.mock('../systemPromptHashIndex.js', async () => {
-  const actual = await vi.importActual('../systemPromptHashIndex.js');
+vi.mock('../systemPromptHashIndex', async () => {
+  const actual = await vi.importActual('../systemPromptHashIndex');
   return {
     ...actual,
     setAppliedHash: vi.fn(),

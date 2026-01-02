@@ -695,10 +695,8 @@ Greet user as \${SETTINGS.preferredName}!`;
         ],
       };
 
-      const { downloadStringsFile } = await import(
-        '../systemPromptDownload.js'
-      );
-      const hashIndexModule = await import('../systemPromptHashIndex.js');
+      const { downloadStringsFile } = await import('../systemPromptDownload');
+      const hashIndexModule = await import('../systemPromptHashIndex');
 
       vi.mocked(downloadStringsFile).mockResolvedValue(
         mockOldStringsFile as StringsFile
@@ -769,10 +767,8 @@ Greet user as \${SETTINGS.preferredName}!`;
         ],
       };
 
-      const { downloadStringsFile } = await import(
-        '../systemPromptDownload.js'
-      );
-      const hashIndexModule = await import('../systemPromptHashIndex.js');
+      const { downloadStringsFile } = await import('../systemPromptDownload');
+      const hashIndexModule = await import('../systemPromptHashIndex');
 
       vi.mocked(downloadStringsFile).mockResolvedValue(
         mockStringsFile as StringsFile
@@ -807,9 +803,7 @@ Greet user as \${SETTINGS.preferredName}!`;
         ],
       };
 
-      const { downloadStringsFile } = await import(
-        '../systemPromptDownload.js'
-      );
+      const { downloadStringsFile } = await import('../systemPromptDownload');
       vi.mocked(downloadStringsFile).mockResolvedValue(
         mockStringsFile as StringsFile
       );
@@ -828,9 +822,7 @@ Greet user as \${SETTINGS.preferredName}!`;
     });
 
     it('should throw error if download fails', async () => {
-      const { downloadStringsFile } = await import(
-        '../systemPromptDownload.js'
-      );
+      const { downloadStringsFile } = await import('../systemPromptDownload');
       vi.mocked(downloadStringsFile).mockRejectedValue(
         new Error('Download failed')
       );
@@ -920,9 +912,7 @@ Greet user as \${SETTINGS.preferredName}!`;
       };
 
       // Mock the download function to return our test data
-      const { downloadStringsFile } = await import(
-        '../systemPromptDownload.js'
-      );
+      const { downloadStringsFile } = await import('../systemPromptDownload');
       vi.mocked(downloadStringsFile).mockResolvedValue(mockStringsFile);
 
       // Preload the strings file using the public API
@@ -971,9 +961,7 @@ Usage: \${MAX_TIMEOUT()} ms`;
       };
 
       // Mock the download function to return our test data
-      const { downloadStringsFile } = await import(
-        '../systemPromptDownload.js'
-      );
+      const { downloadStringsFile } = await import('../systemPromptDownload');
       vi.mocked(downloadStringsFile).mockResolvedValue(mockStringsFile);
 
       // Preload the strings file using the public API
@@ -1035,9 +1023,7 @@ Version: <<CCVERSION>>, BUILD_TIME:"<<BUILD_TIME>>"`;
         ],
       };
 
-      const { downloadStringsFile } = await import(
-        '../systemPromptDownload.js'
-      );
+      const { downloadStringsFile } = await import('../systemPromptDownload');
       vi.mocked(downloadStringsFile).mockResolvedValue(mockStringsFile);
 
       await promptSync.preloadStringsFile('1.0.0');

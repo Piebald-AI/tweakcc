@@ -44,9 +44,7 @@ describe('getClijsSearchPathsWithInfo - glob error handling', () => {
       );
 
       // Import after mocks are set up to ensure module is loaded with mocks
-      const { CLIJS_SEARCH_PATH_INFO } = await import(
-        '../installationPaths.js'
-      );
+      const { CLIJS_SEARCH_PATH_INFO } = await import('../installationPaths');
 
       // Find the /usr/local/n/versions/node pattern in search paths
       const problematicPath = CLIJS_SEARCH_PATH_INFO.find(
@@ -78,9 +76,7 @@ describe('getClijsSearchPathsWithInfo - glob error handling', () => {
       );
 
       // Import after mocks are set up
-      const { CLIJS_SEARCH_PATH_INFO } = await import(
-        '../installationPaths.js'
-      );
+      const { CLIJS_SEARCH_PATH_INFO } = await import('../installationPaths');
 
       // Find the /usr/local/nvm pattern in search paths
       const problematicPath = CLIJS_SEARCH_PATH_INFO.find(
@@ -112,9 +108,7 @@ describe('getClijsSearchPathsWithInfo - glob error handling', () => {
       );
 
       // Import after mocks are set up
-      const { CLIJS_SEARCH_PATH_INFO } = await import(
-        '../installationPaths.js'
-      );
+      const { CLIJS_SEARCH_PATH_INFO } = await import('../installationPaths');
 
       // Find the ~/.nvm pattern in search paths
       const problematicPath = CLIJS_SEARCH_PATH_INFO.find(
@@ -157,9 +151,7 @@ describe('getClijsSearchPathsWithInfo - glob error handling', () => {
       );
 
       // Import after mocks are set up
-      const { CLIJS_SEARCH_PATH_INFO } = await import(
-        '../installationPaths.js'
-      );
+      const { CLIJS_SEARCH_PATH_INFO } = await import('../installationPaths');
 
       // Should have multiple search paths, including ones after the failed one
       expect(CLIJS_SEARCH_PATH_INFO.length).toBeGreaterThan(10);
@@ -191,9 +183,7 @@ describe('getClijsSearchPathsWithInfo - glob error handling', () => {
       );
 
       // Import after mocks are set up to ensure module is loaded with mocks
-      const { CLIJS_SEARCH_PATH_INFO } = await import(
-        '../installationPaths.js'
-      );
+      const { CLIJS_SEARCH_PATH_INFO } = await import('../installationPaths');
 
       // Find the AppData/Roaming/nvm pattern in search paths (converted to backslashes)
       const problematicPath = CLIJS_SEARCH_PATH_INFO.find(
@@ -225,9 +215,7 @@ describe('getClijsSearchPathsWithInfo - glob error handling', () => {
       );
 
       // Import after mocks are set up
-      const { CLIJS_SEARCH_PATH_INFO } = await import(
-        '../installationPaths.js'
-      );
+      const { CLIJS_SEARCH_PATH_INFO } = await import('../installationPaths');
 
       // Find the pnpm pattern in search paths (converted to backslashes)
       const problematicPath = CLIJS_SEARCH_PATH_INFO.find(
@@ -261,9 +249,7 @@ describe('getClijsSearchPathsWithInfo - glob error handling', () => {
       );
 
       // Import after mocks are set up
-      const { CLIJS_SEARCH_PATH_INFO } = await import(
-        '../installationPaths.js'
-      );
+      const { CLIJS_SEARCH_PATH_INFO } = await import('../installationPaths');
 
       // Find the fnm pattern in search paths (converted to backslashes)
       const problematicPath = CLIJS_SEARCH_PATH_INFO.find(
@@ -310,9 +296,7 @@ describe('getClijsSearchPathsWithInfo - glob error handling', () => {
       );
 
       // Import after mocks are set up
-      const { CLIJS_SEARCH_PATH_INFO } = await import(
-        '../installationPaths.js'
-      );
+      const { CLIJS_SEARCH_PATH_INFO } = await import('../installationPaths');
 
       // Should have multiple search paths, including ones after the failed one
       expect(CLIJS_SEARCH_PATH_INFO.length).toBeGreaterThan(10);
@@ -332,7 +316,7 @@ describe('getClijsSearchPathsWithInfo - glob error handling', () => {
     });
 
     // Import after mocks are set up
-    const { CLIJS_SEARCH_PATH_INFO } = await import('../installationPaths.js');
+    const { CLIJS_SEARCH_PATH_INFO } = await import('../installationPaths');
 
     // Find a glob pattern (should have expanded paths)
     const globPattern = CLIJS_SEARCH_PATH_INFO.find(info => info.isGlob);

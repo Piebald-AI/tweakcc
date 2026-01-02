@@ -29,7 +29,7 @@ vi.mock('node:fs/promises');
 vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
 }));
-vi.mock('../nativeInstallationLoader.js', () => ({
+vi.mock('../nativeInstallationLoader', () => ({
   extractClaudeJsFromNativeInstallation: vi.fn(),
   repackNativeInstallation: vi.fn(),
 }));
