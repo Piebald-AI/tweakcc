@@ -1,6 +1,6 @@
 // Please see the note about writing patches in ./index.js.
 
-import { showDiff } from './index.js';
+import { showDiff } from './index';
 
 /**
  * Find all Clawd component function body start indices.

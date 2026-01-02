@@ -6,15 +6,15 @@ import path from 'node:path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { WASMagic } from 'wasmagic';
 
-import { ClaudeCodeInstallationInfo } from '../types.js';
-import * as misc from '../utils.js';
-import * as systemPromptHashIndex from '../systemPromptHashIndex.js';
-import * as nativeInstallation from '../nativeInstallationLoader.js';
-import { DEFAULT_SETTINGS } from '../defaultSettings.js';
-import { CLIJS_SEARCH_PATHS } from '../installationPaths.js';
-import { restoreClijsFromBackup } from '../installationBackup.js';
-import { startupCheck } from '../startup.js';
-import { findClaudeCodeInstallation } from '../installationDetection.js';
+import { ClaudeCodeInstallationInfo } from '../types';
+import * as misc from '../utils';
+import * as systemPromptHashIndex from '../systemPromptHashIndex';
+import * as nativeInstallation from '../nativeInstallationLoader';
+import { DEFAULT_SETTINGS } from '../defaultSettings';
+import { CLIJS_SEARCH_PATHS } from '../installationPaths';
+import { restoreClijsFromBackup } from '../installationBackup';
+import { startupCheck } from '../startup';
+import { findClaudeCodeInstallation } from '../installationDetection';
 import {
   CONFIG_DIR,
   CONFIG_FILE,
@@ -22,7 +22,7 @@ import {
   readConfigFile,
   updateConfigFile,
   warnAboutMultipleConfigs,
-} from '../config.js';
+} from '../config';
 
 vi.mock('wasmagic');
 vi.mock('node:fs/promises');
@@ -61,7 +61,7 @@ import {
   createEperm,
   createSymlinkStats,
   createRegularStats,
-} from './testHelpers.js';
+} from './testHelpers';
 
 describe('config.ts', () => {
   let originalSearchPathsLength: number;

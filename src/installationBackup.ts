@@ -5,10 +5,10 @@ import {
   ensureConfigDir,
   NATIVE_BINARY_BACKUP_FILE,
   updateConfigFile,
-} from './config.js';
-import { clearAllAppliedHashes } from './systemPromptHashIndex.js';
-import { debug, replaceFileBreakingHardLinks, doesFileExist } from './utils.js';
-import { ClaudeCodeInstallationInfo } from './types.js';
+} from './config';
+import { clearAllAppliedHashes } from './systemPromptHashIndex';
+import { debug, replaceFileBreakingHardLinks, doesFileExist } from './utils';
+import { ClaudeCodeInstallationInfo } from './types';
 
 export const backupClijs = async (ccInstInfo: ClaudeCodeInstallationInfo) => {
   // Only backup cli.js for NPM installs (when cliPath is set)

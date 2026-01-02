@@ -3,20 +3,20 @@ import { render } from 'ink';
 import { Command } from 'commander';
 import chalk from 'chalk';
 
-import App from './ui/App.js';
-import { CONFIG_FILE, readConfigFile } from './config.js';
-import { enableDebug, enableVerbose } from './utils.js';
-import { applyCustomization } from './patches/index.js';
-import { preloadStringsFile } from './systemPromptSync.js';
-import { migrateConfigIfNeeded } from './migration.js';
-import { completeStartupCheck, startupCheck } from './startup.js';
+import App from './ui/App';
+import { CONFIG_FILE, readConfigFile } from './config';
+import { enableDebug, enableVerbose } from './utils';
+import { applyCustomization } from './patches/index';
+import { preloadStringsFile } from './systemPromptSync';
+import { migrateConfigIfNeeded } from './migration';
+import { completeStartupCheck, startupCheck } from './startup';
 import {
   formatNotFoundError,
   InstallationDetectionError,
   selectAndSaveInstallation,
-} from './installationDetection.js';
-import { InstallationPicker } from './ui/components/InstallationPicker.js';
-import { InstallationCandidate, StartupCheckInfo } from './types.js';
+} from './installationDetection';
+import { InstallationPicker } from './ui/components/InstallationPicker';
+import { InstallationCandidate, StartupCheckInfo } from './types';
 
 const main = async () => {
   const program = new Command();

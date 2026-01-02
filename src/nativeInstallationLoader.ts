@@ -9,9 +9,9 @@
 import type {
   extractClaudeJsFromNativeInstallation as ExtractFn,
   repackNativeInstallation as RepackFn,
-} from './nativeInstallation.js';
+} from './nativeInstallation';
 
-import { debug } from './utils.js';
+import { debug } from './utils';
 
 interface NativeInstallationModule {
   extractClaudeJsFromNativeInstallation: typeof ExtractFn;

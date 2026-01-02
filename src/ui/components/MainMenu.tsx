@@ -1,8 +1,8 @@
-import { CONFIG_FILE } from '@/config.js';
-import { MainMenuItem } from '@/types.js';
+import { CONFIG_FILE } from '@/config';
+import { MainMenuItem } from '@/types';
 import { useContext, useState } from 'react';
-import { SettingsContext } from '../App.js';
-import { SelectInput, SelectItem } from './SelectInput.js';
+import { SettingsContext } from '../App';
+import { SelectInput, SelectItem } from './SelectInput';
 
 const baseMenuItems: SelectItem[] = [
   {

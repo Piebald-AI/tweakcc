@@ -1,6 +1,6 @@
 // Please see the note about writing patches in ./index.ts.
 
-import { escapeIdent, LocationResult, showDiff } from './index.js';
+import { escapeIdent, LocationResult, showDiff } from './index';
 
 const getOpenDocumentLocation = (oldFile: string): LocationResult | null => {
   // Step 1: Find `ensureServerStarted:[$\w]+`

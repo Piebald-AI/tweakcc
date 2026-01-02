@@ -1,14 +1,14 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'path';
 import matter from 'gray-matter';
-import { downloadStringsFile } from './systemPromptDownload.js';
+import { downloadStringsFile } from './systemPromptDownload';
 import {
   storeHashes,
   getPromptHash,
   computeMD5Hash,
-} from './systemPromptHashIndex.js';
+} from './systemPromptHashIndex';
 import chalk from 'chalk';
-import { SYSTEM_PROMPTS_DIR } from './config.js';
+import { SYSTEM_PROMPTS_DIR } from './config';
 
 /**
  * Prompt structure from strings-X.Y.Z.json files

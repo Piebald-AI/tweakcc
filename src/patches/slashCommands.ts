@@ -1,6 +1,6 @@
 // Utilities for working with slash commands in Claude Code
 
-import { showDiff } from './index.js';
+import { showDiff } from './index';
 
 /**
  * Find the end position of the slash command array using stack machine

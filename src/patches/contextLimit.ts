@@ -1,6 +1,6 @@
 // Please see the note about writing patches in ./index.js.
 
-import { showDiff } from './index.js';
+import { showDiff } from './index';
 
 const getContextLimitLocation = (oldFile: string): number | null => {
   // Pattern: function funcName(paramName){if(paramName.includes("[1m]"))return 1e6;return 200000}

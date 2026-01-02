@@ -1,7 +1,7 @@
 import { useState, useEffect, Fragment } from 'react';
 import { Box, Text, useInput } from 'ink';
 
-import { isValidColorFormat, normalizeColorToRgb } from '@/utils.js';
+import { isValidColorFormat, normalizeColorToRgb } from '@/utils';
 
 interface ColorPickerProps {
   initialValue: string;

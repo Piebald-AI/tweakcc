@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import Header from './Header.js';
+import Header from './Header';
 
 interface ChangeNameViewProps {
   onBack: () => void;

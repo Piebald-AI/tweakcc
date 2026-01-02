@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { applySystemPrompts } from './systemPrompts.js';
-import * as promptSync from '../systemPromptSync.js';
-import * as systemPromptHashIndex from '../systemPromptHashIndex.js';
+import { applySystemPrompts } from './systemPrompts';
+import * as promptSync from '../systemPromptSync';
+import * as systemPromptHashIndex from '../systemPromptHashIndex';
 
 vi.mock('../systemPromptSync.js', async () => {
   const actual = await vi.importActual('../systemPromptSync.js');

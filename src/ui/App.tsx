@@ -1,31 +1,31 @@
 import { useState, useEffect, createContext, useCallback } from 'react';
 import { Box, useInput } from 'ink';
-import { MainView } from './components/MainView.js';
-import { ThemesView } from './components/ThemesView.js';
-import { ThinkingVerbsView } from './components/ThinkingVerbsView.js';
-import { ThinkingStyleView } from './components/ThinkingStyleView.js';
-import { UserMessageDisplayView } from './components/UserMessageDisplayView.js';
-import { MiscView } from './components/MiscView.js';
-import { ToolsetsView } from './components/ToolsetsView.js';
+import { MainView } from './components/MainView';
+import { ThemesView } from './components/ThemesView';
+import { ThinkingVerbsView } from './components/ThinkingVerbsView';
+import { ThinkingStyleView } from './components/ThinkingStyleView';
+import { UserMessageDisplayView } from './components/UserMessageDisplayView';
+import { MiscView } from './components/MiscView';
+import { ToolsetsView } from './components/ToolsetsView';
 import {
   MainMenuItem,
   Settings,
   StartupCheckInfo,
   TweakccConfig,
-} from '../types.js';
+} from '../types';
 import {
   CONFIG_FILE,
   readConfigFile,
   SYSTEM_PROMPTS_DIR,
   updateConfigFile,
-} from '../config.js';
-import { openInExplorer, revealFileInExplorer } from '../utils.js';
-import { applyCustomization } from '../patches/index.js';
-import { DEFAULT_SETTINGS } from '../defaultSettings.js';
+} from '../config';
+import { openInExplorer, revealFileInExplorer } from '../utils';
+import { applyCustomization } from '../patches/index';
+import { DEFAULT_SETTINGS } from '../defaultSettings';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
-} from '../installationBackup.js';
+} from '../installationBackup';
 
 export const SettingsContext = createContext({
   settings: DEFAULT_SETTINGS,

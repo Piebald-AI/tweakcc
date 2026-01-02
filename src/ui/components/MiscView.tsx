@@ -1,7 +1,7 @@
 import { Box, Text, useInput } from 'ink';
 import { useContext, useState, useMemo } from 'react';
-import { SettingsContext } from '../App.js';
-import Header from './Header.js';
+import { SettingsContext } from '../App';
+import Header from './Header';
 
 interface MiscViewProps {
   onSubmit: () => void;

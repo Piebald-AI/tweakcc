@@ -6,12 +6,12 @@ import {
   findTextComponent,
   findBoxComponent,
   getReactVar,
-} from './index.js';
+} from './index';
 import {
   findSlashCommandListEndPosition,
   writeSlashCommandDefinition as writeSlashCommandDefinitionToArray,
-} from './slashCommands.js';
-import { Toolset } from '../types.js';
+} from './slashCommands';
+import { Toolset } from '../types';
 
 // ============================================================================
 // UTILITY FUNCTIONS - Variable Discovery

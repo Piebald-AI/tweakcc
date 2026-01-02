@@ -5,18 +5,18 @@ import {
   CONFIG_DIR,
   NATIVE_BINARY_BACKUP_FILE,
   updateConfigFile,
-} from '../config.js';
-import { ClaudeCodeInstallationInfo, TweakccConfig } from '../types.js';
+} from '../config';
+import { ClaudeCodeInstallationInfo, TweakccConfig } from '../types';
 import {
   isVerbose,
   verbose,
   debug,
   replaceFileBreakingHardLinks,
-} from '../utils.js';
+} from '../utils';
 import {
   extractClaudeJsFromNativeInstallation,
   repackNativeInstallation,
-} from '../nativeInstallationLoader.js';
+} from '../nativeInstallationLoader';
 
 // Notes to patch-writers:
 //
@@ -32,40 +32,40 @@ import {
 //   character such as ',' or ';' can speed up matching even further, e.g. down to 30ms.
 //
 
-import { writeShowMoreItemsInSelectMenus } from './showMoreItemsInSelectMenus.js';
-import { writeThemes } from './themes.js';
-import { writeContextLimit } from './contextLimit.js';
-import { writeInputBoxBorder } from './inputBorderBox.js';
-import { writeSpinnerNoFreeze } from './spinnerNoFreeze.js';
-import { writeThinkerFormat } from './thinkerFormat.js';
-import { writeThinkerSymbolMirrorOption } from './thinkerMirrorOption.js';
-import { writeThinkerSymbolChars } from './thinkerSymbolChars.js';
-import { writeThinkerSymbolSpeed } from './thinkerSymbolSpeed.js';
-import { writeThinkerSymbolWidthLocation } from './thinkerSymbolWidth.js';
-import { writeThinkerVerbs } from './thinkerVerbs.js';
-import { writeUserMessageDisplay } from './userMessageDisplay.js';
-import { writeVerboseProperty } from './verboseProperty.js';
-import { writeModelCustomizations } from './modelSelector.js';
-import { writeThinkingVisibility } from './thinkingVisibility.js';
-import { writePatchesAppliedIndication } from './patchesAppliedIndication.js';
-import { applySystemPrompts } from './systemPrompts.js';
-import { writeFixLspSupport } from './fixLspSupport.js';
+import { writeShowMoreItemsInSelectMenus } from './showMoreItemsInSelectMenus';
+import { writeThemes } from './themes';
+import { writeContextLimit } from './contextLimit';
+import { writeInputBoxBorder } from './inputBorderBox';
+import { writeSpinnerNoFreeze } from './spinnerNoFreeze';
+import { writeThinkerFormat } from './thinkerFormat';
+import { writeThinkerSymbolMirrorOption } from './thinkerMirrorOption';
+import { writeThinkerSymbolChars } from './thinkerSymbolChars';
+import { writeThinkerSymbolSpeed } from './thinkerSymbolSpeed';
+import { writeThinkerSymbolWidthLocation } from './thinkerSymbolWidth';
+import { writeThinkerVerbs } from './thinkerVerbs';
+import { writeUserMessageDisplay } from './userMessageDisplay';
+import { writeVerboseProperty } from './verboseProperty';
+import { writeModelCustomizations } from './modelSelector';
+import { writeThinkingVisibility } from './thinkingVisibility';
+import { writePatchesAppliedIndication } from './patchesAppliedIndication';
+import { applySystemPrompts } from './systemPrompts';
+import { writeFixLspSupport } from './fixLspSupport';
 import {
   writeToolsets,
   writeModeChangeUpdateToolset,
   addSetStateFnAccessAtToolChangeComponentScope,
-} from './toolsets.js';
-import { writeConversationTitle } from './conversationTitle.js';
-import { writeHideStartupBanner } from './hideStartupBanner.js';
-import { writeHideCtrlGToEditPrompt } from './hideCtrlGToEditPrompt.js';
-import { writeHideStartupClawd } from './hideStartupClawd.js';
-import { writeIncreaseFileReadLimit } from './increaseFileReadLimit.js';
-import { writeSuppressLineNumbers } from './suppressLineNumbers.js';
+} from './toolsets';
+import { writeConversationTitle } from './conversationTitle';
+import { writeHideStartupBanner } from './hideStartupBanner';
+import { writeHideCtrlGToEditPrompt } from './hideCtrlGToEditPrompt';
+import { writeHideStartupClawd } from './hideStartupClawd';
+import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
+import { writeSuppressLineNumbers } from './suppressLineNumbers';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
-} from '../installationBackup.js';
-import { compareVersions } from '../systemPromptSync.js';
+} from '../installationBackup';
+import { compareVersions } from '../systemPromptSync';
 
 export interface LocationResult {
   startIndex: number;

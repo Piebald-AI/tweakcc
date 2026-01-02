@@ -6,7 +6,7 @@ import {
   findTextComponent,
   getReactVar,
   showDiff,
-} from './index.js';
+} from './index';
 
 /**
  * PATCH 1: Finds the location of the version output pattern in Claude Code's cli.js

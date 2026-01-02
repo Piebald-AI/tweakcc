@@ -4,10 +4,10 @@ import { Box, Text } from 'ink';
 import chalk from 'chalk';
 import React, { useState, useEffect, useContext } from 'react';
 
-import { Theme } from '@/types.js';
-import { getClaudeSubscriptionType, getSelectedModel } from '@/utils.js';
+import { Theme } from '@/types';
+import { getClaudeSubscriptionType, getSelectedModel } from '@/utils';
 
-import { SettingsContext } from '../App.js';
+import { SettingsContext } from '../App';
 
 interface ThemePreviewProps {
   theme: Theme;

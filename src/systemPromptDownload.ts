@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'path';
-import type { StringsFile } from './systemPromptSync.js';
-import { PROMPT_CACHE_DIR } from './config.js';
+import type { StringsFile } from './systemPromptSync';
+import { PROMPT_CACHE_DIR } from './config';
 
 /**
  * Downloads the strings file for a given CC version from GitHub

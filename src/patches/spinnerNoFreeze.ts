@@ -1,6 +1,6 @@
 // Please see the note about writing patches in ./index.js.
 
-import { LocationResult, showDiff } from './index.js';
+import { LocationResult, showDiff } from './index';
 
 const getSpinnerNoFreezeLocation = (oldFile: string): LocationResult | null => {
   const wholePattern =

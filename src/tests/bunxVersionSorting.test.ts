@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { compareSemverVersions } from '../utils.js';
+import { compareSemverVersions } from '../utils';
 
 describe('compareSemverVersions', () => {
   it('should return positive when a > b (major)', () => {

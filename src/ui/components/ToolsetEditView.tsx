@@ -1,7 +1,7 @@
 import { useState, useContext, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { SettingsContext } from '../App.js';
-import Header from './Header.js';
+import { SettingsContext } from '../App';
+import Header from './Header';
 
 interface ToolsetEditViewProps {
   toolsetIndex: number;

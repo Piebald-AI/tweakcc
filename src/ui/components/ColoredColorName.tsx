@@ -1,5 +1,5 @@
-import { Theme } from '@/types.js';
-import { ColoredText } from './ThemePreview.js';
+import { Theme } from '@/types';
+import { ColoredText } from './ThemePreview';
 
 interface ColoredColorNameProps {
   colorKey: keyof Theme['colors'];

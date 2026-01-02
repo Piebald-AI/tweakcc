@@ -1,11 +1,8 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import {
-  StringsFile,
-  reconstructContentFromPieces,
-} from './systemPromptSync.js';
-import { CONFIG_DIR } from './config.js';
+import { StringsFile, reconstructContentFromPieces } from './systemPromptSync';
+import { CONFIG_DIR } from './config';
 
 /**
  * Gets the path to the system prompt hash index file

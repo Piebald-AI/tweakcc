@@ -1,14 +1,14 @@
 import { useState, useContext } from 'react';
 import { Box, BoxProps, Text, useInput } from 'ink';
 
-import { UserMessageDisplayConfig } from '@/types.js';
-import { getCurrentClaudeCodeTheme } from '@/utils.js';
-import { DEFAULT_SETTINGS } from '@/defaultSettings.js';
+import { UserMessageDisplayConfig } from '@/types';
+import { getCurrentClaudeCodeTheme } from '@/utils';
+import { DEFAULT_SETTINGS } from '@/defaultSettings';
 
-import { ColorPicker } from './ColorPicker.js';
-import { SettingsContext } from '../App.js';
-import Header from './Header.js';
-import { useNonInitialEffect } from '../hooks/useNonInitialEffect.js';
+import { ColorPicker } from './ColorPicker';
+import { SettingsContext } from '../App';
+import Header from './Header';
+import { useNonInitialEffect } from '../hooks/useNonInitialEffect';
 
 type Writable<T> = { -readonly [P in keyof T]: T[P] };
 

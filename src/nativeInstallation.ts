@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import { execSync } from 'node:child_process';
 import LIEF from 'node-lief';
-import { isDebug, debug } from './utils.js';
+import { isDebug, debug } from './utils';
 
 /**
  * Constants for Bun trailer and serialized layout sizes.

@@ -3,12 +3,12 @@ import * as os from 'node:os';
 import { Box, Text } from 'ink';
 import Link from 'ink-link';
 
-import { MainMenuItem } from '@/types.js';
-import { CONFIG_DIR } from '@/config.js';
+import { MainMenuItem } from '@/types';
+import { CONFIG_DIR } from '@/config';
 
-import Header from './Header.js';
-import PiebaldAnnouncement from './PiebaldAnnouncement.js';
-import MainMenu from './MainMenu.js';
+import Header from './Header';
+import PiebaldAnnouncement from './PiebaldAnnouncement';
+import MainMenu from './MainMenu';
 
 const TweakccHeader = () => (
   <Box flexDirection="row">

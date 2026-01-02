@@ -1,11 +1,11 @@
 import { useState, useEffect, useContext } from 'react';
 import { Box, Text, useInput } from 'ink';
 
-import { getCurrentClaudeCodeTheme } from '@/utils.js';
-import { DEFAULT_SETTINGS } from '@/defaultSettings.js';
+import { getCurrentClaudeCodeTheme } from '@/utils';
+import { DEFAULT_SETTINGS } from '@/defaultSettings';
 
-import { SettingsContext } from '../App.js';
-import Header from './Header.js';
+import { SettingsContext } from '../App';
+import Header from './Header';
 
 interface ThinkingStyleViewProps {
   onBack: () => void;

@@ -1,6 +1,6 @@
 // Please see the note about writing patches in ./index.js.
 
-import { LocationResult, showDiff } from './index.js';
+import { LocationResult, showDiff } from './index';
 
 const getStartupBannerLocation = (oldFile: string): LocationResult | null => {
   // Find the createElement with isBeforeFirstMessage:!1

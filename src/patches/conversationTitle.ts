@@ -1,8 +1,8 @@
 // Conversation title management patch for Claude Code
 // Adds ability to set conversation titles and persist them
 
-import { showDiff, getReactVar, getRequireFuncName } from './index.js';
-import { writeSlashCommandDefinition as writeSlashCmd } from './slashCommands.js';
+import { showDiff, getReactVar, getRequireFuncName } from './index';
+import { writeSlashCommandDefinition as writeSlashCmd } from './slashCommands';
 
 // ============================================================================
 // SUB PATCH 1: Add /title slash command

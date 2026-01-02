@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "Node16",
+    "module": "ESNext",
     "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": "./src",
@@ -12,7 +12,7 @@
     "sourceMap": true,
     "resolveJsonModule": true,
     "jsx": "react-jsx",
-    "moduleResolution": "node16",
+    "moduleResolution": "Bundler",
     "baseUrl": ".",
     "noEmit": true,
     "paths": {

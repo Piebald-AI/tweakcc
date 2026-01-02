@@ -1,4 +1,4 @@
-import { Settings } from './types.js';
+import { Settings } from './types';
 
 export const DEFAULT_SETTINGS: Settings = {
   themes: [

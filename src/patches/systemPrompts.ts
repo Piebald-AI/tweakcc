@@ -1,14 +1,14 @@
 import chalk from 'chalk';
-import { debug, verbose } from '../utils.js';
-import { showDiff, PatchApplied } from './index.js';
+import { debug, verbose } from '../utils';
+import { showDiff, PatchApplied } from './index';
 import {
   loadSystemPromptsWithRegex,
   reconstructContentFromPieces,
   findUnescapedBackticks,
   formatBacktickError,
   getPromptFilePath,
-} from '../systemPromptSync.js';
-import { setAppliedHash, computeMD5Hash } from '../systemPromptHashIndex.js';
+} from '../systemPromptSync';
+import { setAppliedHash, computeMD5Hash } from '../systemPromptHashIndex';
 
 /**
  * Detects if the cli.js file uses Unicode escape sequences for non-ASCII characters.

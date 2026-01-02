@@ -1,6 +1,6 @@
 import { globbySync } from 'globby';
 import os from 'node:os';
-import { debug } from './utils.js';
+import { debug } from './utils';
 
 export interface SearchPathInfo {
   pattern: string;

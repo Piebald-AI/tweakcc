@@ -1,6 +1,6 @@
 // Please see the note about writing patches in ./index.js.
 
-import { LocationResult, showDiff } from './index.js';
+import { LocationResult, showDiff } from './index';
 
 /**
  * Find the file read token limit (25000) that's associated with the system-reminder.

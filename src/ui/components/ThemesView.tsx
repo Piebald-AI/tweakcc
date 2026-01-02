@@ -1,13 +1,13 @@
 import { useState, useContext } from 'react';
 import { Box, Text, useInput } from 'ink';
 
-import { Theme } from '@/types.js';
-import { DEFAULT_SETTINGS } from '@/defaultSettings.js';
+import { Theme } from '@/types';
+import { DEFAULT_SETTINGS } from '@/defaultSettings';
 
-import { SettingsContext } from '../App.js';
-import { ThemeEditView } from './ThemeEditView.js';
-import { ThemePreview } from './ThemePreview.js';
-import Header from './Header.js';
+import { SettingsContext } from '../App';
+import { ThemeEditView } from './ThemeEditView';
+import { ThemePreview } from './ThemePreview';
+import Header from './Header';
 
 function generateThemeItems(themes: Theme[]): string[] {
   return themes.map(theme => `${theme.name} (${theme.id})`);

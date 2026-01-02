@@ -4,7 +4,7 @@ import {
   findChalkVar,
   LocationResult,
   showDiff,
-} from './index.js';
+} from './index';
 
 const getUserMessageDisplayLocation = (
   oldFile: string

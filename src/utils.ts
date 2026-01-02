@@ -4,8 +4,8 @@ import * as path from 'path';
 import * as os from 'os';
 import * as child_process from 'child_process';
 import * as crypto from 'crypto';
-import { Theme } from './types.js';
-import { CUSTOM_MODELS } from './patches/modelSelector.js';
+import { Theme } from './types';
+import { CUSTOM_MODELS } from './patches/modelSelector';
 
 let isDebugModeOn = false;
 let isVerboseModeOn = false;

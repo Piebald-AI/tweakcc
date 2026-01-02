@@ -1,6 +1,6 @@
 // Please see the note about writing patches in ./index.js.
 
-import { escapeIdent, showDiff } from './index.js';
+import { escapeIdent, showDiff } from './index';
 
 // Models to inject/make available.
 // prettier-ignore

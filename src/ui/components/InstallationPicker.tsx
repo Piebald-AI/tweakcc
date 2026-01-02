@@ -2,8 +2,8 @@ import * as os from 'node:os';
 import { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 
-import { InstallationCandidate } from '../../types.js';
-import { CONFIG_DIR } from '@/config.js';
+import { InstallationCandidate } from '../../types';
+import { CONFIG_DIR } from '@/config';
 
 interface InstallationPickerProps {
   candidates: InstallationCandidate[];

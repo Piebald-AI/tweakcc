@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as fs from 'node:fs/promises';
-import * as promptSync from '../systemPromptSync.js';
-import type { StringsPrompt, StringsFile } from '../systemPromptSync.js';
+import * as promptSync from '../systemPromptSync';
+import type { StringsPrompt, StringsFile } from '../systemPromptSync';
 
 vi.mock('node:fs/promises');
 vi.mock('../systemPromptDownload.js');

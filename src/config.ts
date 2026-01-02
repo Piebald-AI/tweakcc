@@ -5,16 +5,11 @@ import path from 'node:path';
 import { EOL } from 'node:os';
 import chalk from 'chalk';
 
-import {
-  Settings,
-  Theme,
-  ThinkingVerbsConfig,
-  TweakccConfig,
-} from './types.js';
-import { debug, expandTilde } from './utils.js';
-import { hasUnappliedSystemPromptChanges } from './systemPromptHashIndex.js';
-import { migrateUserMessageDisplayToV320 } from './migration.js';
-import { DEFAULT_SETTINGS } from './defaultSettings.js';
+import { Settings, Theme, ThinkingVerbsConfig, TweakccConfig } from './types';
+import { debug, expandTilde } from './utils';
+import { hasUnappliedSystemPromptChanges } from './systemPromptHashIndex';
+import { migrateUserMessageDisplayToV320 } from './migration';
+import { DEFAULT_SETTINGS } from './defaultSettings';
 
 // Support XDG Base Directory Specification with backward compatibility
 // Priority:

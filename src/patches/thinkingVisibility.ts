@@ -1,6 +1,6 @@
 // Please see the note about writing patches in ./index.js.
 
-import { LocationResult, showDiff } from './index.js';
+import { LocationResult, showDiff } from './index';
 
 /**
  * Forces thinking blocks to be visible inline by default, ensuring thinking content

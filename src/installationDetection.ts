@@ -9,13 +9,10 @@ import {
   hashFileInChunks,
   doesFileExist,
   compareSemverVersions,
-} from './utils.js';
-import { extractClaudeJsFromNativeInstallation } from './nativeInstallationLoader.js';
-import {
-  CLIJS_SEARCH_PATHS,
-  NATIVE_SEARCH_PATHS,
-} from './installationPaths.js';
-import { CONFIG_FILE, updateConfigFile } from './config.js';
+} from './utils';
+import { extractClaudeJsFromNativeInstallation } from './nativeInstallationLoader';
+import { CLIJS_SEARCH_PATHS, NATIVE_SEARCH_PATHS } from './installationPaths';
+import { CONFIG_FILE, updateConfigFile } from './config';
 import {
   ClaudeCodeInstallationInfo,
   FindInstallationOptions,
@@ -23,7 +20,7 @@ import {
   InstallationKind,
   InstallationSource,
   TweakccConfig,
-} from './types.js';
+} from './types';
 
 // ============================================================================
 // Types

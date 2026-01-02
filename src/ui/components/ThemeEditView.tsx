@@ -1,14 +1,14 @@
 import { useState, useContext, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
 
-import { Theme } from '@/types.js';
-import { isValidColorFormat, normalizeColorToRgb } from '@/utils.js';
+import { Theme } from '@/types';
+import { isValidColorFormat, normalizeColorToRgb } from '@/utils';
 
-import { SettingsContext } from '../App.js';
-import { ThemePreview, ColoredText } from './ThemePreview.js';
-import { ColoredColorName } from './ColoredColorName.js';
-import { ColorPicker } from './ColorPicker.js';
-import Header from './Header.js';
+import { SettingsContext } from '../App';
+import { ThemePreview, ColoredText } from './ThemePreview';
+import { ColoredColorName } from './ColoredColorName';
+import { ColorPicker } from './ColorPicker';
+import Header from './Header';
 
 interface ThemeEditViewProps {
   onBack: () => void;

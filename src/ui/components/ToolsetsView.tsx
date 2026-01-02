@@ -1,13 +1,13 @@
 import { useState, useContext } from 'react';
 import { Box, Text, useInput } from 'ink';
 
-import { Toolset } from '@/types.js';
-import { getCurrentClaudeCodeTheme } from '@/utils.js';
-import { DEFAULT_SETTINGS } from '@/defaultSettings.js';
+import { Toolset } from '@/types';
+import { getCurrentClaudeCodeTheme } from '@/utils';
+import { DEFAULT_SETTINGS } from '@/defaultSettings';
 
-import { ToolsetEditView } from './ToolsetEditView.js';
-import Header from './Header.js';
-import { SettingsContext } from '../App.js';
+import { ToolsetEditView } from './ToolsetEditView';
+import Header from './Header';
+import { SettingsContext } from '../App';
 
 interface ToolsetsViewProps {
   onBack: () => void;

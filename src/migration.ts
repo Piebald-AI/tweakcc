@@ -1,8 +1,8 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 
-import { TweakccConfig } from './types.js';
-import { CONFIG_FILE, ensureConfigDir } from './config.js';
+import { TweakccConfig } from './types';
+import { CONFIG_FILE, ensureConfigDir } from './config';
 
 /**
  * In v3.2.0 we changed the user message display config.  This function migrates the old config.

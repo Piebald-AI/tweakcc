@@ -1,7 +1,7 @@
 // Please see the note about writing patches in ./index.js.
 
-import { Theme } from '../types.js';
-import { LocationResult, showDiff } from './index.js';
+import { Theme } from '../types';
+import { LocationResult, showDiff } from './index';
 
 function getThemesLocation(oldFile: string): {
   switchStatement: LocationResult;

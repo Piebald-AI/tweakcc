@@ -3,25 +3,25 @@ import fs from 'node:fs/promises';
 import {
   findClaudeCodeInstallation,
   getPendingCandidates,
-} from './installationDetection.js';
-import { doesFileExist } from './utils.js';
+} from './installationDetection';
+import { doesFileExist } from './utils';
 import {
   CLIJS_BACKUP_FILE,
   CONFIG_DIR,
   CONFIG_FILE,
   NATIVE_BINARY_BACKUP_FILE,
   readConfigFile,
-} from './config.js';
-import { debug } from './utils.js';
-import { displaySyncResults, syncSystemPrompts } from './systemPromptSync.js';
+} from './config';
+import { debug } from './utils';
+import { displaySyncResults, syncSystemPrompts } from './systemPromptSync';
 import {
   ClaudeCodeInstallationInfo,
   FindInstallationOptions,
   InstallationCandidate,
   StartupCheckInfo,
   TweakccConfig,
-} from './types.js';
-import { backupClijs, backupNativeBinary } from './installationBackup.js';
+} from './types';
+import { backupClijs, backupNativeBinary } from './installationBackup';
 
 export interface StartupCheckResult {
   startupCheckInfo: StartupCheckInfo | null;
