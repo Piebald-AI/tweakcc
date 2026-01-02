@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fix macOS and Windows native installation support (#327) - @signadou
+
 ## [v3.2.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.2.3) - 2026-01-01
 
 - Increase thinkerFormat search window to 1000 chars (#317) - @ljepson
