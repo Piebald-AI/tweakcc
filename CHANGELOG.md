@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 - Fix macOS and Windows native installation support (#327) - @signadou
+- Suppress line numbers in edit/read tools: `1→Line 1` to `Line 1` (#326) - @basekevin
 
 ## [v3.2.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.2.3) - 2026-01-01
 
