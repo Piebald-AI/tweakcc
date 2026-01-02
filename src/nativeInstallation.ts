@@ -53,6 +53,8 @@ interface BunModule {
 interface BunData {
   bunOffsets: BunOffsets;
   bunData: Buffer;
+  /** Header size used in section format: 4 for old format (Bun < 1.3.4), 8 for new format. Only for Mach-O and PE. */
+  sectionHeaderSize?: number;
 }
 
 /**
@@ -209,9 +211,12 @@ function parseBunDataBlob(bunDataContent: Buffer): {
 }
 
 /**
- * Section format helper:
- * [u32 size][size bytes of Bun data blob...]
+ * Section format helper (for Mach-O and PE):
+ * Old format (Bun < 1.3.4): [u32 size][size bytes of Bun data blob...]
+ * New format (Bun >= 1.3.4): [u64 size][size bytes of Bun data blob...]
+ *
  * Size is the length of the Bun blob (which itself is [data][OFFSETS][TRAILER]).
+ * We detect which format by checking if (headerSize + size) matches the section length.
  */
 function extractBunDataFromSection(sectionData: Buffer): BunData {
   if (sectionData.length < 4) {
@@ -220,11 +225,60 @@ function extractBunDataFromSection(sectionData: Buffer): BunData {
 
   debug(`extractBunDataFromSection: sectionData.length=${sectionData.length}`);
 
-  const bunDataSize = sectionData.readUInt32LE(0);
+  // Try u32 header (old format, Bun < 1.3.4)
+  const bunDataSizeU32 = sectionData.readUInt32LE(0);
+  const expectedLengthU32 = 4 + bunDataSizeU32;
+
+  // Try u64 header (new format, Bun >= 1.3.4) - only if we have enough bytes
+  const bunDataSizeU64 =
+    sectionData.length >= 8 ? Number(sectionData.readBigUInt64LE(0)) : 0;
+  const expectedLengthU64 = 8 + bunDataSizeU64;
+
+  debug(
+    `extractBunDataFromSection: u32 header would give size=${bunDataSizeU32}, expected total=${expectedLengthU32}`
+  );
+  debug(
+    `extractBunDataFromSection: u64 header would give size=${bunDataSizeU64}, expected total=${expectedLengthU64}`
+  );
+
+  let headerSize: number;
+  let bunDataSize: number;
+
+  // Check which format matches the section length (allowing for padding up to 4KB)
+  if (
+    sectionData.length >= 8 &&
+    expectedLengthU64 <= sectionData.length &&
+    expectedLengthU64 >= sectionData.length - 4096
+  ) {
+    // u64 format matches
+    headerSize = 8;
+    bunDataSize = bunDataSizeU64;
+    debug(
+      `extractBunDataFromSection: detected u64 header format (Bun >= 1.3.4)`
+    );
+  } else if (
+    expectedLengthU32 <= sectionData.length &&
+    expectedLengthU32 >= sectionData.length - 4096
+  ) {
+    // u32 format matches
+    headerSize = 4;
+    bunDataSize = bunDataSizeU32;
+    debug(
+      `extractBunDataFromSection: detected u32 header format (Bun < 1.3.4)`
+    );
+  } else {
+    throw new Error(
+      `Cannot determine section header format: sectionData.length=${sectionData.length}, ` +
+        `u64 would expect ${expectedLengthU64}, u32 would expect ${expectedLengthU32}`
+    );
+  }
 
   debug(`extractBunDataFromSection: bunDataSize from header=${bunDataSize}`);
 
-  const bunDataContent = sectionData.subarray(4, 4 + bunDataSize);
+  const bunDataContent = sectionData.subarray(
+    headerSize,
+    headerSize + bunDataSize
+  );
 
   debug(
     `extractBunDataFromSection: bunDataContent.length=${bunDataContent.length}`
@@ -232,7 +286,7 @@ function extractBunDataFromSection(sectionData: Buffer): BunData {
 
   const { bunOffsets, bunData } = parseBunDataBlob(bunDataContent);
 
-  return { bunOffsets, bunData };
+  return { bunOffsets, bunData, sectionHeaderSize: headerSize };
 }
 
 /**
@@ -683,13 +737,20 @@ function atomicWriteBinary(
 }
 
 /**
- * Builds section data with 4-byte size header followed by content.
- * Format: [4-byte size][content]
+ * Builds section data with size header followed by content.
+ * Format: [size header][content]
+ *
+ * @param bunBuffer - The bun data buffer to wrap
+ * @param headerSize - Header size: 4 for old format (Bun < 1.3.4), 8 for new format (default)
  */
-function buildSectionData(bunBuffer: Buffer): Buffer {
-  const sectionData = Buffer.allocUnsafe(4 + bunBuffer.length);
-  sectionData.writeUInt32LE(bunBuffer.length, 0);
-  bunBuffer.copy(sectionData, 4);
+function buildSectionData(bunBuffer: Buffer, headerSize: number = 8): Buffer {
+  const sectionData = Buffer.allocUnsafe(headerSize + bunBuffer.length);
+  if (headerSize === 8) {
+    sectionData.writeBigUInt64LE(BigInt(bunBuffer.length), 0);
+  } else {
+    sectionData.writeUInt32LE(bunBuffer.length, 0);
+  }
+  bunBuffer.copy(sectionData, headerSize);
   return sectionData;
 }
 
@@ -697,7 +758,8 @@ function repackMachO(
   machoBinary: LIEF.MachO.Binary,
   binPath: string,
   newBunBuffer: Buffer,
-  outputPath: string
+  outputPath: string,
+  sectionHeaderSize: number
 ): void {
   try {
     // CRITICAL: Remove code signature first - it will be invalidated by modifications
@@ -718,7 +780,8 @@ function repackMachO(
       throw new Error('__bun section not found');
     }
 
-    const newSectionData = buildSectionData(newBunBuffer);
+    // Use the same header size as the original binary
+    const newSectionData = buildSectionData(newBunBuffer, sectionHeaderSize);
 
     debug(`repackMachO: Original section size: ${bunSection.size}`);
     debug(`repackMachO: Original segment fileSize: ${bunSegment.fileSize}`);
@@ -726,6 +789,7 @@ function repackMachO(
       `repackMachO: Original segment virtualSize: ${bunSegment.virtualSize}`
     );
     debug(`repackMachO: New data size: ${newSectionData.length}`);
+    debug(`repackMachO: Using header size: ${sectionHeaderSize}`);
 
     // Calculate how much we need to expand
     const sizeDiff = newSectionData.length - Number(bunSection.size);
@@ -799,7 +863,8 @@ function repackPE(
   peBinary: LIEF.PE.Binary,
   binPath: string,
   newBunBuffer: Buffer,
-  outputPath: string
+  outputPath: string,
+  sectionHeaderSize: number
 ): void {
   try {
     const bunSection = peBinary.sections().find(s => s.name === '.bun');
@@ -807,12 +872,14 @@ function repackPE(
       throw new Error('.bun section not found');
     }
 
-    const newSectionData = buildSectionData(newBunBuffer);
+    // Use the same header size as the original binary
+    const newSectionData = buildSectionData(newBunBuffer, sectionHeaderSize);
 
     debug(
       `repackPE: Original section size: ${bunSection.size}, virtual size: ${bunSection.virtualSize}`
     );
     debug(`repackPE: New data size: ${newSectionData.length}`);
+    debug(`repackPE: Using header size: ${sectionHeaderSize}`);
 
     // Update section content
     bunSection.content = newSectionData;
@@ -877,15 +944,33 @@ export function repackNativeInstallation(
   const binary = LIEF.parse(binPath);
 
   // Extract Bun data and rebuild with modified claude.js
-  const { bunOffsets, bunData } = getBunData(binary);
+  const { bunOffsets, bunData, sectionHeaderSize } = getBunData(binary);
   const newBuffer = rebuildBunData(bunData, bunOffsets, modifiedClaudeJs);
 
   switch (binary.format) {
     case 'MachO':
-      repackMachO(binary as LIEF.MachO.Binary, binPath, newBuffer, outputPath);
+      if (!sectionHeaderSize) {
+        throw new Error('sectionHeaderSize is required for Mach-O binaries');
+      }
+      repackMachO(
+        binary as LIEF.MachO.Binary,
+        binPath,
+        newBuffer,
+        outputPath,
+        sectionHeaderSize
+      );
       break;
     case 'PE':
-      repackPE(binary as LIEF.PE.Binary, binPath, newBuffer, outputPath);
+      if (!sectionHeaderSize) {
+        throw new Error('sectionHeaderSize is required for PE binaries');
+      }
+      repackPE(
+        binary as LIEF.PE.Binary,
+        binPath,
+        newBuffer,
+        outputPath,
+        sectionHeaderSize
+      );
       break;
     case 'ELF':
       repackELF(binary as LIEF.ELF.Binary, binPath, newBuffer, outputPath);
