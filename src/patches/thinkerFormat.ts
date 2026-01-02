@@ -1,4 +1,4 @@
-// Please see the note about writing patches in ./index.ts.
+// Please see the note about writing patches in ./index.
 
 import { LocationResult, showDiff } from './index';
 
