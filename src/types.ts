@@ -121,6 +121,12 @@ export interface Toolset {
   allowedTools: string[] | '*';
 }
 
+export interface SubagentModelsConfig {
+  plan: string | null;
+  explore: string | null;
+  generalPurpose: string | null;
+}
+
 export interface Settings {
   themes: Theme[];
   thinkingVerbs: ThinkingVerbsConfig;
@@ -131,6 +137,7 @@ export interface Settings {
   toolsets: Toolset[];
   defaultToolset: string | null;
   planModeToolset: string | null;
+  subagentModels: SubagentModelsConfig;
 }
 
 export interface TweakccConfig {
@@ -183,6 +190,7 @@ export enum MainMenuItem {
   USER_MESSAGE_DISPLAY = 'User message display',
   MISC = 'Misc',
   TOOLSETS = 'Toolsets',
+  SUBAGENT_MODELS = 'Subagent models',
   VIEW_SYSTEM_PROMPTS = 'View system prompts',
   RESTORE_ORIGINAL = 'Restore original Claude Code (preserves config.json)',
   OPEN_CONFIG = 'Open config.json',
