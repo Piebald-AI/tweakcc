@@ -6,7 +6,7 @@ describe('subagentModels patch', () => {
     const oldFile = `
       {
         agentType: "Plan",
-        model: "claude-3-5-sonnet-20241022"
+        model: "inherit"
       }
     `;
     const config = {
@@ -23,7 +23,7 @@ describe('subagentModels patch', () => {
     const oldFile = `
       {
         agentType: "Explore",
-        model: "claude-3-5-sonnet-20241022"
+        model: "haiku"
       }
     `;
     const config = {
@@ -64,7 +64,7 @@ describe('subagentModels patch', () => {
     const oldFile = `
       {
         agentType: "Plan",
-        model: "claude-3-5-sonnet-20241022"
+        model: "inherit"
       }
     `;
     const config = {
