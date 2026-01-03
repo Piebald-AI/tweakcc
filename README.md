@@ -172,7 +172,7 @@ Toolsets are collections of built-in tools that Claude is allowed to call. Unlik
 
 Toolsets can be helpful both for using Claude in different modes, e.g. a research mode where you might only include `WebFetch` and `WebSearch`, and for keeping the size of your system prompt by trimming out tools you don't ever want Claude to call. The description of each tool call is placed in the system prompt (see [here](https://github.com/Piebald-AI/claude-code-system-prompts#builtin-tool-descriptions)), and if there are multiple tools you don't care about (like `Skill`, `SlashCommand`, `BashOutput`, etc.), the accumulated size of their descriptions and parameters can bloat the context by several thousand tokens.
 
-To create a toolset, run `npx tweakcc`, go to `Toolsets`, and hit `n` to create a new toolset. Set tapply your customizations, and then run `claude`. If you marked a toolset as the default in tweakcc, it will be automatically selected.
+To create a toolset, run `npx tweakcc`, go to `Toolsets`, and hit `n` to create a new toolset. Set to apply your customizations, and then run `claude`. If you marked a toolset as the default in tweakcc, it will be automatically selected.
 
 ## Troubleshooting
 
