@@ -47,6 +47,7 @@ import { writeUserMessageDisplay } from './userMessageDisplay';
 import { writeVerboseProperty } from './verboseProperty';
 import { writeModelCustomizations } from './modelSelector';
 import { writeThinkingVisibility } from './thinkingVisibility';
+import { writeSubagentModels } from './subagentModels';
 import { writePatchesAppliedIndication } from './patchesAppliedIndication';
 import { applySystemPrompts } from './systemPrompts';
 import { writeFixLspSupport } from './fixLspSupport';
@@ -577,6 +578,15 @@ export const applyCustomization = async (
 
   // Apply model customizations (known names, mapping, selector options) (always enabled)
   if ((result = writeModelCustomizations(content))) content = result;
+
+  // Apply subagent model customizations
+  if (config.settings.subagentModels) {
+    if (
+      (result = writeSubagentModels(content, config.settings.subagentModels))
+    ) {
+      content = result;
+    }
+  }
 
   // Apply show more items in select menus patch (always enabled)
   if ((result = writeShowMoreItemsInSelectMenus(content, 25))) content = result;

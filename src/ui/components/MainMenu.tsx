@@ -30,6 +30,10 @@ const baseMenuItems: SelectItem[] = [
     desc: 'Manage toolsets to control which tools are available',
   },
   {
+    name: MainMenuItem.SUBAGENT_MODELS,
+    desc: 'Configure which Claude model each subagent uses (Plan, Explore, etc.)',
+  },
+  {
     name: MainMenuItem.VIEW_SYSTEM_PROMPTS,
     desc: "Opens the system prompts directory where you can customize Claude Code's system prompts",
   },
