@@ -113,7 +113,7 @@ node dist/index.js
 
 ## Related projects
 
-- [**cc-mirror**](https://github.com/numman-ali/cc-mirror) - Create multiple isolated Claude Code variants with custom providers (Z.ai, MiniMax, OpenRouter, LiteLLM).  Uses tweakcc to system prompts, customize themes, thinking styles, and toolsets.
+- [**cc-mirror**](https://github.com/numman-ali/cc-mirror) - Create multiple isolated Claude Code variants with custom providers (Z.ai, MiniMax, OpenRouter, LiteLLM).  Uses tweakcc to customize system prompts, themes, thinking styles, and toolsets.
 
 Other tools for customizing Claude Code or adding functionality to it:
 
