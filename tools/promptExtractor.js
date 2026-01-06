@@ -16,6 +16,8 @@ function validateInput(text, minLength = 500) {
   if (!text || typeof text !== 'string') return false;
   
   if (text.startsWith("This is the git status")) return true;
+  if (text.includes("IMPORTANT: Assist with authorized security testing")) return true;
+  if (text.includes(".dim(\"Note:")) return false;
   
   if (text.length < minLength) return false;
 
