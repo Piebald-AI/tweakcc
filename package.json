@@ -1,6 +1,6 @@
 {
   "name": "tweakcc",
-  "version": "3.2.3",
+  "version": "3.2.4",
   "type": "module",
   "description": "Command-line tool to customize your Claude Code theme colors, thinking verbs and more.",
   "main": "dist/index.mjs",
@@ -74,7 +74,7 @@
     "ink": "^6.1.0",
     "ink-image": "^2.0.0",
     "ink-link": "^4.1.0",
-    "node-lief": "^0.1.7",
+    "node-lief": "^0.1.8",
     "ollama": "^0.6.0",
     "openai": "^6.3.0",
     "react": "^19.1.1",
