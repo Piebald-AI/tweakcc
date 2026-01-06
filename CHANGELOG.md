@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Add subagent model configuration (#331) - @brrock
+
 ## [v3.2.4](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.2.4) - 2026-01-04
 
 - Fix macOS and Windows native installation support (#327) - @signadou

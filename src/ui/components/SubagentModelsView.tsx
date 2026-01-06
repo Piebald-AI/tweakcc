@@ -4,12 +4,12 @@ import { SettingsContext } from '../App';
 import Header from './Header';
 
 interface SubagentModelsViewProps {
-  onSubmit: () => void;
+  onBack: () => void;
 }
 
 type SubagentType = 'plan' | 'explore' | 'generalPurpose';
 
-export function SubagentModelsView({ onSubmit }: SubagentModelsViewProps) {
+export function SubagentModelsView({ onBack }: SubagentModelsViewProps) {
   const { settings, updateSettings } = useContext(SettingsContext);
   const [activeSubagent, setActiveSubagent] = useState<SubagentType>('plan');
   const [selectingModel, setSelectingModel] = useState(false);
@@ -75,8 +75,8 @@ export function SubagentModelsView({ onSubmit }: SubagentModelsViewProps) {
         setSelectingModel(false);
       }
     } else {
-      if (key.return || key.escape) {
-        onSubmit();
+      if (key.escape) {
+        onBack();
       } else if (key.upArrow) {
         const currentIndex = subagents.findIndex(s => s.id === activeSubagent);
         const nextIndex =
@@ -87,7 +87,7 @@ export function SubagentModelsView({ onSubmit }: SubagentModelsViewProps) {
         const nextIndex =
           currentIndex < subagents.length - 1 ? currentIndex + 1 : 0;
         setActiveSubagent(subagents[nextIndex].id);
-      } else if (input === ' ') {
+      } else if (input === ' ' || key.return) {
         const currentModel = subagentModels[activeSubagent];
         const modelIndex = modelOptions.findIndex(
           m => m.value === currentModel
@@ -132,7 +132,7 @@ export function SubagentModelsView({ onSubmit }: SubagentModelsViewProps) {
       <Box marginBottom={1}>
         <Text dimColor>
           Configure which Claude model each subagent uses. Use arrow keys to
-          navigate, space to change a model, and enter to go back.
+          navigate, enter or space to change a model, and escape to go back.
         </Text>
       </Box>
 

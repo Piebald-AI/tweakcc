@@ -223,7 +223,7 @@ Please reapply your changes below.`,
         ) : currentView === MainMenuItem.TOOLSETS ? (
           <ToolsetsView onBack={handleBack} />
         ) : currentView === MainMenuItem.SUBAGENT_MODELS ? (
-          <SubagentModelsView onSubmit={handleBack} />
+          <SubagentModelsView onBack={handleBack} />
         ) : null}
       </Box>
     </SettingsContext.Provider>
