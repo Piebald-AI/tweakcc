@@ -302,10 +302,7 @@
         "11": "EDIT_TOOL_NAME",
         "12": "WRITE_TOOL_NAME",
         "13": "EXPLORE_AGENT",
-        "14": "GLOB_TOOL_NAME",
-        "15": "GREP_TOOL_NAME",
-        "16": "ALLOWED_TOOLS_STRING_BUILDER",
-        "17": "ALLOWED_TOOL_PREFIXES"
+        "14": "GLOB_TOOL_NAME"
       },
       "version": "2.0.77"
     },
@@ -525,8 +522,7 @@
       ],
       "identifierMap": {
         "0": "FORMAT_SKILLS_AS_XML_FN",
-        "1": "LIMITED_COMMANDS",
-        "2": "AVAILABLE_SKILLs"
+        "1": "LIMITED_COMMANDS"
       },
       "version": "2.0.77"
     },
@@ -694,9 +690,10 @@
         "1": "AGENT_TYPE_REGISTRY_STRING",
         "2": "READ_TOOL",
         "3": "GLOB_TOOL",
-        "4": "TASK_TOOL",
-        "5": "WRITE_TOOL",
-        "6": "AGENT_OUTPUT_TOOL"
+        "4": "GET_SUBSCRIPTION_TYPE_FN",
+        "5": "BASH_TOOL",
+        "6": "TASK_TOOL_OBJECT",
+        "7": "WRITE_TOOL"
       },
       "version": "2.0.77"
     },
