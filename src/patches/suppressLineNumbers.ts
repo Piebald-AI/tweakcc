@@ -16,21 +16,22 @@ const getLineNumberFormatterLocation = (
 ): LocationResult | null => {
   // Pattern matches the line number formatting function:
   // if(VAR.length>=${NUM})return`${VAR}→${VAR2}`;return`${VAR.padStart(${NUM}," ")}→${VAR2}`
+  // Note: Arrow can be literal → or escaped \u2192
   //
   // Breakdown:
   // - if\( - literal "if("
-  // - ([$\w]+) - capture group 1: the line number variable (e.g., [\w]+)
+  // - ([$\w]+) - capture group 1: the line number variable
   // - \.length>=${NUM}\) - literal ".length>=${NUM})"
   // - return` - literal "return`"
   // - \$\{\1\} - ${VAR} using backreference to group 1
-  // - → - the arrow character
-  // - \$\{([$\w]+)\} - capture group 2: the content variable (e.g., [\w]+)
+  // - (→|\\u2192) - the arrow character (literal or escaped)
+  // - \$\{([$\w]+)\} - capture group 2: the content variable
   // - `;return` - literal ";return`"
   // - \$\{\1\.padStart\(${NUM}," "\)\} - ${VAR.padStart(${NUM}," ")} using backreference
-  // - → - the arrow character
+  // - (→|\\u2192) - the arrow character again
   // - \$\{\2\}` - ${VAR2}` using backreference to group 2
   const pattern =
-    /if\(([$\w]+)\.length>=\d+\)return`\$\{\1\}→\$\{([$\w]+)\}`;return`\$\{\1\.padStart\(\d+," "\)\}→\$\{\2\}`/;
+    /if\(([$\w]+)\.length>=\d+\)return`\$\{\1\}(?:→|\\u2192)\$\{([$\w]+)\}`;return`\$\{\1\.padStart\(\d+," "\)\}(?:→|\\u2192)\$\{\2\}`/;
 
   const match = oldFile.match(pattern);
 

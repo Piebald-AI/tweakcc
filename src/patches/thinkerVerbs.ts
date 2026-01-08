@@ -3,34 +3,48 @@
 import { LocationResult, showDiff } from './index';
 
 const getThinkerVerbsLocation = (oldFile: string): LocationResult | null => {
-  // This finds the folowing pattern:
-  // ```js
-  // kW8 = {
-  //   words: [
-  //     "Actualizing",
-  //     "Baking"
-  //   ]
-  // }
-  // ```
-  // To write, we just do `{varname} = {JSON.stringify({words: verbs})}`.
+  // This finds the following patterns:
+  // NEW FORMAT (2.0.77+, npm & native):
+  //   DE2=["Accomplishing","Actioning",...]  (npm)
+  //   jrI=["Accomplishing","Actioning",...]  (native)
+  // OLD FORMAT:
+  //   kW8 = {words: ["Actualizing", "Baking", ...]}
+  //
+  // To write, we just do `{varname} = {JSON.stringify(verbs)}`.
 
-  // Performance note: putting \b at the beginning, before the variable name speeds it up
-  // from ~1.5s to ~80ms.  Explicitly search for ',' or ' ' brings it down to ~30ms.
-  const verbsPattern =
-    /[, ]([$\w]+)=\{words:\[(?:"[^"{}()]+ing",)+"[^"{}()]+ing"\]\}/s;
+  // Performance note: putting boundary at beginning speeds it up
+  // from ~1.5s to ~80ms.  Explicit ',' or ';' brings it down to ~30ms.
 
-  const verbsMatch = oldFile.match(verbsPattern);
-  if (!verbsMatch || verbsMatch.index == undefined) {
-    console.error('patch: thinker verbs: failed to find verbsMatch');
-    return null;
+  // Try new format first (plain array) - works for both npm & native
+  const newVerbsPattern =
+    /[,;]([$\w]+)=\[(?:"[^"{}()]+ing",)+"[^"{}()]+ing"\]/s;
+
+  const newVerbsMatch = oldFile.match(newVerbsPattern);
+  if (newVerbsMatch && newVerbsMatch.index != undefined) {
+    return {
+      // +1 because of the ',' or ';' at the beginning that we matched.
+      startIndex: newVerbsMatch.index + 1,
+      endIndex: newVerbsMatch.index + newVerbsMatch[0].length,
+      identifiers: [newVerbsMatch[1]],
+    };
   }
 
-  return {
-    // +1 because of the ',' or ' ' at the beginning that we matched.
-    startIndex: verbsMatch.index + 1,
-    endIndex: verbsMatch.index + verbsMatch[0].length,
-    identifiers: [verbsMatch[1]],
-  };
+  // Fall back to old format (object with words property)
+  const oldVerbsPattern =
+    /[, ]([$\w]+)=\{words:\[(?:"[^"{}()]+ing",)+"[^"{}()]+ing"\]\}/s;
+
+  const oldVerbsMatch = oldFile.match(oldVerbsPattern);
+  if (oldVerbsMatch && oldVerbsMatch.index != undefined) {
+    return {
+      // +1 because of the ',' or ' ' at the beginning that we matched.
+      startIndex: oldVerbsMatch.index + 1,
+      endIndex: oldVerbsMatch.index + oldVerbsMatch[0].length,
+      identifiers: [oldVerbsMatch[1], 'old_format'],
+    };
+  }
+
+  console.error('patch: thinker verbs: failed to find verbsMatch');
+  return null;
 };
 
 const getThinkerVerbsUseLocation = (oldFile: string): LocationResult | null => {
@@ -63,8 +77,13 @@ export const writeThinkerVerbs = (
   }
   const verbsLocation = location1;
   const varName = verbsLocation.identifiers?.[0];
+  const isOldFormat = verbsLocation.identifiers?.[1] === 'old_format';
 
-  const verbsJson = `${varName}=${JSON.stringify({ words: verbs })}`;
+  // For new format: just a plain array; for old format: object with words property
+  const verbsJson = isOldFormat
+    ? `${varName}=${JSON.stringify({ words: verbs })}`
+    : `${varName}=${JSON.stringify(verbs)}`;
+
   const newFile1 =
     oldFile.slice(0, verbsLocation.startIndex) +
     verbsJson +
@@ -78,28 +97,33 @@ export const writeThinkerVerbs = (
     verbsLocation.endIndex
   );
 
-  // Update the the function that returns the spinner verbs to always return the hard-coded verbs
-  // and not use any Statsig ones.  That also prevents `undefined...` from showing up in the UI.
-  const location2 = getThinkerVerbsUseLocation(newFile1);
-  if (!location2) {
-    return null;
+  // Update the function that returns the spinner verbs to always return the hard-coded verbs
+  // and not use any Statsig ones. That also prevents `undefined...` from showing up in the UI.
+  // Note: This step is only needed for old format; new format uses the array directly.
+  if (isOldFormat) {
+    const location2 = getThinkerVerbsUseLocation(newFile1);
+    if (!location2) {
+      return null;
+    }
+    const useLocation = location2;
+    const funcName = useLocation.identifiers?.[0];
+
+    const newFn = `function ${funcName}(){return ${varName}.words}`;
+    const newFile2 =
+      newFile1.slice(0, useLocation.startIndex) +
+      newFn +
+      newFile1.slice(useLocation.endIndex);
+
+    showDiff(
+      newFile1,
+      newFile2,
+      newFn,
+      useLocation.startIndex,
+      useLocation.endIndex
+    );
+
+    return newFile2;
   }
-  const useLocation = location2;
-  const funcName = useLocation.identifiers?.[0];
 
-  const newFn = `function ${funcName}(){return ${varName}.words}`;
-  const newFile2 =
-    newFile1.slice(0, useLocation.startIndex) +
-    newFn +
-    newFile1.slice(useLocation.endIndex);
-
-  showDiff(
-    newFile1,
-    newFile2,
-    newFn,
-    useLocation.startIndex,
-    useLocation.endIndex
-  );
-
-  return newFile2;
+  return newFile1;
 };

@@ -155,22 +155,32 @@ export const findChalkVar = (fileContents: string): string | undefined => {
 };
 
 /**
- * Find the module loader function in the first 1000 chars
+ * Find the module loader function
  */
 export const getModuleLoaderFunction = (
   fileContents: string
 ): string | undefined => {
-  // Pattern: var X=(Y,Z,W)=>{
+  // Native bundles: look for ,j=(H,$,A)=>{A=H!=null? pattern (module loader)
+  // This is distinct from other 3-param functions because of the H!=null check
+  const nativeLoaderPattern =
+    /[,;]([$\w]+)=\([$\w]+,[$\w]+,[$\w]+\)=>\{[$\w]+=[$\w]+!=null\?/;
+  const nativeMatch = fileContents.slice(0, 2000).match(nativeLoaderPattern);
+  if (nativeMatch) {
+    return nativeMatch[1];
+  }
+
+  // NPM bundles: var T=(H,$,A)=>{ at the start
   const firstChunk = fileContents.slice(0, 1000);
   const pattern = /var ([$\w]+)=\([$\w]+,[$\w]+,[$\w]+\)=>\{/;
   const match = firstChunk.match(pattern);
-  if (!match) {
-    console.log(
-      'patch: getModuleLoaderFunction: failed to find module loader function'
-    );
-    return undefined;
+  if (match) {
+    return match[1];
   }
-  return match[1];
+
+  console.log(
+    'patch: getModuleLoaderFunction: failed to find module loader function'
+  );
+  return undefined;
 };
 
 /**
