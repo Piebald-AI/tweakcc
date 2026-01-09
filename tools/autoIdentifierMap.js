@@ -14,6 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 // 已知的工具名到人类可读名称的映射
 const TOOL_NAME_MAP = {
@@ -36,13 +37,6 @@ const TOOL_NAME_MAP = {
   'KillShell': 'KILLSHELL_TOOL_NAME',
   'TaskOutput': 'TASKOUTPUT_TOOL_NAME',
 };
-
-// 已知的特殊变量模式
-const SPECIAL_PATTERNS = [
-  // 函数类型（通常是生成额外说明的）
-  { pattern: /([a-zA-Z_$][a-zA-Z0-9_$]*)=\(\)=>"[^"]*commit[^"]*"/gi, suffix: '_INSTRUCTION' },
-  { pattern: /([a-zA-Z_$][a-zA-Z0-9_$]*)=\(\)=>"[^"]*git[^"]*"/gi, suffix: '_INSTRUCTION' },
-];
 
 /**
  * 从 cli.js 提取变量映射
@@ -126,33 +120,6 @@ function extractVariableMap(cliPath) {
 }
 
 /**
- * 为 prompt 的 identifiers 生成 identifierMap
- * @param {Array} identifiers - 标识符列表（混淆后的变量名）
- * @param {Object} variableMap - 变量到人类可读名称的映射
- * @param {Object} variableTypes - 变量类型映射
- * @returns {Object} identifierMap
- */
-function generateIdentifierMap(identifiers, variableMap, variableTypes) {
-  const identifierMap = {};
-  const uniqueVars = [...new Set(identifiers)];
-
-  uniqueVars.forEach((varName, idx) => {
-    if (variableMap[varName]) {
-      identifierMap[idx] = variableMap[varName];
-    } else if (variableTypes[varName]) {
-      // 根据类型生成默认名称
-      const type = variableTypes[varName];
-      identifierMap[idx] = `${type.toUpperCase()}_${varName}`;
-    } else {
-      // 未知变量
-      identifierMap[idx] = `VAR_${varName}`;
-    }
-  });
-
-  return identifierMap;
-}
-
-/**
  * 打印变量映射报告
  */
 function printReport(variableMap, variableTypes) {
@@ -192,7 +159,7 @@ function printReport(variableMap, variableTypes) {
 // CLI
 if (require.main === module) {
   const cliPath = process.argv[2] ||
-    path.join(process.env.HOME, '.claude/local/node_modules/@anthropic-ai/claude-code/cli.js');
+    path.join(os.homedir(), '.claude/local/node_modules/@anthropic-ai/claude-code/cli.js');
 
   if (!fs.existsSync(cliPath)) {
     console.error(`文件不存在: ${cliPath}`);
@@ -213,6 +180,5 @@ if (require.main === module) {
 
 module.exports = {
   extractVariableMap,
-  generateIdentifierMap,
   TOOL_NAME_MAP,
 };

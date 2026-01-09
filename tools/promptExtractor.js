@@ -306,7 +306,7 @@ function mergeWithExisting(newData, oldData, currentVersion) {
 
   // Helper to reconstruct content from pieces and identifiers
   const reconstructContent = item => {
-    return item.pieces.join(''); // Don't actually insert the vairables.
+    return item.pieces.join(''); // Don't actually insert the variables.
   };
 
   const newPrompts = newData.prompts.map((newItem, idx) => {

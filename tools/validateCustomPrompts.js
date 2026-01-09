@@ -7,10 +7,11 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
-const oldDir = process.argv[2] || path.join(process.env.HOME, '.tweakcc/system-prompts.backup');
+const oldDir = process.argv[2] || path.join(os.homedir(), '.tweakcc/system-prompts.backup');
 const promptsJson = process.argv[3] || 'data/prompts/prompts-2.1.2.json';
-const newDir = path.join(process.env.HOME, '.tweakcc/system-prompts');
+const newDir = path.join(os.homedir(), '.tweakcc/system-prompts');
 
 // 加载 prompts.json 获取每个 prompt 的 variables
 const promptsData = JSON.parse(fs.readFileSync(promptsJson, 'utf8'));
@@ -157,6 +158,6 @@ if (results.incompatible.length > 0) {
 }
 
 // 保存结果到 JSON
-const outputPath = '/tmp/prompt-validation-result.json';
+const outputPath = path.join(os.tmpdir(), 'prompt-validation-result.json');
 fs.writeFileSync(outputPath, JSON.stringify(results, null, 2));
 console.log(`\n详细结果已保存到: ${outputPath}`);
