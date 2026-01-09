@@ -120,12 +120,12 @@ export const writeThinkingVisibility = (oldFile: string): string | null => {
 
   // Patch 1: Case statement visibility
   const caseLocation = getCaseStatementLocation(oldFile);
-  if (caseLocation) {
+  if (caseLocation?.identifiers) {
     let replacement: string;
 
-    if (caseLocation.identifiers!.length === 4) {
+    if (caseLocation.identifiers.length === 4) {
       // Old format: remove if/return and set isTranscriptMode to true
-      replacement = `${caseLocation.identifiers![0]}${caseLocation.identifiers![1]}${caseLocation.identifiers![2]}${caseLocation.identifiers![3]}`;
+      replacement = `${caseLocation.identifiers[0]}${caseLocation.identifiers[1]}${caseLocation.identifiers[2]}${caseLocation.identifiers[3]}`;
     } else {
       // New format: replace variable names with 1
       replacement = `case"thinking":{if(!1&&!1)return null`;
@@ -148,8 +148,8 @@ export const writeThinkingVisibility = (oldFile: string): string | null => {
 
   // Patch 2: FbH collapsed view (use newFile to account for offset changes)
   const fbhLocation = getFbhCollapsedLocation(newFile);
-  if (fbhLocation) {
-    const returnVar = fbhLocation.identifiers![2];
+  if (fbhLocation?.identifiers?.[2]) {
+    const returnVar = fbhLocation.identifiers[2];
     const replacement = `if(!(1||1))return ${returnVar}`;
 
     const patchedFile =
@@ -167,6 +167,11 @@ export const writeThinkingVisibility = (oldFile: string): string | null => {
 
     newFile = patchedFile;
     anyPatched = true;
+  }
+
+  // Warn if only partial patching applied (both patches needed for full visibility)
+  if (anyPatched && (!caseLocation || !fbhLocation)) {
+    console.warn('patch: thinkingVisibility: only partial patching applied');
   }
 
   return anyPatched ? newFile : null;
