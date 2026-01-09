@@ -82,8 +82,9 @@ export const getMainAppComponentBodyStart = (
   fileContents: string
 ): number | null => {
   // Pattern matches the main app component function signature with all its props
+  // Updated for 2.1.x: removed initialPrompt, initialCheckpoints; added mainThreadAgentDefinition, disableSlashCommands
   const appComponentPattern =
-    /function ([$\w]+)\(\{(?:(?:commands|debug|initialPrompt|initialTools|initialMessages|initialCheckpoints|initialFileHistorySnapshots|mcpClients|dynamicMcpConfig|mcpCliEndpoint|autoConnectIdeFlag|strictMcpConfig|systemPrompt|appendSystemPrompt|onBeforeQuery|onTurnComplete|disabled):[$\w]+(?:=(?:[^,]+,|[^}]+\})|[,}]))+\)/g;
+    /function ([$\w]+)\(\{(?:(?:commands|debug|initialPrompt|initialTools|initialMessages|initialCheckpoints|initialFileHistorySnapshots|mcpClients|dynamicMcpConfig|mcpCliEndpoint|autoConnectIdeFlag|strictMcpConfig|systemPrompt|appendSystemPrompt|onBeforeQuery|onTurnComplete|disabled|mainThreadAgentDefinition|disableSlashCommands):[$\w]+(?:=(?:[^,]+,|[^}]+\})|[,}]))+\)/g;
 
   const allMatches = Array.from(fileContents.matchAll(appComponentPattern));
   // Filter to only matches that contain 'commands:' - unique to main app component
@@ -127,8 +128,8 @@ export const getAppStateVarAndGetterFunction = (
     return null;
   }
 
-  // Look at the next 20 chars for the useState pattern (NOT 200)
-  const chunk = fileContents.slice(bodyStart, bodyStart + 20);
+  // Look at the next 500 chars for the useState pattern (increased from 20 for 2.1.x)
+  const chunk = fileContents.slice(bodyStart, bodyStart + 500);
   const statePattern = /let\[([$\w]+),[$\w]+\]=([$\w]+)\(\)/;
   const match = chunk.match(statePattern);
 
