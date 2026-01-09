@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v3.2.5](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.2.5) - 2026-01-09
+
+- Fix patching for CC 2.1.2
+- Update node-lief to 0.1.8
 - Add subagent model configuration (#331) - @brrock
 
 ## [v3.2.4](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.2.4) - 2026-01-04
