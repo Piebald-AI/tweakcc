@@ -24,7 +24,6 @@ const getUserMessageDisplayLocation = (
         newMessageDisplayMatch[2], // Text component (C or V)
         newMessageDisplayMatch[5], // Message var (V or U)
         'new_format',
-        newMessageDisplayMatch[4], // Icons object (A1 or oH)
       ],
     };
   }
@@ -42,6 +41,7 @@ const getUserMessageDisplayLocation = (
         oldMessageDisplayMatch[1],
         oldMessageDisplayMatch[2],
         oldMessageDisplayMatch[3],
+        'old_format',
       ],
     };
   }
