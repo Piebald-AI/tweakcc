@@ -9,7 +9,29 @@ import {
 const getUserMessageDisplayLocation = (
   oldFile: string
 ): LocationResult | null => {
-  // Search for the exact error message to find the component
+  // v2.1.2+ format:
+  // return WE.createElement(T,{flexDirection:"column",marginTop:A?1:0,width:"100%"},
+  //   WE.createElement($,{backgroundColor:"userMessageBackground"},
+  //     WE.createElement($,{color:"subtle"},sA.pointer," "),
+  //     WE.createElement($,{color:"text"},J," ")))
+  const newPattern =
+    /return ([$\w]+)\.createElement\(([$\w]+),\{flexDirection:"column",marginTop:[^}]+\},([$\w]+)\.createElement\(([$\w]+),\{backgroundColor:"userMessageBackground"\},[^)]+\.createElement\([^,]+,\{color:"subtle"\},[^)]+\),[^)]+\.createElement\([^,]+,\{color:"text"\},([$\w]+)," "\)\)\)/;
+  const newMatch = oldFile.match(newPattern);
+  if (newMatch && newMatch.index !== undefined) {
+    return {
+      startIndex: newMatch.index,
+      endIndex: newMatch.index + newMatch[0].length,
+      identifiers: [
+        newMatch[1], // React var (WE)
+        newMatch[4], // Text component ($)
+        newMatch[5], // message var (J)
+        newMatch[2], // Box component (T)
+        'new', // format marker
+      ],
+    };
+  }
+
+  // Legacy format: return X.createElement(Y,{backgroundColor:"userMessageBackground",color:"text"},"> ",Z+" ");
   const messageDisplayPattern =
     /return ([$\w]+)\.createElement\(([$\w]+),\{backgroundColor:"userMessageBackground",color:"text"\},"> ",([$\w]+)\+" "\);/;
   const messageDisplayMatch = oldFile.match(messageDisplayPattern);
@@ -25,6 +47,8 @@ const getUserMessageDisplayLocation = (
       messageDisplayMatch[1],
       messageDisplayMatch[2],
       messageDisplayMatch[3],
+      '', // no separate box component in legacy
+      'legacy',
     ],
   };
 };
@@ -157,14 +181,39 @@ export const writeUserMessageDisplay = (
     if (inverse) chalkChain += '.inverse';
   }
 
-  const [reactVar, textComponent, messageVar] = location.identifiers!;
+  const [
+    reactVar,
+    textComponent,
+    messageVar,
+    boxComponentFromMatch,
+    formatType,
+  ] = location.identifiers!;
   // Replace {} in format string with the message variable
   const formattedMessage =
     '"' + format.replace(/\{\}/g, `"+${messageVar}+"`) + '"';
 
-  const newContent = `
+  // Use box component from match if available (new format), otherwise use found one
+  const finalBoxComponent = boxComponentFromMatch || boxComponent;
+
+  let newContent: string;
+
+  if (formatType === 'new') {
+    // New format (v2.1.2+): preserve the outer Box structure
+    newContent = `
 return ${reactVar}.createElement(
-  ${boxComponent},
+  ${finalBoxComponent},
+  {flexDirection:"column",marginTop:1,width:"100%",...${boxAttrsObjStr}},
+  ${reactVar}.createElement(
+    ${textComponent},
+    ${textAttrsObjStr},
+    ${needsChalk ? chalkChain + '(' : ''}${formattedMessage}${needsChalk ? ')' : ''}
+  )
+)`;
+  } else {
+    // Legacy format
+    newContent = `
+return ${reactVar}.createElement(
+  ${finalBoxComponent},
   ${boxAttrsObjStr},
   ${reactVar}.createElement(
     ${textComponent},
@@ -172,6 +221,7 @@ return ${reactVar}.createElement(
     ${needsChalk ? chalkChain + '(' : ''}${formattedMessage}${needsChalk ? ')' : ''}
   )
 );`;
+  }
 
   // Apply modification
   const newFile =
