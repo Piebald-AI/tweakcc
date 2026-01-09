@@ -3,19 +3,21 @@
 import { LocationResult, showDiff } from './index';
 
 const getThinkerVerbsLocation = (oldFile: string): LocationResult | null => {
-  // This finds the folowing pattern:
-  // ```js
-  // kW8 = {
-  //   words: [
-  //     "Actualizing",
-  //     "Baking"
-  //   ]
-  // }
-  // ```
-  // To write, we just do `{varname} = {JSON.stringify({words: verbs})}`.
+  // v2.1.2+ format: varName=["Accomplishing","Actioning","Actualizing",...]
+  // Direct array assignment without {words:...} wrapper
+  const newVerbsPattern =
+    /[;{]([$\w]+)=\["Accomplishing","Actioning","Actualizing"[^\]]*\]/;
 
-  // Performance note: putting \b at the beginning, before the variable name speeds it up
-  // from ~1.5s to ~80ms.  Explicitly search for ',' or ' ' brings it down to ~30ms.
+  const newVerbsMatch = oldFile.match(newVerbsPattern);
+  if (newVerbsMatch && newVerbsMatch.index !== undefined) {
+    return {
+      startIndex: newVerbsMatch.index + 1, // +1 to skip the ; or {
+      endIndex: newVerbsMatch.index + newVerbsMatch[0].length,
+      identifiers: [newVerbsMatch[1], 'new'], // 'new' marks the new format
+    };
+  }
+
+  // Legacy format: varName={words:["Actualizing","Baking",...]}
   const verbsPattern =
     /[, ]([$\w]+)=\{words:\[(?:"[^"{}()]+ing",)+"[^"{}()]+ing"\]\}/s;
 
@@ -29,7 +31,7 @@ const getThinkerVerbsLocation = (oldFile: string): LocationResult | null => {
     // +1 because of the ',' or ' ' at the beginning that we matched.
     startIndex: verbsMatch.index + 1,
     endIndex: verbsMatch.index + verbsMatch[0].length,
-    identifiers: [verbsMatch[1]],
+    identifiers: [verbsMatch[1], 'legacy'],
   };
 };
 
@@ -63,8 +65,15 @@ export const writeThinkerVerbs = (
   }
   const verbsLocation = location1;
   const varName = verbsLocation.identifiers?.[0];
+  const formatType = verbsLocation.identifiers?.[1]; // 'new' or 'legacy'
 
-  const verbsJson = `${varName}=${JSON.stringify({ words: verbs })}`;
+  // For new format (v2.1.2+), write direct array
+  // For legacy format, write {words: [...]}
+  const verbsJson =
+    formatType === 'new'
+      ? `${varName}=${JSON.stringify(verbs)}`
+      : `${varName}=${JSON.stringify({ words: verbs })}`;
+
   const newFile1 =
     oldFile.slice(0, verbsLocation.startIndex) +
     verbsJson +
@@ -78,8 +87,13 @@ export const writeThinkerVerbs = (
     verbsLocation.endIndex
   );
 
-  // Update the the function that returns the spinner verbs to always return the hard-coded verbs
-  // and not use any Statsig ones.  That also prevents `undefined...` from showing up in the UI.
+  // For new format (v2.1.2+), the statsig function doesn't exist, so we're done
+  if (formatType === 'new') {
+    return newFile1;
+  }
+
+  // For legacy format: Update the function that returns the spinner verbs
+  // to always return the hard-coded verbs and not use any Statsig ones.
   const location2 = getThinkerVerbsUseLocation(newFile1);
   if (!location2) {
     return null;

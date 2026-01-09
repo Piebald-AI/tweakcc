@@ -10,14 +10,29 @@ import { LocationResult, showDiff } from './index';
 const getThinkingVisibilityLocation = (
   oldFile: string
 ): LocationResult | null => {
-  // In this code:
-  // ```
+  // v2.1.2+ format:
+  // function ybA({...isTranscriptMode:B,verbose:G...}){
+  //   if(!A)return null;
+  //   if(Z)return null;
+  //   if(!(B||G))return createElement(...,"∴ Thinking (ctrl+o to expand)");
+  //   return createElement(...); // full thinking content
+  // }
+  // We need to remove the if(!(B||G))return... line to always show full thinking.
+  const newPattern =
+    /if\(!\([A-Za-z]+\|\|[A-Za-z]+\)\)return[^;]+Thinking[^;]+;/;
+  const newMatch = oldFile.match(newPattern);
+  if (newMatch && newMatch.index !== undefined) {
+    return {
+      startIndex: newMatch.index,
+      endIndex: newMatch.index + newMatch[0].length,
+      identifiers: ['new'],
+    };
+  }
+
+  // Legacy format:
   // case "thinking":
-  //  if (!H && !G)
-  //    return null;
-  //  return b5.createElement(mn2, {addMargin: Q, param: A, isTranscriptMode: H, verbose: G });
-  // ```
-  // we need to remove the if and the return.
+  //  if (!H && !G) return null;
+  //  return createElement(..., {isTranscriptMode: H, ...});
   const visibilityPattern =
     /(case"thinking":)if\(.+?\)return null;(.+?isTranscriptMode:).+?([},])/;
   const visibilityMatch = oldFile.match(visibilityPattern);
@@ -46,7 +61,17 @@ export const writeThinkingVisibility = (oldFile: string): string | null => {
     return null;
   }
 
-  const visibilityReplacement = `${visibilityLocation.identifiers![0]}${visibilityLocation.identifiers![1]}true${visibilityLocation.identifiers![2]}`;
+  const formatType = visibilityLocation.identifiers![0];
+  let visibilityReplacement: string;
+
+  if (formatType === 'new') {
+    // v2.1.2+: Remove the if(!(B||G))return... line entirely
+    visibilityReplacement = '';
+  } else {
+    // Legacy: Replace with isTranscriptMode:true
+    visibilityReplacement = `${visibilityLocation.identifiers![0]}${visibilityLocation.identifiers![1]}true${visibilityLocation.identifiers![2]}`;
+  }
+
   const newFile =
     oldFile.slice(0, visibilityLocation.startIndex) +
     visibilityReplacement +
@@ -55,7 +80,7 @@ export const writeThinkingVisibility = (oldFile: string): string | null => {
   showDiff(
     oldFile,
     newFile,
-    visibilityReplacement,
+    visibilityReplacement || '(removed)',
     visibilityLocation.startIndex,
     visibilityLocation.endIndex
   );
