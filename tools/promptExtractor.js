@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const parser = require('@babel/parser');
+const { extractVariableMap, TOOL_NAME_MAP } = require('./autoIdentifierMap');
 
 function slugify(text) {
   return text
@@ -76,8 +77,11 @@ function validateInput(text, minLength = 500) {
   return true;
 }
 
-function extractStrings(filepath, minLength = 500) {
+function extractStrings(filepath, minLength = 500, autoVariableMap = null) {
   const code = fs.readFileSync(filepath, 'utf-8');
+
+  // 自动提取变量映射（如果没有提供）
+  const variableMap = autoVariableMap || extractVariableMap(filepath).variableMap;
 
   const ast = parser.parse(code, {
     sourceType: 'module',
@@ -107,7 +111,7 @@ function extractStrings(filepath, minLength = 500) {
 
     // Extract template literals
     if (node.type === 'TemplateLiteral') {
-      const { expressions } = node;
+      const { quasis, expressions } = node;
 
       // Extract the entire template content directly from source (excluding backticks)
       const contentStart = node.start + 1; // After opening backtick
@@ -119,104 +123,84 @@ function extractStrings(filepath, minLength = 500) {
         return;
       }
 
-      // Collect all identifiers with their positions
-      const allIdentifiers = []; // Array of {name, start, end} sorted by position
+      // Helper: extract the ROOT identifier from an expression
+      // For ${VAR} -> VAR
+      // For ${FN()} -> FN
+      // For ${OBJ.prop} -> OBJ
+      // For ${FN(A,B)} -> FN (not A, B - we only want the root)
+      const getRootIdentifier = (exprNode) => {
+        if (!exprNode || typeof exprNode !== 'object') return null;
 
-      for (let i = 0; i < expressions.length; i++) {
-        const expr = expressions[i];
-
-        const traverseExpr = (exprNode, isTopLevel = true) => {
-          if (!exprNode || typeof exprNode !== 'object') return;
-
-          if (exprNode.type === 'Identifier' && isTopLevel) {
-            allIdentifiers.push({
-              name: exprNode.name,
-              start: exprNode.start - contentStart,
-              end: exprNode.end - contentStart,
-            });
-          }
-
-          if (exprNode.type === 'CallExpression') {
-            traverseExpr(exprNode.callee, true);
-            if (exprNode.arguments) {
-              exprNode.arguments.forEach(arg => traverseExpr(arg, true));
-            }
-            return;
-          }
-
-          if (exprNode.type === 'MemberExpression') {
-            traverseExpr(exprNode.object, true);
-            return;
-          }
-
-          if (exprNode.type === 'TemplateLiteral') {
-            if (exprNode.expressions) {
-              exprNode.expressions.forEach(nestedExpr =>
-                traverseExpr(nestedExpr, true)
-              );
-            }
-            return;
-          }
-
-          if (exprNode.type === 'ObjectExpression') {
-            if (exprNode.properties) {
-              exprNode.properties.forEach(prop => {
-                if (prop.value) {
-                  traverseExpr(prop.value, false);
-                }
-              });
-            }
-            return;
-          }
-
-          for (const key in exprNode) {
-            if (key === 'loc' || key === 'start' || key === 'end') continue;
-            const value = exprNode[key];
-            if (Array.isArray(value)) {
-              value.forEach(v => traverseExpr(v, true));
-            } else if (value && typeof value === 'object') {
-              traverseExpr(value, true);
-            }
-          }
-        };
-
-        traverseExpr(expr, true);
-      }
-
-      // Sort identifiers by position
-      allIdentifiers.sort((a, b) => a.start - b.start);
-
-      // Build pieces array by splitting around identifiers, keeping ${ and }
-      const pieces = [];
-      const identifierList = [];
-      const identifierMap = {};
-
-      let lastPos = 0;
-
-      for (const id of allIdentifiers) {
-        // Find the ${ before this identifier (search backwards from id.start)
-        let beforeIdentifier = fullContent.substring(lastPos, id.start);
-
-        // Find the } after this identifier (search forwards from id.end)
-        // We need to find the matching closing brace for the interpolation
-        let afterIdentifierStart = id.end;
-
-        // Add the piece including everything up to and including just before the identifier
-        pieces.push(beforeIdentifier);
-
-        // Add identifier to the list
-        identifierList.push(id.name);
-
-        // Add to map if not already there
-        if (!identifierMap[id.name]) {
-          identifierMap[id.name] = '';
+        if (exprNode.type === 'Identifier') {
+          return exprNode.name;
         }
 
-        lastPos = id.end;
+        if (exprNode.type === 'CallExpression') {
+          return getRootIdentifier(exprNode.callee);
+        }
+
+        if (exprNode.type === 'MemberExpression') {
+          return getRootIdentifier(exprNode.object);
+        }
+
+        if (exprNode.type === 'ConditionalExpression') {
+          return getRootIdentifier(exprNode.test);
+        }
+
+        if (exprNode.type === 'BinaryExpression' || exprNode.type === 'LogicalExpression') {
+          return getRootIdentifier(exprNode.left);
+        }
+
+        if (exprNode.type === 'UnaryExpression') {
+          return getRootIdentifier(exprNode.argument);
+        }
+
+        return null;
+      };
+
+      // Build pieces in the format expected by buildSearchRegexFromPieces:
+      // - pieces[i] ends with "${" (except last piece)
+      // - pieces[i+1] starts with the closing part after the root identifier
+      const pieces = [];
+
+      for (let i = 0; i < quasis.length; i++) {
+        let piece = quasis[i].value.raw;
+
+        if (i < expressions.length) {
+          // Not the last quasi - add ${ suffix
+          piece += '${';
+        }
+
+        if (i > 0) {
+          // Not the first quasi - need to add prefix from previous expression
+          const prevExpr = expressions[i - 1];
+          const rootId = getRootIdentifier(prevExpr);
+
+          if (rootId) {
+            // Get the source code of the expression
+            const exprSource = code.substring(prevExpr.start, prevExpr.end);
+            // Find where the root identifier ends in the expression
+            const rootIdx = exprSource.indexOf(rootId);
+            if (rootIdx !== -1) {
+              // Everything after the root identifier becomes the prefix
+              const afterRoot = exprSource.substring(rootIdx + rootId.length);
+              piece = afterRoot + '}' + piece;
+            } else {
+              piece = '}' + piece;
+            }
+          } else {
+            piece = '}' + piece;
+          }
+        }
+
+        pieces.push(piece);
       }
 
-      // Add the final piece after the last identifier
-      pieces.push(fullContent.substring(lastPos));
+      // Extract root identifier for each expression
+      const identifierList = expressions.map(expr => {
+        const rootId = getRootIdentifier(expr);
+        return rootId || '__UNKNOWN__';
+      });
 
       // Label encode the identifiers
       const uniqueVars = [...new Set(identifierList)];
@@ -230,7 +214,13 @@ function extractStrings(filepath, minLength = 500) {
       );
       const labelEncodedMap = {};
       Object.keys(varToLabel).forEach(varName => {
-        labelEncodedMap[varToLabel[varName]] = '';
+        const label = varToLabel[varName];
+        // 自动填充人类可读名称
+        if (variableMap[varName]) {
+          labelEncodedMap[label] = variableMap[varName];
+        } else {
+          labelEncodedMap[label] = `VAR_${varName}`;
+        }
       });
 
       stringData.push({
@@ -289,6 +279,21 @@ function extractStrings(filepath, minLength = 500) {
 }
 
 function mergeWithExisting(newData, oldData, currentVersion) {
+  // Helper to merge identifierMap: prefer user-set names, fallback to auto-generated
+  const mergeIdentifierMap = (newMap, oldMap) => {
+    const merged = { ...newMap };
+    if (oldMap) {
+      Object.keys(oldMap).forEach(key => {
+        // If old map has a non-empty, user-set value (not VAR_* or SET_*), keep it
+        const oldValue = oldMap[key];
+        if (oldValue && !oldValue.startsWith('VAR_') && !oldValue.startsWith('SET_')) {
+          merged[key] = oldValue;
+        }
+      });
+    }
+    return merged;
+  };
+
   if (!oldData || !oldData.prompts) {
     // No old data, add current version to all new prompts
     return {
@@ -307,56 +312,44 @@ function mergeWithExisting(newData, oldData, currentVersion) {
   const newPrompts = newData.prompts.map((newItem, idx) => {
     const newContent = reconstructContent(newItem);
 
-    // Try to find a matching old item by content and label-encoded identifiers
+    // Try to find a matching old item by content (ignore identifiers, they may change)
     const matchingOld = oldData.prompts.find(oldItem => {
       const oldContent = reconstructContent(oldItem);
-      if (newContent !== oldContent) return false;
-
-      // Also compare label-encoded identifiers
-      if (newItem.identifiers.length !== oldItem.identifiers.length)
-        return false;
-      return (
-        JSON.stringify(newItem.identifiers) ===
-        JSON.stringify(oldItem.identifiers)
-      );
+      return newContent === oldContent;
     });
 
     // If we found a match, copy over the metadata
     if (matchingOld) {
       // Prompt matches exactly
-      // If old prompt has no version, use current version; otherwise use old version
       return {
         ...newItem,
         name: matchingOld.name,
         id: matchingOld.id || slugify(matchingOld.name),
         description: matchingOld.description,
-        identifierMap: matchingOld.identifierMap,
+        // Smart merge: keep user-set names, use auto-generated for others
+        identifierMap: mergeIdentifierMap(newItem.identifierMap, matchingOld.identifierMap),
         version: matchingOld.version || currentVersion,
       };
     }
 
-    // No exact match found - check if there's a prompt with same metadata but different content
+    // No exact match found - check if there's a prompt with same name
     const similarOld = oldData.prompts.find(oldItem => {
-      // Check if names match (not placeholder) as a heuristic for "same prompt, different content"
       return oldItem.name !== '' && oldItem.name === newItem.name;
     });
 
     if (similarOld && similarOld.version) {
-      // Old prompt exists with a version and content changed - use current version
       console.log(
         `Content changed for "${newItem.name}", updating version from ${similarOld.version} to ${currentVersion}`
       );
       return {
         ...newItem,
         id: similarOld.id || slugify(similarOld.name),
+        identifierMap: mergeIdentifierMap(newItem.identifierMap, similarOld.identifierMap),
         version: currentVersion,
       };
     }
 
-    // Check if there's any old prompt without a version (we should add current version)
-    const oldWithoutVersion = oldData.prompts.find(oldItem => !oldItem.version);
-
-    // New prompt or old prompt didn't have version - add current version
+    // New prompt - add current version
     console.log(
       `No match for item ${idx}: ${JSON.stringify(newContent.slice(0, 100))}`
     );
