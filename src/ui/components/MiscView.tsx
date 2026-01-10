@@ -31,7 +31,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     hideCtrlGToEditPrompt: false,
     hideStartupClawd: false,
     increaseFileReadLimit: false,
-    suppressLineNumbers: true,
+    suppressLineNumbers: false,
   };
 
   const ensureMisc = () => {
@@ -172,7 +172,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         title: 'Suppress line numbers in file reads/edits',
         description:
           'Removes line number prefixes from file content to reduce token usage.',
-        getValue: () => settings.misc?.suppressLineNumbers ?? true,
+        getValue: () => settings.misc?.suppressLineNumbers ?? false,
         toggle: () => {
           updateSettings(settings => {
             ensureMisc();
