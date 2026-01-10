@@ -61,6 +61,7 @@ import { writeHideCtrlGToEditPrompt } from './hideCtrlGToEditPrompt';
 import { writeHideStartupClawd } from './hideStartupClawd';
 import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
+import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -661,6 +662,11 @@ export const applyCustomization = async (
   // Apply suppress line number patch (if enabled)
   if (config.settings.misc?.suppressLineNumbers) {
     if ((result = writeSuppressLineNumbers(content))) content = result;
+  }
+
+  // Apply suppress rate limit options patch (if enabled)
+  if (config.settings.misc?.suppressRateLimitOptions) {
+    if ((result = writeSuppressRateLimitOptions(content))) content = result;
   }
 
   // Write the modified content back

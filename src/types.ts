@@ -114,6 +114,7 @@ export interface MiscConfig {
   hideStartupClawd: boolean;
   increaseFileReadLimit: boolean;
   suppressLineNumbers: boolean;
+  suppressRateLimitOptions: boolean;
 }
 
 export interface Toolset {
