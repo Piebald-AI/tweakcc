@@ -6,7 +6,8 @@ export const writeSuppressRateLimitOptions = (
   oldFile: string
 ): string | null => {
   // Find all occurrences of: agentDefinitions:someVar,onOpenRateLimitOptions:someVar
-  const pattern = /agentDefinitions:[$\w]+,onOpenRateLimitOptions:([$\w]+)/g;
+  const pattern =
+    /showAllInTranscript:[$\w]+,agentDefinitions:[$\w]+,onOpenRateLimitOptions:([$\w]+)/g;
 
   let content = oldFile;
   let match;
