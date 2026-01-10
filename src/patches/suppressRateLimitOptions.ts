@@ -5,9 +5,8 @@ import { showDiff } from './index';
 export const writeSuppressRateLimitOptions = (
   oldFile: string
 ): string | null => {
-  // Find all occurrences of: agentDefinitions:someVar,onOpenRateLimitOptions:someVar
   const pattern =
-    /showAllInTranscript:[$\w]+,agentDefinitions:[$\w]+,onOpenRateLimitOptions:([$\w]+)/g;
+    /\bshowAllInTranscript:[$\w]+,agentDefinitions:[$\w]+,onOpenRateLimitOptions:([$\w]+)/g;
 
   let content = oldFile;
   let match;
