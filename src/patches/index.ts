@@ -58,7 +58,7 @@ import {
 } from './toolsets';
 import { writeConversationTitle } from './conversationTitle';
 import { writeHideStartupBanner } from './hideStartupBanner';
-import { writeHideCtrlGToEditPrompt } from './hideCtrlGToEditPrompt';
+import { writeHideCtrlGToEdit } from './hideCtrlGToEdit';
 import { writeHideStartupClawd } from './hideStartupClawd';
 import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
@@ -663,9 +663,9 @@ export const applyCustomization = async (
     if ((result = writeHideStartupBanner(content))) content = result;
   }
 
-  // Apply hide ctrl-g to edit prompt patch (if enabled)
-  if (config.settings.misc?.hideCtrlGToEditPrompt) {
-    if ((result = writeHideCtrlGToEditPrompt(content))) content = result;
+  // Apply hide ctrl-g to edit patch (if enabled)
+  if (config.settings.misc?.hideCtrlGToEdit) {
+    if ((result = writeHideCtrlGToEdit(content))) content = result;
   }
 
   // Apply hide startup clawd patch (if enabled)

@@ -28,7 +28,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     expandThinkingBlocks: true,
     enableConversationTitle: true,
     hideStartupBanner: false,
-    hideCtrlGToEditPrompt: false,
+    hideCtrlGToEdit: false,
     hideStartupClawd: false,
     increaseFileReadLimit: false,
     suppressLineNumbers: true,
@@ -132,12 +132,11 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         title: 'Hide ctrl-g to edit prompt hint',
         description:
           'Hides the "ctrl-g to edit prompt" hint shown during streaming.',
-        getValue: () => settings.misc?.hideCtrlGToEditPrompt ?? false,
+        getValue: () => settings.misc?.hideCtrlGToEdit ?? false,
         toggle: () => {
           updateSettings(settings => {
             ensureMisc();
-            settings.misc!.hideCtrlGToEditPrompt =
-              !settings.misc!.hideCtrlGToEditPrompt;
+            settings.misc!.hideCtrlGToEdit = !settings.misc!.hideCtrlGToEdit;
           });
         },
       },

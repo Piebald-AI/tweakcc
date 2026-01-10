@@ -110,7 +110,7 @@ export interface MiscConfig {
   expandThinkingBlocks: boolean;
   enableConversationTitle: boolean;
   hideStartupBanner: boolean;
-  hideCtrlGToEditPrompt: boolean;
+  hideCtrlGToEdit: boolean;
   hideStartupClawd: boolean;
   increaseFileReadLimit: boolean;
   suppressLineNumbers: boolean;
