@@ -539,6 +539,195 @@ describe('config.ts', () => {
       });
     });
 
+    it('should use fallback detection for JavaScript when WASMagic fails (SIMD unsupported)', async () => {
+      const mockConfig = {
+        ccInstallationPath: null,
+        changesApplied: false,
+        ccVersion: '',
+        lastModified: '',
+        settings: DEFAULT_SETTINGS,
+      };
+
+      const mockExePath = '/usr/local/bin/claude';
+      const mockCliContent =
+        'some code VERSION:"5.5.5" more code VERSION:"5.5.5" and VERSION:"5.5.5"';
+
+      // Simulate WASMagic initialization failure (SIMD unsupported)
+      (
+        WASMagic.create as unknown as ReturnType<typeof vi.fn>
+      ).mockRejectedValue(
+        new Error('RuntimeError: Aborted(CompileError: Wasm SIMD unsupported)')
+      );
+
+      vi.mocked(whichMock).mockResolvedValue(mockExePath);
+
+      vi.spyOn(fs, 'stat').mockImplementation(async p => {
+        if (p === mockExePath) {
+          return {} as Stats;
+        }
+        throw createEnoent();
+      });
+      lstatSpy.mockResolvedValue(createRegularStats());
+      vi.spyOn(fs, 'realpath').mockResolvedValue(mockExePath);
+
+      // Return JavaScript content (text, no binary magic bytes)
+      vi.spyOn(fs, 'open').mockResolvedValue({
+        read: async ({ buffer }: { buffer: Buffer }) => {
+          const contentBuffer = Buffer.from(mockCliContent);
+          contentBuffer.copy(buffer);
+          return { bytesRead: contentBuffer.length, buffer };
+        },
+        close: async () => {},
+      } as unknown as fs.FileHandle);
+
+      vi.spyOn(fs, 'readFile').mockImplementation(async (p, encoding) => {
+        if (p === mockExePath && encoding === 'utf8') {
+          return mockCliContent;
+        }
+        throw createEnoent();
+      });
+
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
+
+      expect(result).toEqual({
+        cliPath: mockExePath,
+        source: 'path',
+        version: '5.5.5',
+      });
+    });
+
+    it('should use fallback detection for ELF binary when WASMagic fails', async () => {
+      const mockConfig = {
+        ccInstallationPath: null,
+        changesApplied: false,
+        ccVersion: '',
+        lastModified: '',
+        settings: DEFAULT_SETTINGS,
+      };
+
+      const mockExePath = '/usr/local/bin/claude';
+      const mockJsBuffer = Buffer.from(
+        'some code VERSION:"6.6.6" more code VERSION:"6.6.6" and VERSION:"6.6.6"',
+        'utf8'
+      );
+
+      // ELF magic bytes: 0x7F 'E' 'L' 'F'
+      const elfBinary = Buffer.alloc(100);
+      elfBinary[0] = 0x7f;
+      elfBinary[1] = 0x45; // E
+      elfBinary[2] = 0x4c; // L
+      elfBinary[3] = 0x46; // F
+
+      // Simulate WASMagic initialization failure
+      (
+        WASMagic.create as unknown as ReturnType<typeof vi.fn>
+      ).mockRejectedValue(
+        new Error('RuntimeError: Aborted(CompileError: Wasm SIMD unsupported)')
+      );
+
+      vi.mocked(whichMock).mockResolvedValue(mockExePath);
+
+      vi.spyOn(fs, 'stat').mockImplementation(async p => {
+        if (p === mockExePath) {
+          return {} as Stats;
+        }
+        throw createEnoent();
+      });
+      lstatSpy.mockResolvedValue(createRegularStats());
+      vi.spyOn(fs, 'realpath').mockResolvedValue(mockExePath);
+
+      // Return ELF binary content
+      vi.spyOn(fs, 'open').mockResolvedValue({
+        read: async ({ buffer }: { buffer: Buffer }) => {
+          elfBinary.copy(buffer);
+          return { bytesRead: elfBinary.length, buffer };
+        },
+        close: async () => {},
+      } as unknown as fs.FileHandle);
+
+      vi.spyOn(
+        nativeInstallation,
+        'extractClaudeJsFromNativeInstallation'
+      ).mockResolvedValue(mockJsBuffer);
+
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
+
+      expect(result).toEqual({
+        nativeInstallationPath: mockExePath,
+        source: 'path',
+        version: '6.6.6',
+      });
+    });
+
+    it('should use fallback detection for Mach-O binary when WASMagic fails', async () => {
+      const mockConfig = {
+        ccInstallationPath: null,
+        changesApplied: false,
+        ccVersion: '',
+        lastModified: '',
+        settings: DEFAULT_SETTINGS,
+      };
+
+      const mockExePath = '/usr/local/bin/claude';
+      const mockJsBuffer = Buffer.from(
+        'some code VERSION:"7.7.7" more code VERSION:"7.7.7" and VERSION:"7.7.7"',
+        'utf8'
+      );
+
+      // Mach-O 64-bit magic bytes (little-endian): CF FA ED FE
+      const machoBuffer = Buffer.alloc(100);
+      machoBuffer[0] = 0xcf;
+      machoBuffer[1] = 0xfa;
+      machoBuffer[2] = 0xed;
+      machoBuffer[3] = 0xfe;
+
+      // Simulate WASMagic initialization failure
+      (
+        WASMagic.create as unknown as ReturnType<typeof vi.fn>
+      ).mockRejectedValue(
+        new Error('RuntimeError: Aborted(CompileError: Wasm SIMD unsupported)')
+      );
+
+      vi.mocked(whichMock).mockResolvedValue(mockExePath);
+
+      vi.spyOn(fs, 'stat').mockImplementation(async p => {
+        if (p === mockExePath) {
+          return {} as Stats;
+        }
+        throw createEnoent();
+      });
+      lstatSpy.mockResolvedValue(createRegularStats());
+      vi.spyOn(fs, 'realpath').mockResolvedValue(mockExePath);
+
+      // Return Mach-O binary content
+      vi.spyOn(fs, 'open').mockResolvedValue({
+        read: async ({ buffer }: { buffer: Buffer }) => {
+          machoBuffer.copy(buffer);
+          return { bytesRead: machoBuffer.length, buffer };
+        },
+        close: async () => {},
+      } as unknown as fs.FileHandle);
+
+      vi.spyOn(
+        nativeInstallation,
+        'extractClaudeJsFromNativeInstallation'
+      ).mockResolvedValue(mockJsBuffer);
+
+      const result = await findClaudeCodeInstallation(mockConfig, {
+        interactive: true,
+      });
+
+      expect(result).toEqual({
+        nativeInstallationPath: mockExePath,
+        source: 'path',
+        version: '7.7.7',
+      });
+    });
+
     it('should return null if the installation is not found', async () => {
       const mockConfig = {
         ccInstallationPath: null,
