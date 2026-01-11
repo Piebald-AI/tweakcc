@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fix hideCtrlGToEdit patch (#361) - @basekevin
+
 ## [v3.2.5](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.2.5) - 2026-01-09
 
 - Fix patching for CC 2.1.2 (#352) - @basekevin
