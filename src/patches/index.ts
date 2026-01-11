@@ -43,6 +43,7 @@ import { writeThinkerSymbolChars } from './thinkerSymbolChars';
 import { writeThinkerSymbolSpeed } from './thinkerSymbolSpeed';
 import { writeThinkerSymbolWidthLocation } from './thinkerSymbolWidth';
 import { writeThinkerVerbs } from './thinkerVerbs';
+import { writeCompletionVerbs } from './completionVerbs';
 import { writeUserMessageDisplay } from './userMessageDisplay';
 import { writeVerboseProperty } from './verboseProperty';
 import { writeModelCustomizations } from './modelSelector';
@@ -522,6 +523,13 @@ export const applyCustomization = async (
     if ((result = writeThinkerVerbs(content, config.settings.thinkingVerbs.verbs)))
       content = result;
     if ((result = writeThinkerFormat(content, config.settings.thinkingVerbs.format)))
+      content = result;
+  }
+
+  // Apply completion verbs (past-tense verbs shown after thinking completes)
+  // prettier-ignore
+  if (config.settings.completionVerbs) {
+    if ((result = writeCompletionVerbs(content, config.settings.completionVerbs.verbs)))
       content = result;
   }
 

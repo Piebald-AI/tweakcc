@@ -14,6 +14,10 @@ const baseMenuItems: SelectItem[] = [
     desc: "Customize the list of verbs that Claude Code uses when it's working",
   },
   {
+    name: MainMenuItem.COMPLETION_VERBS,
+    desc: "Customize the past-tense verbs shown after thinking completes (e.g., 'Baked for 42s')",
+  },
+  {
     name: MainMenuItem.THINKING_STYLE,
     desc: 'Choose custom spinners',
   },

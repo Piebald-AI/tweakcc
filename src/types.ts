@@ -71,6 +71,10 @@ export interface ThinkingVerbsConfig {
   verbs: string[];
 }
 
+export interface CompletionVerbsConfig {
+  verbs: string[];
+}
+
 export interface ThinkingStyleConfig {
   reverseMirror: boolean;
   updateInterval: number;
@@ -130,6 +134,7 @@ export interface SubagentModelsConfig {
 export interface Settings {
   themes: Theme[];
   thinkingVerbs: ThinkingVerbsConfig;
+  completionVerbs: CompletionVerbsConfig;
   thinkingStyle: ThinkingStyleConfig;
   userMessageDisplay: UserMessageDisplayConfig;
   inputBox: InputBoxConfig;
@@ -186,6 +191,7 @@ export enum MainMenuItem {
   APPLY_CHANGES = '*Apply customizations',
   THEMES = 'Themes',
   THINKING_VERBS = 'Thinking verbs',
+  COMPLETION_VERBS = 'Completion verbs',
   THINKING_STYLE = 'Thinking style',
   USER_MESSAGE_DISPLAY = 'User message display',
   MISC = 'Misc',
