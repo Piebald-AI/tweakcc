@@ -248,7 +248,7 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
     // In v3.2.0 userMessageDisplay was restructured from prefix/message to a single format string.
     migrateUserMessageDisplayToV320(readConfig);
 
-    // Migrate hideCtrlGToEditPrompt to hideCtrlGToEdit
+    // In 3.2.6 hideCtrlGToEditPrompt was renamed to hideCtrlGToEdit.
     migrateHideCtrlGToEditPrompt(readConfig);
 
     // Remove launchText if it exists in the config; it was removed in v3.0.0.
