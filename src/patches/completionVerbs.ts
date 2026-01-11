@@ -9,10 +9,10 @@ const getCompletionVerbsLocation = (oldFile: string): LocationResult | null => {
 
   // Performance note: putting boundary at beginning speeds up matching significantly
   const completionVerbsPattern =
-    /[,;]([$\w]+)=\[(?:"[^"{}()]+",)+"[^"{}()]+"]\]/s;
+    /[,;]([$\w]+)=\[(?:"[^"]+"(?:,"[^"]+")*)?]/;
 
   const match = oldFile.match(completionVerbsPattern);
-  if (match && match.index != undefined) {
+  if (match && match.index !== undefined) {
     return {
       // +1 because of the ',' or ';' at the beginning that we matched.
       startIndex: match.index + 1,
