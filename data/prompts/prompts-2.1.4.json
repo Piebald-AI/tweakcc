@@ -584,9 +584,9 @@
         7,
         8,
         9,
-        10,
-        10,
-        10,
+        3,
+        3,
+        3,
         11
       ],
       "identifierMap": {
@@ -731,11 +731,11 @@
         "2": "READ_TOOL",
         "3": "GLOB_TOOL",
         "4": "GET_SUBSCRIPTION_TYPE_FN",
-        "5": "BASH_TOOL",
-        "6": "TASK_TOOL_OBJECT",
-        "7": "WRITE_TOOL",
-        "8": "IS_TRUTHY_FN",
-        "9": "PROCESS_OBJECT"
+        "5": "IS_TRUTHY_FN",
+        "6": "PROCESS_OBJECT",
+        "7": "BASH_TOOL",
+        "8": "TASK_TOOL_OBJECT",
+        "9": "WRITE_TOOL"
       },
       "version": "2.1.4"
     },
