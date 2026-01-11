@@ -205,9 +205,15 @@ export function CompletionVerbsView({ onBack }: CompletionVerbsViewProps) {
           flexDirection="column"
         >
           <Text>
-            <Text color={claudeColor}>
-              {verbs[selectedVerbIndex]} for 42s
-            </Text>
+            {verbs.length > 0 &&
+            selectedVerbIndex >= 0 &&
+            selectedVerbIndex < verbs.length ? (
+              <Text color={claudeColor}>
+                {verbs[selectedVerbIndex]} for 42s
+              </Text>
+            ) : (
+              <Text color="gray">No verbs configured</Text>
+            )}
           </Text>
         </Box>
       </Box>
