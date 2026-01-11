@@ -62,6 +62,7 @@ import { writeHideCtrlGToEditPrompt } from './hideCtrlGToEditPrompt';
 import { writeHideStartupClawd } from './hideStartupClawd';
 import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
+import { writeThinkingLabel } from './thinkingLabel';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -603,6 +604,9 @@ export const applyCustomization = async (
 
   // Apply thinking visibility patch (always enabled)
   if ((result = writeThinkingVisibility(content))) content = result;
+
+  // Apply thinking label styling patch (always enabled)
+  if ((result = writeThinkingLabel(content))) content = result;
 
   // Apply patches applied indication
   const showTweakccVersion = config.settings.misc?.showTweakccVersion ?? true;
