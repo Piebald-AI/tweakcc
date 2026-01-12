@@ -309,7 +309,6 @@ export const writeToolsetFieldToAppState = (
     ? JSON.stringify(defaultToolset)
     : 'undefined';
   const textToInsert = `,toolset:${toolsetValue}`;
-
   for (const mod of modifications) {
     newFile =
       newFile.slice(0, mod.index) + textToInsert + newFile.slice(mod.index);

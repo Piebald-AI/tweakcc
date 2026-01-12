@@ -87,6 +87,18 @@ export const migrateUserMessageDisplayToV320 = (readConfig: TweakccConfig) => {
 };
 
 /**
+ * Migrates old hideCtrlGToEditPrompt to hideCtrlGToEdit.
+ * @param readConfig The config that was read.
+ */
+export const migrateHideCtrlGToEditPrompt = (readConfig: TweakccConfig) => {
+  const misc = readConfig?.settings?.misc as unknown as Record<string, unknown>;
+  if (misc && 'hideCtrlGToEditPrompt' in misc) {
+    misc.hideCtrlGToEdit = misc.hideCtrlGToEditPrompt;
+    delete misc.hideCtrlGToEditPrompt;
+  }
+};
+
+/**
  * Migrates old ccInstallationDir config to ccInstallationPath if needed.
  * This should be called once at startup before any readConfigFile() calls.
  * @returns true if migration occurred, false otherwise

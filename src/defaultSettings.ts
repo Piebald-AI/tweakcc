@@ -750,7 +750,7 @@ export const DEFAULT_SETTINGS: Settings = {
     expandThinkingBlocks: true,
     enableConversationTitle: true,
     hideStartupBanner: false,
-    hideCtrlGToEditPrompt: false,
+    hideCtrlGToEdit: false,
     hideStartupClawd: false,
     increaseFileReadLimit: false,
     suppressLineNumbers: true,

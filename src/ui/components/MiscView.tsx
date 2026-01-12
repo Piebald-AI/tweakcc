@@ -28,10 +28,10 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     expandThinkingBlocks: true,
     enableConversationTitle: true,
     hideStartupBanner: false,
-    hideCtrlGToEditPrompt: false,
+    hideCtrlGToEdit: false,
     hideStartupClawd: false,
     increaseFileReadLimit: false,
-    suppressLineNumbers: true,
+    suppressLineNumbers: false,
   };
 
   const ensureMisc = () => {
@@ -132,12 +132,11 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         title: 'Hide ctrl-g to edit prompt hint',
         description:
           'Hides the "ctrl-g to edit prompt" hint shown during streaming.',
-        getValue: () => settings.misc?.hideCtrlGToEditPrompt ?? false,
+        getValue: () => settings.misc?.hideCtrlGToEdit ?? false,
         toggle: () => {
           updateSettings(settings => {
             ensureMisc();
-            settings.misc!.hideCtrlGToEditPrompt =
-              !settings.misc!.hideCtrlGToEditPrompt;
+            settings.misc!.hideCtrlGToEdit = !settings.misc!.hideCtrlGToEdit;
           });
         },
       },
@@ -172,7 +171,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         title: 'Suppress line numbers in file reads/edits',
         description:
           'Removes line number prefixes from file content to reduce token usage.',
-        getValue: () => settings.misc?.suppressLineNumbers ?? true,
+        getValue: () => settings.misc?.suppressLineNumbers ?? false,
         toggle: () => {
           updateSettings(settings => {
             ensureMisc();
