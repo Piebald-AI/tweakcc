@@ -7,7 +7,7 @@ const getContextLimitLocation = (oldFile: string): number | null => {
   // npm: function R$(A,Q){if(A.includes("[1m]")||Q?.includes(T8A)&&lL9(A))return 1e6;return cL9}var cL9=200000
   // native: function SP(H,$){if(H.includes("[1m]")||$?.includes(ffH)&&SAB(H))return 1e6;return OAB}var OAB=200000
   const newPattern =
-    /function ([$\w]+)\(([$\w]+),([$\w]+)\)\{if\([$\w]+\.includes\("\[1m\]"\)\|\|[$\w]+\?\.includes\([$\w]+\)&&[$\w]+\([$\w]+\)\)return 1e6;return ([$\w]+)\}var \4=200000/;
+    /function ([$\w]+)\(([$\w,]+)\)\{if\([$\w]+\.includes\("\[(1m|2m)\]"\)\|\|[$\w]+\?\.includes\([$\w]+\)&&[$\w]+\([$\w]+\)\)return 1e6;return ([$\w]+)\}/;
   const newMatch = oldFile.match(newPattern);
 
   if (newMatch && newMatch.index !== undefined) {
