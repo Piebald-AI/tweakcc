@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-- Suppress /rate-limit-options from being triggered when rate limits are (#358) - @bl-ue
+- Suppress /rate-limit-options from being triggered when rate limits are hit (#358) - @basekevin
 - Don't suppress line numbers by default (#360) - @bl-ue
 - Fix hideCtrlGToEdit patch (#361) - @basekevin
 - Fix context limit patch for CC 2.1.5 (#367) - @bl-ue
