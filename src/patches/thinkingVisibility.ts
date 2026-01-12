@@ -10,33 +10,54 @@ import { LocationResult, showDiff } from './index';
 const getThinkingVisibilityLocation = (
   oldFile: string
 ): LocationResult | null => {
-  // In this code:
-  // ```
-  // case "thinking":
-  //  if (!H && !G)
-  //    return null;
-  //  return b5.createElement(mn2, {addMargin: Q, param: A, isTranscriptMode: H, verbose: G });
-  // ```
-  // we need to remove the if and the return.
-  const visibilityPattern =
-    /(case"thinking":)if\(.+?\)return null;(.+?isTranscriptMode:).+?([},])/;
-  const visibilityMatch = oldFile.match(visibilityPattern);
+  // New format (2.0.77+): Case body wrapped in braces with additional hideInTranscript param
+  // npm: case"thinking":{if(!D&&!Z)return null;return n8.createElement($bA,{addMargin:Q,param:A,isTranscriptMode:D,verbose:Z,hideInTranscript:D&&!(!$||z===$)})}
+  // native: case"thinking":{if(!J&&!I)return null;return lf.createElement(ajH,{addMargin:$,param:H,isTranscriptMode:J,verbose:I,hideInTranscript:J&&!(!Q||C===Q)})
+  const newVisibilityPattern =
+    /(case"thinking":)\{if\(![$\w]+&&![$\w]+\)return null;(return [$\w]+\.createElement\([$\w]+,\{addMargin:[$\w]+,param:[$\w]+,isTranscriptMode:)([$\w]+)(,verbose:[$\w]+,hideInTranscript:[$\w]+&&!\(![$\w]+\|\|[$\w]+===[$\w]+\)\})\)\}/;
+  const newVisibilityMatch = oldFile.match(newVisibilityPattern);
 
-  if (!visibilityMatch || visibilityMatch.index === undefined) {
-    console.error(
-      'patch: thinkingVisibility: failed to find thinking visibility pattern'
-    );
-    return null;
+  if (newVisibilityMatch && newVisibilityMatch.index !== undefined) {
+    const startIndex = newVisibilityMatch.index;
+    const endIndex = startIndex + newVisibilityMatch[0].length;
+
+    return {
+      startIndex,
+      endIndex,
+      identifiers: [
+        newVisibilityMatch[1], // case"thinking":
+        newVisibilityMatch[2], // return X.createElement(...,isTranscriptMode:
+        newVisibilityMatch[4], // ,verbose:...,hideInTranscript:...})}
+        'new_format',
+      ],
+    };
   }
 
-  const startIndex = visibilityMatch.index;
-  const endIndex = startIndex + visibilityMatch[0].length;
+  // Old format: Case without braces
+  // case"thinking":if(!H && !G)return null;return createElement(...,isTranscriptMode:H,...)
+  const oldVisibilityPattern =
+    /(case"thinking":)if\([$\w!&]+\)return null;([$\w.]+\.createElement\([$\w]+,\{addMargin:[$\w]+,param:[$\w]+,isTranscriptMode:)([$\w]+)(,verbose:[$\w]+\s*\})\)/;
+  const oldVisibilityMatch = oldFile.match(oldVisibilityPattern);
 
-  return {
-    startIndex,
-    endIndex,
-    identifiers: [visibilityMatch[1], visibilityMatch[2], visibilityMatch[3]],
-  };
+  if (oldVisibilityMatch && oldVisibilityMatch.index !== undefined) {
+    const startIndex = oldVisibilityMatch.index;
+    const endIndex = startIndex + oldVisibilityMatch[0].length;
+
+    return {
+      startIndex,
+      endIndex,
+      identifiers: [
+        oldVisibilityMatch[1],
+        oldVisibilityMatch[2],
+        oldVisibilityMatch[4],
+      ],
+    };
+  }
+
+  console.error(
+    'patch: thinkingVisibility: failed to find thinking visibility pattern'
+  );
+  return null;
 };
 
 export const writeThinkingVisibility = (oldFile: string): string | null => {
@@ -46,7 +67,20 @@ export const writeThinkingVisibility = (oldFile: string): string | null => {
     return null;
   }
 
-  const visibilityReplacement = `${visibilityLocation.identifiers![0]}${visibilityLocation.identifiers![1]}true${visibilityLocation.identifiers![2]}`;
+  const isNewFormat = visibilityLocation.identifiers![3] === 'new_format';
+
+  let visibilityReplacement: string;
+
+  if (isNewFormat) {
+    // New format: case"thinking":{return X.createElement(...,isTranscriptMode:true,verbose:...,hideInTranscript:...})}
+    // We remove the if block and set isTranscriptMode to true
+    // Note: identifiers[2] ends with }), we need to add the closing ) for createElement
+    visibilityReplacement = `${visibilityLocation.identifiers![0]}{${visibilityLocation.identifiers![1]}true${visibilityLocation.identifiers![2]})}`;
+  } else {
+    // Old format: case"thinking":return X.createElement(...,isTranscriptMode:true,verbose:...})
+    visibilityReplacement = `${visibilityLocation.identifiers![0]}${visibilityLocation.identifiers![1]}true${visibilityLocation.identifiers![2]}`;
+  }
+
   const newFile =
     oldFile.slice(0, visibilityLocation.startIndex) +
     visibilityReplacement +

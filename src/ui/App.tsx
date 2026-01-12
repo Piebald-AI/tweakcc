@@ -7,6 +7,7 @@ import { ThinkingStyleView } from './components/ThinkingStyleView';
 import { UserMessageDisplayView } from './components/UserMessageDisplayView';
 import { MiscView } from './components/MiscView';
 import { ToolsetsView } from './components/ToolsetsView';
+import { SubagentModelsView } from './components/SubagentModelsView';
 import {
   MainMenuItem,
   Settings,
@@ -152,6 +153,7 @@ Please reapply your changes below.`,
       case MainMenuItem.USER_MESSAGE_DISPLAY:
       case MainMenuItem.MISC:
       case MainMenuItem.TOOLSETS:
+      case MainMenuItem.SUBAGENT_MODELS:
         setCurrentView(item);
         break;
       case MainMenuItem.VIEW_SYSTEM_PROMPTS:
@@ -220,6 +222,8 @@ Please reapply your changes below.`,
           <MiscView onSubmit={handleBack} />
         ) : currentView === MainMenuItem.TOOLSETS ? (
           <ToolsetsView onBack={handleBack} />
+        ) : currentView === MainMenuItem.SUBAGENT_MODELS ? (
+          <SubagentModelsView onBack={handleBack} />
         ) : null}
       </Box>
     </SettingsContext.Provider>

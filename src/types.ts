@@ -110,7 +110,7 @@ export interface MiscConfig {
   expandThinkingBlocks: boolean;
   enableConversationTitle: boolean;
   hideStartupBanner: boolean;
-  hideCtrlGToEditPrompt: boolean;
+  hideCtrlGToEdit: boolean;
   hideStartupClawd: boolean;
   increaseFileReadLimit: boolean;
   suppressLineNumbers: boolean;
@@ -120,6 +120,12 @@ export interface MiscConfig {
 export interface Toolset {
   name: string;
   allowedTools: string[] | '*';
+}
+
+export interface SubagentModelsConfig {
+  plan: string | null;
+  explore: string | null;
+  generalPurpose: string | null;
 }
 
 export interface Settings {
@@ -132,6 +138,7 @@ export interface Settings {
   toolsets: Toolset[];
   defaultToolset: string | null;
   planModeToolset: string | null;
+  subagentModels: SubagentModelsConfig;
 }
 
 export interface TweakccConfig {
@@ -184,6 +191,7 @@ export enum MainMenuItem {
   USER_MESSAGE_DISPLAY = 'User message display',
   MISC = 'Misc',
   TOOLSETS = 'Toolsets',
+  SUBAGENT_MODELS = 'Subagent models',
   VIEW_SYSTEM_PROMPTS = 'View system prompts',
   RESTORE_ORIGINAL = 'Restore original Claude Code (preserves config.json)',
   OPEN_CONFIG = 'Open config.json',

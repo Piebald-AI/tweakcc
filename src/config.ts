@@ -8,7 +8,10 @@ import chalk from 'chalk';
 import { Settings, Theme, ThinkingVerbsConfig, TweakccConfig } from './types';
 import { debug, expandTilde } from './utils';
 import { hasUnappliedSystemPromptChanges } from './systemPromptHashIndex';
-import { migrateUserMessageDisplayToV320 } from './migration';
+import {
+  migrateUserMessageDisplayToV320,
+  migrateHideCtrlGToEditPrompt,
+} from './migration';
 import { DEFAULT_SETTINGS } from './defaultSettings';
 
 // Support XDG Base Directory Specification with backward compatibility
@@ -244,6 +247,9 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
 
     // In v3.2.0 userMessageDisplay was restructured from prefix/message to a single format string.
     migrateUserMessageDisplayToV320(readConfig);
+
+    // In 3.2.6 hideCtrlGToEditPrompt was renamed to hideCtrlGToEdit.
+    migrateHideCtrlGToEditPrompt(readConfig);
 
     // Remove launchText if it exists in the config; it was removed in v3.0.0.
     delete (readConfig.settings as Settings & { launchText: unknown })

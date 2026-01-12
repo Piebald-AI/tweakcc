@@ -47,6 +47,7 @@ import { writeUserMessageDisplay } from './userMessageDisplay';
 import { writeVerboseProperty } from './verboseProperty';
 import { writeModelCustomizations } from './modelSelector';
 import { writeThinkingVisibility } from './thinkingVisibility';
+import { writeSubagentModels } from './subagentModels';
 import { writePatchesAppliedIndication } from './patchesAppliedIndication';
 import { applySystemPrompts } from './systemPrompts';
 import { writeFixLspSupport } from './fixLspSupport';
@@ -57,7 +58,7 @@ import {
 } from './toolsets';
 import { writeConversationTitle } from './conversationTitle';
 import { writeHideStartupBanner } from './hideStartupBanner';
-import { writeHideCtrlGToEditPrompt } from './hideCtrlGToEditPrompt';
+import { writeHideCtrlGToEdit } from './hideCtrlGToEdit';
 import { writeHideStartupClawd } from './hideStartupClawd';
 import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
@@ -156,22 +157,32 @@ export const findChalkVar = (fileContents: string): string | undefined => {
 };
 
 /**
- * Find the module loader function in the first 1000 chars
+ * Find the module loader function
  */
 export const getModuleLoaderFunction = (
   fileContents: string
 ): string | undefined => {
-  // Pattern: var X=(Y,Z,W)=>{
+  // Native bundles: look for ,j=(H,$,A)=>{A=H!=null? pattern (module loader)
+  // This is distinct from other 3-param functions because of the H!=null check
+  const nativeLoaderPattern =
+    /[,;]([$\w]+)=\([$\w]+,[$\w]+,[$\w]+\)=>\{[$\w]+=[$\w]+!=null\?/;
+  const nativeMatch = fileContents.slice(0, 2000).match(nativeLoaderPattern);
+  if (nativeMatch) {
+    return nativeMatch[1];
+  }
+
+  // NPM bundles: var T=(H,$,A)=>{ at the start
   const firstChunk = fileContents.slice(0, 1000);
   const pattern = /var ([$\w]+)=\([$\w]+,[$\w]+,[$\w]+\)=>\{/;
   const match = firstChunk.match(pattern);
-  if (!match) {
-    console.log(
-      'patch: getModuleLoaderFunction: failed to find module loader function'
-    );
-    return undefined;
+  if (match) {
+    return match[1];
   }
-  return match[1];
+
+  console.log(
+    'patch: getModuleLoaderFunction: failed to find module loader function'
+  );
+  return undefined;
 };
 
 /**
@@ -579,6 +590,15 @@ export const applyCustomization = async (
   // Apply model customizations (known names, mapping, selector options) (always enabled)
   if ((result = writeModelCustomizations(content))) content = result;
 
+  // Apply subagent model customizations
+  if (config.settings.subagentModels) {
+    if (
+      (result = writeSubagentModels(content, config.settings.subagentModels))
+    ) {
+      content = result;
+    }
+  }
+
   // Apply show more items in select menus patch (always enabled)
   if ((result = writeShowMoreItemsInSelectMenus(content, 25))) content = result;
 
@@ -591,7 +611,7 @@ export const applyCustomization = async (
   if (
     (result = writePatchesAppliedIndication(
       content,
-      '3.2.4',
+      '3.2.5',
       items,
       showTweakccVersion,
       showPatchesApplied
@@ -644,9 +664,9 @@ export const applyCustomization = async (
     if ((result = writeHideStartupBanner(content))) content = result;
   }
 
-  // Apply hide ctrl-g to edit prompt patch (if enabled)
-  if (config.settings.misc?.hideCtrlGToEditPrompt) {
-    if ((result = writeHideCtrlGToEditPrompt(content))) content = result;
+  // Apply hide ctrl-g to edit patch (if enabled)
+  if (config.settings.misc?.hideCtrlGToEdit) {
+    if ((result = writeHideCtrlGToEdit(content))) content = result;
   }
 
   // Apply hide startup clawd patch (if enabled)

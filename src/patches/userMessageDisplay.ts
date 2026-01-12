@@ -9,24 +9,47 @@ import {
 const getUserMessageDisplayLocation = (
   oldFile: string
 ): LocationResult | null => {
-  // Search for the exact error message to find the component
-  const messageDisplayPattern =
-    /return ([$\w]+)\.createElement\(([$\w]+),\{backgroundColor:"userMessageBackground",color:"text"\},"> ",([$\w]+)\+" "\);/;
-  const messageDisplayMatch = oldFile.match(messageDisplayPattern);
-  if (!messageDisplayMatch || messageDisplayMatch.index == undefined) {
-    console.error('patch: messageDisplayMatch: failed to find error message');
-    return null;
+  // New format (2.0.77+): nested structure with pointer icon and separate color components
+  // npm: return _W.createElement(C,{backgroundColor:"userMessageBackground"},...rJ.createElement(C,{color:"text"},V))
+  // native: return rJ.createElement(V,{backgroundColor:"userMessageBackground"},...rJ.createElement(V,{color:"text"},U))
+  const newMessageDisplayPattern =
+    /return ([$\w]+)\.createElement\(([$\w]+),\{backgroundColor:"userMessageBackground"\},([$\w]+)\.createElement\([$\w]+,\{color:"subtle"\},([$\w]+)\.pointer," "\),[$\w]+\.createElement\([$\w]+,\{color:"text"\},([$\w]+)\)\)/;
+  const newMessageDisplayMatch = oldFile.match(newMessageDisplayPattern);
+  if (newMessageDisplayMatch && newMessageDisplayMatch.index != undefined) {
+    return {
+      startIndex: newMessageDisplayMatch.index,
+      endIndex: newMessageDisplayMatch.index + newMessageDisplayMatch[0].length,
+      identifiers: [
+        newMessageDisplayMatch[1], // React var (_W or rJ)
+        newMessageDisplayMatch[2], // Text component (C or V)
+        newMessageDisplayMatch[5], // Message var (V or U)
+        'new_format',
+      ],
+    };
   }
 
-  return {
-    startIndex: messageDisplayMatch.index,
-    endIndex: messageDisplayMatch.index + messageDisplayMatch[0].length,
-    identifiers: [
-      messageDisplayMatch[1],
-      messageDisplayMatch[2],
-      messageDisplayMatch[3],
-    ],
-  };
+  // Old format: single component with both backgroundColor and color
+  // return X.createElement(Y,{backgroundColor:"userMessageBackground",color:"text"},"> ",Z+" ");
+  const oldMessageDisplayPattern =
+    /return ([$\w]+)\.createElement\(([$\w]+),\{backgroundColor:"userMessageBackground",color:"text"\},"> ",([$\w]+)\+" "\);/;
+  const oldMessageDisplayMatch = oldFile.match(oldMessageDisplayPattern);
+  if (oldMessageDisplayMatch && oldMessageDisplayMatch.index != undefined) {
+    return {
+      startIndex: oldMessageDisplayMatch.index,
+      endIndex: oldMessageDisplayMatch.index + oldMessageDisplayMatch[0].length,
+      identifiers: [
+        oldMessageDisplayMatch[1],
+        oldMessageDisplayMatch[2],
+        oldMessageDisplayMatch[3],
+        'old_format',
+      ],
+    };
+  }
+
+  console.error(
+    'patch: messageDisplayMatch: failed to find user message display pattern'
+  );
+  return null;
 };
 
 export const writeUserMessageDisplay = (
@@ -157,12 +180,19 @@ export const writeUserMessageDisplay = (
     if (inverse) chalkChain += '.inverse';
   }
 
-  const [reactVar, textComponent, messageVar] = location.identifiers!;
+  const [reactVar, textComponent, messageVar, formatType] =
+    location.identifiers!;
+  const isNewFormat = formatType === 'new_format';
+
   // Replace {} in format string with the message variable
   const formattedMessage =
     '"' + format.replace(/\{\}/g, `"+${messageVar}+"`) + '"';
 
-  const newContent = `
+  let newContent: string;
+
+  if (isNewFormat) {
+    // New format: preserve the pointer icon structure but apply customizations
+    newContent = `
 return ${reactVar}.createElement(
   ${boxComponent},
   ${boxAttrsObjStr},
@@ -172,6 +202,19 @@ return ${reactVar}.createElement(
     ${needsChalk ? chalkChain + '(' : ''}${formattedMessage}${needsChalk ? ')' : ''}
   )
 );`;
+  } else {
+    // Old format
+    newContent = `
+return ${reactVar}.createElement(
+  ${boxComponent},
+  ${boxAttrsObjStr},
+  ${reactVar}.createElement(
+    ${textComponent},
+    ${textAttrsObjStr},
+    ${needsChalk ? chalkChain + '(' : ''}${formattedMessage}${needsChalk ? ')' : ''}
+  )
+);`;
+  }
 
   // Apply modification
   const newFile =
