@@ -6,45 +6,25 @@ export const writeSuppressRateLimitOptions = (
   oldFile: string
 ): string | null => {
   const pattern =
-    /\bshowAllInTranscript:[$\w]+,agentDefinitions:[$\w]+,onOpenRateLimitOptions:([$\w]+)/g;
+    /\bshowAllInTranscript:[$\w]+,agentDefinitions:[$\w]+,onOpenRateLimitOptions:([$\w]+)/;
 
-  let content = oldFile;
-  let match;
+  const match = oldFile.match(pattern);
 
-  // Reset regex state
-  pattern.lastIndex = 0;
-
-  // Find all matches first
-  const matches: { index: number; fullMatch: string; callbackVar: string }[] =
-    [];
-  while ((match = pattern.exec(oldFile)) !== null) {
-    matches.push({
-      index: match.index,
-      fullMatch: match[0],
-      callbackVar: match[1],
-    });
-  }
-
-  if (matches.length === 0) {
+  if (!match || match.index === undefined) {
     console.error(
       'patch: suppressRateLimitOptions: failed to find onOpenRateLimitOptions pattern'
     );
     return null;
   }
 
-  // Apply replacements in reverse order to preserve indices
-  for (let i = matches.length - 1; i >= 0; i--) {
-    const m = matches[i];
-    const callbackStart = m.index + m.fullMatch.length - m.callbackVar.length;
-    const callbackEnd = callbackStart + m.callbackVar.length;
+  const callbackVar = match[1];
+  const callbackStart = match.index + match[0].length - callbackVar.length;
+  const callbackEnd = callbackStart + callbackVar.length;
 
-    const newCode = '()=>{}';
-    const newContent =
-      content.slice(0, callbackStart) + newCode + content.slice(callbackEnd);
+  const newCode = '()=>{}';
+  const newFile =
+    oldFile.slice(0, callbackStart) + newCode + oldFile.slice(callbackEnd);
 
-    showDiff(content, newContent, newCode, callbackStart, callbackEnd);
-    content = newContent;
-  }
-
-  return content;
+  showDiff(oldFile, newFile, newCode, callbackStart, callbackEnd);
+  return newFile;
 };
