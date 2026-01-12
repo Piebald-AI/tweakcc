@@ -62,6 +62,7 @@ import { writeHideCtrlGToEdit } from './hideCtrlGToEdit';
 import { writeHideStartupClawd } from './hideStartupClawd';
 import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
+import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
 import { writeThinkingLabel } from './thinkingLabel';
 import {
   restoreNativeBinaryFromBackup,
@@ -685,6 +686,11 @@ export const applyCustomization = async (
   // Apply suppress line number patch (if enabled)
   if (config.settings.misc?.suppressLineNumbers) {
     if ((result = writeSuppressLineNumbers(content))) content = result;
+  }
+
+  // Apply suppress rate limit options patch (if enabled)
+  if (config.settings.misc?.suppressRateLimitOptions) {
+    if ((result = writeSuppressRateLimitOptions(content))) content = result;
   }
 
   // Write the modified content back

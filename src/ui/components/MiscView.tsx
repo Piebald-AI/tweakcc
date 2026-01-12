@@ -32,6 +32,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     hideStartupClawd: false,
     increaseFileReadLimit: false,
     suppressLineNumbers: false,
+    suppressRateLimitOptions: false,
   };
 
   const ensureMisc = () => {
@@ -177,6 +178,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.suppressLineNumbers =
               !settings.misc!.suppressLineNumbers;
+          });
+        },
+      },
+      {
+        id: 'suppressRateLimitOptions',
+        title: 'Suppress rate limit options popup',
+        description:
+          'Prevents the automatic /rate-limit-options command from being triggered when hitting rate limits.',
+        getValue: () => settings.misc?.suppressRateLimitOptions ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.suppressRateLimitOptions =
+              !settings.misc!.suppressRateLimitOptions;
           });
         },
       },

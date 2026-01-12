@@ -754,6 +754,7 @@ export const DEFAULT_SETTINGS: Settings = {
     hideStartupClawd: false,
     increaseFileReadLimit: false,
     suppressLineNumbers: true,
+    suppressRateLimitOptions: false,
   },
   toolsets: [],
   defaultToolset: null,
