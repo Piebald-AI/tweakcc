@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 - Don't suppress line numbers by default (#360) - @bl-ue
+- Fix context limit patch for CC 2.1.5 (#367) - @bl-ue
 
 ## [v3.2.5](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.2.5) - 2026-01-09
 
