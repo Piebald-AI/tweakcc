@@ -593,7 +593,7 @@
         "0": "CUSTOM_TIMEOUT_MS",
         "1": "MAX_TIMEOUT_MS",
         "2": "MAX_OUTPUT_CHARS",
-        "3": "BASH_TOOL_NAME",
+        "3": "RUN_IN_BACKGROUND_NOTE",
         "4": "BASH_TOOL_EXTRA_NOTES",
         "5": "SEARCH_TOOL_NAME",
         "6": "GREP_TOOL_NAME",
@@ -1284,13 +1284,13 @@
         6
       ],
       "identifierMap": {
-        "0": "WEBFETCH_TOOL_NAME",
-        "1": "CLAUDE_CODE_DOCS_MAP_URL",
-        "2": "AGENT_SDK_DOCS_MAP_URL",
-        "3": "WEBFETCH_TOOL_NAME",
-        "4": "WEBSEARCH_TOOL_NAME",
-        "5": "READ_TOOL_NAME",
-        "6": "GLOB_TOOL_NAME"
+        "0": "CLAUDE_CODE_DOCS_MAP_URL",
+        "1": "AGENT_SDK_DOCS_MAP_URL",
+        "2": "WEBFETCH_TOOL_NAME",
+        "3": "WEBSEARCH_TOOL_NAME",
+        "4": "READ_TOOL_NAME",
+        "5": "GLOB_TOOL_NAME",
+        "6": "GREP_TOOL_NAME"
       },
       "version": "2.0.73"
     },
