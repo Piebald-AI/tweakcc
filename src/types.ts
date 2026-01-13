@@ -78,6 +78,7 @@ export interface ThinkingStyleConfig {
 }
 
 export interface UserMessageDisplayConfig {
+  enabled?: boolean;
   format: string;
   styling: string[];
   foregroundColor: string | 'default';

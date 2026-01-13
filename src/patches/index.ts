@@ -540,27 +540,42 @@ export const applyCustomization = async (
   if ((result = writeThinkerSymbolMirrorOption(content, config.settings.thinkingStyle.reverseMirror)))
     content = result;
 
-  // Apply user message display customization
-  if (config.settings.userMessageDisplay) {
+  // Apply user message display customization (opt-in only due to CC 2.1.6+ compatibility issues)
+  const displayConfig = config.settings.userMessageDisplay;
+  if (displayConfig?.enabled === true) {
     if (
       (result = writeUserMessageDisplay(
         content,
-        config.settings.userMessageDisplay.format,
-        config.settings.userMessageDisplay.foregroundColor,
-        config.settings.userMessageDisplay.backgroundColor,
-        config.settings.userMessageDisplay.styling.includes('bold'),
-        config.settings.userMessageDisplay.styling.includes('italic'),
-        config.settings.userMessageDisplay.styling.includes('underline'),
-        config.settings.userMessageDisplay.styling.includes('strikethrough'),
-        config.settings.userMessageDisplay.styling.includes('inverse'),
-        config.settings.userMessageDisplay.borderStyle,
-        config.settings.userMessageDisplay.borderColor,
-        config.settings.userMessageDisplay.paddingX,
-        config.settings.userMessageDisplay.paddingY,
-        config.settings.userMessageDisplay.fitBoxToContent
+        displayConfig.format,
+        displayConfig.foregroundColor,
+        displayConfig.backgroundColor,
+        displayConfig.styling.includes('bold'),
+        displayConfig.styling.includes('italic'),
+        displayConfig.styling.includes('underline'),
+        displayConfig.styling.includes('strikethrough'),
+        displayConfig.styling.includes('inverse'),
+        displayConfig.borderStyle,
+        displayConfig.borderColor,
+        displayConfig.paddingX,
+        displayConfig.paddingY,
+        displayConfig.fitBoxToContent
       ))
     ) {
       content = result;
+    }
+  } else if (displayConfig) {
+    // Warn users who may have had custom styling that it's now disabled by default
+    const hasCustomStyling =
+      displayConfig.format !== ' > {} ' ||
+      (displayConfig.styling?.length ?? 0) > 0 ||
+      displayConfig.foregroundColor !== 'default' ||
+      displayConfig.backgroundColor !== null ||
+      displayConfig.borderStyle !== 'none';
+    if (hasCustomStyling) {
+      console.log(
+        'Note: User message display customization is disabled by default due to compatibility issues with Claude Code 2.1.6+. ' +
+          'Set "enabled": true in your userMessageDisplay config to re-enable (use at your own risk).'
+      );
     }
   }
 
