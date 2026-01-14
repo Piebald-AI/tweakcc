@@ -33,6 +33,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     increaseFileReadLimit: false,
     suppressLineNumbers: false,
     suppressRateLimitOptions: false,
+    enableWinterTheme: false,
   };
 
   const ensureMisc = () => {
@@ -192,6 +193,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.suppressRateLimitOptions =
               !settings.misc!.suppressRateLimitOptions;
+          });
+        },
+      },
+      {
+        id: 'enableWinterTheme',
+        title: 'Enable Winter theme',
+        description:
+          'Forces Winter theme mode with ice-blue colors and snowflake Clawd logo. Requires applying changes.',
+        getValue: () => settings.misc?.enableWinterTheme ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableWinterTheme =
+              !settings.misc!.enableWinterTheme;
           });
         },
       },
