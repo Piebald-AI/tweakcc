@@ -31,6 +31,10 @@ import {
 //   search down to 80ms.  More specific boundaries like explicitly requiring a particular
 //   character such as ',' or ';' can speed up matching even further, e.g. down to 30ms.
 //
+// - Two-step approach for complex patterns: First use indexOf/includes to find candidate regions,
+//   then apply regex only to those bounded slices. This prevents catastrophic backtracking on
+//   large files and keeps regex patterns simpler.
+//
 
 import { writeShowMoreItemsInSelectMenus } from './showMoreItemsInSelectMenus';
 import { writeThemes } from './themes';
@@ -63,6 +67,7 @@ import { writeHideStartupClawd } from './hideStartupClawd';
 import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
 import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
+import { writeWinterTheme, WINTER_THEME_COLORS } from './winterTheme';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -511,10 +516,27 @@ export const applyCustomization = async (
 
   let result: string | null = null;
 
+  // If winter theme is enabled, add it to the themes list
+  // This must happen BEFORE writeThemes so it's included in the switch statement
+  let themesToApply = config.settings.themes || [];
+  if (config.settings.misc?.enableWinterTheme) {
+    // Check if winter theme already exists
+    const hasWinter = themesToApply.some(t => t.id === 'winter');
+    if (!hasWinter) {
+      themesToApply = [
+        ...themesToApply,
+        {
+          name: 'Winter mode',
+          id: 'winter',
+          colors: WINTER_THEME_COLORS,
+        },
+      ];
+    }
+  }
+
   // Apply themes
-  if (config.settings.themes && config.settings.themes.length > 0) {
-    if ((result = writeThemes(content, config.settings.themes)))
-      content = result;
+  if (themesToApply.length > 0) {
+    if ((result = writeThemes(content, themesToApply))) content = result;
   }
 
   // Apply thinking verbs
@@ -687,6 +709,18 @@ export const applyCustomization = async (
   // Apply suppress rate limit options patch (if enabled)
   if (config.settings.misc?.suppressRateLimitOptions) {
     if ((result = writeSuppressRateLimitOptions(content))) content = result;
+  }
+
+  // Apply winter theme patch (if enabled)
+  if (config.settings.misc?.enableWinterTheme) {
+    if ((result = writeWinterTheme(content))) {
+      content = result;
+      items.push('winter theme');
+    } else {
+      console.warn(
+        'patch: winterTheme: patch returned null (may already be applied or patterns not found)'
+      );
+    }
   }
 
   // Write the modified content back

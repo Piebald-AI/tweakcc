@@ -161,14 +161,23 @@ async function getClaudeFromPath(): Promise<string | null> {
 
 /**
  * Extracts version from claude.js content.
- * Searches for VERSION:"x.y.z" patterns and returns the version that appears most frequently.
+ * Searches for VERSION:"x.y.z" patterns and // Version: x.y.z comments,
+ * returns the version that appears most frequently.
  */
 function extractVersionFromContent(content: string): string | null {
-  const versionRegex = /\bVERSION:"(\d+\.\d+\.\d+)"/g;
   const versionCounts = new Map<string, number>();
 
+  // Pattern 1: Minified format VERSION:"x.y.z"
+  const minifiedRegex = /\bVERSION:"(\d+\.\d+\.\d+)"/g;
   let match;
-  while ((match = versionRegex.exec(content)) !== null) {
+  while ((match = minifiedRegex.exec(content)) !== null) {
+    const version = match[1];
+    versionCounts.set(version, (versionCounts.get(version) || 0) + 1);
+  }
+
+  // Pattern 2: Comment format // Version: x.y.z
+  const commentRegex = /\/\/\s*Version:\s*(\d+\.\d+\.\d+)/gi;
+  while ((match = commentRegex.exec(content)) !== null) {
     const version = match[1];
     versionCounts.set(version, (versionCounts.get(version) || 0) + 1);
   }
