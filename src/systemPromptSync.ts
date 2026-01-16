@@ -97,7 +97,7 @@ export const parseMarkdownPrompt = (markdown: string): MarkdownPrompt => {
     description: description || '',
     ccVersion: ccVersion || '',
     variables: variables || [],
-    content: parsed.content.trim(),
+    content: parsed.content,
     contentLineOffset,
   };
 };

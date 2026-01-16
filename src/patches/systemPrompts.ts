@@ -33,7 +33,9 @@ const extractBuildTime = (content: string): string | undefined => {
 };
 
 const stringifyRegex = (regex: RegExp): string => {
-  const str = regex.toString();
+  let str = regex.toString();
+  // Trim off flags if any.
+  str = str.substring(0, str.lastIndexOf('/') + 1);
   const pattern = JSON.stringify(str.substring(1, str.length - 1));
   const flags = JSON.stringify(str.match(/\/(\w*)$/)![1]);
   return `new RegExp(${pattern}, ${flags})`;
