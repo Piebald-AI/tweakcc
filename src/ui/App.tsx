@@ -3,6 +3,7 @@ import { Box, useInput } from 'ink';
 import { MainView } from './components/MainView';
 import { ThemesView } from './components/ThemesView';
 import { ThinkingVerbsView } from './components/ThinkingVerbsView';
+import { CompletionVerbsView } from './components/CompletionVerbsView';
 import { ThinkingStyleView } from './components/ThinkingStyleView';
 import { UserMessageDisplayView } from './components/UserMessageDisplayView';
 import { MiscView } from './components/MiscView';
@@ -149,6 +150,7 @@ Please reapply your changes below.`,
         break;
       case MainMenuItem.THEMES:
       case MainMenuItem.THINKING_VERBS:
+      case MainMenuItem.COMPLETION_VERBS:
       case MainMenuItem.THINKING_STYLE:
       case MainMenuItem.USER_MESSAGE_DISPLAY:
       case MainMenuItem.MISC:
@@ -214,6 +216,8 @@ Please reapply your changes below.`,
           <ThemesView onBack={handleBack} />
         ) : currentView === MainMenuItem.THINKING_VERBS ? (
           <ThinkingVerbsView onBack={handleBack} />
+        ) : currentView === MainMenuItem.COMPLETION_VERBS ? (
+          <CompletionVerbsView onBack={handleBack} />
         ) : currentView === MainMenuItem.THINKING_STYLE ? (
           <ThinkingStyleView onBack={handleBack} />
         ) : currentView === MainMenuItem.USER_MESSAGE_DISPLAY ? (

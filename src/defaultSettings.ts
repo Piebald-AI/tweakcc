@@ -718,6 +718,18 @@ export const DEFAULT_SETTINGS: Settings = {
       'Zigzagging',
     ],
   },
+  completionVerbs: {
+    verbs: [
+      'Baked',
+      'Brewed',
+      'Churned',
+      'Cogitated',
+      'Cooked',
+      'Crunched',
+      'Sautéed',
+      'Worked',
+    ],
+  },
   thinkingStyle: {
     updateInterval: 120,
     phases:
