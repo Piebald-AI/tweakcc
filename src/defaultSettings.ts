@@ -731,6 +731,7 @@ export const DEFAULT_SETTINGS: Settings = {
     reverseMirror: true,
   },
   userMessageDisplay: {
+    enabled: false,
     format: ' > {} ',
     styling: [],
     foregroundColor: 'default',
