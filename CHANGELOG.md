@@ -7,11 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v3.3.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.3.0) - 2026-01-18
+
 - Suppress /rate-limit-options from being triggered when rate limits are hit (#358) - @basekevin
 - Don't suppress line numbers by default (#360) - @bl-ue
 - Fix hideCtrlGToEdit patch (#361) - @basekevin
 - Fix context limit patch for CC 2.1.5 (#367) - @bl-ue
-- Fix patching for CC 2.1.8 (#380) - @basekevin
+- Add a patch to make thinking blocks italic and dim again (#369) - @bl-ue
+- Don't trim newlines when reading system prompt markdown files (#380)
+- Make the `expandThinkingBlocks` patch optional per the existing setting (#381) - @bl-ue
+- Fix patching for CC 2.1.9 (#380) - @basekevin
 
 ## [v3.2.5](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.2.5) - 2026-01-09
 

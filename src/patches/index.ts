@@ -63,6 +63,7 @@ import { writeHideStartupClawd } from './hideStartupClawd';
 import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
 import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
+import { writeThinkingLabel } from './thinkingLabel';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -627,8 +628,13 @@ export const applyCustomization = async (
   // Apply show more items in select menus patch (always enabled)
   if ((result = writeShowMoreItemsInSelectMenus(content, 25))) content = result;
 
-  // Apply thinking visibility patch (always enabled)
-  if ((result = writeThinkingVisibility(content))) content = result;
+  // Apply thinking visibility patch (if enabled)
+  if (config.settings.misc?.expandThinkingBlocks ?? true) {
+    if ((result = writeThinkingVisibility(content))) content = result;
+  }
+
+  // Apply thinking label styling patch (always enabled)
+  if ((result = writeThinkingLabel(content))) content = result;
 
   // Apply patches applied indication
   const showTweakccVersion = config.settings.misc?.showTweakccVersion ?? true;
@@ -636,7 +642,7 @@ export const applyCustomization = async (
   if (
     (result = writePatchesAppliedIndication(
       content,
-      '3.2.5',
+      '3.3.0',
       items,
       showTweakccVersion,
       showPatchesApplied

@@ -40,7 +40,7 @@ This is the content with \${SETTINGS.preferredName} and \${CONFIG.taskType}.`;
         ccVersion: '1.0.0',
         variables: ['SETTINGS', 'CONFIG'],
         content:
-          'This is the content with ${SETTINGS.preferredName} and ${CONFIG.taskType}.',
+          '\nThis is the content with ${SETTINGS.preferredName} and ${CONFIG.taskType}.',
         // Line offset as computed from original markdown
         contentLineOffset: 8,
       });
@@ -62,7 +62,7 @@ Simple content.`;
         description: 'No variables',
         ccVersion: '1.0.0',
         variables: [],
-        content: 'Simple content.',
+        content: '\nSimple content.',
         // Line offset as computed from original markdown
         contentLineOffset: 5,
       });
@@ -81,7 +81,7 @@ Content only.`;
         description: '',
         ccVersion: '',
         variables: [],
-        content: 'Content only.',
+        content: '\nContent only.',
         // Line offset as computed from original markdown
         contentLineOffset: 2,
       });
@@ -499,7 +499,7 @@ Content here`;
         description: 'Test',
         ccVersion: '1.0.0',
         variables: [],
-        content: 'Content here',
+        content: '\nContent here',
         contentLineOffset: 5,
       });
     });
@@ -940,8 +940,8 @@ Usage: \${MAX_TIMEOUT()} ms`;
       const interpolated = results[0].getInterpolatedContent(matchResult);
 
       // The bug: J$$ should NOT become J$
-      expect(interpolated).toBe('Usage: ${J$$()} ms');
-      expect(interpolated).not.toBe('Usage: ${J$()} ms');
+      expect(interpolated).toBe('\nUsage: ${J$$()} ms');
+      expect(interpolated).not.toBe('\nUsage: ${J$()} ms');
     });
 
     it('should correctly handle <<BUILD_TIME>> placeholder', async () => {
@@ -1003,7 +1003,7 @@ Version: <<CCVERSION>>, BUILD_TIME:"<<BUILD_TIME>>"`;
 
       // Should replace <<CCVERSION>> with 1.0.0 and <<BUILD_TIME>> with the provided buildTime
       expect(interpolated).toBe(
-        'Version: 1.0.0, BUILD_TIME:"2025-12-09T19:43:43Z"'
+        '\nVersion: 1.0.0, BUILD_TIME:"2025-12-09T19:43:43Z"'
       );
     });
 
