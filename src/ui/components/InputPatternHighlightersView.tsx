@@ -99,7 +99,7 @@ export function InputPatternHighlightersView({
         onBack();
       } else if (key.upArrow) {
         setSelectedIndex(prev => Math.max(0, prev - 1));
-      } else if (key.downArrow) {
+      } else if (key.downArrow && inputPatternHighlighters.length > 0) {
         setSelectedIndex(prev =>
           Math.min(inputPatternHighlighters.length - 1, prev + 1)
         );
