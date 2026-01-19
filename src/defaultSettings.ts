@@ -1,4 +1,4 @@
-import { Settings, InputPatternHighlighter } from './types';
+import { Settings, InputPatternHighlighter, Toolset, Theme } from './types';
 
 export const DEFAULT_SETTINGS: Settings = {
   themes: [
@@ -782,3 +782,19 @@ export const DEFAULT_INPUT_PATTERN_HIGHLIGHTER: InputPatternHighlighter = {
   backgroundColor: null,
   enabled: true,
 };
+
+/**
+ * Default template for Toolset items.
+ * Used to fill in missing properties when loading user configs.
+ */
+export const DEFAULT_TOOLSET: Toolset = {
+  name: 'Unnamed Toolset',
+  allowedTools: '*',
+};
+
+/**
+ * Default template for Theme items.
+ * Used to fill in missing properties when loading user configs.
+ * Uses dark mode colors as the fallback.
+ */
+export const DEFAULT_THEME: Theme = DEFAULT_SETTINGS.themes[0];

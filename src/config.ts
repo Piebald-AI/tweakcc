@@ -5,7 +5,7 @@ import path from 'node:path';
 import { EOL } from 'node:os';
 import chalk from 'chalk';
 
-import { Settings, ThinkingVerbsConfig, TweakccConfig } from './types';
+import { Settings, Theme, ThinkingVerbsConfig, TweakccConfig } from './types';
 import { debug, expandTilde, deepMergeWithDefaults } from './utils';
 import { hasUnappliedSystemPromptChanges } from './systemPromptHashIndex';
 import {
@@ -15,6 +15,8 @@ import {
 import {
   DEFAULT_SETTINGS,
   DEFAULT_INPUT_PATTERN_HIGHLIGHTER,
+  DEFAULT_TOOLSET,
+  DEFAULT_THEME,
 } from './defaultSettings';
 
 // Support XDG Base Directory Specification with backward compatibility
@@ -194,6 +196,26 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
               DEFAULT_INPUT_PATTERN_HIGHLIGHTER
             ) as typeof DEFAULT_INPUT_PATTERN_HIGHLIGHTER
         );
+    }
+
+    // Merge each toolset item against the default template
+    // This ensures each toolset has all required properties even if some were deleted
+    if (readConfig.settings.toolsets) {
+      readConfig.settings.toolsets = readConfig.settings.toolsets.map(
+        toolset =>
+          deepMergeWithDefaults(
+            toolset,
+            DEFAULT_TOOLSET
+          ) as typeof DEFAULT_TOOLSET
+      );
+    }
+
+    // Merge each theme item against the default template
+    // This ensures each theme has all required properties (name, id, colors) even if some were deleted
+    if (readConfig.settings.themes) {
+      readConfig.settings.themes = readConfig.settings.themes.map(
+        theme => deepMergeWithDefaults(theme, DEFAULT_THEME) as Theme
+      );
     }
 
     // In v3.2.0 userMessageDisplay was restructured from prefix/message to a single format string.
