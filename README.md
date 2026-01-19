@@ -125,7 +125,7 @@ To add some patterns, you can use the tweakcc UI or edit [`~/.tweakcc/config.jso
 
 | Listing                                              | Edit                                              |
 | ---------------------------------------------------- | ------------------------------------------------- |
-| ![](./assets/input_pattern_highlighters_listing.png) | ![](./assets/input_pattern_highlighters_edit.png) |
+| ![Input pattern highlighters listing view showing configured patterns](./assets/input_pattern_highlighters_listing.png) | ![Input pattern highlighter edit view with fields for name, regex, colors, and styling](./assets/input_pattern_highlighters_edit.png) |
 
 **Via `config.json`:**
 
