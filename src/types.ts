@@ -117,6 +117,17 @@ export interface MiscConfig {
   suppressRateLimitOptions: boolean;
 }
 
+export interface InputPatternHighlighter {
+  name: string; // User-friendly name
+  regex: string; // Regex pattern (stored as string)
+  regexFlags: string; // Flags for the regex, must include 'g' for matchAll
+  format: string; // Format string, use {MATCH} as placeholder
+  styling: string[]; // ['bold', 'italic', 'underline', 'strikethrough', 'inverse']
+  foregroundColor: string | null; // null = don't specify, otherwise rgb(r,g,b)
+  backgroundColor: string | null; // null = don't specify, otherwise rgb(r,g,b)
+  enabled: boolean;
+}
+
 export interface Toolset {
   name: string;
   allowedTools: string[] | '*';
@@ -139,6 +150,8 @@ export interface Settings {
   defaultToolset: string | null;
   planModeToolset: string | null;
   subagentModels: SubagentModelsConfig;
+  inputPatternHighlighters: InputPatternHighlighter[];
+  inputPatternHighlightersTestText: string; // Global test text for previewing highlighters
 }
 
 export interface TweakccConfig {
@@ -189,6 +202,7 @@ export enum MainMenuItem {
   THINKING_VERBS = 'Thinking verbs',
   THINKING_STYLE = 'Thinking style',
   USER_MESSAGE_DISPLAY = 'User message display',
+  INPUT_PATTERN_HIGHLIGHTERS = 'Input pattern highlighters',
   MISC = 'Misc',
   TOOLSETS = 'Toolsets',
   SUBAGENT_MODELS = 'Subagent models',

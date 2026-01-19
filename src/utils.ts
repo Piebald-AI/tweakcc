@@ -398,3 +398,11 @@ export const compareSemverVersions = (a: string, b: string): number => {
   if (aParts[1] !== bParts[1]) return aParts[1] - bParts[1];
   return aParts[2] - bParts[2];
 };
+
+export const stringifyRegex = (regex: RegExp): string => {
+  const str = regex.toString();
+  const lastSlash = str.lastIndexOf('/');
+  const pattern = JSON.stringify(str.substring(1, lastSlash));
+  const flags = JSON.stringify(str.substring(lastSlash + 1));
+  return `new RegExp(${pattern}, ${flags})`;
+};
