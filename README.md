@@ -105,7 +105,7 @@ _More feature documentation coming soon._
 
 ### Input pattern highlighters
 
-For a time, when you typed the word "ultrathink" into the Claude Code input box, it was highlighted rainbow. That's gone now, but the underlying highlighting infrastructure is still present in Claude Code today, and tweakcc lets you specify custom highlighters comprised of a **regular expression**, **format string**, and **colors & styling**.
+For a few weeks, when you typed the word "ultrathink" into the Claude Code input box, it would be highlighted rainbow. That's gone now, but the underlying highlighting infrastructure is still present in Claude Code today, and tweakcc lets you specify custom highlighters comprised of a **regular expression**, **format string**, and **colors & styling**.
 
 Here's a demo where every word is assigned a different color based on its first letter:
 
