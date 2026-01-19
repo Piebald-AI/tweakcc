@@ -117,7 +117,7 @@ Here's one where various common patterns like environment variables, file paths,
 
 Finally, here's one showing how you can render extra characters that aren't actually part of the prompt by customizing the **format string**:
 
-![](./assets/input_pattern_highlight_3_format_string.png)
+![](./assets/input_pattern_highlight_3_with_format_string.png)
 
 To add some patterns, you can use the tweakcc UI or edit [`~/.tweakcc/config.json`](#configuration-directory) manually.
 
