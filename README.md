@@ -109,16 +109,15 @@ For a few weeks, when you typed the word "ultrathink" into the Claude Code input
 
 Here's a demo where every word is assigned a different color based on its first letter:
 
-![](./assets/input_pattern_highlight_1_all_words_colored.png)
+![Input box showing every word colored differently based on its first letter](./assets/input_pattern_highlight_1_all_words_colored.png)
 
 Here's one where various common patterns like environment variables, file paths, numbers, and markdown constructs are highlighted:
 
-![](./assets/input_pattern_highlight_2_common_patterns.png)
+![Input box highlighting environment variables, file paths, numbers, and markdown constructs](./assets/input_pattern_highlight_2_common_patterns.png)
 
 Finally, here's one showing how you can render extra characters that aren't actually part of the prompt by customizing the **format string**:
 
-![](./assets/input_pattern_highlight_3_with_format_string.png)
-
+![Input box demonstrating format strings rendering extra characters not in the actual prompt](./assets/input_pattern_highlight_3_format_string.png)
 To add some patterns, you can use the tweakcc UI or edit [`~/.tweakcc/config.json`](#configuration-directory) manually.
 
 **Via the UI:**
