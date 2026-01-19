@@ -125,7 +125,7 @@ export interface InputPatternHighlighter {
   styling: string[]; // ['bold', 'italic', 'underline', 'strikethrough', 'inverse']
   foregroundColor: string | null; // null = don't specify, otherwise rgb(r,g,b)
   backgroundColor: string | null; // null = don't specify, otherwise rgb(r,g,b)
-  enabled: boolean;
+  enabled: boolean; // Temporarily disable this pattern
 }
 
 export interface Toolset {

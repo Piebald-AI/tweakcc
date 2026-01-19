@@ -115,7 +115,7 @@ Here's one where various common patterns like environment variables, file paths,
 
 ![Input box highlighting environment variables, file paths, numbers, and markdown constructs](./assets/input_pattern_highlight_2_common_patterns.png)
 
-Finally, here's one showing how you can render extra characters that aren't actually part of the prompt by customizing the **format string**:
+Finally, here's one showing how you can render extra characters that aren't really part of the prompt by customizing the **format string**.  The first line shows a copy of what I've actually got typed into the prompt, and in the prompt itself you can see that `cluade` was _visually_ (but not _truly_) replaced with `Claude Code, ...`, etc.
 
 ![Input box demonstrating format strings rendering extra characters not in the actual prompt](./assets/input_pattern_highlight_3_format_string.png)
 To add some patterns, you can use the tweakcc UI or edit [`~/.tweakcc/config.json`](#configuration-directory) manually.
@@ -159,7 +159,7 @@ Here's the schema for the object format:
   styling: string[];              // ['bold', 'italic', 'underline', 'strikethrough', 'inverse']
   foregroundColor: string | null; // null = don't specify, otherwise rgb(r,g,b)
   backgroundColor: string | null; // null = don't specify, otherwise rgb(r,g,b)
-  enabled: boolean;               // Temporarily disable this attern
+  enabled: boolean;               // Temporarily disable this pattern
 }
 ```
 
