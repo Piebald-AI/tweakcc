@@ -47,6 +47,7 @@ With tweakcc, you can
 
 - Customize all of Claude Code's **system prompts** (**NEW:** also see all of [**Claude Code's system prompts**](https://github.com/Piebald-AI/claude-code-system-prompts))
 - Create custom **toolsets** that can be used in Claude Code with the new **`/toolset`** command
+- **Highlight** custom patterns while you type in the CC input box with custom colors and styling, like how `ultrathink` used to be rainbow-highlighted.
 - Manually name **sessions** in Claude Code with `/title my chat name` or `/rename` (see [**our blog post**](https://piebald.ai/blog/messages-as-commits-claude-codes-git-like-dag-of-conversations) for implementation details)
 - Create **custom themes** with a graphical HSL/RGB color picker
 - Add custom **thinking verbs** that will show while Claude's working
@@ -78,13 +79,91 @@ $ npx tweakcc
 $ pnpm dlx tweakcc
 ```
 
+## Table of contents
+
+- [How it works](#how-it-works)
+- [**Features**](#features)
+  - [Input pattern highlighters](#input-pattern-highlighters)
+- [Configuration directory](#configuration-directory)
+- [Building from source](#building-from-source)
+- [Related projects](#related-projects)
+- [System prompts](#system-prompts)
+- [Toolsets](#toolsets)
+- [Troubleshooting](#troubleshooting)
+- [FAQ](#faq)
+- [License](#license)
+
 ## How it works
 
 tweakcc works by patching Claude Code's minified `cli.js` file. For npm-based installations this file is modified directly, but for native installation it's extracted from the binary, patched, and then the binary is repacked. When you update your Claude Code installation, your customizations will be overwritten, but they're remembered in your configuration file, so they can be reapplied by just running `npx tweakcc --apply`.
 
-tweakcc is verified to work with Claude Code **2.1.2.** In newer or earlier versions various patches might not work. However, if we have the system prompts for your version (check [here](https://github.com/Piebald-AI/tweakcc/tree/main/data/prompts)) then system prompt patching is guaranteed to work with that version, even if it's significantly different from the verified CC version. We get the latest system prompts within minutes of each new CC release, so unless you're using a CC version older than 2.0.14, your version is supported.
+tweakcc is verified to work with Claude Code **2.1.2.** In newer or earlier versions various patches might not work. However, if we have the [system prompts for your version](https://github.com/Piebald-AI/tweakcc/tree/main/data/prompts) then system prompt patching is guaranteed to work with that version, even if it's significantly different from the verified CC version. We get the latest system prompts within minutes of each new CC release, so unless you're using a CC version older than 2.0.14, your version is supported.
 
-### Configuration directory
+## Features
+
+_More feature documentation coming soon._
+
+### Input pattern highlighters
+
+For a few weeks, when you typed the word "ultrathink" into the Claude Code input box, it would be highlighted rainbow. That's gone now, but the underlying highlighting infrastructure is still present in Claude Code today, and tweakcc lets you specify custom highlighters comprised of a **regular expression**, **format string**, and **colors & styling**.
+
+Here's a demo where every word is assigned a different color based on its first letter:
+
+![Input box showing every word colored differently based on its first letter](./assets/input_pattern_highlight_1_all_words_colored.png)
+
+Here's one where various common patterns like environment variables, file paths, numbers, and markdown constructs are highlighted:
+
+![Input box highlighting environment variables, file paths, numbers, and markdown constructs](./assets/input_pattern_highlight_2_common_patterns.png)
+
+Finally, here's one showing how you can render extra characters that aren't really part of the prompt by customizing the **format string**.  The first line shows a copy of what I've actually got typed into the prompt, and in the prompt itself you can see that `cluade` was _visually_ (but not _in reality_) replaced with `Claude Code, ...`, etc.
+
+![Input box demonstrating format strings rendering extra characters not in the actual prompt](./assets/input_pattern_highlight_3_with_format_string.png)
+To add some patterns, you can use the tweakcc UI or edit [`~/.tweakcc/config.json`](#configuration-directory) manually.
+
+**Via the UI:**
+
+| Listing                                              | Edit                                              |
+| ---------------------------------------------------- | ------------------------------------------------- |
+| ![Input pattern highlighters listing view showing configured patterns](./assets/input_pattern_highlighters_listing.png) | ![Input pattern highlighter edit view with fields for name, regex, colors, and styling](./assets/input_pattern_highlighters_edit.png) |
+
+**Via `config.json`:**
+
+In `.settings.inputPatternHighlighters` (an array), add a new object:
+
+```json
+"inputPatternHighlighters": [
+  ...
+  {
+    "name": "File path",
+    "regex": "(?:[a-zA-Z]:)?[/\\\\]?[a-zA-Z0-9._\\-]+(?:[/\\\\][a-zA-Z0-9._\\-]+)+",
+    "regexFlags": "g",
+    "format": "{MATCH}",
+    "styling": [
+      "bold"
+    ],
+    "foregroundColor": "rgb(71,194,10)",
+    "backgroundColor": null,
+    "enabled": true
+  },
+]
+```
+
+Here's the schema for the object format:
+
+```typescript
+{
+  name: string;                   // User-friendly name
+  regex: string;                  // Regex pattern (stored as string)
+  regexFlags: string;             // Flags for the regex, must include 'g' for matchAll
+  format: string;                 // Format string, use {MATCH} as placeholder
+  styling: string[];              // ['bold', 'italic', 'underline', 'strikethrough', 'inverse']
+  foregroundColor: string | null; // null = don't specify, otherwise rgb(r,g,b)
+  backgroundColor: string | null; // null = don't specify, otherwise rgb(r,g,b)
+  enabled: boolean;               // Temporarily disable this pattern
+}
+```
+
+## Configuration directory
 
 tweakcc stores its configuration files in one of the following locations, in order of priority:
 

@@ -5,6 +5,7 @@ import { ThemesView } from './components/ThemesView';
 import { ThinkingVerbsView } from './components/ThinkingVerbsView';
 import { ThinkingStyleView } from './components/ThinkingStyleView';
 import { UserMessageDisplayView } from './components/UserMessageDisplayView';
+import { InputPatternHighlightersView } from './components/InputPatternHighlightersView';
 import { MiscView } from './components/MiscView';
 import { ToolsetsView } from './components/ToolsetsView';
 import { SubagentModelsView } from './components/SubagentModelsView';
@@ -151,6 +152,7 @@ Please reapply your changes below.`,
       case MainMenuItem.THINKING_VERBS:
       case MainMenuItem.THINKING_STYLE:
       case MainMenuItem.USER_MESSAGE_DISPLAY:
+      case MainMenuItem.INPUT_PATTERN_HIGHLIGHTERS:
       case MainMenuItem.MISC:
       case MainMenuItem.TOOLSETS:
       case MainMenuItem.SUBAGENT_MODELS:
@@ -218,6 +220,8 @@ Please reapply your changes below.`,
           <ThinkingStyleView onBack={handleBack} />
         ) : currentView === MainMenuItem.USER_MESSAGE_DISPLAY ? (
           <UserMessageDisplayView onBack={handleBack} />
+        ) : currentView === MainMenuItem.INPUT_PATTERN_HIGHLIGHTERS ? (
+          <InputPatternHighlightersView onBack={handleBack} />
         ) : currentView === MainMenuItem.MISC ? (
           <MiscView onSubmit={handleBack} />
         ) : currentView === MainMenuItem.TOOLSETS ? (

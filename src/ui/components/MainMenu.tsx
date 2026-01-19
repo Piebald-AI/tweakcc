@@ -22,6 +22,10 @@ const baseMenuItems: SelectItem[] = [
     desc: 'Customize how user messages are displayed',
   },
   {
+    name: MainMenuItem.INPUT_PATTERN_HIGHLIGHTERS,
+    desc: 'Create custom highlighters for patterns in your input',
+  },
+  {
     name: MainMenuItem.MISC,
     desc: 'Miscellaneous settings (input box border, etc.)',
   },
