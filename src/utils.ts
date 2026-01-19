@@ -406,3 +406,55 @@ export const stringifyRegex = (regex: RegExp): string => {
   const flags = JSON.stringify(str.substring(lastSlash + 1));
   return `new RegExp(${pattern}, ${flags})`;
 };
+
+/**
+ * Recursively merges a partial object with a defaults object,
+ * filling in any missing keys from the defaults.
+ * This ensures that all properties from the defaults are present,
+ * while preserving any user-provided values from the partial object.
+ *
+ * @param partial - The user-provided partial object (may be missing keys)
+ * @param defaults - The complete default object with all keys
+ * @returns A merged object with all keys from defaults, using partial values where available
+ */
+export function deepMergeWithDefaults(
+  partial: unknown,
+  defaults: unknown
+): unknown {
+  // If partial is null or undefined, use defaults
+  if (partial === null || partial === undefined) {
+    return defaults;
+  }
+
+  // If defaults is not an object, return partial as-is
+  if (typeof defaults !== 'object' || defaults === null) {
+    return partial;
+  }
+
+  // If defaults is an array, return partial if it's also an array, otherwise use defaults
+  if (Array.isArray(defaults)) {
+    return Array.isArray(partial) ? partial : defaults;
+  }
+
+  // For objects, recursively merge
+  const result = { ...partial } as Record<string, unknown>;
+
+  for (const key of Object.keys(defaults as Record<string, unknown>)) {
+    const defaultValue = (defaults as Record<string, unknown>)[key];
+
+    if (!(key in result)) {
+      // Key is missing from partial, use default
+      result[key] = defaultValue;
+    } else if (
+      typeof defaultValue === 'object' &&
+      defaultValue !== null &&
+      !Array.isArray(defaultValue)
+    ) {
+      // Key exists in both, and default is a plain object - recurse
+      result[key] = deepMergeWithDefaults(result[key], defaultValue);
+    }
+    // Otherwise, keep the partial value as-is
+  }
+
+  return result;
+}

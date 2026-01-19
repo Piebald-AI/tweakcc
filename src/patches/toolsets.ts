@@ -172,9 +172,10 @@ export const getToolFetchingUseMemoLocation = (
   const chunk = fileContents.slice(bodyStart, bodyStart + 2000);
 
   // Pattern to match: outputVar=reactVar.useMemo(()=>filterFunc(contextVar),[contextVar])
+  // Or (CC 2.1.9+): outputVar=reactVar.useMemo(()=>filterFunc(contextVar),[contextVar,extraDep])
   // Note: may be comma-separated (,v=...) or let-prefixed (let v=...)
   const useMemoPattern =
-    /(?:let |,)([$\w]+)=([$\w]+)\.useMemo\(\(\)=>([$\w]+)\(([$\w]+)\),\[\4\]\)/;
+    /(?:let |,)([$\w]+)=([$\w]+)\.useMemo\(\(\)=>([$\w]+)\(([$\w]+)\),\[\4(?:,[$\w]+)?\]\)/;
   const match = chunk.match(useMemoPattern);
 
   if (!match || match.index === undefined) {

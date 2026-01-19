@@ -115,15 +115,15 @@ Here's one where various common patterns like environment variables, file paths,
 
 ![Input box highlighting environment variables, file paths, numbers, and markdown constructs](./assets/input_pattern_highlight_2_common_patterns.png)
 
-Finally, here's one showing how you can render extra characters that aren't really part of the prompt by customizing the **format string**.  The first line shows a copy of what I've actually got typed into the prompt, and in the prompt itself you can see that `cluade` was _visually_ (but not _in reality_) replaced with `Claude Code, ...`, etc.
+Finally, here's one showing how you can render extra characters that aren't really part of the prompt by customizing the **format string**. The first line shows a copy of what I've actually got typed into the prompt, and in the prompt itself you can see that `cluade` was _visually_ (but not _in reality_) replaced with `Claude Code, ...`, etc.
 
 ![Input box demonstrating format strings rendering extra characters not in the actual prompt](./assets/input_pattern_highlight_3_with_format_string.png)
 To add some patterns, you can use the tweakcc UI or edit [`~/.tweakcc/config.json`](#configuration-directory) manually.
 
 **Via the UI:**
 
-| Listing                                              | Edit                                              |
-| ---------------------------------------------------- | ------------------------------------------------- |
+| Listing                                                                                                                 | Edit                                                                                                                                  |
+| ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | ![Input pattern highlighters listing view showing configured patterns](./assets/input_pattern_highlighters_listing.png) | ![Input pattern highlighter edit view with fields for name, regex, colors, and styling](./assets/input_pattern_highlighters_edit.png) |
 
 **Via `config.json`:**
