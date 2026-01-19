@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v3.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.4.0) - 2026-01-18
+
 - Add input pattern highlighters (#387) - @bl-ue
 - Fix patching for CC 2.1.9 (#388) - @basekevin
 - Add missing fields recursively to settings on startup (#389) - @bl-ue
