@@ -47,22 +47,30 @@ def main():
     # Update src/index.tsx
     index_tsx_path = root / "src" / "index.tsx"
     content = index_tsx_path.read_text()
-    content = re.sub(
+    content, count = re.subn(
         rf"\.version\('{re.escape(current_version)}'\)",
         f".version('{new_version}')",
         content,
     )
+    if count != 1:
+        raise RuntimeError(
+            f"Expected exactly 1 .version('{current_version}') match in {index_tsx_path}, found {count}"
+        )
     index_tsx_path.write_text(content)
     print("  src/index.tsx")
 
     # Update src/patches/index.ts
     patches_path = root / "src" / "patches" / "index.ts"
     content = patches_path.read_text()
-    content = re.sub(
+    content, count = re.subn(
         rf"writePatchesAppliedIndication\(\s*content,\s*'{re.escape(current_version)}'",
         f"writePatchesAppliedIndication(\n      content,\n      '{new_version}'",
         content,
     )
+    if count != 1:
+        raise RuntimeError(
+            f"Expected exactly 1 writePatchesAppliedIndication(..., '{current_version}') match in {patches_path}, found {count}"
+        )
     patches_path.write_text(content)
     print("  src/patches/index.ts")
 
@@ -72,11 +80,15 @@ def main():
     today = date.today().strftime("%Y-%m-%d")
     release_url = f"https://github.com/Piebald-AI/tweakcc/releases/tag/v{new_version}"
     new_header = f"## [v{new_version}]({release_url}) - {today}\n"
-    content = re.sub(
+    content, count = re.subn(
         r"(## Unreleased\n)",
         rf"\1\n{new_header}",
         content,
     )
+    if count != 1:
+        raise RuntimeError(
+            f"Expected exactly 1 '## Unreleased' match in {changelog_path}, found {count}"
+        )
     changelog_path.write_text(content)
     print("  CHANGELOG.md")
 
