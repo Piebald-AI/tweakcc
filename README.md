@@ -109,7 +109,7 @@ For a few weeks, when you typed the word "ultrathink" into the Claude Code input
 
 Here's a demo where every word is assigned a different color based on its first letter:
 
-![](./assets/input_pattern_highlight_1_all_words.png?v1)
+![](./assets/input_pattern_highlight_1_all_words_colored.png)
 
 Here's one where various common patterns like environment variables, file paths, numbers, and markdown constructs are highlighted:
 
