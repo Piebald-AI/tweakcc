@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { debug, verbose } from '../utils';
+import { debug, stringifyRegex, verbose } from '../utils';
 import { showDiff, PatchApplied } from './index';
 import {
   loadSystemPromptsWithRegex,
@@ -30,14 +30,6 @@ const extractBuildTime = (content: string): string | undefined => {
     /\bBUILD_TIME:"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)"/
   );
   return match ? match[1] : undefined;
-};
-
-const stringifyRegex = (regex: RegExp): string => {
-  const str = regex.toString();
-  const lastSlash = str.lastIndexOf('/');
-  const pattern = JSON.stringify(str.substring(1, lastSlash));
-  const flags = JSON.stringify(str.substring(lastSlash + 1));
-  return `new RegExp(${pattern}, ${flags})`;
 };
 
 /**

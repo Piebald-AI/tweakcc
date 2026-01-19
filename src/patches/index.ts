@@ -44,6 +44,7 @@ import { writeThinkerSymbolSpeed } from './thinkerSymbolSpeed';
 import { writeThinkerSymbolWidthLocation } from './thinkerSymbolWidth';
 import { writeThinkerVerbs } from './thinkerVerbs';
 import { writeUserMessageDisplay } from './userMessageDisplay';
+import { writeInputPatternHighlighters } from './inputPatternHighlighters';
 import { writeVerboseProperty } from './verboseProperty';
 import { writeModelCustomizations } from './modelSelector';
 import { writeThinkingVisibility } from './thinkingVisibility';
@@ -584,6 +585,21 @@ export const applyCustomization = async (
         config.settings.userMessageDisplay.paddingX,
         config.settings.userMessageDisplay.paddingY,
         config.settings.userMessageDisplay.fitBoxToContent
+      ))
+    ) {
+      content = result;
+    }
+  }
+
+  // Apply input pattern highlighters
+  if (
+    config.settings.inputPatternHighlighters &&
+    config.settings.inputPatternHighlighters.length > 0
+  ) {
+    if (
+      (result = writeInputPatternHighlighters(
+        content,
+        config.settings.inputPatternHighlighters
       ))
     ) {
       content = result;

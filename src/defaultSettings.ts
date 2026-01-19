@@ -764,4 +764,6 @@ export const DEFAULT_SETTINGS: Settings = {
     explore: null,
     generalPurpose: null,
   },
+  inputPatternHighlighters: [],
+  inputPatternHighlightersTestText: 'Type test text here to see highlighting',
 };
