@@ -1,4 +1,4 @@
-import { Settings } from './types';
+import { Settings, InputPatternHighlighter, Toolset, Theme } from './types';
 
 export const DEFAULT_SETTINGS: Settings = {
   themes: [
@@ -767,3 +767,34 @@ export const DEFAULT_SETTINGS: Settings = {
   inputPatternHighlighters: [],
   inputPatternHighlightersTestText: 'Type test text here to see highlighting',
 };
+
+/**
+ * Default template for InputPatternHighlighter items.
+ * Used to fill in missing properties when loading user configs.
+ */
+export const DEFAULT_INPUT_PATTERN_HIGHLIGHTER: InputPatternHighlighter = {
+  name: 'Unnamed Highlighter',
+  regex: '',
+  regexFlags: 'g',
+  format: '{MATCH}',
+  styling: [],
+  foregroundColor: null,
+  backgroundColor: null,
+  enabled: true,
+};
+
+/**
+ * Default template for Toolset items.
+ * Used to fill in missing properties when loading user configs.
+ */
+export const DEFAULT_TOOLSET: Toolset = {
+  name: 'Unnamed Toolset',
+  allowedTools: '*',
+};
+
+/**
+ * Default template for Theme items.
+ * Used to fill in missing properties when loading user configs.
+ * Uses dark mode colors as the fallback.
+ */
+export const DEFAULT_THEME: Theme = DEFAULT_SETTINGS.themes[0];
