@@ -142,24 +142,6 @@ export function InputPatternHighlightersView({
     );
   }
 
-  const getHighlighterDescription = (
-    highlighter: InputPatternHighlighter
-  ): string => {
-    const parts: string[] = [];
-
-    if (highlighter.regex) {
-      parts.push(`/${highlighter.regex}/${highlighter.regexFlags}`);
-    } else {
-      parts.push('(no regex)');
-    }
-
-    if (highlighter.styling.length > 0) {
-      parts.push(highlighter.styling.join(', '));
-    }
-
-    return parts.join(' · ');
-  };
-
   return (
     <Box flexDirection="column">
       <Header>Input Pattern Highlighters</Header>
@@ -210,9 +192,26 @@ export function InputPatternHighlightersView({
                   {highlighter.name}{' '}
                 </Text>
 
-                <Text color={lineColor} dimColor={!highlighter.enabled}>
-                  ({getHighlighterDescription(highlighter)})
-                </Text>
+                <Text dimColor>(</Text>
+
+                {highlighter.regex ? (
+                  <Text dimColor>
+                    /{highlighter.regex}/{highlighter.regexFlags}
+                  </Text>
+                ) : (
+                  <Text dimColor>(no regex)</Text>
+                )}
+
+                {highlighter.styling.length > 0 && (
+                  <>
+                    <Text color={lineColor} dimColor={!highlighter.enabled}>
+                      {' '}
+                      · {highlighter.styling.join(', ')}
+                    </Text>
+                  </>
+                )}
+
+                <Text dimColor>)</Text>
 
                 {highlighter.enabled ? (
                   <Text color={successColor}> enabled</Text>
