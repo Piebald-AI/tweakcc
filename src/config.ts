@@ -5,14 +5,17 @@ import path from 'node:path';
 import { EOL } from 'node:os';
 import chalk from 'chalk';
 
-import { Settings, Theme, ThinkingVerbsConfig, TweakccConfig } from './types';
-import { debug, expandTilde } from './utils';
+import { Settings, ThinkingVerbsConfig, TweakccConfig } from './types';
+import { debug, expandTilde, deepMergeWithDefaults } from './utils';
 import { hasUnappliedSystemPromptChanges } from './systemPromptHashIndex';
 import {
   migrateUserMessageDisplayToV320,
   migrateHideCtrlGToEditPrompt,
 } from './migration';
-import { DEFAULT_SETTINGS } from './defaultSettings';
+import {
+  DEFAULT_SETTINGS,
+  DEFAULT_INPUT_PATTERN_HIGHLIGHTER,
+} from './defaultSettings';
 
 // Support XDG Base Directory Specification with backward compatibility
 // Priority:
@@ -173,76 +176,24 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
       delete tmpThinkingVerbs.punctuation;
     }
 
-    // Add any missing top-level settings properties from defaults
-    if (!readConfig.settings.inputBox) {
-      readConfig.settings.inputBox = DEFAULT_SETTINGS.inputBox;
-    }
-    if (!readConfig.settings.toolsets) {
-      readConfig.settings.toolsets = DEFAULT_SETTINGS.toolsets;
-    }
-    if (!Object.hasOwn(readConfig.settings, 'defaultToolset')) {
-      readConfig.settings.defaultToolset = DEFAULT_SETTINGS.defaultToolset;
-    }
-    if (!Object.hasOwn(readConfig.settings, 'planModeToolset')) {
-      readConfig.settings.planModeToolset = DEFAULT_SETTINGS.planModeToolset;
-    }
+    // Deep merge the loaded settings with defaults to fill in any missing keys (recursively)
+    // This ensures all required properties exist, including nested ones like inputPatternHighlighters
+    readConfig.settings = deepMergeWithDefaults(
+      readConfig.settings,
+      DEFAULT_SETTINGS
+    ) as Settings;
 
-    // Add any colors that the user doesn't have to any built-in themes.
-    for (const defaultTheme of DEFAULT_SETTINGS.themes) {
-      // Find this theme in the user's settings.
-      const readTheme = readConfig?.settings?.themes.find(
-        t => t.id === defaultTheme.id || t.name === defaultTheme.name
-      );
-      if (readTheme) {
-        // Add any missing top-level properties (like name, id)
-        for (const [key, value] of Object.entries(defaultTheme)) {
-          if (key !== 'colors' && !Object.hasOwn(readTheme, key)) {
-            (readTheme as unknown as Record<string, unknown>)[key] = value;
-          }
-        }
-
-        // Add any missing colors
-        if (!readTheme.colors) {
-          readTheme.colors = {} as Theme['colors'];
-        }
-        for (const [colorKey, colorValue] of Object.entries(
-          defaultTheme.colors
-        )) {
-          if (!Object.hasOwn(readTheme.colors, colorKey)) {
-            (readTheme.colors as Record<string, string>)[colorKey] = colorValue;
-          }
-        }
-      }
-    }
-
-    // Also add missing colors to custom themes (non-built-in themes)
-    for (const readTheme of readConfig?.settings?.themes || []) {
-      // Skip built-in themes (already handled above)
-      const isBuiltIn = DEFAULT_SETTINGS.themes.some(
-        dt => dt.id === readTheme.id || dt.name === readTheme.name
-      );
-      if (isBuiltIn) continue;
-
-      // For custom themes, use the first default theme as a template for missing colors
-      const defaultTemplate = DEFAULT_SETTINGS.themes[0];
-      if (!readTheme.colors) {
-        readTheme.colors = {} as Theme['colors'];
-      }
-      for (const [colorKey, colorValue] of Object.entries(
-        defaultTemplate.colors
-      )) {
-        if (!Object.hasOwn(readTheme.colors, colorKey)) {
-          // Use the template's color as a fallback
-          (readTheme.colors as Record<string, string>)[colorKey] = colorValue;
-        }
-      }
-    }
-
-    // Add userMessageDisplay if it doesn't exist in the config; it was added in v1.4.0.
-    if (!readConfig?.settings?.userMessageDisplay) {
-      readConfig.settings = readConfig.settings || DEFAULT_SETTINGS;
-      readConfig.settings.userMessageDisplay =
-        DEFAULT_SETTINGS.userMessageDisplay;
+    // Merge each inputPatternHighlighter item against the default template
+    // This ensures each highlighter has all required properties even if some were deleted
+    if (readConfig.settings.inputPatternHighlighters) {
+      readConfig.settings.inputPatternHighlighters =
+        readConfig.settings.inputPatternHighlighters.map(
+          highlighter =>
+            deepMergeWithDefaults(
+              highlighter,
+              DEFAULT_INPUT_PATTERN_HIGHLIGHTER
+            ) as typeof DEFAULT_INPUT_PATTERN_HIGHLIGHTER
+        );
     }
 
     // In v3.2.0 userMessageDisplay was restructured from prefix/message to a single format string.
@@ -262,6 +213,10 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
     if (hasSystemPromptChanges) {
       readConfig.changesApplied = false;
     }
+
+    // Save the merged config back to disk so missing properties are persisted
+    // This auto-fixes config files that are missing required properties
+    await saveConfig(readConfig);
 
     lastConfig = readConfig;
     return readConfig;
