@@ -54,7 +54,6 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "prettier": "^3.6.2",
-    "rollup-plugin-node-externals": "^8.0.1",
     "tsdown": "^0.18.4",
     "tsx": "^4.20.3",
     "typescript": "^5.9.2",
@@ -66,17 +65,13 @@
     "*.{json,md}": "prettier --write"
   },
   "dependencies": {
-    "@babel/parser": "^7.28.4",
     "chalk": "^5.5.0",
     "commander": "^14.0.0",
     "globby": "^14.1.0",
     "gray-matter": "^4.0.3",
     "ink": "^6.1.0",
-    "ink-image": "^2.0.0",
     "ink-link": "^4.1.0",
-    "node-lief": "^0.1.8",
-    "ollama": "^0.6.0",
-    "openai": "^6.3.0",
+    "node-lief": "^1.0.0",
     "react": "^19.1.1",
     "wasmagic": "^1.0.7",
     "which": "^6.0.0"
