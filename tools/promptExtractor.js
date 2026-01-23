@@ -14,12 +14,34 @@ function slugify(text) {
 
 function validateInput(text, minLength = 500) {
   if (!text || typeof text !== 'string') return false;
-  
-  if (text.startsWith("This is the git status")) return true;
-  if (text.includes("IMPORTANT: Assist with authorized security testing")) return true;
+
+  // ////////////////
+  // What to include.
+  // ////////////////
+
+  // Context about Git status
+  if (text.startsWith('This is the git status')) return true;
+
+  // Include the system reminder accompanying every Read tool.
+  if (text.includes('Whenever you read a file, you should consider whether it')) return true;
+
+  // Another prompt smaller then 500 characters that should be included
+  if (text.includes('IMPORTANT: Assist with authorized security testing'))
+    return true;
+
+  // ////////////////
+  // What to exclude.
+  // ////////////////
+
   // In one specific case, some of the TUI code shows up in the prompts files.  Exclude it.
-  if (text.includes(".dim(\"Note:")) return false;
-  
+  if (text.includes('.dim("Note:')) return false;
+
+  // CLI help text for `claude mcp add` is not a prompt - it's user-facing documentation.
+  if (text.startsWith('Add an MCP server to Claude Code.')) return false;
+
+  // Skip the warning about keybindings when connecting to a remote server.
+  if (text.includes('Cannot install keybindings from a remote')) return false;
+
   if (text.length < minLength) return false;
 
   const first10 = text.substring(0, 10);
