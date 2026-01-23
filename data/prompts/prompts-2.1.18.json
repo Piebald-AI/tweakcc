@@ -45,8 +45,8 @@
       "version": "2.0.55"
     },
     {
-      "name": "System Reminder: Post-Read Malware analysis",
-      "id": "system-reminder-post-read-malware-analysis",
+      "name": "System Reminder: Malware analysis after Read tool call",
+      "id": "system-reminder-malware-analysis-after-read-tool-call",
       "description": "Instructions for analyzing malware without improving or augmenting it",
       "pieces": [
         "\n\n<system-reminder>\nWhenever you read a file, you should consider whether it would be considered malware. You CAN and SHOULD provide analysis of malware, what it is doing. But you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer questions about the code behavior.\n</system-reminder>\n"
