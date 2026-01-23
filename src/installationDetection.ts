@@ -43,16 +43,139 @@ export class InstallationDetectionError extends Error {
 }
 
 // ============================================================================
-// WASMagic singleton
+// WASMagic singleton (with graceful fallback for SIMD-unsupported systems)
 // ============================================================================
 
-let magicInstancePromise: Promise<WASMagic> | null = null;
+let magicInstancePromise: Promise<WASMagic | null> | null = null;
 
-async function getMagicInstance(): Promise<WASMagic> {
+/**
+ * Gets the WASMagic instance, or null if it fails to initialize.
+ * This can happen on older CPUs that don't support WebAssembly SIMD (requires SSE 4.1+).
+ */
+async function getMagicInstance(): Promise<WASMagic | null> {
   if (!magicInstancePromise) {
-    magicInstancePromise = WASMagic.create();
+    magicInstancePromise = WASMagic.create().catch(error => {
+      debug(
+        'WASMagic initialization failed (likely SIMD unsupported on this CPU):',
+        error
+      );
+      debug('Using fallback file type detection');
+      return null;
+    });
   }
   return magicInstancePromise;
+}
+
+// ============================================================================
+// Fallback file type detection (pure JavaScript, no WASM)
+// ============================================================================
+
+// Binary file magic numbers
+const ELF_MAGIC = Buffer.from([0x7f, 0x45, 0x4c, 0x46]); // \x7FELF
+const MACHO_MAGIC_32_BE = Buffer.from([0xfe, 0xed, 0xfa, 0xce]); // Mach-O 32-bit (big-endian)
+const MACHO_MAGIC_64_BE = Buffer.from([0xfe, 0xed, 0xfa, 0xcf]); // Mach-O 64-bit (big-endian)
+const MACHO_MAGIC_32_LE = Buffer.from([0xce, 0xfa, 0xed, 0xfe]); // Mach-O 32-bit (little-endian)
+const MACHO_MAGIC_64_LE = Buffer.from([0xcf, 0xfa, 0xed, 0xfe]); // Mach-O 64-bit (little-endian)
+const MACHO_FAT = Buffer.from([0xca, 0xfe, 0xba, 0xbe]); // Mach-O Fat/Universal binary
+const PE_MAGIC = Buffer.from([0x4d, 0x5a]); // MZ (DOS/PE/Windows executable)
+
+/**
+ * Fallback file type detection using magic numbers and heuristics.
+ * Used when WASMagic is unavailable (e.g., on CPUs without SIMD support).
+ *
+ * Returns 'javascript' for JS files, 'binary' for executables, or null if unknown.
+ */
+function detectFileTypeFallback(
+  prefix: Buffer
+): 'javascript' | 'binary' | null {
+  if (prefix.length === 0) {
+    return null;
+  }
+
+  // Check for shebang (#!/usr/bin/env node, #!/usr/bin/node, etc.)
+  if (prefix[0] === 0x23 && prefix[1] === 0x21) {
+    // #!
+    const shebangLine = prefix.subarray(0, Math.min(256, prefix.length));
+    const shebangStr = shebangLine.toString('utf8').split('\n')[0];
+    if (shebangStr.includes('node')) {
+      debug('detectFileTypeFallback: Detected JavaScript via shebang');
+      return 'javascript';
+    }
+  }
+
+  // Check for binary magic numbers
+  if (prefix.length >= 4) {
+    const first4 = prefix.subarray(0, 4);
+
+    // ELF binary
+    if (first4.equals(ELF_MAGIC)) {
+      debug('detectFileTypeFallback: Detected ELF binary');
+      return 'binary';
+    }
+
+    // Mach-O binaries (macOS/iOS)
+    if (
+      first4.equals(MACHO_MAGIC_32_BE) ||
+      first4.equals(MACHO_MAGIC_64_BE) ||
+      first4.equals(MACHO_MAGIC_32_LE) ||
+      first4.equals(MACHO_MAGIC_64_LE) ||
+      first4.equals(MACHO_FAT)
+    ) {
+      debug('detectFileTypeFallback: Detected Mach-O binary');
+      return 'binary';
+    }
+  }
+
+  // PE/Windows executable
+  if (prefix.length >= 2 && prefix.subarray(0, 2).equals(PE_MAGIC)) {
+    debug('detectFileTypeFallback: Detected PE binary');
+    return 'binary';
+  }
+
+  // Heuristic: Check if file looks like text/JavaScript
+  // JavaScript files (including minified cli.js without shebang) are text,
+  // so they should be mostly printable ASCII characters.
+  const sampleSize = Math.min(512, prefix.length);
+  let printableCount = 0;
+  let nullCount = 0;
+
+  for (let i = 0; i < sampleSize; i++) {
+    const byte = prefix[i];
+    // Printable ASCII (space through tilde) or common whitespace
+    if (
+      (byte >= 0x20 && byte <= 0x7e) ||
+      byte === 0x09 ||
+      byte === 0x0a ||
+      byte === 0x0d
+    ) {
+      printableCount++;
+    }
+    if (byte === 0x00) {
+      nullCount++;
+    }
+  }
+
+  // If file has null bytes, it's likely binary
+  if (nullCount > 0) {
+    debug(
+      `detectFileTypeFallback: Detected binary (${nullCount} null bytes in first ${sampleSize} bytes)`
+    );
+    return 'binary';
+  }
+
+  // If >90% printable, assume it's text (likely JavaScript)
+  const printableRatio = printableCount / sampleSize;
+  if (printableRatio > 0.9) {
+    debug(
+      `detectFileTypeFallback: Detected JavaScript via text heuristic (${Math.round(printableRatio * 100)}% printable)`
+    );
+    return 'javascript';
+  }
+
+  debug(
+    `detectFileTypeFallback: Unknown file type (${Math.round(printableRatio * 100)}% printable)`
+  );
+  return null;
 }
 
 // ============================================================================
@@ -108,31 +231,46 @@ export async function resolvePathToInstallationType(
       return null;
     }
 
-    // Use WASMagic to detect file type
+    // Try WASMagic first (may be null on systems without SIMD support)
     const magic = await getMagicInstance();
-    let mime: string | null = null;
 
-    if (typeof magic.detect === 'function') {
-      mime = magic.detect(prefix) || null;
+    if (magic && typeof magic.detect === 'function') {
+      // Use WASMagic for accurate MIME type detection
+      const mime = magic.detect(prefix) || null;
+
+      if (mime) {
+        const lower = mime.toLowerCase();
+        debug(`resolvePathToInstallationType: Detected mime type: ${lower}`);
+
+        if (lower.includes('javascript')) {
+          return { kind: 'npm-based', resolvedPath };
+        }
+
+        if (!lower.startsWith('text/')) {
+          return { kind: 'native-binary', resolvedPath };
+        }
+
+        debug('resolvePathToInstallationType: Unrecognized file type');
+        return null;
+      }
     }
 
-    if (!mime) {
-      debug('resolvePathToInstallationType: WASMagic returned no mime type');
-      return null;
-    }
+    // Fallback: WASMagic unavailable or returned no result
+    // Use pure JavaScript detection (works on all systems)
+    debug('resolvePathToInstallationType: Using fallback file type detection');
+    const fallbackType = detectFileTypeFallback(prefix);
 
-    const lower = mime.toLowerCase();
-    debug(`resolvePathToInstallationType: Detected mime type: ${lower}`);
-
-    if (lower.includes('javascript')) {
+    if (fallbackType === 'javascript') {
       return { kind: 'npm-based', resolvedPath };
     }
 
-    if (!lower.startsWith('text/')) {
+    if (fallbackType === 'binary') {
       return { kind: 'native-binary', resolvedPath };
     }
 
-    debug('resolvePathToInstallationType: Unrecognized file type');
+    debug(
+      'resolvePathToInstallationType: Fallback could not determine file type'
+    );
     return null;
   } catch (error) {
     debug('resolvePathToInstallationType: Error:', error);
