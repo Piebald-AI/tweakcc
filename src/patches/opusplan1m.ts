@@ -245,6 +245,44 @@ const patchModelSelectorOptions = (oldFile: string): string | null => {
 };
 
 /**
+ * Patch 6: Add opusplan[1m] to the model selector list so it's ALWAYS visible
+ *
+ * This injects push statements to add opusplan and opusplan[1m] to the model list
+ * so they always appear in the /model menu, not just when selected.
+ *
+ * We find the point right after the conditional check `if(K===null||A.some(...))`
+ * and inject before the opusplan conditional return.
+ */
+const patchAlwaysShowInModelSelector = (oldFile: string): string | null => {
+  // Find the pattern: if(K===null||A.some((VAR)=>VAR.value===K))return A;
+  // This is right before the opusplan conditional, and we want to inject pushes before this
+  const pattern =
+    /(if\s*\(\s*[$\w]+\s*===\s*null\s*\|\|\s*([$\w]+)\.some\s*\(\s*\(\s*[$\w]+\s*\)\s*=>\s*[$\w]+\.value\s*===\s*[$\w]+\s*\)\s*\)\s*return\s*[$\w]+\s*;)/;
+
+  const match = oldFile.match(pattern);
+  if (!match || match.index === undefined) {
+    console.error(
+      'patch: opusplan1m: patchAlwaysShowInModelSelector: failed to find model list check pattern'
+    );
+    return null;
+  }
+
+  const [, , listVar] = match;
+
+  // Inject pushes BEFORE the conditional return
+  // This ensures opusplan and opusplan[1m] are always in the list
+  const inject =
+    `${listVar}.push({value:"opusplan",label:"Opus Plan Mode",description:"Use Opus 4.5 in plan mode, Sonnet 4.5 otherwise"});` +
+    `${listVar}.push({value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus 4.5 in plan mode, Sonnet 4.5 (1M context) otherwise"});`;
+
+  const newFile =
+    oldFile.slice(0, match.index) + inject + oldFile.slice(match.index);
+
+  showDiff(oldFile, newFile, inject, match.index, match.index);
+  return newFile;
+};
+
+/**
  * Main entry point: Apply all opusplan[1m] patches
  */
 export const writeOpusplan1m = (oldFile: string): string | null => {
@@ -291,7 +329,7 @@ export const writeOpusplan1m = (oldFile: string): string | null => {
     console.error('patch: opusplan1m: failed to apply label function patch');
   }
 
-  // Patch 5: Model selector options
+  // Patch 5: Model selector options (conditional show when selected)
   const result5 = patchModelSelectorOptions(newFile);
   if (result5) {
     newFile = result5;
@@ -299,6 +337,17 @@ export const writeOpusplan1m = (oldFile: string): string | null => {
   } else {
     console.error(
       'patch: opusplan1m: failed to apply model selector options patch'
+    );
+  }
+
+  // Patch 6: Always show in model selector (push to list)
+  const result6 = patchAlwaysShowInModelSelector(newFile);
+  if (result6) {
+    newFile = result6;
+    applied = true;
+  } else {
+    console.error(
+      'patch: opusplan1m: failed to apply always-show-in-selector patch'
     );
   }
 
