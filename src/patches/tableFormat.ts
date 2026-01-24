@@ -42,6 +42,11 @@ import { showDiff } from './index';
 const TABLE_BORDERS_PATTERN =
   /\{top:\["┌","─","┬","┐"\],middle:\["├","─","┼","┤"\],bottom:\["└","─","┴","┘"\]\}/;
 
+// Native builds use Unicode escape sequences instead of literal characters
+// e.g., top:["\u250C","\u2500","\u252C","\u2510"]
+const TABLE_BORDERS_PATTERN_NATIVE =
+  /top:\["\\u250C","\\u2500","\\u252C","\\u2510"\],middle:\["\\u251C","\\u2500","\\u253C","\\u2524"\],bottom:\["\\u2514","\\u2500","\\u2534","\\u2518"\]/;
+
 // Replacement with true markdown table format:
 // - No top border (empty strings)
 // - Header separator uses |---|---| format
@@ -50,6 +55,10 @@ const TABLE_BORDERS_PATTERN =
 // Must match the minified format exactly (no spaces)
 const TABLE_BORDERS_MARKDOWN =
   '{top:["","","",""],middle:["|","-","|","|"],bottom:["","","",""]}';
+
+// Replacement for native builds (without the leading {)
+const TABLE_BORDERS_MARKDOWN_NATIVE =
+  'top:["","","",""],middle:["|","-","|","|"],bottom:["","","",""]';
 
 // Also try the spaced format for older/unminified CLI versions
 const TABLE_BORDERS_PATTERN_SPACED =
@@ -83,29 +92,29 @@ export const writeTableFormat = (
     return null;
   }
 
-  // Check if this is a native binary bundle (Bun bytecode)
-  // Native bundles start with "// @bun @bytecode" and don't have the same structure
-  if (oldFile.includes('@bun @bytecode') || oldFile.includes('/$bunfs/')) {
-    verbose(
-      'Table format patch: Native binary installation detected. Table format customization is only supported for NPM installations.'
-    );
-    console.log(
-      'Note: Table format customization is not yet supported for native binary installations.'
-    );
-    return null;
-  }
-
   let newFile = oldFile;
   let patchCount = 0;
 
   // 1. Patch the main table border definition object
-  // Try minified pattern first (current CLI version), then spaced pattern (older versions)
+  // Try minified pattern first (current CLI version), then native, then spaced (older versions)
   if (TABLE_BORDERS_PATTERN.test(newFile)) {
     const beforeBorderPatch = newFile;
     newFile = newFile.replace(TABLE_BORDERS_PATTERN, TABLE_BORDERS_MARKDOWN);
     if (newFile !== beforeBorderPatch) {
       patchCount++;
       debug('Patched table border definition object (minified format)');
+    }
+  } else if (TABLE_BORDERS_PATTERN_NATIVE.test(newFile)) {
+    const beforeBorderPatch = newFile;
+    newFile = newFile.replace(
+      TABLE_BORDERS_PATTERN_NATIVE,
+      TABLE_BORDERS_MARKDOWN_NATIVE
+    );
+    if (newFile !== beforeBorderPatch) {
+      patchCount++;
+      debug(
+        'Patched table border definition object (native Unicode escape format)'
+      );
     }
   } else if (TABLE_BORDERS_PATTERN_SPACED.test(newFile)) {
     const beforeBorderPatch = newFile;
@@ -119,46 +128,36 @@ export const writeTableFormat = (
     }
   } else {
     verbose(
-      'Could not find table border definition pattern - CLI may have changed or this may be a native installation'
+      'Could not find table border definition pattern - CLI may have changed'
     );
   }
 
-  // 2. Patch vertical border initialization (let o = "│";)
-  // We need to be careful here as there might be multiple occurrences
-  // We specifically want the one in the table rendering function context
+  // 2. Patch vertical border characters
+  // NPM uses literal "│", native uses escaped "\u2502"
   {
-    // Find the table rendering function context and patch vertical borders within it
-    const tableFunctionPattern =
-      /function\s+(\w)\((\w)\)\s*\{[\s\S]{1,500}?top:\s*\[/;
-    const funcMatch = newFile.match(tableFunctionPattern);
+    const beforeVertPatch = newFile;
 
-    if (funcMatch && funcMatch.index !== undefined) {
-      // Find and patch vertical border patterns near this function
-      // Within ~2000 characters before the border definition
-      const searchStart = Math.max(0, funcMatch.index - 2000);
-      const searchEnd = funcMatch.index + 500;
-      const searchRegion = newFile.slice(searchStart, searchEnd);
+    // Native format: let VAR="\u2502" and " \u2502"
+    newFile = newFile.replace(/let\s+(\w+)\s*=\s*"\\u2502";/g, 'let $1="|";');
+    newFile = newFile.replace(/" \\u2502"/g, '" |"');
+    newFile = newFile.replace(/"\\u2502"/g, '"|"');
 
-      // Patch "│" to "|" in this region
-      const patchedRegion = searchRegion
-        .replace(/let\s+(\w)\s*=\s*"│";/g, 'let $1 = "|";')
-        .replace(/"\s*│"/g, '" |"');
+    // NPM format: let VAR = "│" and " │"
+    newFile = newFile.replace(/let\s+(\w)\s*=\s*"│";/g, 'let $1 = "|";');
+    newFile = newFile.replace(/"\s*│"/g, '" |"');
 
-      if (patchedRegion !== searchRegion) {
-        newFile =
-          newFile.slice(0, searchStart) +
-          patchedRegion +
-          newFile.slice(searchEnd);
-        patchCount++;
-        debug('Patched vertical border characters in table rendering region');
-      }
+    if (newFile !== beforeVertPatch) {
+      patchCount++;
+      debug('Patched vertical border characters');
     }
   }
 
-  // 3. Patch the horizontal separator for compact view (Q = "─".repeat(b))
+  // 3. Patch the horizontal separator for compact view
+  // NPM: "─".repeat(  Native: "\u2500".repeat(
   {
     const beforeHorizPatch = newFile;
     newFile = newFile.replace(/"─"\.repeat\(/g, '"-".repeat(');
+    newFile = newFile.replace(/"\\u2500"\.repeat\(/g, '"-".repeat(');
     if (newFile !== beforeHorizPatch) {
       patchCount++;
       debug('Patched horizontal separator characters');
