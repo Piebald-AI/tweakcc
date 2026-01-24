@@ -2,6 +2,7 @@ import { Box, Text, useInput } from 'ink';
 import { useContext, useState, useMemo } from 'react';
 import { SettingsContext } from '../App';
 import Header from './Header';
+import { TableFormat } from '../../types';
 
 interface MiscViewProps {
   onSubmit: () => void;
@@ -11,8 +12,10 @@ interface MiscItem {
   id: string;
   title: string;
   description: string;
-  getValue: () => boolean;
+  getValue: () => boolean | string;
   toggle: () => void;
+  isMultiValue?: boolean;
+  getDisplayValue?: () => string;
 }
 
 const ITEMS_PER_PAGE = 4;
@@ -33,11 +36,31 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     increaseFileReadLimit: false,
     suppressLineNumbers: false,
     suppressRateLimitOptions: false,
+    tableFormat: 'default' as TableFormat,
   };
 
   const ensureMisc = () => {
     if (!settings.misc) {
       settings.misc = { ...defaultMisc };
+    }
+  };
+
+  // Helper to cycle through table format options
+  const cycleTableFormat = (current: TableFormat): TableFormat => {
+    const formats: TableFormat[] = ['default', 'markdown', 'box-drawing'];
+    const currentIndex = formats.indexOf(current);
+    return formats[(currentIndex + 1) % formats.length];
+  };
+
+  const getTableFormatDisplay = (format: TableFormat): string => {
+    switch (format) {
+      case 'markdown':
+        return 'Markdown (| and -)';
+      case 'box-drawing':
+        return 'Box-drawing (┌─┬┐)';
+      case 'default':
+      default:
+        return 'Default (no preference)';
     }
   };
 
@@ -195,6 +218,24 @@ export function MiscView({ onSubmit }: MiscViewProps) {
           });
         },
       },
+      {
+        id: 'tableFormat',
+        title: 'Table output format',
+        description:
+          'Controls how Claude formats tables in responses. "Markdown" uses | and -, "Box-drawing" uses Unicode box characters.',
+        getValue: () => settings.misc?.tableFormat ?? 'default',
+        isMultiValue: true,
+        getDisplayValue: () =>
+          getTableFormatDisplay(settings.misc?.tableFormat ?? 'default'),
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.tableFormat = cycleTableFormat(
+              settings.misc!.tableFormat ?? 'default'
+            );
+          });
+        },
+      },
     ],
     [settings, updateSettings]
   );
@@ -253,7 +294,13 @@ export function MiscView({ onSubmit }: MiscViewProps) {
       {visibleItems.map((item, i) => {
         const actualIndex = scrollOffset + i;
         const isSelected = actualIndex === selectedIndex;
-        const checkbox = item.getValue() ? '☑' : '☐';
+        const isMultiValue = item.isMultiValue ?? false;
+        const checkbox = isMultiValue ? '◉' : item.getValue() ? '☑' : '☐';
+        const statusText = isMultiValue
+          ? (item.getDisplayValue?.() ?? String(item.getValue()))
+          : item.getValue()
+            ? 'Enabled'
+            : 'Disabled';
 
         return (
           <Box key={item.id} flexDirection="column">
@@ -277,7 +324,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
 
             <Box marginLeft={4} marginBottom={1}>
               <Text>
-                {checkbox} {item.getValue() ? 'Enabled' : 'Disabled'}
+                {checkbox} {statusText}
               </Text>
             </Box>
           </Box>

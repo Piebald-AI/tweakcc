@@ -104,6 +104,8 @@ export interface InputBoxConfig {
   removeBorder: boolean;
 }
 
+export type TableFormat = 'default' | 'markdown' | 'box-drawing';
+
 export interface MiscConfig {
   showTweakccVersion: boolean;
   showPatchesApplied: boolean;
@@ -115,6 +117,7 @@ export interface MiscConfig {
   increaseFileReadLimit: boolean;
   suppressLineNumbers: boolean;
   suppressRateLimitOptions: boolean;
+  tableFormat: TableFormat;
 }
 
 export interface InputPatternHighlighter {

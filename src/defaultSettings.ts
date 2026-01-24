@@ -755,6 +755,7 @@ export const DEFAULT_SETTINGS: Settings = {
     increaseFileReadLimit: false,
     suppressLineNumbers: true,
     suppressRateLimitOptions: false,
+    tableFormat: 'default',
   },
   toolsets: [],
   defaultToolset: null,
