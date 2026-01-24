@@ -61,6 +61,7 @@ tweakcc also
 
 - Fixes a bug where the **spinner animation** is frozen if you have the `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` environment variable set ([#46](https://github.com/Piebald-AI/tweakcc/issues/46))
 - Allows you to **change the context limit** (default: 200k tokens) used with models from custom Anthropic-compatible APIs with a new environment variable, `CLAUDE_CODE_CONTEXT_LIMIT`
+- Adds the **`opusplan[1m]`** model alias, combining Opus for planning with Sonnet's 1M context for execution—reducing "[context anxiety](#opusplan1m-mode)" ([#108](https://github.com/Piebald-AI/tweakcc/issues/108))
 - Adds a message to Claude Code's startup banner indicating that you're running the patched version of CC (configurable)
 
 Additionally, we're working on features that will allow you to
@@ -84,6 +85,7 @@ $ pnpm dlx tweakcc
 - [How it works](#how-it-works)
 - [**Features**](#features)
   - [Input pattern highlighters](#input-pattern-highlighters)
+  - [Opus Plan 1M mode](#opusplan1m-mode)
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
 - [Related projects](#related-projects)
@@ -162,6 +164,44 @@ Here's the schema for the object format:
   enabled: boolean;               // Temporarily disable this pattern
 }
 ```
+
+### Opus Plan 1M mode
+
+tweakcc adds support for a new model alias: **`opusplan[1m]`**. This combines the best of both worlds:
+
+- **Plan mode**: Uses **Opus 4.5** for complex reasoning and architecture decisions
+- **Execution mode**: Uses **Sonnet 4.5 with 1M context** for code generation
+
+#### Why use this?
+
+Sonnet 4.5 likes to exhibit a very frusterating problem called _context anxiety_ - in other words, it takes shortcuts or just leaves tasks enitrely incomplete, even when the context window isn't anywhere near filling.
+
+By using the 1M context model, Claude _believes_ it has plenty of room and doesn't rush to finish. Of course, if you don't actually want the 1M model, you'll have to manually make sure that you don't hit the 200K limits.
+
+#### How to use it
+
+After applying tweakcc patches, you can use `opusplan[1m]` like any other model alias:
+
+```bash
+# Via CLI flag
+claude --model opusplan[1m]
+
+# Via /model command in Claude Code
+/model opusplan[1m]
+```
+
+Or set it permanently in your Claude Code settings:
+
+```json
+{
+  "model": "opusplan[1m]"
+}
+```
+
+| Mode                        | Model Used | Context Window |
+| --------------------------- | ---------- | -------------- |
+| Plan mode (Shift+Tab twice) | Opus 4.5   | 200k           |
+| Execution mode (default)    | Sonnet 4.5 | **1M**         |
 
 ## Configuration directory
 
