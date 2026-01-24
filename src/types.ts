@@ -115,6 +115,7 @@ export interface MiscConfig {
   increaseFileReadLimit: boolean;
   suppressLineNumbers: boolean;
   suppressRateLimitOptions: boolean;
+  preventUpdateToUnsupportedVersions: boolean;
 }
 
 export interface InputPatternHighlighter {

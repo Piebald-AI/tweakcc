@@ -70,6 +70,7 @@ import {
   restoreClijsFromBackup,
 } from '../installationBackup';
 import { compareVersions } from '../systemPromptSync';
+import { writePreventUnsupportedUpdates } from './preventUnsupportedUpdates';
 
 export interface LocationResult {
   startIndex: number;
@@ -734,6 +735,11 @@ export const applyCustomization = async (
   // Apply suppress rate limit options patch (if enabled)
   if (config.settings.misc?.suppressRateLimitOptions) {
     if ((result = writeSuppressRateLimitOptions(content))) content = result;
+  }
+
+  // Apply prevent update to unsupported versions patch (if enabled)
+  if (config.settings.misc?.preventUpdateToUnsupportedVersions) {
+    if ((result = writePreventUnsupportedUpdates(content))) content = result;
   }
 
   // Write the modified content back
