@@ -138,12 +138,15 @@ export const writeTableFormat = (
     const beforeVertPatch = newFile;
 
     // Native format: let VAR="\u2502" and " \u2502"
-    newFile = newFile.replace(/let\s+(\w+)\s*=\s*"\\u2502";/g, 'let $1="|";');
+    newFile = newFile.replace(
+      /let\s+([$\w]+)\s*=\s*"\\u2502";/g,
+      'let $1="|";'
+    );
     newFile = newFile.replace(/" \\u2502"/g, '" |"');
     newFile = newFile.replace(/"\\u2502"/g, '"|"');
 
     // NPM format: let VAR = "│" and " │"
-    newFile = newFile.replace(/let\s+(\w)\s*=\s*"│";/g, 'let $1 = "|";');
+    newFile = newFile.replace(/let\s+([$\w]+)\s*=\s*"│";/g, 'let $1 = "|";');
     newFile = newFile.replace(/"\s*│"/g, '" |"');
 
     if (newFile !== beforeVertPatch) {
@@ -173,7 +176,7 @@ export const writeTableFormat = (
     // Match: if(VAR.push(...N(VAR,!1)),VAR<VAR.rows.length-1)VAR.push(T("middle"))
     // Replace with just: VAR.push(...N(VAR,!1))
     const interRowSepPattern =
-      /if\((\w)\.push\(\.\.\.(\w)\((\w),!1\)\),(\w)<(\w)\.rows\.length-1\)(\w)\.push\((\w)\("middle"\)\)/g;
+      /if\(([$\w]+)\.push\(\.\.\.([$\w]+)\(([$\w]+),!1\)\),([$\w]+)<([$\w]+)\.rows\.length-1\)([$\w]+)\.push\(([$\w]+)\("middle"\)\)/g;
     const beforeInterRowPatch = newFile;
     // Replace with just the push call (without the if and the middle separator)
     newFile = newFile.replace(interRowSepPattern, '$1.push(...$2($3,!1))');

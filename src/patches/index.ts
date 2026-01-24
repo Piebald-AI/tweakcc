@@ -540,9 +540,9 @@ export const applyCustomization = async (
   let result: string | null = null;
 
   // Apply table format preference (inject into system prompt)
-  if (config.settings.misc.tableFormat !== 'default') {
-    if ((result = writeTableFormat(content, config.settings.misc.tableFormat)))
-      content = result;
+  const tableFormat = config.settings.misc?.tableFormat ?? 'default';
+  if (tableFormat !== 'default') {
+    if ((result = writeTableFormat(content, tableFormat))) content = result;
   }
 
   // Apply themes
