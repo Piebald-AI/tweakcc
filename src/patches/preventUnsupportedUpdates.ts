@@ -105,8 +105,9 @@ export const writePreventUnsupportedUpdates = (
 
   // Construct the replacement with the tweakcc version check injected
   // The check wraps the version fetch to check if tweakcc supports the version.
-  // If the prompts file doesn't exist (404), it returns the current version to block the update.
-  const tweakccVersionCheck = `${versionVar}=await(async()=>{let v=await ${fetchFunc}(${channelVar});if(!v)return v;try{const r=await fetch(\`https://raw.githubusercontent.com/Piebald-AI/tweakcc/refs/heads/main/data/prompts/prompts-\${v}.json\`,{method:'HEAD'});if(!r.ok)return ${currentVersionVar};}catch(e){}return v;})(),`;
+  // If the prompts file doesn't exist (404) or check fails, it returns the current version to block the update.
+  // Fails closed: if we can't verify support, we block the update to be safe.
+  const tweakccVersionCheck = `${versionVar}=await(async()=>{let v=await ${fetchFunc}(${channelVar});if(!v)return v;try{const r=await fetch(\`https://raw.githubusercontent.com/Piebald-AI/tweakcc/refs/heads/main/data/prompts/prompts-\${v}.json\`,{method:'HEAD'});if(!r.ok)return ${currentVersionVar};}catch(e){return ${currentVersionVar};}return v;})(),`;
 
   // Reconstruct the original prefix (BUILD_TIME part) which we matched but want to preserve
   const buildTimeMatch = location.identifiers![0].match(/BUILD_TIME:"[^"]+"\}/);
