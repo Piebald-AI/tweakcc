@@ -65,7 +65,7 @@ import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
 import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
 import { writeThinkingLabel } from './thinkingLabel';
-import { writeMcpStartupOptimization } from './mcpStartup';
+import { writeMcpNonBlocking, writeMcpBatchSize } from './mcpStartup';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -738,15 +738,14 @@ export const applyCustomization = async (
   }
 
   // Apply MCP startup optimization (if enabled)
-  if (
-    config.settings.misc?.mcpConnectionNonBlocking ||
-    config.settings.misc?.mcpServerBatchSize
-  ) {
+  if (config.settings.misc?.mcpConnectionNonBlocking) {
+    if ((result = writeMcpNonBlocking(content))) content = result;
+  }
+  if (config.settings.misc?.mcpServerBatchSize) {
     if (
-      (result = writeMcpStartupOptimization(
+      (result = writeMcpBatchSize(
         content,
-        config.settings.misc.mcpConnectionNonBlocking ?? false,
-        config.settings.misc.mcpServerBatchSize ?? null
+        config.settings.misc.mcpServerBatchSize
       ))
     )
       content = result;
