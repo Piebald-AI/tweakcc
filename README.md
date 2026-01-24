@@ -167,32 +167,46 @@ Here's the schema for the object format:
 
 ### Table format
 
-By default, Claude Code renders tables using Unicode box-drawing characters:
+Recent Claude Code versions render tables using Unicode box-drawing characters.  While these have a more elegant look compared to the traditional plain markdown table rendering, they take up more room due to the row dividers:
 
 ```
-┌───────┬─────┬───────────────┐
-│ Name  │ Age │ City          │
-├───────┼─────┼───────────────┤
-│ Alice │ 28  │ San Francisco │
-├───────┼─────┼───────────────┤
-│ Bob   │ 34  │ New York      │
-└───────┴─────┴───────────────┘
+┌───────────┬───────────────────────────────┬───────┐
+│  Library  │            Purpose            │ Size  │
+├───────────┼───────────────────────────────┼───────┤
+│ React     │ UI components, virtual DOM    │ ~40kb │
+├───────────┼───────────────────────────────┼───────┤
+│ Vue       │ Progressive framework         │ ~34kb │
+├───────────┼───────────────────────────────┼───────┤
+│ Svelte    │ Compile-time framework        │ ~2kb  │
+├───────────┼───────────────────────────────┼───────┤
+│ Preact    │ Lightweight React alternative │ ~3kb  │
+├───────────┼───────────────────────────────┼───────┤
+│ Solid     │ Reactive UI, no virtual DOM   │ ~7kb  │
+├───────────┼───────────────────────────────┼───────┤
+│ htmx      │ HTML-driven interactivity     │ ~14kb │
+├───────────┼───────────────────────────────┼───────┤
+│ Alpine.js │ Lightweight reactivity        │ ~15kb │
+├───────────┼───────────────────────────────┼───────┤
+│ Lit       │ Web components                │ ~5kb  │
+└───────────┴───────────────────────────────┴───────┘
 ```
 
-While they look nice from a visual perspective, they're difficult to copy-paste into other applications. tweakcc lets you switch to **true markdown table format**:
+tweakcc lets you switch to **true markdown table format** if you prefer:
 
 ```
-| Name  | Age | City          |
-|-------|-----|---------------|
-| Alice | 28  | San Francisco |
-| Bob   | 34  | New York      |
+|  Library  |            Purpose            | Size  |
+|-----------|-------------------------------|-------|
+| React     | UI components, virtual DOM    | ~40kb |
+| Vue       | Progressive framework         | ~34kb |
+| Svelte    | Compile-time framework        | ~2kb  |
+| Preact    | Lightweight React alternative | ~3kb  |
+| Solid     | Reactive UI, no virtual DOM   | ~7kb  |
+| htmx      | HTML-driven interactivity     | ~14kb |
+| Alpine.js | Lightweight reactivity        | ~15kb |
+| Lit       | Web components                | ~5kb  |
 ```
 
-This format is, for obvious reasons, much easier to copy into documents, spreadsheets, or other text-based files.
-
-To enable markdown tables, run `npx tweakcc`, go to `Misc`, and change the **Table format** option from "default" to "markdown." Then apply your customizations.
-
-Alternatively, edit `~/.tweakcc/config.json` and set:
+To enable the more compact markdown format, run `npx tweakcc`, go to `Misc`, and change the **Table format** option from "default" to "markdown" (hit spacebar).  Then apply your customizations.  If you prefer headless configuration, edit `~/.tweakcc/config.json` and set:
 
 ```json
 {
@@ -203,8 +217,6 @@ Alternatively, edit `~/.tweakcc/config.json` and set:
   }
 }
 ```
-
-This feature works with both npm-based and native binary Claude Code installations.
 
 ## Configuration directory
 
