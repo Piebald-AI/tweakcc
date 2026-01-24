@@ -174,6 +174,7 @@ By default, Claude Code renders tables using Unicode box-drawing characters:
 │ Name  │ Age │ City          │
 ├───────┼─────┼───────────────┤
 │ Alice │ 28  │ San Francisco │
+├───────┼─────┼───────────────┤
 │ Bob   │ 34  │ New York      │
 └───────┴─────┴───────────────┘
 ```
