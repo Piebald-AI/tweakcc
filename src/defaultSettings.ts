@@ -755,6 +755,8 @@ export const DEFAULT_SETTINGS: Settings = {
     increaseFileReadLimit: false,
     suppressLineNumbers: true,
     suppressRateLimitOptions: false,
+    mcpConnectionNonBlocking: false,
+    mcpServerBatchSize: null,
   },
   toolsets: [],
   defaultToolset: null,

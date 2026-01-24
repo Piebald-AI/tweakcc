@@ -11,7 +11,7 @@ interface MiscItem {
   id: string;
   title: string;
   description: string;
-  getValue: () => boolean;
+  getValue: () => boolean | number | null;
   toggle: () => void;
 }
 
@@ -33,12 +33,27 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     increaseFileReadLimit: false,
     suppressLineNumbers: false,
     suppressRateLimitOptions: false,
+    mcpConnectionNonBlocking: false,
+    mcpServerBatchSize: null as number | null,
   };
 
   const ensureMisc = () => {
     if (!settings.misc) {
       settings.misc = { ...defaultMisc };
     }
+  };
+
+  // Helper to cycle through MCP batch size options
+  const cycleMcpBatchSize = (current: number | null): number | null => {
+    const sizes: (number | null)[] = [null, 4, 6, 8, 10, 12];
+    const currentIndex = sizes.indexOf(current);
+    if (currentIndex === -1) return sizes[0];
+    return sizes[(currentIndex + 1) % sizes.length];
+  };
+
+  const getMcpBatchSizeDisplay = (size: number | null): string => {
+    if (size === null) return 'Default (3)';
+    return `${size} servers`;
   };
 
   const items: MiscItem[] = useMemo(
@@ -192,6 +207,38 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.suppressRateLimitOptions =
               !settings.misc!.suppressRateLimitOptions;
+          });
+        },
+      },
+      {
+        id: 'mcpNonBlocking',
+        title: 'Non-blocking MCP startup',
+        description:
+          'Start Claude Code immediately while MCP servers connect in the background. Can reduce startup time by ~50% with multiple MCPs.',
+        getValue: () => settings.misc?.mcpConnectionNonBlocking ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.mcpConnectionNonBlocking =
+              !settings.misc!.mcpConnectionNonBlocking;
+          });
+        },
+      },
+      {
+        id: 'mcpBatchSize',
+        title: 'MCP server batch size',
+        description:
+          'Number of MCP servers to connect in parallel. Higher values speed up background connections when non-blocking is enabled.',
+        getValue: () => settings.misc?.mcpServerBatchSize ?? null,
+        isMultiValue: true,
+        getDisplayValue: () =>
+          getMcpBatchSizeDisplay(settings.misc?.mcpServerBatchSize ?? null),
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.mcpServerBatchSize = cycleMcpBatchSize(
+              settings.misc!.mcpServerBatchSize ?? null
+            );
           });
         },
       },

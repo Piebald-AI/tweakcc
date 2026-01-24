@@ -65,6 +65,7 @@ import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
 import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
 import { writeThinkingLabel } from './thinkingLabel';
+import { writeMcpStartupOptimization } from './mcpStartup';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -734,6 +735,21 @@ export const applyCustomization = async (
   // Apply suppress rate limit options patch (if enabled)
   if (config.settings.misc?.suppressRateLimitOptions) {
     if ((result = writeSuppressRateLimitOptions(content))) content = result;
+  }
+
+  // Apply MCP startup optimization (if enabled)
+  if (
+    config.settings.misc?.mcpConnectionNonBlocking ||
+    config.settings.misc?.mcpServerBatchSize
+  ) {
+    if (
+      (result = writeMcpStartupOptimization(
+        content,
+        config.settings.misc.mcpConnectionNonBlocking ?? false,
+        config.settings.misc.mcpServerBatchSize ?? null
+      ))
+    )
+      content = result;
   }
 
   // Write the modified content back
