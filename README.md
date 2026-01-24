@@ -47,6 +47,7 @@ With tweakcc, you can
 
 - Customize all of Claude Code's **system prompts** (**NEW:** also see all of [**Claude Code's system prompts**](https://github.com/Piebald-AI/claude-code-system-prompts))
 - Create custom **toolsets** that can be used in Claude Code with the new **`/toolset`** command
+- Switch between **table formats**: keep the default Unicode box-drawing characters (`┌─┬─┐`) or use true **markdown tables** (`| A | B |`) for easier copy-paste and less noise.
 - **Highlight** custom patterns while you type in the CC input box with custom colors and styling, like how `ultrathink` used to be rainbow-highlighted.
 - Manually name **sessions** in Claude Code with `/title my chat name` or `/rename` (see [**our blog post**](https://piebald.ai/blog/messages-as-commits-claude-codes-git-like-dag-of-conversations) for implementation details)
 - Create **custom themes** with a graphical HSL/RGB color picker
@@ -84,6 +85,7 @@ $ pnpm dlx tweakcc
 - [How it works](#how-it-works)
 - [**Features**](#features)
   - [Input pattern highlighters](#input-pattern-highlighters)
+  - [Table format](#table-format)
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
 - [Related projects](#related-projects)
@@ -162,6 +164,46 @@ Here's the schema for the object format:
   enabled: boolean;               // Temporarily disable this pattern
 }
 ```
+
+### Table format
+
+By default, Claude Code renders tables using Unicode box-drawing characters:
+
+```
+┌───────┬─────┬───────────────┐
+│ Name  │ Age │ City          │
+├───────┼─────┼───────────────┤
+│ Alice │ 28  │ San Francisco │
+│ Bob   │ 34  │ New York      │
+└───────┴─────┴───────────────┘
+```
+
+While they look nice from a visual perspective, they're difficult to copy-paste into other applications. tweakcc lets you switch to **true markdown table format**:
+
+```
+| Name  | Age | City          |
+|-------|-----|---------------|
+| Alice | 28  | San Francisco |
+| Bob   | 34  | New York      |
+```
+
+This format is, for obvious reasons, much easier to copy into documents, spreadsheets, or other text-based files.
+
+To enable markdown tables, run `npx tweakcc`, go to `Misc`, and change the **Table format** option from "default" to "markdown." Then apply your customizations.
+
+Alternatively, edit `~/.tweakcc/config.json` and set:
+
+```json
+{
+  "settings": {
+    "misc": {
+      "tableFormat": "markdown"
+    }
+  }
+}
+```
+
+This feature works with both npm-based and native binary Claude Code installations.
 
 ## Configuration directory
 
