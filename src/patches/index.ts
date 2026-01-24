@@ -90,6 +90,7 @@ import {
   restoreClijsFromBackup,
 } from '../installationBackup';
 import { compareVersions } from '../systemPromptSync';
+import { writePreventUnsupportedUpdates } from './preventUnsupportedUpdates';
 
 export { showDiff, showPositionalDiff, globalReplace } from './patchDiffing';
 export {

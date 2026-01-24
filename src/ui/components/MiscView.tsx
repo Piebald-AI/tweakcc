@@ -87,6 +87,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableVoiceMode: false,
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
+    preventUpdateToUnsupportedVersions: false,
   };
 
   const ensureMisc = () => {
@@ -670,6 +671,21 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.allowCustomAgentModels =
               !settings.misc!.allowCustomAgentModels;
+          });
+        },
+      },
+      {
+        id: 'preventUnsupportedUpdates',
+        title: 'Prevent updates to unsupported versions',
+        description:
+          'Blocks Claude Code auto-updates to versions not yet supported by tweakcc.',
+        getValue: () =>
+          settings.misc?.preventUpdateToUnsupportedVersions ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.preventUpdateToUnsupportedVersions =
+              !settings.misc!.preventUpdateToUnsupportedVersions;
           });
         },
       },
