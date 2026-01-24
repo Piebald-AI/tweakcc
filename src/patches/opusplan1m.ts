@@ -210,8 +210,9 @@ const patchModelSelectorOptions = (oldFile: string): string | null => {
   // Find where opusplan is added to the model list: [...A, Mm3()]
   // Pattern: if (K === "opusplan") return [...A, Mm3()];
   // We need to add a similar case for opusplan[1m]
+  // Capture groups: 1=fullMatch, 2=conditionVar (K), 3=listVar (A), 4=funcName (Mm3)
   const pattern =
-    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*\[\s*\.\.\.[$\w]+\s*,\s*([$\w]+)\(\)\s*\];)/;
+    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*\[\s*\.\.\.([$\w]+)\s*,\s*([$\w]+)\(\)\s*\];)/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
@@ -221,13 +222,13 @@ const patchModelSelectorOptions = (oldFile: string): string | null => {
     return null;
   }
 
-  const [fullMatch, , varName] = match;
+  const [fullMatch, , varName, listVar] = match;
 
   // Add the opusplan[1m] case right after. We create an inline object instead of a function
   // since we don't want to modify the function definitions area
   const replacement =
     fullMatch +
-    `if(${varName}==="opusplan[1m]")return[...A,{value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus 4.5 in plan mode, Sonnet 4.5 (1M context) otherwise"}];`;
+    `if(${varName}==="opusplan[1m]")return[...${listVar},{value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus 4.5 in plan mode, Sonnet 4.5 (1M context) otherwise"}];`;
 
   const newFile =
     oldFile.slice(0, match.index) +
