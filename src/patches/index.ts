@@ -633,6 +633,10 @@ export const applyCustomization = async (
   // Apply model customizations (known names, mapping, selector options) (always enabled)
   if ((result = writeModelCustomizations(content))) content = result;
 
+  // Apply opusplan[1m] support (always enabled)
+  // This adds support for using Opus in plan mode with Sonnet 1M in execution mode
+  if ((result = writeOpusplan1m(content))) content = result;
+
   // Apply subagent model customizations
   if (config.settings.subagentModels) {
     if (
