@@ -106,10 +106,7 @@ export const writePreventUnsupportedUpdates = (
   // Construct the replacement with the tweakcc version check injected
   // The check wraps the version fetch to check if tweakcc supports the version.
   // If the prompts file doesn't exist (404), it returns the current version to block the update.
-  //
-  // TEST MODE: Spoofing version to 99.0.0 to test blocking behavior
-  // TODO: Remove test code before merging!
-  const tweakccVersionCheck = `${versionVar}=await(async()=>{let v=await ${fetchFunc}(${channelVar});require("fs").appendFileSync("/tmp/tweakcc-test.log","[tweakcc] Fetched version: "+v+"\\n");v="99.0.0";require("fs").appendFileSync("/tmp/tweakcc-test.log","[tweakcc] Spoofed to: "+v+"\\n");try{const r=await fetch(\`https://raw.githubusercontent.com/Piebald-AI/tweakcc/refs/heads/main/data/prompts/prompts-\${v}.json\`,{method:'HEAD'});require("fs").appendFileSync("/tmp/tweakcc-test.log","[tweakcc] GitHub status: "+r.status+"\\n");if(!r.ok){require("fs").appendFileSync("/tmp/tweakcc-test.log","[tweakcc] BLOCKING update!\\n");return ${currentVersionVar};}}catch(e){require("fs").appendFileSync("/tmp/tweakcc-test.log","[tweakcc] Error: "+e+"\\n")}return v;})(),`;
+  const tweakccVersionCheck = `${versionVar}=await(async()=>{let v=await ${fetchFunc}(${channelVar});if(!v)return v;try{const r=await fetch(\`https://raw.githubusercontent.com/Piebald-AI/tweakcc/refs/heads/main/data/prompts/prompts-\${v}.json\`,{method:'HEAD'});if(!r.ok)return ${currentVersionVar};}catch(e){}return v;})(),`;
 
   // Reconstruct the original prefix (BUILD_TIME part) which we matched but want to preserve
   const buildTimeMatch = location.identifiers![0].match(/BUILD_TIME:"[^"]+"\}/);
