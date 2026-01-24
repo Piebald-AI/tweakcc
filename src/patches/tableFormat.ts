@@ -197,27 +197,22 @@ export const writeTableFormat = (
   const patchSummary = `[Table format patch: ${patchCount} modifications for markdown style]`;
   debug(patchSummary);
 
-  // Calculate what changed for the diff display
-  const oldLength = oldFile.length;
-  const newLength = newFile.length;
-
   // Show a diff near the first change
   const firstDiffIndex = findFirstDifference(oldFile, newFile);
   if (firstDiffIndex !== -1) {
-    const contextStart = Math.max(0, firstDiffIndex - 50);
-    const contextEnd = Math.min(newFile.length, firstDiffIndex + 150);
-
-    showDiff(
+    // Find where the first changed region ends in both files
+    const { oldEnd, newEnd } = findFirstDiffEnd(
       oldFile,
       newFile,
-      `Table borders changed to markdown style (${patchCount} patches)`,
-      contextStart,
-      contextEnd
+      firstDiffIndex
     );
+    const injectedText = newFile.slice(firstDiffIndex, newEnd);
+
+    showDiff(oldFile, newFile, injectedText, firstDiffIndex, oldEnd);
   }
 
   debug(
-    `Table format patch applied: ${patchCount} changes, file size ${oldLength} -> ${newLength}`
+    `Table format patch applied: ${patchCount} changes, file size ${oldFile.length} -> ${newFile.length}`
   );
   return newFile;
 };
@@ -231,4 +226,29 @@ function findFirstDifference(a: string, b: string): number {
     if (a[i] !== b[i]) return i;
   }
   return a.length !== b.length ? minLen : -1;
+}
+
+/**
+ * Find where the first differing region ends in both strings.
+ * This helps identify the boundaries of a single replacement.
+ */
+function findFirstDiffEnd(
+  oldStr: string,
+  newStr: string,
+  diffStart: number
+): { oldEnd: number; newEnd: number } {
+  // Scan backwards from the ends to find where they match again
+  let oldIdx = oldStr.length - 1;
+  let newIdx = newStr.length - 1;
+
+  while (
+    oldIdx >= diffStart &&
+    newIdx >= diffStart &&
+    oldStr[oldIdx] === newStr[newIdx]
+  ) {
+    oldIdx--;
+    newIdx--;
+  }
+
+  return { oldEnd: oldIdx + 1, newEnd: newIdx + 1 };
 }
