@@ -59,7 +59,7 @@ With tweakcc, you can
 
 tweakcc also
 
-- **Force-enables native multi-agent/swarm mode** (TeammateTool, delegate mode, swarm spawning) by bypassing the `tengu_brass_pebble` statsig flag — enabled by default
+- **Enables native multi-agent/swarm mode** (TeammateTool, delegate mode, swarm spawning) by bypassing the `tengu_brass_pebble` statsig flag. Enabled by default.
 - Fixes a bug where the **spinner animation** is frozen if you have the `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` environment variable set ([#46](https://github.com/Piebald-AI/tweakcc/issues/46))
 - Allows you to **change the context limit** (default: 200k tokens) used with models from custom Anthropic-compatible APIs with a new environment variable, `CLAUDE_CODE_CONTEXT_LIMIT`
 - Adds a message to Claude Code's startup banner indicating that you're running the patched version of CC (configurable)
@@ -107,7 +107,7 @@ _More feature documentation coming soon._
 
 ### Swarm mode (native multi-agent)
 
-Claude Code 2.1.16+ includes native multi-agent features that are gated behind the `tengu_brass_pebble` statsig flag. tweakcc patches this gate to force-enable these features for everyone — **enabled by default**.
+Claude Code 2.1.16+ includes native multi-agent features that are gated behind the `tengu_brass_pebble` statsig flag. tweakcc patches this gate to enable these features for everyone. Enabled by default.
 
 ![Screenshot showing swarm mode status](./assets/swarm_1_swarm_status.png)
 ![Screenshot showing one of the workers request permission](./assets/swarm_2_worker_permission_request.png)
