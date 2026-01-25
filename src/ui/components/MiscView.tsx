@@ -33,6 +33,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     increaseFileReadLimit: false,
     suppressLineNumbers: false,
     suppressRateLimitOptions: false,
+    enableSwarmMode: true,
   };
 
   const ensureMisc = () => {
@@ -192,6 +193,19 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.suppressRateLimitOptions =
               !settings.misc!.suppressRateLimitOptions;
+          });
+        },
+      },
+      {
+        id: 'enableSwarmMode',
+        title: 'Enable swarm mode (native multi-agent)',
+        description:
+          'Force-enable native multi-agent features (TeammateTool, delegate mode, swarm spawning) by bypassing the tengu_brass_pebble statsig flag.',
+        getValue: () => settings.misc?.enableSwarmMode ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableSwarmMode = !settings.misc!.enableSwarmMode;
           });
         },
       },

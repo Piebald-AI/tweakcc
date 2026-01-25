@@ -64,6 +64,7 @@ import { writeHideStartupClawd } from './hideStartupClawd';
 import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
 import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
+import { writeSwarmMode } from './swarmMode';
 import { writeThinkingLabel } from './thinkingLabel';
 import {
   restoreNativeBinaryFromBackup,
@@ -734,6 +735,12 @@ export const applyCustomization = async (
   // Apply suppress rate limit options patch (if enabled)
   if (config.settings.misc?.suppressRateLimitOptions) {
     if ((result = writeSuppressRateLimitOptions(content))) content = result;
+  }
+
+  // Apply swarm mode patch to enable native multi-agent features (if enabled)
+  // This patches the tengu_brass_pebble statsig flag gate function to always return true
+  if (config.settings.misc?.enableSwarmMode) {
+    if ((result = writeSwarmMode(content))) content = result;
   }
 
   // Write the modified content back
