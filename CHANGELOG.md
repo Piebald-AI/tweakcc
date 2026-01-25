@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 - Add a fallback for WASMagic when it's not available (#399) - @signadou
+- Add all available CC tools and their aliases to the toolset editor (#410) - @signadou
 
 ## [v3.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.4.0) - 2026-01-18
 
