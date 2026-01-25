@@ -59,6 +59,7 @@ With tweakcc, you can
 
 tweakcc also
 
+- **Force-enables native multi-agent/swarm mode** (TeammateTool, delegate mode, swarm spawning) by bypassing the `tengu_brass_pebble` statsig flag — enabled by default
 - Fixes a bug where the **spinner animation** is frozen if you have the `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` environment variable set ([#46](https://github.com/Piebald-AI/tweakcc/issues/46))
 - Allows you to **change the context limit** (default: 200k tokens) used with models from custom Anthropic-compatible APIs with a new environment variable, `CLAUDE_CODE_CONTEXT_LIMIT`
 - Adds a message to Claude Code's startup banner indicating that you're running the patched version of CC (configurable)
@@ -83,6 +84,7 @@ $ pnpm dlx tweakcc
 
 - [How it works](#how-it-works)
 - [**Features**](#features)
+  - [Swarm mode (native multi-agent)](#swarm-mode-native-multi-agent)
   - [Input pattern highlighters](#input-pattern-highlighters)
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
@@ -102,6 +104,25 @@ tweakcc is verified to work with Claude Code **2.1.2.** In newer or earlier vers
 ## Features
 
 _More feature documentation coming soon._
+
+### Swarm mode (native multi-agent)
+
+Claude Code 2.1.16+ includes native multi-agent features that are gated behind the `tengu_brass_pebble` statsig flag. tweakcc patches this gate to force-enable these features for everyone — **enabled by default**.
+
+![Screenshot showing swarm mode status](./assets/swarm_1_swarm_status.png)
+![Screenshot showing one of the workers request permission](./assets/swarm_2_worker_permission_request.png)
+
+**Features unlocked:**
+
+| Feature              | Description                                                |
+| -------------------- | ---------------------------------------------------------- |
+| **TeammateTool**     | Tool for spawning and coordinating teammate agents         |
+| **Delegate mode**    | Task tool mode option for delegating work                  |
+| **Swarm spawning**   | `launchSwarm` + `teammateCount` parameters in ExitPlanMode |
+| **Teammate mailbox** | Inter-agent messaging system                               |
+| **Task teammates**   | Task list teammate display and coordination                |
+
+To disable swarm mode, go to `Misc` in the tweakcc UI and toggle off "Enable swarm mode (native multi-agent)".
 
 ### Input pattern highlighters
 
