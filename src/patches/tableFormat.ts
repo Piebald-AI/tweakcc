@@ -310,6 +310,16 @@ export const writeTableFormat = (
         debug('Removed inter-row separators');
       }
     }
+
+    // 5. Remove top/bottom border pushes to avoid blank lines
+    {
+      const { result, success } = removeTopBottomPushes(newFile);
+      if (success) {
+        newFile = result;
+        patchCount++;
+        debug('Removed top/bottom border pushes');
+      }
+    }
   }
 
   // ==========================================================================

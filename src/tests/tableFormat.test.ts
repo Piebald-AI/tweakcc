@@ -34,6 +34,13 @@ describe('tableFormat patch', () => {
       // After patch it should just have: R.push(...N(S,!1))
       expect(result).not.toContain('g<A.rows.length-1');
     });
+
+    it('should remove T("top") and T("bottom") pushes to prevent blank lines', () => {
+      const result = writeTableFormat(testCliCode, 'ascii');
+      expect(result).not.toBeNull();
+      expect(result).not.toContain('R.push(T("top"))');
+      expect(result).not.toContain('R.push(T("bottom"))');
+    });
   });
 
   describe('clean format', () => {
