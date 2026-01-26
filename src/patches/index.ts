@@ -47,6 +47,7 @@ import { writeUserMessageDisplay } from './userMessageDisplay';
 import { writeInputPatternHighlighters } from './inputPatternHighlighters';
 import { writeVerboseProperty } from './verboseProperty';
 import { writeModelCustomizations } from './modelSelector';
+import { writeOpusplan1m } from './opusplan1m';
 import { writeThinkingVisibility } from './thinkingVisibility';
 import { writeSubagentModels } from './subagentModels';
 import { writePatchesAppliedIndication } from './patchesAppliedIndication';
@@ -57,6 +58,7 @@ import {
   writeModeChangeUpdateToolset,
   addSetStateFnAccessAtToolChangeComponentScope,
 } from './toolsets';
+import { writeTableFormat } from './tableFormat';
 import { writeConversationTitle } from './conversationTitle';
 import { writeHideStartupBanner } from './hideStartupBanner';
 import { writeHideCtrlGToEdit } from './hideCtrlGToEdit';
@@ -66,6 +68,7 @@ import { writeSuppressLineNumbers } from './suppressLineNumbers';
 import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
 import { writeSwarmMode } from './swarmMode';
 import { writeThinkingLabel } from './thinkingLabel';
+import { writeMcpNonBlocking, writeMcpBatchSize } from './mcpStartup';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -539,6 +542,12 @@ export const applyCustomization = async (
 
   let result: string | null = null;
 
+  // Apply table format preference (inject into system prompt)
+  const tableFormat = config.settings.misc?.tableFormat ?? 'default';
+  if (tableFormat !== 'default') {
+    if ((result = writeTableFormat(content, tableFormat))) content = result;
+  }
+
   // Apply themes
   if (config.settings.themes && config.settings.themes.length > 0) {
     if ((result = writeThemes(content, config.settings.themes)))
@@ -632,6 +641,10 @@ export const applyCustomization = async (
 
   // Apply model customizations (known names, mapping, selector options) (always enabled)
   if ((result = writeModelCustomizations(content))) content = result;
+
+  // Apply opusplan[1m] support (always enabled)
+  // This adds support for using Opus in plan mode with Sonnet 1M in execution mode
+  if ((result = writeOpusplan1m(content))) content = result;
 
   // Apply subagent model customizations
   if (config.settings.subagentModels) {
@@ -741,6 +754,20 @@ export const applyCustomization = async (
   // This patches the tengu_brass_pebble statsig flag gate function to always return true
   if (config.settings.misc?.enableSwarmMode) {
     if ((result = writeSwarmMode(content))) content = result;
+  }
+
+  // Apply MCP startup optimization (if enabled)
+  if (config.settings.misc?.mcpConnectionNonBlocking) {
+    if ((result = writeMcpNonBlocking(content))) content = result;
+  }
+  if (config.settings.misc?.mcpServerBatchSize) {
+    if (
+      (result = writeMcpBatchSize(
+        content,
+        config.settings.misc.mcpServerBatchSize
+      ))
+    )
+      content = result;
   }
 
   // Write the modified content back
