@@ -12,13 +12,20 @@ interface MiscItem {
   id: string;
   title: string;
   description: string;
-  getValue: () => boolean | string;
+  getValue: () => boolean | string | number | null;
   toggle: () => void;
-  isMultiValue?: boolean;
+  // For numeric items that support increment/decrement
+  increment?: () => void;
+  decrement?: () => void;
   getDisplayValue?: () => string;
 }
 
 const ITEMS_PER_PAGE = 4;
+
+// MCP batch size constraints
+const MCP_BATCH_SIZE_MIN = 1;
+const MCP_BATCH_SIZE_MAX = 20;
+const MCP_BATCH_SIZE_DEFAULT = 3;
 
 export function MiscView({ onSubmit }: MiscViewProps) {
   const { settings, updateSettings } = useContext(SettingsContext);
@@ -36,6 +43,8 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     increaseFileReadLimit: false,
     suppressLineNumbers: false,
     suppressRateLimitOptions: false,
+    mcpConnectionNonBlocking: true,
+    mcpServerBatchSize: null as number | null,
     tableFormat: 'default' as TableFormat,
   };
 
@@ -69,6 +78,13 @@ export function MiscView({ onSubmit }: MiscViewProps) {
       default:
         return 'Default (box-drawing)';
     }
+  };
+
+  const getMcpBatchSizeDisplay = (size: number | null): string => {
+    if (size === null) return `Default (${MCP_BATCH_SIZE_DEFAULT})`;
+    if (size <= 3) return `${size} (conservative)`;
+    if (size <= 8) return `${size} (recommended)`;
+    return `${size} (aggressive)`;
   };
 
   const items: MiscItem[] = useMemo(
@@ -226,6 +242,57 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         },
       },
       {
+        id: 'mcpNonBlocking',
+        title: 'Non-blocking MCP startup',
+        description:
+          'Start immediately while MCP servers connect in background. Reduces startup time ~50% with multiple MCPs.',
+        getValue: () => settings.misc?.mcpConnectionNonBlocking ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.mcpConnectionNonBlocking =
+              !settings.misc!.mcpConnectionNonBlocking;
+          });
+        },
+      },
+      {
+        id: 'mcpBatchSize',
+        title: 'MCP server batch size',
+        description: `Parallel MCP connections (${MCP_BATCH_SIZE_MIN}-${MCP_BATCH_SIZE_MAX}). Use ←/→ to adjust. Higher = faster startup, more resources.`,
+        getValue: () => settings.misc?.mcpServerBatchSize ?? null,
+        getDisplayValue: () =>
+          getMcpBatchSizeDisplay(settings.misc?.mcpServerBatchSize ?? null),
+        toggle: () => {
+          // Space resets to default
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.mcpServerBatchSize = null;
+          });
+        },
+        increment: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            const current =
+              settings.misc!.mcpServerBatchSize ?? MCP_BATCH_SIZE_DEFAULT;
+            settings.misc!.mcpServerBatchSize = Math.min(
+              MCP_BATCH_SIZE_MAX,
+              current + 1
+            );
+          });
+        },
+        decrement: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            const current =
+              settings.misc!.mcpServerBatchSize ?? MCP_BATCH_SIZE_DEFAULT;
+            const newValue = current - 1;
+            // If going below min, set to null (default)
+            settings.misc!.mcpServerBatchSize =
+              newValue < MCP_BATCH_SIZE_MIN ? null : newValue;
+          });
+        },
+      },
+      {
         id: 'tableFormat',
         title: 'Table output format',
         description:
@@ -241,7 +308,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
               settings.misc!.tableFormat ?? 'default'
             );
           });
-        },
+        }
       },
     ],
     [settings, updateSettings]
@@ -274,6 +341,10 @@ export function MiscView({ onSubmit }: MiscViewProps) {
       setSelectedIndex(prev => Math.min(maxIndex, prev + 1));
     } else if (input === ' ') {
       items[selectedIndex]?.toggle();
+    } else if (key.rightArrow) {
+      items[selectedIndex]?.increment?.();
+    } else if (key.leftArrow) {
+      items[selectedIndex]?.decrement?.();
     }
   });
 
@@ -285,8 +356,8 @@ export function MiscView({ onSubmit }: MiscViewProps) {
 
       <Box marginBottom={1}>
         <Text dimColor>
-          Various tweaks and customizations. Press space to toggle settings,
-          enter to go back.
+          Use ↑/↓ to navigate, space to toggle, ←/→ to adjust numbers, enter to
+          go back.
         </Text>
       </Box>
 
@@ -301,13 +372,32 @@ export function MiscView({ onSubmit }: MiscViewProps) {
       {visibleItems.map((item, i) => {
         const actualIndex = scrollOffset + i;
         const isSelected = actualIndex === selectedIndex;
-        const isMultiValue = item.isMultiValue ?? false;
-        const checkbox = isMultiValue ? '◉' : item.getValue() ? '☑' : '☐';
-        const statusText = isMultiValue
-          ? (item.getDisplayValue?.() ?? String(item.getValue()))
-          : item.getValue()
-            ? 'Enabled'
-            : 'Disabled';
+        const value = item.getValue();
+        const hasCustomDisplay = !!item.getDisplayValue;
+        const isNumeric = !!item.increment;
+
+        // Determine checkbox/indicator
+        let indicator: string;
+        if (isNumeric) {
+          indicator = '◆'; // Diamond for numeric
+        } else if (hasCustomDisplay) {
+          indicator = '◉'; // Filled circle for multi-value
+        } else {
+          indicator = value ? '☑' : '☐'; // Checkbox for boolean
+        }
+
+        // Determine status text
+        let statusText: string;
+        if (hasCustomDisplay) {
+          statusText = item.getDisplayValue!();
+        } else if (typeof value === 'boolean') {
+          statusText = value ? 'Enabled' : 'Disabled';
+        } else {
+          statusText = String(value ?? 'Default');
+        }
+
+        // Show arrow hints for numeric items when selected
+        const arrowHint = isSelected && isNumeric ? ' ← → ' : '';
 
         return (
           <Box key={item.id} flexDirection="column">
@@ -331,7 +421,8 @@ export function MiscView({ onSubmit }: MiscViewProps) {
 
             <Box marginLeft={4} marginBottom={1}>
               <Text>
-                {checkbox} {statusText}
+                {indicator} {statusText}
+                <Text dimColor>{arrowHint}</Text>
               </Text>
             </Box>
           </Box>

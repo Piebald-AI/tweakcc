@@ -47,6 +47,7 @@ import { writeUserMessageDisplay } from './userMessageDisplay';
 import { writeInputPatternHighlighters } from './inputPatternHighlighters';
 import { writeVerboseProperty } from './verboseProperty';
 import { writeModelCustomizations } from './modelSelector';
+import { writeOpusplan1m } from './opusplan1m';
 import { writeThinkingVisibility } from './thinkingVisibility';
 import { writeSubagentModels } from './subagentModels';
 import { writePatchesAppliedIndication } from './patchesAppliedIndication';
@@ -66,6 +67,7 @@ import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
 import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
 import { writeThinkingLabel } from './thinkingLabel';
+import { writeMcpNonBlocking, writeMcpBatchSize } from './mcpStartup';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -639,6 +641,10 @@ export const applyCustomization = async (
   // Apply model customizations (known names, mapping, selector options) (always enabled)
   if ((result = writeModelCustomizations(content))) content = result;
 
+  // Apply opusplan[1m] support (always enabled)
+  // This adds support for using Opus in plan mode with Sonnet 1M in execution mode
+  if ((result = writeOpusplan1m(content))) content = result;
+
   // Apply subagent model customizations
   if (config.settings.subagentModels) {
     if (
@@ -741,6 +747,20 @@ export const applyCustomization = async (
   // Apply suppress rate limit options patch (if enabled)
   if (config.settings.misc?.suppressRateLimitOptions) {
     if ((result = writeSuppressRateLimitOptions(content))) content = result;
+  }
+
+  // Apply MCP startup optimization (if enabled)
+  if (config.settings.misc?.mcpConnectionNonBlocking) {
+    if ((result = writeMcpNonBlocking(content))) content = result;
+  }
+  if (config.settings.misc?.mcpServerBatchSize) {
+    if (
+      (result = writeMcpBatchSize(
+        content,
+        config.settings.misc.mcpServerBatchSize
+      ))
+    )
+      content = result;
   }
 
   // Write the modified content back
