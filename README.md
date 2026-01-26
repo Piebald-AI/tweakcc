@@ -176,7 +176,7 @@ tweakcc adds support for a new model alias: **`opusplan[1m]`**. This combines th
 
 Claude Sonnet 4.5 is aware of its context window, so when it gets close to full, the model exhibits [context anxiety](https://cognition.ai/blog/devin-sonnet-4-5-lessons-and-challenges), where it thinks there may not be enough context to complete the given task, so it takes shortcuts or leaves subtasks incomplete.
 
-By using the 1M context model, Claude thinks it has plenty of room and doesn't skip things, and as long as you ensure you stay under 200k tokens you'll be charged the normal input/output rates even though you're using the 1M model.  However, once you exceed 200k tokens when using the 1M model, you'll be automatically charged premium rates (2x for input tokens and 1.5x for output tokens)&mdash;see https://platform.claude.com/docs/en/build-with-claude/context-windows#1-m-token-context-window.
+By using the 1M context model, Claude thinks it has plenty of room and doesn't skip things, and as long as you ensure you stay under 200k tokens you'll be charged the normal input/output rates even though you're using the 1M model. However, once you exceed 200k tokens when using the 1M model, you'll be automatically charged premium rates (2x for input tokens and 1.5x for output tokens)&mdash;see [the 1M context window docs](https://platform.claude.com/docs/en/build-with-claude/context-windows#1-m-token-context-window).
 
 #### How to use it
 
