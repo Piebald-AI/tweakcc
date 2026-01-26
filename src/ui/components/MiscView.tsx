@@ -62,9 +62,9 @@ export function MiscView({ onSubmit }: MiscViewProps) {
       case 'ascii':
         return 'ASCII (| and -)';
       case 'clean':
-        return 'Clean (no borders)';
+        return 'Clean (no row separators)';
       case 'clean-top-bottom':
-        return 'Clean with borders';
+        return 'Clean with top/bottom';
       case 'default':
       default:
         return 'Default (box-drawing)';
@@ -229,7 +229,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         id: 'tableFormat',
         title: 'Table output format',
         description:
-          'Controls how Claude formats tables in responses. Options: Default (full borders), ASCII (| and -), Clean (no borders/separators), Clean+Borders.',
+          'Controls how Claude formats tables. Default: full borders. ASCII: | and -. Clean: no top/bottom/row separators. Clean+top/bottom: borders but no row separators.',
         getValue: () => settings.misc?.tableFormat ?? 'default',
         isMultiValue: true,
         getDisplayValue: () =>

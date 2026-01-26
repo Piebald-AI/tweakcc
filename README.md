@@ -195,7 +195,7 @@ tweakcc provides three alternative formats:
 | Svelte    | Compile-time framework        | ~2kb  |
 ```
 
-**`clean`** — Box-drawing without row separators or top/bottom borders:
+**`clean`** — Box-drawing without top/bottom borders or row separators:
 
 ```
 │  Library  │            Purpose            │ Size  │

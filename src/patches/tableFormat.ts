@@ -82,6 +82,20 @@ const INTER_ROW_SEP_PATTERN_MINIFIED =
 const INTER_ROW_SEP_PATTERN_FORMATTED =
   /if\s*\(\s*\(\s*([$\w]+)\.push\(\.\.\.([$\w]+)\(([$\w]+)\s*,\s*!1\)\)\s*,\s*([$\w]+)\s*<\s*([$\w]+)\.rows\.length\s*-\s*1\s*\)\s*\)\s*([$\w]+)\.push\(([$\w]+)\("middle"\)\)\s*;?/g;
 
+// Patterns to remove T("top") and T("bottom") pushes for clean format
+// Minified: R.push(T("top")),R.push(...  ->  R.push(...
+// We match the R.push(T("top")), prefix and remove it
+const PUSH_TOP_PATTERN_MINIFIED = /([$\w]+)\.push\(([$\w]+)\("top"\)\),/g;
+// Minified: ),R.push(T("bottom")),Math  ->  ),Math
+const PUSH_BOTTOM_PATTERN_MINIFIED =
+  /,([$\w]+)\.push\(([$\w]+)\("bottom"\)\),/g;
+
+// Formatted versions
+const PUSH_TOP_PATTERN_FORMATTED =
+  /([$\w]+)\.push\(\s*([$\w]+)\(\s*"top"\s*\)\s*\)\s*,\s*/g;
+const PUSH_BOTTOM_PATTERN_FORMATTED =
+  /,\s*([$\w]+)\.push\(\s*([$\w]+)\(\s*"bottom"\s*\)\s*\)\s*,/g;
+
 // =============================================================================
 // Replacement Values
 // =============================================================================
@@ -148,6 +162,50 @@ function removeInterRowSeparators(content: string): {
   return { result, success };
 }
 
+/**
+ * Remove top/bottom border pushes from the file content.
+ * This removes the R.push(T("top")) and R.push(T("bottom")) calls
+ * to prevent blank lines in the clean format output.
+ * Returns the modified content and whether it was successful.
+ */
+function removeTopBottomPushes(content: string): {
+  result: string;
+  success: boolean;
+} {
+  let result = content;
+  let success = false;
+
+  // Remove T("top") push - minified
+  const beforeTopMinified = result;
+  result = result.replace(PUSH_TOP_PATTERN_MINIFIED, '');
+  if (result !== beforeTopMinified) {
+    success = true;
+  }
+
+  // Remove T("top") push - formatted
+  const beforeTopFormatted = result;
+  result = result.replace(PUSH_TOP_PATTERN_FORMATTED, '');
+  if (result !== beforeTopFormatted) {
+    success = true;
+  }
+
+  // Remove T("bottom") push - minified
+  const beforeBottomMinified = result;
+  result = result.replace(PUSH_BOTTOM_PATTERN_MINIFIED, ',');
+  if (result !== beforeBottomMinified) {
+    success = true;
+  }
+
+  // Remove T("bottom") push - formatted
+  const beforeBottomFormatted = result;
+  result = result.replace(PUSH_BOTTOM_PATTERN_FORMATTED, ',');
+  if (result !== beforeBottomFormatted) {
+    success = true;
+  }
+
+  return { result, success };
+}
+
 // =============================================================================
 // Main Patch Function
 // =============================================================================
@@ -173,7 +231,7 @@ export const writeTableFormat = (
   let patchCount = 0;
 
   // ==========================================================================
-  // Handle 'ascii' format (formerly 'markdown')
+  // Handle 'ascii' format
   // ==========================================================================
   if (tableFormat === 'ascii') {
     // 1. Patch the main table border definition object
@@ -305,6 +363,16 @@ export const writeTableFormat = (
         newFile = result;
         patchCount++;
         debug('Removed inter-row separators');
+      }
+    }
+
+    // 3. Remove T("top") and T("bottom") pushes to prevent blank lines
+    {
+      const { result, success } = removeTopBottomPushes(newFile);
+      if (success) {
+        newFile = result;
+        patchCount++;
+        debug('Removed top/bottom border pushes');
       }
     }
   }

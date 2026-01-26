@@ -55,6 +55,15 @@ describe('tableFormat patch', () => {
       expect(result).not.toBeNull();
       expect(result).not.toContain('g<A.rows.length-1');
     });
+
+    it('should remove T("top") and T("bottom") pushes to prevent blank lines', () => {
+      const result = writeTableFormat(testCliCode, 'clean');
+      expect(result).not.toBeNull();
+      // Original has: R.push(T("top")),R.push(...
+      // Should be removed to prevent blank lines
+      expect(result).not.toContain('R.push(T("top"))');
+      expect(result).not.toContain('R.push(T("bottom"))');
+    });
   });
 
   describe('clean-top-bottom format', () => {
