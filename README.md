@@ -61,7 +61,7 @@ tweakcc also
 
 - Fixes a bug where the **spinner animation** is frozen if you have the `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` environment variable set ([#46](https://github.com/Piebald-AI/tweakcc/issues/46))
 - Allows you to **change the context limit** (default: 200k tokens) used with models from custom Anthropic-compatible APIs with a new environment variable, `CLAUDE_CODE_CONTEXT_LIMIT`
-- Adds the **`opusplan[1m]`** model alias, combining Opus for planning with Sonnet's 1M context for execution—reducing "[context anxiety](#opusplan1m-mode)" ([#108](https://github.com/Piebald-AI/tweakcc/issues/108))
+- Adds the **`opusplan[1m]`** model alias, combining Opus for planning with Sonnet's 1M context for execution—reducing "[context anxiety](#opus-plan-1m-mode)" ([#108](https://github.com/Piebald-AI/tweakcc/issues/108))
 - Adds a message to Claude Code's startup banner indicating that you're running the patched version of CC (configurable)
 
 Additionally, we're working on features that will allow you to
