@@ -104,7 +104,7 @@ export interface InputBoxConfig {
   removeBorder: boolean;
 }
 
-export type TableFormat = 'default' | 'markdown' | 'box-drawing';
+export type TableFormat = 'default' | 'ascii' | 'clean' | 'clean-top-bottom';
 
 export interface MiscConfig {
   showTweakccVersion: boolean;

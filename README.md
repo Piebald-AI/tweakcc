@@ -47,7 +47,7 @@ With tweakcc, you can
 
 - Customize all of Claude Code's **system prompts** (**NEW:** also see all of [**Claude Code's system prompts**](https://github.com/Piebald-AI/claude-code-system-prompts))
 - Create custom **toolsets** that can be used in Claude Code with the new **`/toolset`** command
-- Switch between **table formats**: keep the default Unicode box-drawing characters (`┌─┬─┐`) or use true **markdown tables** (`| A | B |`) for easier copy-paste and less noise.
+- Switch between **table formats**: keep the default Unicode box-drawing characters (`┌─┬─┐`), use **ASCII/markdown tables** (`| A | B |`) for easier copy-paste, or use **clean** variants without row separators.
 - **Highlight** custom patterns while you type in the CC input box with custom colors and styling, like how `ultrathink` used to be rainbow-highlighted.
 - Manually name **sessions** in Claude Code with `/title my chat name` or `/rename` (see [**our blog post**](https://piebald.ai/blog/messages-as-commits-claude-codes-git-like-dag-of-conversations) for implementation details)
 - Create **custom themes** with a graphical HSL/RGB color picker
@@ -167,7 +167,9 @@ Here's the schema for the object format:
 
 ### Table format
 
-Recent Claude Code versions render tables using Unicode box-drawing characters.  While these have a more elegant look compared to the traditional plain markdown table rendering, they take up more room due to the row dividers:
+Recent Claude Code versions render tables using Unicode box-drawing characters. While these have a more elegant look compared to the traditional plain markdown table rendering, they take up more room due to the row dividers:
+
+**`default`** — Original box-drawing with all row separators:
 
 ```
 ┌───────────┬───────────────────────────────┬───────┐
@@ -178,20 +180,12 @@ Recent Claude Code versions render tables using Unicode box-drawing characters. 
 │ Vue       │ Progressive framework         │ ~34kb │
 ├───────────┼───────────────────────────────┼───────┤
 │ Svelte    │ Compile-time framework        │ ~2kb  │
-├───────────┼───────────────────────────────┼───────┤
-│ Preact    │ Lightweight React alternative │ ~3kb  │
-├───────────┼───────────────────────────────┼───────┤
-│ Solid     │ Reactive UI, no virtual DOM   │ ~7kb  │
-├───────────┼───────────────────────────────┼───────┤
-│ htmx      │ HTML-driven interactivity     │ ~14kb │
-├───────────┼───────────────────────────────┼───────┤
-│ Alpine.js │ Lightweight reactivity        │ ~15kb │
-├───────────┼───────────────────────────────┼───────┤
-│ Lit       │ Web components                │ ~5kb  │
 └───────────┴───────────────────────────────┴───────┘
 ```
 
-tweakcc lets you switch to **true markdown table format** if you prefer:
+tweakcc provides three alternative formats:
+
+**`ascii`** — ASCII/Markdown style using `|` and `-` (easy to copy-paste):
 
 ```
 |  Library  |            Purpose            | Size  |
@@ -199,24 +193,43 @@ tweakcc lets you switch to **true markdown table format** if you prefer:
 | React     | UI components, virtual DOM    | ~40kb |
 | Vue       | Progressive framework         | ~34kb |
 | Svelte    | Compile-time framework        | ~2kb  |
-| Preact    | Lightweight React alternative | ~3kb  |
-| Solid     | Reactive UI, no virtual DOM   | ~7kb  |
-| htmx      | HTML-driven interactivity     | ~14kb |
-| Alpine.js | Lightweight reactivity        | ~15kb |
-| Lit       | Web components                | ~5kb  |
 ```
 
-To enable the more compact markdown format, run `npx tweakcc`, go to `Misc`, and change the **Table format** option from "default" to "markdown" (hit spacebar).  Then apply your customizations.  If you prefer headless configuration, edit `~/.tweakcc/config.json` and set:
+**`clean`** — Box-drawing without row separators or top/bottom borders:
+
+```
+│  Library  │            Purpose            │ Size  │
+├───────────┼───────────────────────────────┼───────┤
+│ React     │ UI components, virtual DOM    │ ~40kb │
+│ Vue       │ Progressive framework         │ ~34kb │
+│ Svelte    │ Compile-time framework        │ ~2kb  │
+```
+
+**`clean-top-bottom`** — Box-drawing with top/bottom borders but no row separators:
+
+```
+┌───────────┬───────────────────────────────┬───────┐
+│  Library  │            Purpose            │ Size  │
+├───────────┼───────────────────────────────┼───────┤
+│ React     │ UI components, virtual DOM    │ ~40kb │
+│ Vue       │ Progressive framework         │ ~34kb │
+│ Svelte    │ Compile-time framework        │ ~2kb  │
+└───────────┴───────────────────────────────┴───────┘
+```
+
+To change the table format, run `npx tweakcc`, go to `Misc`, and cycle through the **Table format** options with spacebar. Then apply your customizations. If you prefer headless configuration, edit `~/.tweakcc/config.json` and set:
 
 ```json
 {
   "settings": {
     "misc": {
-      "tableFormat": "markdown"
+      "tableFormat": "ascii"
     }
   }
 }
 ```
+
+Valid values are `"default"`, `"ascii"`, `"clean"`, and `"clean-top-bottom"`.
 
 ## Configuration directory
 

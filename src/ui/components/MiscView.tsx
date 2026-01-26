@@ -47,20 +47,27 @@ export function MiscView({ onSubmit }: MiscViewProps) {
 
   // Helper to cycle through table format options
   const cycleTableFormat = (current: TableFormat): TableFormat => {
-    const formats: TableFormat[] = ['default', 'markdown', 'box-drawing'];
+    const formats: TableFormat[] = [
+      'default',
+      'ascii',
+      'clean',
+      'clean-top-bottom',
+    ];
     const currentIndex = formats.indexOf(current);
     return formats[(currentIndex + 1) % formats.length];
   };
 
   const getTableFormatDisplay = (format: TableFormat): string => {
     switch (format) {
-      case 'markdown':
-        return 'Markdown (| and -)';
-      case 'box-drawing':
-        return 'Box-drawing (┌─┬┐)';
+      case 'ascii':
+        return 'ASCII (| and -)';
+      case 'clean':
+        return 'Clean (no borders)';
+      case 'clean-top-bottom':
+        return 'Clean with borders';
       case 'default':
       default:
-        return 'Default (no preference)';
+        return 'Default (box-drawing)';
     }
   };
 
@@ -222,7 +229,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         id: 'tableFormat',
         title: 'Table output format',
         description:
-          'Controls how Claude formats tables in responses. "Markdown" uses | and -, "Box-drawing" uses Unicode box characters.',
+          'Controls how Claude formats tables in responses. Options: Default (full borders), ASCII (| and -), Clean (no borders/separators), Clean+Borders.',
         getValue: () => settings.misc?.tableFormat ?? 'default',
         isMultiValue: true,
         getDisplayValue: () =>
