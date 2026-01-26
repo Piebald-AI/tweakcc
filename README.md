@@ -63,6 +63,7 @@ tweakcc also
 - Allows you to **change the context limit** (default: 200k tokens) used with models from custom Anthropic-compatible APIs with a new environment variable, `CLAUDE_CODE_CONTEXT_LIMIT`
 - Adds the **`opusplan[1m]`** model alias, combining Opus for planning with Sonnet's 1M context for execution—reducing "[context anxiety](#opus-plan-1m-mode)" ([#108](https://github.com/Piebald-AI/tweakcc/issues/108))
 - Adds a message to Claude Code's startup banner indicating that you're running the patched version of CC (configurable)
+- Speeds up Claude Code startup by **~50%** with non-blocking MCP connections and configurable parallel connection batch size ([#406](https://github.com/Piebald-AI/tweakcc/issues/406))
 
 Additionally, we're working on features that will allow you to
 
@@ -84,6 +85,7 @@ $ pnpm dlx tweakcc
 
 - [How it works](#how-it-works)
 - [**Features**](#features)
+  - [MCP startup optimization](#mcp-startup-optimization)
   - [Input pattern highlighters](#input-pattern-highlighters)
   - [Opus Plan 1M mode](#opus-plan-1m-mode)
 - [Configuration directory](#configuration-directory)
@@ -194,6 +196,48 @@ claude --model opusplan[1m]
 | --------------------------- | ---------- | -------------- |
 | Plan mode (Shift+Tab twice) | Opus 4.5   | 200k           |
 | Execution mode (default)    | Sonnet 4.5 | **1M**         |
+
+
+### MCP startup optimization
+
+If you use multiple MCP servers, Claude Code's startup can be slow—waiting 10-15+ seconds for all servers to connect before you can start typing.
+
+tweakcc fixes this with two optimizations (based on [this blog post](https://cuipengfei.is-a.dev/blog/2026/01/24/claude-code-mcp-startup-optimization/)):
+
+1. **Non-blocking MCP connections** (enabled by default): Start typing immediately while MCP servers connect in the background
+2. **Configurable batch size**: Connect more servers in parallel (default: 3, configurable from 1-20)
+
+#### Results
+
+| Configuration       | Startup Time | Improvement     |
+| ------------------- | ------------ | --------------- |
+| Default Claude Code | ~15s         | —               |
+| With non-blocking   | ~7s          | **~50% faster** |
+
+#### Configuration
+
+**Via the UI:** Run `npx tweakcc`, go to **Misc**, and adjust:
+
+- **Non-blocking MCP startup** — Toggle on/off (default: on)
+- **MCP server batch size** — Use ←/→ arrows to adjust (1-20)
+
+**Via `config.json`:**
+
+```json
+{
+  "settings": {
+    "misc": {
+      "mcpConnectionNonBlocking": true,
+      "mcpServerBatchSize": 8
+    }
+  }
+}
+```
+
+| Setting                    | Default                         | Description                                   |
+| -------------------------- | ------------------------------- | --------------------------------------------- |
+| `mcpConnectionNonBlocking` | `true`                          | Start immediately, connect MCPs in background |
+| `mcpServerBatchSize`       | `null` (uses CC's default of 3) | Number of parallel MCP connections (1-20)     |
 
 ## Configuration directory
 
