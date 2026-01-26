@@ -61,7 +61,9 @@ tweakcc also
 
 - Fixes a bug where the **spinner animation** is frozen if you have the `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` environment variable set ([#46](https://github.com/Piebald-AI/tweakcc/issues/46))
 - Allows you to **change the context limit** (default: 200k tokens) used with models from custom Anthropic-compatible APIs with a new environment variable, `CLAUDE_CODE_CONTEXT_LIMIT`
+- Adds the **`opusplan[1m]`** model alias, combining Opus for planning with Sonnet's 1M context for execution—reducing "[context anxiety](#opus-plan-1m-mode)" ([#108](https://github.com/Piebald-AI/tweakcc/issues/108))
 - Adds a message to Claude Code's startup banner indicating that you're running the patched version of CC (configurable)
+- Speeds up Claude Code startup by **~50%** with non-blocking MCP connections and configurable parallel connection batch size ([#406](https://github.com/Piebald-AI/tweakcc/issues/406))
 
 Additionally, we're working on features that will allow you to
 
@@ -69,6 +71,8 @@ Additionally, we're working on features that will allow you to
 - Apply **custom styling** to the markdown elements in Claude's responses like code, bold, headers, etc
 
 tweakcc supports Claude Code installed on **Windows, macOS, and Linux**, both **native/binary installations** and those installed via npm, yarn, pnpm, bun, Homebrew/Linuxbrew, nvm, fnm, n, volta, nvs, and nodenv, as well as custom locations.
+
+tweakcc supports Claude Code's **native installation**, which is a large platform-specific native executable containing the same minified/compiled JavaScript code from npm, just packaged up in a [Bun](https://github.com/oven-sh/bun) binary.  We support patching the native binary on macOS, Windows, and Linux, including ad-hoc signing on Apple Silicon, via [**node-lief**](https://github.com/Piebald-AI/node-lief), our Node.js bindings for [LIEF (Library to Instrument Executables)](github.com/lief-project/LIEF).
 
 Run without installation:
 
@@ -83,7 +87,9 @@ $ pnpm dlx tweakcc
 
 - [How it works](#how-it-works)
 - [**Features**](#features)
+  - [MCP startup optimization](#mcp-startup-optimization)
   - [Input pattern highlighters](#input-pattern-highlighters)
+  - [Opus Plan 1M mode](#opus-plan-1m-mode)
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
 - [Related projects](#related-projects)
@@ -163,6 +169,78 @@ Here's the schema for the object format:
 }
 ```
 
+### Opus Plan 1M mode
+
+tweakcc adds support for a new model alias: **`opusplan[1m]`**. This combines the best of both worlds:
+
+- **Plan mode**: Uses **Opus 4.5** for complex reasoning and architecture decisions
+- **Execution mode**: Uses **Sonnet 4.5 with 1M context** for code generation
+
+#### Why use this?
+
+Claude Sonnet 4.5 is aware of its context window, so when it gets close to full, the model exhibits [context anxiety](https://cognition.ai/blog/devin-sonnet-4-5-lessons-and-challenges), where it thinks there may not be enough context to complete the given task, so it takes shortcuts or leaves subtasks incomplete.
+
+By using the 1M context model, Claude thinks it has plenty of room and doesn't skip things, and as long as you ensure you stay under 200k tokens you'll be charged the normal input/output rates even though you're using the 1M model. However, once you exceed 200k tokens when using the 1M model, you'll be automatically charged premium rates (2x for input tokens and 1.5x for output tokens)&mdash;see [the 1M context window docs](https://platform.claude.com/docs/en/build-with-claude/context-windows#1-m-token-context-window).
+
+#### How to use it
+
+After applying tweakcc patches, you can use `opusplan[1m]` like any other model alias:
+
+```bash
+# Via CLI flag
+claude --model opusplan[1m]
+
+# Or set it permanently via /model command in Claude Code
+/model opusplan[1m]
+```
+
+| Mode                        | Model Used | Context Window |
+| --------------------------- | ---------- | -------------- |
+| Plan mode (Shift+Tab twice) | Opus 4.5   | 200k           |
+| Execution mode (default)    | Sonnet 4.5 | **1M**         |
+
+
+### MCP startup optimization
+
+If you use multiple MCP servers, Claude Code's startup can be slow—waiting 10-15+ seconds for all servers to connect before you can start typing.
+
+tweakcc fixes this with two optimizations (based on [this blog post](https://cuipengfei.is-a.dev/blog/2026/01/24/claude-code-mcp-startup-optimization/)):
+
+1. **Non-blocking MCP connections** (enabled by default): Start typing immediately while MCP servers connect in the background
+2. **Configurable batch size**: Connect more servers in parallel (default: 3, configurable from 1-20)
+
+#### Results
+
+| Configuration       | Startup Time | Improvement     |
+| ------------------- | ------------ | --------------- |
+| Default Claude Code | ~15s         | —               |
+| With non-blocking   | ~7s          | **~50% faster** |
+
+#### Configuration
+
+**Via the UI:** Run `npx tweakcc`, go to **Misc**, and adjust:
+
+- **Non-blocking MCP startup** — Toggle on/off (default: on)
+- **MCP server batch size** — Use ←/→ arrows to adjust (1-20)
+
+**Via `config.json`:**
+
+```json
+{
+  "settings": {
+    "misc": {
+      "mcpConnectionNonBlocking": true,
+      "mcpServerBatchSize": 8
+    }
+  }
+}
+```
+
+| Setting                    | Default                         | Description                                   |
+| -------------------------- | ------------------------------- | --------------------------------------------- |
+| `mcpConnectionNonBlocking` | `true`                          | Start immediately, connect MCPs in background |
+| `mcpServerBatchSize`       | `null` (uses CC's default of 3) | Number of parallel MCP connections (1-20)     |
+
 ## Configuration directory
 
 tweakcc stores its configuration files in one of the following locations, in order of priority:
@@ -228,7 +306,7 @@ tweakcc's method for modifying involves maintaining one markdown file for each i
 
 When tweakcc starts up, it downloads a list of system prompt parts for your Claude Code installation from GitHub (the [`data/prompts`](https://github.com/Piebald-AI/tweakcc/tree/main/data/prompts) folder in the tweakcc repo). It then checks if each prompt part has a corresponding markdown file on disk, creating ones that don't exist and populating them with the default text for the version.
 
-Simply edit the markdown files in `~/.tweakcc/system-prompts` (or `$XDG_CONFIG_HOME/tweakcc/system-prompts`) and then run `npx tweakcc --apply`.
+:star: **To customize any part of the system prompt,** simply edit the markdown files in `~/.tweakcc/system-prompts` (or `$XDG_CONFIG_HOME/tweakcc/system-prompts`) and then run `npx tweakcc --apply`.
 
 #### What happens when Anthropic changes the prompts?
 

@@ -115,6 +115,8 @@ export interface MiscConfig {
   increaseFileReadLimit: boolean;
   suppressLineNumbers: boolean;
   suppressRateLimitOptions: boolean;
+  mcpConnectionNonBlocking: boolean;
+  mcpServerBatchSize: number | null;
 }
 
 export interface InputPatternHighlighter {
