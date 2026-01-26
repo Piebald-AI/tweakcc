@@ -85,7 +85,7 @@ $ pnpm dlx tweakcc
 - [How it works](#how-it-works)
 - [**Features**](#features)
   - [Input pattern highlighters](#input-pattern-highlighters)
-  - [Opus Plan 1M mode](#opusplan1m-mode)
+  - [Opus Plan 1M mode](#opus-plan-1m-mode)
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
 - [Related projects](#related-projects)
@@ -174,9 +174,9 @@ tweakcc adds support for a new model alias: **`opusplan[1m]`**. This combines th
 
 #### Why use this?
 
-Sonnet 4.5 likes to exhibit a very frusterating problem called _context anxiety_ - in other words, it takes shortcuts or just leaves tasks enitrely incomplete, even when the context window isn't anywhere near filling.
+Claude Sonnet 4.5 is aware of its context window, so when it gets close to full, the model exhibits [context anxiety](https://cognition.ai/blog/devin-sonnet-4-5-lessons-and-challenges), where it thinks there may not be enough context to complete the given task, so it takes shortcuts or leaves subtasks incomplete.
 
-By using the 1M context model, Claude _believes_ it has plenty of room and doesn't rush to finish. Of course, if you don't actually want the 1M model, you'll have to manually make sure that you don't hit the 200K limits.
+By using the 1M context model, Claude thinks it has plenty of room and doesn't skip things, and as long as you ensure you stay under 200k tokens you'll be charged the normal input/output rates even though you're using the 1M model.  However, once you exceed 200k tokens when using the 1M model, you'll be automatically charged premium rates (2x for input tokens and 1.5x for output tokens)&mdash;see https://platform.claude.com/docs/en/build-with-claude/context-windows#1-m-token-context-window.
 
 #### How to use it
 
@@ -186,16 +186,8 @@ After applying tweakcc patches, you can use `opusplan[1m]` like any other model 
 # Via CLI flag
 claude --model opusplan[1m]
 
-# Via /model command in Claude Code
+# Or set it permanently via /model command in Claude Code
 /model opusplan[1m]
-```
-
-Or set it permanently in your Claude Code settings:
-
-```json
-{
-  "model": "opusplan[1m]"
-}
 ```
 
 | Mode                        | Model Used | Context Window |
