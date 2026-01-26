@@ -46,6 +46,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     mcpConnectionNonBlocking: true,
     mcpServerBatchSize: null as number | null,
     tableFormat: 'default' as TableFormat,
+    enableSwarmMode: true,
   };
 
   const ensureMisc = () => {
@@ -307,6 +308,19 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             settings.misc!.tableFormat = cycleTableFormat(
               settings.misc!.tableFormat ?? 'default'
             );
+          });
+        },
+      },
+      {
+        id: 'enableSwarmMode',
+        title: 'Enable swarm mode (native multi-agent)',
+        description:
+          'Force-enable native multi-agent features (TeammateTool, delegate mode, swarm spawning) by bypassing the tengu_brass_pebble statsig flag.',
+        getValue: () => settings.misc?.enableSwarmMode ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableSwarmMode = !settings.misc!.enableSwarmMode;
           });
         },
       },

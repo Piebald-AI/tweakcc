@@ -120,6 +120,7 @@ export interface MiscConfig {
   mcpConnectionNonBlocking: boolean;
   mcpServerBatchSize: number | null;
   tableFormat: TableFormat;
+  enableSwarmMode: boolean;
 }
 
 export interface InputPatternHighlighter {

@@ -758,6 +758,7 @@ export const DEFAULT_SETTINGS: Settings = {
     mcpConnectionNonBlocking: true,
     mcpServerBatchSize: null,
     tableFormat: 'default',
+    enableSwarmMode: true,
   },
   toolsets: [],
   defaultToolset: null,

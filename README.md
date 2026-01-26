@@ -65,6 +65,7 @@ tweakcc also
 - Adds the **`opusplan[1m]`** model alias, combining Opus for planning with Sonnet's 1M context for execution—reducing "[context anxiety](#opus-plan-1m-mode)" ([#108](https://github.com/Piebald-AI/tweakcc/issues/108))
 - Adds a message to Claude Code's startup banner indicating that you're running the patched version of CC (configurable)
 - Speeds up Claude Code startup by **~50%** with non-blocking MCP connections and configurable parallel connection batch size ([#406](https://github.com/Piebald-AI/tweakcc/issues/406))
+- Enables native multi-agent/swarm mode (TeammateTool, delegate mode, swarm spawning) by bypassing the `tengu_brass_pebble` Statsig flag.
 
 Additionally, we're working on features that will allow you to
 
@@ -92,6 +93,7 @@ $ pnpm dlx tweakcc
   - [Input pattern highlighters](#input-pattern-highlighters)
   - [Opus Plan 1M mode](#opus-plan-1m-mode)
   - [Table format](#table-format)
+  - [Swarm mode (native multi-agent)](#swarm-mode-native-multi-agent)
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
 - [Related projects](#related-projects)
@@ -309,6 +311,39 @@ tweakcc provides three alternative formats:
 ```
 
 Valid values are `"default"`, `"ascii"`, `"clean"`, and `"clean-top-bottom"`.
+
+### Swarm mode (native multi-agent)
+
+Claude Code 2.1.16+ includes native multi-agent features that are gated behind the `tengu_brass_pebble` Statsig flag. tweakcc patches this gate to enable these features for everyone.
+
+![Screenshot showing swarm mode status](./assets/swarm_1_swarm_status.png)
+![Screenshot showing one of the workers request permission](./assets/swarm_2_worker_permission_request.png)
+
+**Features unlocked:**
+
+| Feature              | Description                                                |
+| -------------------- | ---------------------------------------------------------- |
+| **TeammateTool**     | Tool for spawning and coordinating teammate agents         |
+| **Delegate mode**    | Task tool mode option for delegating work                  |
+| **Swarm spawning**   | `launchSwarm` + `teammateCount` parameters in ExitPlanMode |
+| **Teammate mailbox** | Inter-agent messaging system                               |
+| **Task teammates**   | Task list teammate display and coordination                |
+
+**Enable/disable**
+
+**Via the UI:** Run `npx tweakcc`, go to **Misc**, and check/uncheck **Enable swarm mode (native multi-agent)**.  Then **Apply customizations**.
+
+**Via `config.json`:**
+
+```json
+{
+  "settings": {
+    "misc": {
+      "enableSwarmMode": true
+    }
+  }
+}
+```
 
 ## Configuration directory
 
