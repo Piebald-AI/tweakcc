@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add a fallback for WASMagic when it's not available (#399) - @signadou
 - Add MCP startup optimization settings (#407) - @mike1858
+- Add opusplan[1m] model alias for 1M context support (#404) - @mike1858
 
 ## [v3.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.4.0) - 2026-01-18
 
