@@ -47,7 +47,6 @@ With tweakcc, you can
 
 - Customize all of Claude Code's **system prompts** (**NEW:** also see all of [**Claude Code's system prompts**](https://github.com/Piebald-AI/claude-code-system-prompts))
 - Create custom **toolsets** that can be used in Claude Code with the new **`/toolset`** command
-- Switch between **table formats**: keep the default Unicode box-drawing characters (`┌─┬─┐`), use **ASCII/markdown tables** (`| A | B |`) for easier copy-paste, or use **clean** variants without row separators.
 - **Highlight** custom patterns while you type in the CC input box with custom colors and styling, like how `ultrathink` used to be rainbow-highlighted.
 - Manually name **sessions** in Claude Code with `/title my chat name` or `/rename` (see [**our blog post**](https://piebald.ai/blog/messages-as-commits-claude-codes-git-like-dag-of-conversations) for implementation details)
 - Create **custom themes** with a graphical HSL/RGB color picker
@@ -57,6 +56,7 @@ With tweakcc, you can
 - Remove the **ASCII border** from the input box
 - Expand **thinking blocks** by default, so that you don't need to use the transcript (<kbd>Ctrl+O</kbd>) to see them
 - Configure which Claude **model** each **subagent** (Plan, Explore, and general-purpose) uses
+- Switch between **table formats** - Claude Code default, Unicode (`┌─┬─┐`), ASCII/markdown (`|---|`), Unicode without top/bottom borders.
 
 tweakcc also
 
@@ -294,7 +294,7 @@ tweakcc provides three alternative formats:
 └───────────┴───────────────────────────────┴───────┘
 ```
 
-To change the table format, run `npx tweakcc`, go to `Misc`, and cycle through the **Table format** options with spacebar. Then apply your customizations. If you prefer headless configuration, edit `~/.tweakcc/config.json` and set:
+To change the table format, run `npx tweakcc`, go to `Misc`, and cycle through the **Table format** options with spacebar. Then apply your customizations. You can also set it manually in your tweakcc config file (e.g. `~/.tweakcc/config.json`):
 
 ```json
 {
