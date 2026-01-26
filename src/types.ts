@@ -104,6 +104,8 @@ export interface InputBoxConfig {
   removeBorder: boolean;
 }
 
+export type TableFormat = 'default' | 'ascii' | 'clean' | 'clean-top-bottom';
+
 export interface MiscConfig {
   showTweakccVersion: boolean;
   showPatchesApplied: boolean;
@@ -117,6 +119,7 @@ export interface MiscConfig {
   suppressRateLimitOptions: boolean;
   mcpConnectionNonBlocking: boolean;
   mcpServerBatchSize: number | null;
+  tableFormat: TableFormat;
 }
 
 export interface InputPatternHighlighter {

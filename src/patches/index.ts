@@ -58,6 +58,7 @@ import {
   writeModeChangeUpdateToolset,
   addSetStateFnAccessAtToolChangeComponentScope,
 } from './toolsets';
+import { writeTableFormat } from './tableFormat';
 import { writeConversationTitle } from './conversationTitle';
 import { writeHideStartupBanner } from './hideStartupBanner';
 import { writeHideCtrlGToEdit } from './hideCtrlGToEdit';
@@ -539,6 +540,12 @@ export const applyCustomization = async (
   items.push(...systemPromptsResult.items);
 
   let result: string | null = null;
+
+  // Apply table format preference (inject into system prompt)
+  const tableFormat = config.settings.misc?.tableFormat ?? 'default';
+  if (tableFormat !== 'default') {
+    if ((result = writeTableFormat(content, tableFormat))) content = result;
+  }
 
   // Apply themes
   if (config.settings.themes && config.settings.themes.length > 0) {

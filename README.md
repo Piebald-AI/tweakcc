@@ -56,6 +56,7 @@ With tweakcc, you can
 - Remove the **ASCII border** from the input box
 - Expand **thinking blocks** by default, so that you don't need to use the transcript (<kbd>Ctrl+O</kbd>) to see them
 - Configure which Claude **model** each **subagent** (Plan, Explore, and general-purpose) uses
+- Switch between **table formats** - Claude Code default, Unicode (`┌─┬─┐`), ASCII/markdown (`|---|`), Unicode without top/bottom borders.
 
 tweakcc also
 
@@ -90,6 +91,7 @@ $ pnpm dlx tweakcc
   - [MCP startup optimization](#mcp-startup-optimization)
   - [Input pattern highlighters](#input-pattern-highlighters)
   - [Opus Plan 1M mode](#opus-plan-1m-mode)
+  - [Table format](#table-format)
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
 - [Related projects](#related-projects)
@@ -199,7 +201,6 @@ claude --model opusplan[1m]
 | Plan mode (Shift+Tab twice) | Opus 4.5   | 200k           |
 | Execution mode (default)    | Sonnet 4.5 | **1M**         |
 
-
 ### MCP startup optimization
 
 If you use multiple MCP servers, Claude Code's startup can be slow—waiting 10-15+ seconds for all servers to connect before you can start typing.
@@ -240,6 +241,74 @@ tweakcc fixes this with two optimizations (based on [this blog post](https://cui
 | -------------------------- | ------------------------------- | --------------------------------------------- |
 | `mcpConnectionNonBlocking` | `true`                          | Start immediately, connect MCPs in background |
 | `mcpServerBatchSize`       | `null` (uses CC's default of 3) | Number of parallel MCP connections (1-20)     |
+
+### Table format
+
+Recent Claude Code versions render tables using Unicode box-drawing characters. While these have a more elegant look compared to the traditional plain markdown table rendering, they take up more room due to the row dividers:
+
+**`default`** — Original box-drawing with all row separators:
+
+```
+┌───────────┬───────────────────────────────┬───────┐
+│  Library  │            Purpose            │ Size  │
+├───────────┼───────────────────────────────┼───────┤
+│ React     │ UI components, virtual DOM    │ ~40kb │
+├───────────┼───────────────────────────────┼───────┤
+│ Vue       │ Progressive framework         │ ~34kb │
+├───────────┼───────────────────────────────┼───────┤
+│ Svelte    │ Compile-time framework        │ ~2kb  │
+└───────────┴───────────────────────────────┴───────┘
+```
+
+tweakcc provides three alternative formats:
+
+**`ascii`** — ASCII/Markdown style using `|` and `-` (easy to copy-paste):
+
+```
+|  Library  |            Purpose            | Size  |
+|-----------|-------------------------------|-------|
+| React     | UI components, virtual DOM    | ~40kb |
+| Vue       | Progressive framework         | ~34kb |
+| Svelte    | Compile-time framework        | ~2kb  |
+```
+
+**`clean`** — Box-drawing without top/bottom borders or row separators:
+
+```
+│  Library  │            Purpose            │ Size  │
+├───────────┼───────────────────────────────┼───────┤
+│ React     │ UI components, virtual DOM    │ ~40kb │
+│ Vue       │ Progressive framework         │ ~34kb │
+│ Svelte    │ Compile-time framework        │ ~2kb  │
+```
+
+**`clean-top-bottom`** — Box-drawing with top/bottom borders but no row separators:
+
+```
+┌───────────┬───────────────────────────────┬───────┐
+│  Library  │            Purpose            │ Size  │
+├───────────┼───────────────────────────────┼───────┤
+│ React     │ UI components, virtual DOM    │ ~40kb │
+│ Vue       │ Progressive framework         │ ~34kb │
+│ Svelte    │ Compile-time framework        │ ~2kb  │
+└───────────┴───────────────────────────────┴───────┘
+```
+
+**Via the UI:** Run `npx tweakcc`, go to `Misc`, and cycle through the **Table format** options with spacebar. Then apply your customizations.
+
+**Via `config.json`:**
+
+```json
+{
+  "settings": {
+    "misc": {
+      "tableFormat": "ascii"
+    }
+  }
+}
+```
+
+Valid values are `"default"`, `"ascii"`, `"clean"`, and `"clean-top-bottom"`.
 
 ## Configuration directory
 

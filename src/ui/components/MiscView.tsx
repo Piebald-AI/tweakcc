@@ -2,6 +2,7 @@ import { Box, Text, useInput } from 'ink';
 import { useContext, useState, useMemo } from 'react';
 import { SettingsContext } from '../App';
 import Header from './Header';
+import { TableFormat } from '../../types';
 
 interface MiscViewProps {
   onSubmit: () => void;
@@ -44,11 +45,38 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     suppressRateLimitOptions: false,
     mcpConnectionNonBlocking: true,
     mcpServerBatchSize: null as number | null,
+    tableFormat: 'default' as TableFormat,
   };
 
   const ensureMisc = () => {
     if (!settings.misc) {
       settings.misc = { ...defaultMisc };
+    }
+  };
+
+  // Helper to cycle through table format options
+  const cycleTableFormat = (current: TableFormat): TableFormat => {
+    const formats: TableFormat[] = [
+      'default',
+      'ascii',
+      'clean',
+      'clean-top-bottom',
+    ];
+    const currentIndex = formats.indexOf(current);
+    return formats[(currentIndex + 1) % formats.length];
+  };
+
+  const getTableFormatDisplay = (format: TableFormat): string => {
+    switch (format) {
+      case 'ascii':
+        return 'ASCII (| and -)';
+      case 'clean':
+        return 'Clean (no row separators)';
+      case 'clean-top-bottom':
+        return 'Clean with top/bottom';
+      case 'default':
+      default:
+        return 'Default (box-drawing)';
     }
   };
 
@@ -261,6 +289,24 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             // If going below min, set to null (default)
             settings.misc!.mcpServerBatchSize =
               newValue < MCP_BATCH_SIZE_MIN ? null : newValue;
+          });
+        },
+      },
+      {
+        id: 'tableFormat',
+        title: 'Table output format',
+        description:
+          'Controls how Claude formats tables. Default: full borders. ASCII: | and -. Clean: no top/bottom/row separators. Clean+top/bottom: borders but no row separators.',
+        getValue: () => settings.misc?.tableFormat ?? 'default',
+        isMultiValue: true,
+        getDisplayValue: () =>
+          getTableFormatDisplay(settings.misc?.tableFormat ?? 'default'),
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.tableFormat = cycleTableFormat(
+              settings.misc!.tableFormat ?? 'default'
+            );
           });
         },
       },
