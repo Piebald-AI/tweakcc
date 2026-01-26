@@ -294,7 +294,9 @@ tweakcc provides three alternative formats:
 └───────────┴───────────────────────────────┴───────┘
 ```
 
-To change the table format, run `npx tweakcc`, go to `Misc`, and cycle through the **Table format** options with spacebar. Then apply your customizations. You can also set it manually in your tweakcc config file (e.g. `~/.tweakcc/config.json`):
+**Via the UI:** Run `npx tweakcc`, go to `Misc`, and cycle through the **Table format** options with spacebar. Then apply your customizations.
+
+**Via `config.json`:**
 
 ```json
 {
