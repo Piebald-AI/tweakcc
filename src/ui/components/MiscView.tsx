@@ -308,7 +308,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
               settings.misc!.tableFormat ?? 'default'
             );
           });
-        }
+        },
       },
     ],
     [settings, updateSettings]
