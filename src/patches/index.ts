@@ -104,11 +104,16 @@ export const showDiff = (
     return;
   }
 
-  const contextStart = Math.max(0, startIndex - 20);
-  const contextEndOld = Math.min(oldFileContents.length, endIndex + 20);
+  const numContextChars = 40;
+
+  const contextStart = Math.max(0, startIndex - numContextChars);
+  const contextEndOld = Math.min(
+    oldFileContents.length,
+    endIndex + numContextChars
+  );
   const contextEndNew = Math.min(
     newFileContents.length,
-    startIndex + injectedText.length + 20
+    startIndex + injectedText.length + numContextChars
   );
 
   const oldBefore = oldFileContents.slice(contextStart, startIndex);
@@ -127,8 +132,18 @@ export const showDiff = (
 
   if (oldChanged !== newChanged) {
     verbose('\n--- Diff ---');
-    verbose('OLD:', oldBefore + `\x1b[31m${oldChanged}\x1b[0m` + oldAfter);
-    verbose('NEW:', newBefore + `\x1b[32m${newChanged}\x1b[0m` + newAfter);
+    verbose(
+      `\x1b[31mOLD: \x1b[0;2m${oldBefore}\x1b[0;31;1m${oldChanged}\x1b[0;2m${oldAfter}\x1b[0m`
+    );
+    verbose(
+      `\x1b[32mNEW: \x1b[0;2m${newBefore}\x1b[0;32;1m${newChanged}\x1b[0;2m${newAfter}\x1b[0m`
+    );
+    verbose('--- End Diff ---\n');
+  } else {
+    verbose('\n--- Diff ---');
+    verbose(
+      `\x1b[34mUNCHANGED: \x1b[0;2m${oldBefore}\x1b[0;34;1m${oldChanged}\x1b[0;2m${oldAfter}\x1b[0m`
+    );
     verbose('--- End Diff ---\n');
   }
 };
