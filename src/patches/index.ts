@@ -36,7 +36,6 @@ import { writeShowMoreItemsInSelectMenus } from './showMoreItemsInSelectMenus';
 import { writeThemes } from './themes';
 import { writeContextLimit } from './contextLimit';
 import { writeInputBoxBorder } from './inputBorderBox';
-import { writeSpinnerNoFreeze } from './spinnerNoFreeze';
 import { writeThinkerFormat } from './thinkerFormat';
 import { writeThinkerSymbolMirrorOption } from './thinkerMirrorOption';
 import { writeThinkerSymbolChars } from './thinkerSymbolChars';
@@ -647,9 +646,6 @@ export const applyCustomization = async (
 
   // Apply verbose property patch (always true by default)
   if ((result = writeVerboseProperty(content))) content = result;
-
-  // Apply spinner no-freeze patch (always enabled)
-  if ((result = writeSpinnerNoFreeze(content))) content = result;
 
   // Apply context limit patch (always enabled)
   if ((result = writeContextLimit(content))) content = result;
