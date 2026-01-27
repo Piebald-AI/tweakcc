@@ -32,7 +32,7 @@ export const writeThinkingVerbs = (
   // - Beboppin'
   // - Dilly-dallying
   // - Flambéing
-  const pattern = /\[("[A-Z][a-z'é-]+in[g']",?)+\]/;
+  const pattern = /\[("[A-Z][a-z'é-]+in[g']",?){50,}\]/;
 
   const match = oldFile.match(pattern);
 
