@@ -42,7 +42,7 @@ import { writeThinkerSymbolMirrorOption } from './thinkerMirrorOption';
 import { writeThinkerSymbolChars } from './thinkerSymbolChars';
 import { writeThinkerSymbolSpeed } from './thinkerSymbolSpeed';
 import { writeThinkerSymbolWidthLocation } from './thinkerSymbolWidth';
-import { writeThinkerVerbs } from './thinkerVerbs';
+import { writeThinkingVerbs } from './thinkingVerbs';
 import { writeUserMessageDisplay } from './userMessageDisplay';
 import { writeInputPatternHighlighters } from './inputPatternHighlighters';
 import { writeVerboseProperty } from './verboseProperty';
@@ -572,7 +572,7 @@ export const applyCustomization = async (
   // Apply thinking verbs
   // prettier-ignore
   if (config.settings.thinkingVerbs) {
-    if ((result = writeThinkerVerbs(content, config.settings.thinkingVerbs.verbs)))
+    if ((result = writeThinkingVerbs(content, config.settings.thinkingVerbs.verbs)))
       content = result;
     if ((result = writeThinkerFormat(content, config.settings.thinkingVerbs.format)))
       content = result;
