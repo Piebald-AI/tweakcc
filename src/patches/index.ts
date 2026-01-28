@@ -1,18 +1,14 @@
 import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import * as path from 'node:path';
+
 import {
   CONFIG_DIR,
   NATIVE_BINARY_BACKUP_FILE,
   updateConfigFile,
 } from '../config';
 import { ClaudeCodeInstallationInfo, TweakccConfig } from '../types';
-import {
-  isVerbose,
-  verbose,
-  debug,
-  replaceFileBreakingHardLinks,
-} from '../utils';
+import { debug, replaceFileBreakingHardLinks } from '../utils';
 import {
   extractClaudeJsFromNativeInstallation,
   repackNativeInstallation,
@@ -74,6 +70,8 @@ import {
 } from '../installationBackup';
 import { compareVersions } from '../systemPromptSync';
 
+export { showDiff, globalReplace } from './patchDiffing';
+
 export interface LocationResult {
   startIndex: number;
   endIndex: number;
@@ -90,62 +88,6 @@ export interface PatchApplied {
   newContent: string;
   items: string[];
 }
-
-// Debug function for showing diffs (requires --verbose flag)
-export const showDiff = (
-  oldFileContents: string,
-  newFileContents: string,
-  injectedText: string,
-  startIndex: number,
-  endIndex: number
-): void => {
-  if (!isVerbose()) {
-    return;
-  }
-
-  const numContextChars = 40;
-
-  const contextStart = Math.max(0, startIndex - numContextChars);
-  const contextEndOld = Math.min(
-    oldFileContents.length,
-    endIndex + numContextChars
-  );
-  const contextEndNew = Math.min(
-    newFileContents.length,
-    startIndex + injectedText.length + numContextChars
-  );
-
-  const oldBefore = oldFileContents.slice(contextStart, startIndex);
-  const oldChanged = oldFileContents.slice(startIndex, endIndex);
-  const oldAfter = oldFileContents.slice(endIndex, contextEndOld);
-
-  const newBefore = newFileContents.slice(contextStart, startIndex);
-  const newChanged = newFileContents.slice(
-    startIndex,
-    startIndex + injectedText.length
-  );
-  const newAfter = newFileContents.slice(
-    startIndex + injectedText.length,
-    contextEndNew
-  );
-
-  if (oldChanged !== newChanged) {
-    verbose('\n--- Diff ---');
-    verbose(
-      `\x1b[31mOLD: \x1b[0;2m${oldBefore}\x1b[0;31;1m${oldChanged}\x1b[0;2m${oldAfter}\x1b[0m`
-    );
-    verbose(
-      `\x1b[32mNEW: \x1b[0;2m${newBefore}\x1b[0;32;1m${newChanged}\x1b[0;2m${newAfter}\x1b[0m`
-    );
-    verbose('--- End Diff ---\n');
-  } else {
-    verbose('\n--- Diff ---');
-    verbose(
-      `\x1b[34mUNCHANGED: \x1b[0;2m${oldBefore}\x1b[0;34;1m${oldChanged}\x1b[0;2m${oldAfter}\x1b[0m`
-    );
-    verbose('--- End Diff ---\n');
-  }
-};
 
 export const escapeIdent = (ident: string): string => {
   return ident.replace(/\$/g, '\\$');

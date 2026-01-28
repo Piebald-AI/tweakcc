@@ -126,32 +126,6 @@ export const applySystemPrompts = async (
       totalOriginalChars += originalLength;
       totalNewChars += newLength;
 
-      if (originalLength !== newLength) {
-        verbose(`\n  Character count difference for ${prompt.name}:`);
-        verbose(`    Original baseline: ${originalLength} chars`);
-        verbose(`    User's version: ${newLength} chars`);
-        verbose(`    Difference: ${originalLength - newLength} chars`);
-        if (Math.abs(originalLength - newLength) < 200) {
-          verbose(
-            `\n    Original baseline content:\n${originalBaselineContent}`
-          );
-          verbose(`\n    User's content:\n${prompt.content}`);
-        }
-      }
-
-      verbose(`\nFound match for prompt: ${prompt.name}`);
-      verbose(
-        `  Match location: index ${match.index}, length ${match[0].length}`
-      );
-      verbose(
-        `  Original content (first 100 chars): ${match[0].substring(0, 100)}...`
-      );
-      verbose(
-        `  Replacement content (first 100 chars): ${interpolatedContent.substring(0, 100)}...`
-      );
-      verbose(`  Captured variables: ${match.slice(1).join(', ')}`);
-      verbose(`  Content identical: ${match[0] === interpolatedContent}`);
-
       const oldContent = content;
       const matchLength = match[0].length;
 
