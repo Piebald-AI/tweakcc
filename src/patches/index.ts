@@ -66,7 +66,7 @@ import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
 import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
 import { writeSwarmMode } from './swarmMode';
-import { writeThinkingLabel } from './thinkingLabel';
+import { writeThinkingBlockStyling } from './thinkingBlockStyling';
 import { writeMcpNonBlocking, writeMcpBatchSize } from './mcpStartup';
 import {
   restoreNativeBinaryFromBackup,
@@ -428,7 +428,7 @@ export const findTextComponent = (fileContents: string): string | undefined => {
   // The minified Text component has this signature:
   // function X({color:A,backgroundColor:B,dimColor:C=!1,bold:D=!1,...})
   const textComponentPattern =
-    /\bfunction ([$\w]+)\(\{color:[$\w]+,backgroundColor:[$\w]+,dimColor:[$\w]+=![01],bold:[$\w]+=![01]/;
+    /\bfunction ([$\w]+).{0,20}color:[$\w]+,backgroundColor:[$\w]+,dimColor:[$\w]+(?:=![01])?,bold:[$\w]+(?:=![01])?/;
   const match = fileContents.match(textComponentPattern);
   if (!match) {
     console.log('patch: findTextComponent: failed to find text component');
@@ -675,7 +675,7 @@ export const applyCustomization = async (
   }
 
   // Apply thinking label styling patch (always enabled)
-  if ((result = writeThinkingLabel(content))) content = result;
+  if ((result = writeThinkingBlockStyling(content))) content = result;
 
   // Apply patches applied indication
   const showTweakccVersion = config.settings.misc?.showTweakccVersion ?? true;
