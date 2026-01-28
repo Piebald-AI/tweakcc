@@ -1244,6 +1244,49 @@ export const formatBacktickError = (
 };
 
 /**
+ * Extracts leading and trailing whitespace from the original prompt pieces.
+ * Returns the whitespace prefix from the first piece and suffix from the last piece.
+ */
+export const extractOriginalWhitespace = (
+  pieces: string[]
+): { leading: string; trailing: string } => {
+  if (pieces.length === 0) {
+    return { leading: '', trailing: '' };
+  }
+
+  // Extract leading whitespace from the first piece
+  const firstPiece = pieces[0];
+  const leadingMatch = firstPiece.match(/^(\s*)/);
+  const leading = leadingMatch ? leadingMatch[1] : '';
+
+  // Extract trailing whitespace from the last piece
+  const lastPiece = pieces[pieces.length - 1];
+  const trailingMatch = lastPiece.match(/(\s*)$/);
+  const trailing = trailingMatch ? trailingMatch[1] : '';
+
+  return { leading, trailing };
+};
+
+/**
+ * Applies the original prompt's whitespace structure to user content.
+ * If the user content is empty/whitespace-only, returns empty string.
+ * Otherwise, trims the user content and wraps it with the original's whitespace.
+ */
+export const applyOriginalWhitespace = (
+  userContent: string,
+  originalWhitespace: { leading: string; trailing: string }
+): string => {
+  // If user content is empty or whitespace-only, they want it empty
+  if (userContent.trim() === '') {
+    return '';
+  }
+
+  // Trim user content and apply original whitespace
+  const trimmed = userContent.trim();
+  return originalWhitespace.leading + trimmed + originalWhitespace.trailing;
+};
+
+/**
  * Applies identifier mapping to convert human-readable names to actual minified variables.
  * Takes content with ${HUMAN_NAME} and converts to ${actualVar} using extracted variable names.
  *
@@ -1261,7 +1304,8 @@ const applyIdentifierMapping = (
   extractedVars: string[],
   ccVersion: string,
   escapeNonAscii = false,
-  buildTime?: string
+  buildTime?: string,
+  pieces?: string[]
 ): string => {
   // Build reverse map: HUMAN_NAME -> actual minified var from cli.js
   const reverseMap: Record<string, string> = {};
@@ -1301,6 +1345,12 @@ const applyIdentifierMapping = (
   // Escape non-ASCII characters if requested (for Bun native executables)
   if (escapeNonAscii) {
     result = escapeNonAsciiChars(result);
+  }
+
+  // Apply original whitespace structure from pieces if provided
+  if (pieces && pieces.length > 0) {
+    const originalWhitespace = extractOriginalWhitespace(pieces);
+    result = applyOriginalWhitespace(result, originalWhitespace);
   }
 
   return result;
@@ -1385,7 +1435,8 @@ export const loadSystemPromptsWithRegex = async (
         extractedVars,
         ccVersion,
         escapeNonAscii,
-        buildTime
+        buildTime,
+        jsonPrompt.pieces
       );
     };
 

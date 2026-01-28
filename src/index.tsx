@@ -5,7 +5,7 @@ import chalk from 'chalk';
 
 import App from './ui/App';
 import { CONFIG_FILE, readConfigFile } from './config';
-import { enableDebug, enableVerbose } from './utils';
+import { enableDebug, enableVerbose, enableShowUnchanged } from './utils';
 import { applyCustomization } from './patches/index';
 import { preloadStringsFile } from './systemPromptSync';
 import { migrateConfigIfNeeded } from './migration';
@@ -28,6 +28,7 @@ const main = async () => {
     .version('3.4.0')
     .option('-d, --debug', 'enable debug mode')
     .option('-v, --verbose', 'enable verbose debug mode (includes diffs)')
+    .option('--show-unchanged', 'show unchanged diffs (requires --verbose)')
     .option('-a, --apply', 'apply saved customizations without interactive UI');
   program.parse();
   const options = program.opts();
@@ -36,6 +37,10 @@ const main = async () => {
     enableVerbose();
   } else if (options.debug) {
     enableDebug();
+  }
+
+  if (options.showUnchanged) {
+    enableShowUnchanged();
   }
 
   // Migrate old ccInstallationDir config to ccInstallationPath if needed
