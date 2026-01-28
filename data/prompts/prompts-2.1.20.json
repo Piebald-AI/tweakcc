@@ -292,12 +292,12 @@
         4
       ],
       "identifierMap": {
-        "0": "BASH_TOOL_NAME",
-        "1": "COMMIT_CO_AUTHORED_BY_CLAUDE_CODE",
-        "2": "TODO_TOOL_OBJECT",
-        "3": "TASK_TOOL_NAME",
-        "4": "PR_GENERATED_WITH_CLAUDE_CODE",
-        "5": "GIT_COMMAND_PARALLEL_NOTE"
+        "0": "GIT_COMMAND_PARALLEL_NOTE",
+        "1": "BASH_TOOL_NAME",
+        "2": "COMMIT_CO_AUTHORED_BY_CLAUDE_CODE",
+        "3": "TODO_TOOL_OBJECT",
+        "4": "TASK_TOOL_NAME",
+        "5": "PR_GENERATED_WITH_CLAUDE_CODE"
       },
       "version": "2.1.20"
     },
@@ -352,7 +352,7 @@
       ],
       "identifierMap": {
         "0": "READ_TOOL_NAME",
-        "1": "WRITE_TOOL_NAME",
+        "1": "EDIT_TOOL_NAME",
         "2": "AVAILABLE_TOOLS_LIST",
         "3": "TOOL_ITEM",
         "4": "FULL_SERVER_TOOL_PATH",
@@ -409,8 +409,8 @@
         0
       ],
       "identifierMap": {
-        "0": "TASK_TOOL_NAME",
-        "1": "TODO_TOOL_OBJECT"
+        "0": "TODO_TOOL_OBJECT",
+        "1": "BASH_TOOL_NAME"
       },
       "version": "2.1.20"
     },
@@ -471,12 +471,12 @@
         "0": "WEBFETCH_ENABLED_SECTION",
         "1": "MCP_TOOLS_SECTION",
         "2": "TASK_TOOL_NAME",
-        "3": "EXPLORE_AGENT",
-        "4": "GLOB_TOOL_NAME",
-        "5": "GREP_TOOL_NAME",
-        "6": "READ_TOOL_NAME",
-        "7": "EDIT_TOOL_NAME",
-        "8": "WRITE_TOOL_NAME"
+        "3": "READ_TOOL_NAME",
+        "4": "EDIT_TOOL_NAME",
+        "5": "WRITE_TOOL_NAME",
+        "6": "EXPLORE_AGENT",
+        "7": "GLOB_TOOL_NAME",
+        "8": "GREP_TOOL_NAME"
       },
       "version": "2.1.20"
     },
@@ -991,7 +991,7 @@
         "2": "MAX_OUTPUT_CHARS",
         "3": "RUN_IN_BACKGROUND_NOTE",
         "4": "BASH_TOOL_EXTRA_NOTES",
-        "5": "SEARCH_TOOL_NAME",
+        "5": "GLOB_TOOL_NAME",
         "6": "GREP_TOOL_NAME",
         "7": "READ_TOOL_NAME",
         "8": "EDIT_TOOL_NAME",
@@ -1233,7 +1233,7 @@
         0
       ],
       "identifierMap": {
-        "0": "READ_TOOL_NAME"
+        "0": "MUST_READ_FIRST_FN"
       },
       "version": "2.1.20"
     },
@@ -1780,7 +1780,7 @@
         0
       ],
       "identifierMap": {
-        "0": "READ_TOOL_NAME"
+        "0": "MUST_READ_FIRST_FN"
       },
       "version": "2.1.20"
     },
