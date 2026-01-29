@@ -22,7 +22,6 @@ import {
   updateConfigFile,
 } from '../config';
 import { openInExplorer, revealFileInExplorer } from '../utils';
-import { applyCustomization, ApplyCustomizationResult } from '../patches/index';
 import { DEFAULT_SETTINGS } from '../defaultSettings';
 import {
   restoreNativeBinaryFromBackup,
@@ -40,9 +39,11 @@ export const SettingsContext = createContext({
 export default function App({
   startupCheckInfo,
   configMigrated,
+  invocationCommand,
 }: {
   startupCheckInfo: StartupCheckInfo;
   configMigrated: boolean;
+  invocationCommand: string;
 }) {
   const [config, setConfig] = useState<TweakccConfig>({
     settings: DEFAULT_SETTINGS,
@@ -131,23 +132,6 @@ Please reapply your changes below.`,
   const handleMainSubmit = (item: MainMenuItem) => {
     setNotification(null);
     switch (item) {
-      case MainMenuItem.APPLY_CHANGES:
-        if (startupCheckInfo.ccInstInfo) {
-          setNotification({
-            message: 'Applying patches...',
-            type: 'info',
-          });
-          applyCustomization(config, startupCheckInfo.ccInstInfo).then(
-            (result: ApplyCustomizationResult) => {
-              setConfig(result.config);
-              setNotification({
-                message: 'Customization patches applied successfully!',
-                type: 'success',
-              });
-            }
-          );
-        }
-        break;
       case MainMenuItem.THEMES:
       case MainMenuItem.THINKING_VERBS:
       case MainMenuItem.THINKING_STYLE:
@@ -211,6 +195,8 @@ Please reapply your changes below.`,
             notification={notification}
             configMigrated={configMigrated}
             showPiebaldAnnouncement={showPiebaldAnnouncement}
+            changesApplied={config.changesApplied}
+            invocationCommand={invocationCommand}
           />
         ) : currentView === MainMenuItem.THEMES ? (
           <ThemesView onBack={handleBack} />

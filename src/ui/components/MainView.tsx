@@ -84,6 +84,8 @@ interface MainViewProps {
   } | null;
   configMigrated: boolean;
   showPiebaldAnnouncement: boolean;
+  changesApplied: boolean;
+  invocationCommand: string;
 }
 
 export const MainView = ({
@@ -91,6 +93,8 @@ export const MainView = ({
   notification,
   configMigrated,
   showPiebaldAnnouncement,
+  changesApplied,
+  invocationCommand,
 }: MainViewProps) => (
   <Box flexDirection="column" gap={1}>
     {configMigrated && (
@@ -118,6 +122,15 @@ export const MainView = ({
     {showPiebaldAnnouncement ? <PiebaldAnnouncement /> : <PleaseStarBanner />}
 
     {notification && <NotificationBanner notification={notification} />}
+
+    {!changesApplied && !notification && (
+      <NotificationBanner
+        notification={{
+          message: `Your changes are configured but not applied.\nRun \`${invocationCommand} --apply\` to apply your customizations!`,
+          type: 'info',
+        }}
+      />
+    )}
 
     <MainMenu onSubmit={onSubmit} />
   </Box>

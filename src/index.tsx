@@ -29,6 +29,39 @@ import {
 import { clearAllAppliedHashes } from './systemPromptHashIndex';
 
 // =============================================================================
+// Invocation Command Detection
+// =============================================================================
+
+/**
+ * Detects how the user invoked tweakcc to show the correct --apply command.
+ * Handles: tweakcc, npx tweakcc, pnpm dlx tweakcc, yarn dlx tweakcc, etc.
+ */
+function getInvocationCommand(): string {
+  const args = process.argv;
+
+  // args[0] is the node executable, args[1] is the script path
+  // For npx/pnpm/yarn, the script path often contains clues
+  const scriptPath = args[1] || '';
+
+  // Check for package manager dlx/npx patterns in the path
+  if (scriptPath.includes('npx') || scriptPath.includes('.npm/_npx')) {
+    return 'npx tweakcc';
+  }
+  if (scriptPath.includes('pnpm') || scriptPath.includes('.pnpm')) {
+    return 'pnpm dlx tweakcc';
+  }
+  if (scriptPath.includes('yarn')) {
+    return 'yarn dlx tweakcc';
+  }
+  if (scriptPath.includes('bun')) {
+    return 'bunx tweakcc';
+  }
+
+  // Default to just 'tweakcc' (globally installed or via PATH)
+  return 'tweakcc';
+}
+
+// =============================================================================
 // Patch Results Display
 // =============================================================================
 
@@ -57,7 +90,9 @@ function printPatchResults(results: PatchResult[]): void {
     }
   }
 
-  console.log('\nPatches applied:');
+  console.log(
+    '\nPatches applied (run with --show-unchanged to show all patches):'
+  );
 
   for (const group of groupOrder) {
     const groupResults = byGroup.get(group)!;
@@ -383,8 +418,14 @@ async function startApp(
     );
   }
 
+  const invocationCommand = getInvocationCommand();
+
   render(
-    <App startupCheckInfo={startupCheckInfo} configMigrated={configMigrated} />
+    <App
+      startupCheckInfo={startupCheckInfo}
+      configMigrated={configMigrated}
+      invocationCommand={invocationCommand}
+    />
   );
 }
 
