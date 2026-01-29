@@ -203,7 +203,6 @@ export interface StartupCheckInfo {
 }
 
 export enum MainMenuItem {
-  APPLY_CHANGES = '*Apply customizations',
   THEMES = 'Themes',
   THINKING_VERBS = 'Thinking verbs',
   THINKING_STYLE = 'Thinking style',

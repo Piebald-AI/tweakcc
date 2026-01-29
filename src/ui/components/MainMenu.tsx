@@ -1,7 +1,6 @@
 import { CONFIG_FILE } from '@/config';
 import { MainMenuItem } from '@/types';
-import { useContext, useState } from 'react';
-import { SettingsContext } from '../App';
+import { useState } from 'react';
 import { SelectInput, SelectItem } from './SelectInput';
 
 const baseMenuItems: SelectItem[] = [
@@ -63,23 +62,7 @@ const systemMenuItems: SelectItem[] = [
 ];
 
 const MainMenu = ({ onSubmit }: { onSubmit: (item: MainMenuItem) => void }) => {
-  const settings = useContext(SettingsContext);
-
-  const menuItems: SelectItem[] = [
-    ...(settings.changesApplied
-      ? []
-      : [
-          {
-            name: MainMenuItem.APPLY_CHANGES,
-            desc: 'Required: Updates Claude Code in-place with your changes',
-            selectedStyles: {
-              color: 'green',
-            },
-          },
-        ]),
-    ...baseMenuItems,
-    ...systemMenuItems,
-  ];
+  const menuItems: SelectItem[] = [...baseMenuItems, ...systemMenuItems];
 
   const [selectedIndex, setSelectedIndex] = useState(0);
 
