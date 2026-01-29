@@ -91,7 +91,7 @@ function printPatchResults(results: PatchResult[]): void {
   }
 
   console.log(
-    '\nPatches applied (run with --show-unchaned to show all patches):'
+    '\nPatches applied (run with --show-unchanged to show all patches):'
   );
 
   for (const group of groupOrder) {
