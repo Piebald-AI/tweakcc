@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { debug, stringifyRegex, verbose } from '../utils';
-import { showDiff, PatchApplied } from './index';
+import { showDiff, PatchResult, PatchGroup } from './index';
 import {
   loadSystemPromptsWithRegex,
   reconstructContentFromPieces,
@@ -9,6 +9,14 @@ import {
   getPromptFilePath,
 } from '../systemPromptSync';
 import { setAppliedHash, computeMD5Hash } from '../systemPromptHashIndex';
+
+/**
+ * Result of applying system prompts
+ */
+export interface SystemPromptsResult {
+  newContent: string;
+  results: PatchResult[];
+}
 
 /**
  * Detects if the cli.js file uses Unicode escape sequences for non-ASCII characters.
@@ -37,13 +45,13 @@ const extractBuildTime = (content: string): string | undefined => {
  * @param content - The current content of cli.js
  * @param version - The Claude Code version
  * @param escapeNonAscii - Whether to escape non-ASCII characters (auto-detected if not specified)
- * @returns PatchApplied object with modified content and items for display
+ * @returns SystemPromptsResult with modified content and per-prompt results
  */
 export const applySystemPrompts = async (
   content: string,
   version: string,
   escapeNonAscii?: boolean
-): Promise<PatchApplied> => {
+): Promise<SystemPromptsResult> => {
   // Auto-detect if we should escape non-ASCII characters based on cli.js content
   const shouldEscapeNonAscii = escapeNonAscii ?? detectUnicodeEscaping(content);
 
@@ -67,8 +75,8 @@ export const applySystemPrompts = async (
   );
   debug(`Loaded ${systemPrompts.length} system prompts with regexes`);
 
-  let totalOriginalChars = 0;
-  let totalNewChars = 0;
+  // Track per-prompt results
+  const results: PatchResult[] = [];
 
   // Search for and replace each prompt in cli.js
   for (const {
@@ -80,6 +88,7 @@ export const applySystemPrompts = async (
     identifiers,
     identifierMap,
   } of systemPrompts) {
+    debug(`Applying system prompt: ${prompt.name}`);
     const pattern = new RegExp(regex, 'si'); // 's' flag for dotAll mode, 'i' because of casing inconsistencies in unicode escape sequences (e.g. `\u201c` in the regex vs `\u201C` in the file)
     const match = content.match(pattern);
 
@@ -115,16 +124,14 @@ export const applySystemPrompts = async (
       }
 
       // Calculate character counts for this prompt (both with human-readable placeholders)
-      // Note: trim() to match how markdown files are parsed (parsed.content.trim() in parseMarkdownPrompt)
+      // Note: trim() to match how markdown files are parsed and how whitespace is applied
       const originalBaselineContent = reconstructContentFromPieces(
         pieces,
         identifiers,
         identifierMap
       ).trim();
       const originalLength = originalBaselineContent.length;
-      const newLength = prompt.content.length;
-      totalOriginalChars += originalLength;
-      totalNewChars += newLength;
+      const newLength = prompt.content.trim().length;
 
       const oldContent = content;
       const matchLength = match[0].length;
@@ -158,6 +165,27 @@ export const applySystemPrompts = async (
         matchIndex,
         matchIndex + matchLength
       );
+
+      // Track this prompt's result
+      const charDiff = originalLength - newLength;
+      const applied = charDiff !== 0;
+
+      let details: string;
+      if (charDiff > 0) {
+        details = chalk.green(`${charDiff} fewer chars`);
+      } else if (charDiff < 0) {
+        details = chalk.red(`${Math.abs(charDiff)} more chars`);
+      } else {
+        details = 'unchanged';
+      }
+
+      results.push({
+        id: promptId,
+        name: prompt.name,
+        group: PatchGroup.SYSTEM_PROMPTS,
+        applied,
+        details,
+      });
     } else {
       console.log(
         chalk.yellow(
@@ -181,21 +209,8 @@ export const applySystemPrompts = async (
     }
   }
 
-  // Calculate character savings
-  const items: string[] = [];
-  const charDiff = totalOriginalChars - totalNewChars;
-  if (charDiff > 0) {
-    items.push(
-      `system prompts: \${CHALK_VAR.green('${charDiff} fewer chars')} than original`
-    );
-  } else if (charDiff < 0) {
-    items.push(
-      `system prompts: \${CHALK_VAR.red('${Math.abs(charDiff)} more chars')} than original`
-    );
-  }
-
   return {
     newContent: content,
-    items,
+    results,
   };
 };

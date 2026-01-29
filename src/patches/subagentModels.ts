@@ -28,6 +28,8 @@ export const writeSubagentModels = (
         newFile = replaced;
         applied = true;
       }
+    } else {
+      console.error('patch: subagentModels: failed to find Plan agent pattern');
     }
   }
 
@@ -49,6 +51,10 @@ export const writeSubagentModels = (
         newFile = replaced;
         applied = true;
       }
+    } else {
+      console.error(
+        'patch: subagentModels: failed to find Explore agent pattern'
+      );
     }
   }
 
@@ -85,6 +91,10 @@ export const writeSubagentModels = (
         newFile = replaced;
         applied = true;
       }
+    } else {
+      console.error(
+        'patch: subagentModels: failed to find general-purpose agent pattern'
+      );
     }
   }
 

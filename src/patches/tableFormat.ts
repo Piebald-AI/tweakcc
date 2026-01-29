@@ -108,7 +108,7 @@ const TABLE_BORDERS_ASCII_NATIVE =
   'top:["","","",""],middle:["|","-","|","|"],bottom:["","","",""]';
 
 const TABLE_BORDERS_ASCII_SPACED =
-  'top: ["", "", "", ""],\n        middle: ["|", "-", "|", "|"],\n        bottom: ["", "", "", ""]';
+  'top: ["", "", "", ""],\n        middle: ["|", "-", "|", "|"],bottom: ["", "", "", ""]';
 
 // Clean format - box-drawing but no top/bottom borders
 const TABLE_BORDERS_CLEAN =

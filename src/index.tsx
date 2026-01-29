@@ -5,8 +5,13 @@ import chalk from 'chalk';
 
 import App from './ui/App';
 import { CONFIG_FILE, readConfigFile, updateConfigFile } from './config';
-import { enableDebug, enableVerbose, enableShowUnchanged } from './utils';
-import { applyCustomization } from './patches/index';
+import {
+  enableDebug,
+  enableVerbose,
+  enableShowUnchanged,
+  isShowUnchanged,
+} from './utils';
+import { applyCustomization, PatchResult, PatchGroup } from './patches/index';
 import { preloadStringsFile } from './systemPromptSync';
 import { migrateConfigIfNeeded } from './migration';
 import { completeStartupCheck, startupCheck } from './startup';
@@ -22,6 +27,61 @@ import {
   restoreNativeBinaryFromBackup,
 } from './installationBackup';
 import { clearAllAppliedHashes } from './systemPromptHashIndex';
+
+// =============================================================================
+// Patch Results Display
+// =============================================================================
+
+/**
+ * Prints patch results to console, organized by group.
+ * Respects --show-unchanged flag for filtering.
+ */
+function printPatchResults(results: PatchResult[]): void {
+  // Define group order for display
+  const groupOrder = [
+    PatchGroup.SYSTEM_PROMPTS,
+    PatchGroup.ALWAYS_APPLIED,
+    PatchGroup.MISC_CONFIGURABLE,
+    PatchGroup.NEW_FEATURES,
+  ];
+
+  // Group results by PatchGroup
+  const byGroup = new Map<PatchGroup, PatchResult[]>();
+  for (const group of groupOrder) {
+    byGroup.set(group, []);
+  }
+  for (const result of results) {
+    const groupResults = byGroup.get(result.group);
+    if (groupResults) {
+      groupResults.push(result);
+    }
+  }
+
+  console.log('\nPatches applied:');
+
+  for (const group of groupOrder) {
+    const groupResults = byGroup.get(group)!;
+
+    // Filter based on --show-unchanged
+    const filtered = groupResults.filter(r => r.applied || isShowUnchanged());
+    if (filtered.length === 0) continue;
+
+    console.log(`\n  ${chalk.bold(group)}:`);
+
+    for (const result of filtered) {
+      const status = result.applied ? chalk.green('✓') : chalk.dim('○');
+      const details = result.details ? `: ${result.details}` : '';
+      // Show description in gray on the same line for applied patches only
+      const description =
+        result.applied && result.description
+          ? ` ${chalk.gray('—')} ${chalk.gray(result.description)}`
+          : '';
+      console.log(`    ${status} ${result.name}${details}${description}`);
+    }
+  }
+
+  console.log('');
+}
 
 const main = async () => {
   const program = new Command();
@@ -133,7 +193,11 @@ async function handleApplyMode(): Promise<void> {
 
     // Apply the customizations
     console.log('Applying customizations...');
-    await applyCustomization(config, ccInstInfo);
+    const { results } = await applyCustomization(config, ccInstInfo);
+
+    // Print patch results
+    printPatchResults(results);
+
     console.log(chalk.green('Customizations applied successfully!'));
     console.log(
       chalk.gray(

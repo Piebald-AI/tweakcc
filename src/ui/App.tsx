@@ -22,7 +22,7 @@ import {
   updateConfigFile,
 } from '../config';
 import { openInExplorer, revealFileInExplorer } from '../utils';
-import { applyCustomization } from '../patches/index';
+import { applyCustomization, ApplyCustomizationResult } from '../patches/index';
 import { DEFAULT_SETTINGS } from '../defaultSettings';
 import {
   restoreNativeBinaryFromBackup,
@@ -138,8 +138,8 @@ Please reapply your changes below.`,
             type: 'info',
           });
           applyCustomization(config, startupCheckInfo.ccInstInfo).then(
-            newConfig => {
-              setConfig(newConfig);
+            (result: ApplyCustomizationResult) => {
+              setConfig(result.config);
               setNotification({
                 message: 'Customization patches applied successfully!',
                 type: 'success',
