@@ -209,19 +209,7 @@ export const applyCustomization = async (
     if (
       (result = writeUserMessageDisplay(
         content,
-        config.settings.userMessageDisplay.format,
-        config.settings.userMessageDisplay.foregroundColor,
-        config.settings.userMessageDisplay.backgroundColor,
-        config.settings.userMessageDisplay.styling.includes('bold'),
-        config.settings.userMessageDisplay.styling.includes('italic'),
-        config.settings.userMessageDisplay.styling.includes('underline'),
-        config.settings.userMessageDisplay.styling.includes('strikethrough'),
-        config.settings.userMessageDisplay.styling.includes('inverse'),
-        config.settings.userMessageDisplay.borderStyle,
-        config.settings.userMessageDisplay.borderColor,
-        config.settings.userMessageDisplay.paddingX,
-        config.settings.userMessageDisplay.paddingY,
-        config.settings.userMessageDisplay.fitBoxToContent
+        config.settings.userMessageDisplay
       ))
     ) {
       content = result;
