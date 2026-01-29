@@ -62,8 +62,10 @@ export const writeHideStartupClawd = (oldFile: string): string | null => {
   const indices = findStartupClawdComponents(oldFile);
 
   if (indices.length === 0) {
-    console.error('patch: hideStartupClawd: no Clawd components found');
-    return null;
+    console.error(
+      'patch: hideStartupClawd: no Clawd components found (banner may have been removed in this version)'
+    );
+    return oldFile;
   }
 
   // Sort indices in REVERSE order so we can insert without affecting earlier positions

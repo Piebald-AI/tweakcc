@@ -32,7 +32,9 @@ export const writeThinkingVerbs = (
   // - Beboppin'
   // - Dilly-dallying
   // - Flambéing
-  const pattern = /\[("[A-Z][a-z'é-]+in[g']",?){50,}\]/;
+  // Character class includes a-z, apostrophe, hyphens, and \xNN escape sequences
+  // (e.g., Flambéing stored as Flamb\xE9ing in minified source)
+  const pattern = /\[("[A-Z][a-z'é\-\\xA-F0-9]+in[g']",?){50,}\]/;
 
   const match = oldFile.match(pattern);
 

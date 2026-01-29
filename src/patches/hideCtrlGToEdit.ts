@@ -6,7 +6,7 @@ const getCtrlGToEditLocation = (oldFile: string): LocationResult | null => {
   // Find: if(X&&Y)p("tengu_external_editor_hint_shown",
   // Replace the condition (X&&Y) with just "false"
   const pattern =
-    /if\(([$\w]+&&[$\w]+)\)p\("tengu_external_editor_hint_shown",/;
+    /if\(([$\w]+&&[$\w]+)\)[$\w]+\("tengu_external_editor_hint_shown",/;
   const match = oldFile.match(pattern);
 
   if (!match || match.index === undefined) {
