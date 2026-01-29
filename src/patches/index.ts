@@ -67,7 +67,7 @@ import {
 } from '../installationBackup';
 import { compareVersions } from '../systemPromptSync';
 
-export { showDiff, globalReplace } from './patchDiffing';
+export { showDiff, showPositionalDiff, globalReplace } from './patchDiffing';
 export {
   findChalkVar,
   getModuleLoaderFunction,

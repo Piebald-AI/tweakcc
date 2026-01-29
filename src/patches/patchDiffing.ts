@@ -14,9 +14,76 @@ const unescapeUnicode = (str: string): string => {
 };
 
 /**
- * Debug function for showing diffs between old and new file contents.
+ * Debug function for showing simple raw diffs (requires --verbose flag).
  *
- * Uses the `diff` library to compute character-level differences and displays them with
+ * This is the original simple diff display that shows exact positional changes.
+ * Uses ANSI escape codes for coloring: red for OLD, green for NEW, blue for UNCHANGED.
+ *
+ * @param oldFileContents - The original file content before modification
+ * @param newFileContents - The modified file content after patching
+ * @param injectedText - The text that was injected (used to calculate context window)
+ * @param startIndex - The start index where the modification occurred
+ * @param endIndex - The end index of the original content that was replaced
+ * @param numContextChars - Number of context characters to show before and after diff.
+ */
+export const showPositionalDiff = (
+  oldFileContents: string,
+  newFileContents: string,
+  injectedText: string,
+  startIndex: number,
+  endIndex: number,
+  numContextChars: number = 40
+): void => {
+  if (!isVerbose()) {
+    return;
+  }
+
+  const contextStart = Math.max(0, startIndex - numContextChars);
+  const contextEndOld = Math.min(
+    oldFileContents.length,
+    endIndex + numContextChars
+  );
+  const contextEndNew = Math.min(
+    newFileContents.length,
+    startIndex + injectedText.length + numContextChars
+  );
+
+  const oldBefore = oldFileContents.slice(contextStart, startIndex);
+  const oldChanged = oldFileContents.slice(startIndex, endIndex);
+  const oldAfter = oldFileContents.slice(endIndex, contextEndOld);
+
+  const newBefore = newFileContents.slice(contextStart, startIndex);
+  const newChanged = newFileContents.slice(
+    startIndex,
+    startIndex + injectedText.length
+  );
+  const newAfter = newFileContents.slice(
+    startIndex + injectedText.length,
+    contextEndNew
+  );
+
+  if (oldChanged !== newChanged) {
+    verbose('\n--- Diff ---');
+    verbose(
+      `\x1b[31mOLD: \x1b[0;2m${oldBefore}\x1b[0;31;1m${oldChanged}\x1b[0;2m${oldAfter}\x1b[0m`
+    );
+    verbose(
+      `\x1b[32mNEW: \x1b[0;2m${newBefore}\x1b[0;32;1m${newChanged}\x1b[0;2m${newAfter}\x1b[0m`
+    );
+    verbose('--- End Diff ---\n');
+  } else {
+    verbose('\n--- Diff ---');
+    verbose(
+      `\x1b[34mUNCHANGED: \x1b[0;2m${oldBefore}\x1b[0;34;1m${oldChanged}\x1b[0;2m${oldAfter}\x1b[0m`
+    );
+    verbose('--- End Diff ---\n');
+  }
+};
+
+/**
+ * Debug function for showing diffs between old and new file contents using smart word-level diffing.
+ *
+ * Uses the `diff` library to compute word-level differences and displays them with
  * chalk-styled colors: green background for additions, red background for removals, and
  * dim text for unchanged portions. Only outputs when --verbose flag is set.
  *
@@ -25,6 +92,7 @@ const unescapeUnicode = (str: string): string => {
  * @param injectedText - The text that was injected (used to calculate context window)
  * @param startIndex - The start index where the modification occurred
  * @param endIndex - The end index of the original content that was replaced
+ * @param numContextChars - Number of context characters to show before and after diff.
  *
  * @example
  * ```ts
@@ -40,13 +108,12 @@ export const showDiff = (
   newFileContents: string,
   injectedText: string,
   startIndex: number,
-  endIndex: number
+  endIndex: number,
+  numContextChars: number = 40
 ): void => {
   if (!isVerbose()) {
     return;
   }
-
-  const numContextChars = 40;
 
   // Extract the relevant portions with context
   const contextStart = Math.max(0, startIndex - numContextChars);
