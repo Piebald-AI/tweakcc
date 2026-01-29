@@ -854,11 +854,16 @@ export const writeModeChangeUpdateToolset = (
 
 /**
  * Apply all toolset patches to the file
+ * @param oldFile - The file content to patch
+ * @param toolsets - Array of toolset configurations
+ * @param defaultToolset - The default toolset name (or null)
+ * @param planModeToolset - Optional toolset to switch to when entering plan mode
  */
 export const writeToolsets = (
   oldFile: string,
   toolsets: Toolset[],
-  defaultToolset: string | null
+  defaultToolset: string | null,
+  planModeToolset?: string | null
 ): string | null => {
   // Return null if no toolsets configured
   if (!toolsets || toolsets.length === 0) {
@@ -924,6 +929,31 @@ export const writeToolsets = (
       'patch: toolsets: step 7 failed (appendToolsetToShortcutsDisplay)'
     );
     return null;
+  }
+
+  // Step 8: Mode-change toolset switching (optional)
+  if (planModeToolset && defaultToolset) {
+    // First, add setState access at the tool change component scope
+    result = addSetStateFnAccessAtToolChangeComponentScope(result);
+    if (!result) {
+      console.error(
+        'patch: toolsets: step 8a failed (addSetStateFnAccessAtToolChangeComponentScope)'
+      );
+      return null;
+    }
+
+    // Then, inject the mode change toolset switching code
+    result = writeModeChangeUpdateToolset(
+      result,
+      planModeToolset,
+      defaultToolset
+    );
+    if (!result) {
+      console.error(
+        'patch: toolsets: step 8b failed (writeModeChangeUpdateToolset)'
+      );
+      return null;
+    }
   }
 
   return result;
