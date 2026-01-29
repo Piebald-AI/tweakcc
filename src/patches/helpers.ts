@@ -290,54 +290,23 @@ export const findTextComponent = (fileContents: string): string | undefined => {
  * Find the Box component variable name
  */
 export const findBoxComponent = (fileContents: string): string | undefined => {
-  // Method 1: Search for Box displayName (older CC versions)
+  // Method 1: Find Box by ink-box createElement pattern (newer CC versions)
+  const inkBoxPattern =
+    /function ([$\w]+)\(.{0,2000}\b([$\w]+)=[$\w]+(?:\.default)?\.createElement\("ink-box".{0,200}?return \2/;
+  const inkBoxMatch = fileContents.match(inkBoxPattern);
+  if (inkBoxMatch) {
+    return inkBoxMatch[1];
+  }
+
+  // Method 2: Search for Box displayName (older CC versions, 0.2.9 - 2.0.77 at least)
   const boxDisplayNamePattern = /\b([$\w]+)\.displayName="Box"/;
   const boxDisplayNameMatch = fileContents.match(boxDisplayNamePattern);
   if (boxDisplayNameMatch) {
-    const boxOrigCompName = boxDisplayNameMatch[1];
-
-    // Search for the variable that equals the original Box component
-    const boxVarPattern = new RegExp(
-      // /[^$\w]/ = /\b/ but considering dollar signs word characters.
-      // Normally /$\b/ does NOT match "$}" but this does.
-      // Because once boxOrigCompName was `LK$` so `_=LK$}` wasn't matching.
-      `\\b([$\\w]+)=${escapeIdent(boxOrigCompName)}[^$\\w]`
-    );
-    const boxVarMatch = fileContents.match(boxVarPattern);
-    if (boxVarMatch) {
-      return boxVarMatch[1];
-    }
-    console.error(
-      `patch: findBoxComponent: found Box displayName but failed to find Box component variable (boxOrigCompName=${boxOrigCompName})`
-    );
-  }
-
-  // Method 2: Find Box component by its unique function signature (newer CLI versions 2.1.8+)
-  // The internal Box function has a unique signature: function X({children:Y,flexWrap:Z="nowrap",flexDirection:W="row",...
-  const internalBoxPattern =
-    /\bfunction ([$\w]+)\(\{children:[$\w]+,flexWrap:[$\w]+="nowrap",flexDirection:[$\w]+="row",flexGrow:[$\w]+=[0-9]+,flexShrink:[$\w]+=[0-9]+/;
-  const internalBoxMatch = fileContents.match(internalBoxPattern);
-  if (internalBoxMatch) {
-    const internalBoxFn = internalBoxMatch[1];
-
-    // Find the variable that's assigned the internal Box function: boxVar=internalBoxFn}
-    // Pattern like: eq=uW8}
-    const boxVarAssignPattern = new RegExp(
-      `\\b([$\\w]+)=${escapeIdent(internalBoxFn)}\\}`
-    );
-    const boxVarAssignMatch = fileContents.match(boxVarAssignPattern);
-    if (boxVarAssignMatch) {
-      return boxVarAssignMatch[1];
-    }
-    // If no assignment found, the internal function itself might be used directly
-    console.error(
-      `patch: findBoxComponent: found internal Box function (${internalBoxFn}) but no assignment found`
-    );
-    return internalBoxFn;
+    return boxDisplayNameMatch[1];
   }
 
   console.error(
-    'patch: findBoxComponent: failed to find Box component (neither displayName nor function signature found)'
+    'patch: findBoxComponent: failed to find Box component (neither ink-box createElement nor displayName found)'
   );
   return undefined;
 };
