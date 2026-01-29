@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add all available CC tools and their aliases to the toolset editor (#410) - @signadou
 - Add the option to be able to change the table format - @mike1858
 - Enable swarm mode (via `tengu_brass_pebble`) (#414) - @mike1858
+- Add a `--restore`/`--revert` flag to undo patches and restore original CC installation (#431) - @bl-ue
 
 ## [v3.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.4.0) - 2026-01-18
 
