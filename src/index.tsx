@@ -4,7 +4,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 
 import App from './ui/App';
-import { CONFIG_FILE, readConfigFile } from './config';
+import { CONFIG_FILE, readConfigFile, updateConfigFile } from './config';
 import { enableDebug, enableVerbose, enableShowUnchanged } from './utils';
 import { applyCustomization } from './patches/index';
 import { preloadStringsFile } from './systemPromptSync';
@@ -17,6 +17,11 @@ import {
 } from './installationDetection';
 import { InstallationPicker } from './ui/components/InstallationPicker';
 import { InstallationCandidate, StartupCheckInfo } from './types';
+import {
+  restoreClijsFromBackup,
+  restoreNativeBinaryFromBackup,
+} from './installationBackup';
+import { clearAllAppliedHashes } from './systemPromptHashIndex';
 
 const main = async () => {
   const program = new Command();
@@ -29,7 +34,12 @@ const main = async () => {
     .option('-d, --debug', 'enable debug mode')
     .option('-v, --verbose', 'enable verbose debug mode (includes diffs)')
     .option('--show-unchanged', 'show unchanged diffs (requires --verbose)')
-    .option('-a, --apply', 'apply saved customizations without interactive UI');
+    .option('-a, --apply', 'apply saved customizations without interactive UI')
+    .option('--restore', 'restore Claude Code to its original state')
+    .option(
+      '--revert',
+      'restore Claude Code to its original state (alias for --restore)'
+    );
   program.parse();
   const options = program.opts();
 
@@ -46,9 +56,23 @@ const main = async () => {
   // Migrate old ccInstallationDir config to ccInstallationPath if needed
   const configMigrated = await migrateConfigIfNeeded();
 
+  // Check for conflicting flags
+  if (options.apply && (options.restore || options.revert)) {
+    console.error(
+      chalk.red('Error: Cannot use --apply and --restore/--revert together.')
+    );
+    process.exit(1);
+  }
+
   // Handle --apply flag for non-interactive mode
   if (options.apply) {
     await handleApplyMode();
+    return;
+  }
+
+  // Handle --restore or --revert flags for non-interactive mode
+  if (options.restore || options.revert) {
+    await handleRestoreMode();
     return;
   }
 
@@ -110,7 +134,86 @@ async function handleApplyMode(): Promise<void> {
     // Apply the customizations
     console.log('Applying customizations...');
     await applyCustomization(config, ccInstInfo);
-    console.log('Customizations applied successfully!');
+    console.log(chalk.green('Customizations applied successfully!'));
+    console.log(
+      chalk.gray(
+        'Run with --restore/--revert to revert Claude Code to its original state.'
+      )
+    );
+    process.exit(0);
+  } catch (error) {
+    if (error instanceof InstallationDetectionError) {
+      console.error(chalk.red(`Error: ${error.message}`));
+      process.exit(1);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Handles the --restore/--revert flags for non-interactive mode.
+ * Restores Claude Code to its original state by reverting from backup.
+ */
+async function handleRestoreMode(): Promise<void> {
+  console.log('Restoring Claude Code to its original state...');
+
+  try {
+    // Find Claude Code installation (non-interactive mode throws on ambiguity)
+    const result = await startupCheck({ interactive: false });
+
+    if (!result.startupCheckInfo || !result.startupCheckInfo.ccInstInfo) {
+      // This shouldn't happen in non-interactive mode (should throw instead),
+      // but handle it just in case
+      console.error(formatNotFoundError());
+      process.exit(1);
+    }
+
+    const { ccInstInfo } = result.startupCheckInfo;
+
+    if (ccInstInfo.nativeInstallationPath) {
+      console.log(
+        `Found Claude Code (native installation): ${ccInstInfo.nativeInstallationPath}`
+      );
+    } else {
+      console.log(`Found Claude Code at: ${ccInstInfo.cliPath}`);
+    }
+    console.log(`Version: ${ccInstInfo.version}`);
+
+    // Restore from backup based on installation type
+    console.log('Restoring from backup...');
+    let restored: boolean;
+    if (ccInstInfo.nativeInstallationPath) {
+      restored = await restoreNativeBinaryFromBackup(ccInstInfo);
+    } else {
+      restored = await restoreClijsFromBackup(ccInstInfo);
+    }
+
+    if (!restored) {
+      console.error(
+        chalk.red('No backup found. Cannot restore original Claude Code.')
+      );
+      console.error(
+        chalk.yellow(
+          'Tip: A backup is created automatically when you first apply customizations.'
+        )
+      );
+      process.exit(1);
+    }
+
+    // Clear all applied hashes since we're restoring to defaults
+    await clearAllAppliedHashes();
+
+    // Update config to mark changes as not applied
+    await updateConfigFile(config => {
+      config.changesApplied = false;
+    });
+
+    console.log(chalk.blue('Original Claude Code restored successfully!'));
+    console.log(
+      chalk.gray(
+        `Your customizations are still saved in ${CONFIG_FILE} and can be reapplied with --apply.`
+      )
+    );
     process.exit(0);
   } catch (error) {
     if (error instanceof InstallationDetectionError) {
