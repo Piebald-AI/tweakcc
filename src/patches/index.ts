@@ -110,6 +110,7 @@ export interface PatchResult {
   name: string;
   group: PatchGroup;
   applied: boolean;
+  failed?: boolean;
   details?: string;
   description?: string;
 }
@@ -162,9 +163,10 @@ const applyPatches = (
 
     debug(`Applying patch: ${patch.name}`);
     const result = patch.fn(content);
-    const applied = result !== null;
+    const failed = result === null;
+    const applied = !failed && result !== content;
 
-    if (applied) {
+    if (!failed) {
       content = result;
     }
 
@@ -173,6 +175,7 @@ const applyPatches = (
       name: patch.name,
       group: patch.group,
       applied,
+      failed,
       description: patch.description,
     });
   }

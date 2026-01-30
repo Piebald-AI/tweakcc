@@ -97,14 +97,20 @@ function printPatchResults(results: PatchResult[]): void {
   for (const group of groupOrder) {
     const groupResults = byGroup.get(group)!;
 
-    // Filter based on --show-unchanged
-    const filtered = groupResults.filter(r => r.applied || isShowUnchanged());
+    // Filter based on --show-unchanged (but always show applied and failed)
+    const filtered = groupResults.filter(
+      r => r.applied || r.failed || isShowUnchanged()
+    );
     if (filtered.length === 0) continue;
 
     console.log(`\n  ${chalk.bold(group)}:`);
 
     for (const result of filtered) {
-      const status = result.applied ? chalk.green('✓') : chalk.dim('○');
+      const status = result.failed
+        ? chalk.red('✗')
+        : result.applied
+          ? chalk.green('✓')
+          : chalk.dim('○');
       const details = result.details ? `: ${result.details}` : '';
       // Show description in gray on the same line for applied patches only
       const description =
