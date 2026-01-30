@@ -75,7 +75,7 @@ function printPatchResults(results: PatchResult[]): void {
     PatchGroup.SYSTEM_PROMPTS,
     PatchGroup.ALWAYS_APPLIED,
     PatchGroup.MISC_CONFIGURABLE,
-    PatchGroup.NEW_FEATURES,
+    PatchGroup.FEATURES,
   ];
 
   // Group results by PatchGroup

@@ -102,7 +102,7 @@ export enum PatchGroup {
   SYSTEM_PROMPTS = 'System Prompts',
   ALWAYS_APPLIED = 'Always Applied',
   MISC_CONFIGURABLE = 'Misc Configurable',
-  NEW_FEATURES = 'New Features',
+  FEATURES = 'Features',
 }
 
 export interface PatchResult {
@@ -111,6 +111,7 @@ export interface PatchResult {
   group: PatchGroup;
   applied: boolean;
   failed?: boolean;
+  skipped?: boolean;
   details?: string;
   description?: string;
 }
@@ -121,7 +122,7 @@ interface Patch {
   group: PatchGroup;
   fn: (content: string) => string | null;
   condition?: boolean;
-  description?: string;
+  description: string;
 }
 
 export interface ApplyCustomizationResult {
@@ -156,8 +157,16 @@ const applyPatches = (
   const results: PatchResult[] = [];
 
   for (const patch of patches) {
-    // Skip patches where condition is explicitly false
+    // Skip patches where condition is explicitly false, but record them as skipped
     if (patch.condition === false) {
+      results.push({
+        id: patch.id,
+        name: patch.name,
+        group: patch.group,
+        applied: false,
+        skipped: true,
+        description: patch.description,
+      });
       continue;
     }
 
@@ -386,6 +395,8 @@ export const applyCustomization = async (
       group: PatchGroup.MISC_CONFIGURABLE,
       fn: c => writeThinkerFormat(c, config.settings.thinkingVerbs!.format),
       condition: !!config.settings.thinkingVerbs,
+      description:
+        'Your custom format string that thinking verbs are wrapped in is applied',
     },
     {
       id: 'thinker-symbol-chars',
@@ -525,12 +536,12 @@ export const applyCustomization = async (
     },
 
     // -------------------------------------------------------------------------
-    // New Features
+    // Features
     // -------------------------------------------------------------------------
     {
       id: 'swarm-mode',
       name: 'swarm mode',
-      group: PatchGroup.NEW_FEATURES,
+      group: PatchGroup.FEATURES,
       fn: c => writeSwarmMode(c),
       condition: !!config.settings.misc?.enableSwarmMode,
       description: 'SWARM MODE in Claude Code is enabled',
@@ -538,7 +549,7 @@ export const applyCustomization = async (
     {
       id: 'toolsets',
       name: 'toolsets',
-      group: PatchGroup.NEW_FEATURES,
+      group: PatchGroup.FEATURES,
       fn: c =>
         writeToolsets(
           c,
@@ -554,7 +565,7 @@ export const applyCustomization = async (
     {
       id: 'mcp-non-blocking',
       name: 'MCP non-blocking',
-      group: PatchGroup.NEW_FEATURES,
+      group: PatchGroup.FEATURES,
       fn: c => writeMcpNonBlocking(c),
       condition: !!config.settings.misc?.mcpConnectionNonBlocking,
       description:
@@ -563,14 +574,15 @@ export const applyCustomization = async (
     {
       id: 'mcp-batch-size',
       name: `MCP batch size (${config.settings.misc?.mcpServerBatchSize ?? 'default'})`,
-      group: PatchGroup.NEW_FEATURES,
+      group: PatchGroup.FEATURES,
       fn: c => writeMcpBatchSize(c, config.settings.misc!.mcpServerBatchSize!),
       condition: !!config.settings.misc?.mcpServerBatchSize,
+      description: `Number of MCP servers started in parallel is set to ${!!config.settings.misc?.mcpServerBatchSize}`,
     },
     {
       id: 'user-message-display',
       name: 'user message display',
-      group: PatchGroup.NEW_FEATURES,
+      group: PatchGroup.FEATURES,
       fn: c => writeUserMessageDisplay(c, config.settings.userMessageDisplay!),
       condition: !!config.settings.userMessageDisplay,
       description: 'User messages in the chat history will be styled',
@@ -578,7 +590,7 @@ export const applyCustomization = async (
     {
       id: 'input-pattern-highlighters',
       name: 'input pattern highlighters',
-      group: PatchGroup.NEW_FEATURES,
+      group: PatchGroup.FEATURES,
       fn: c =>
         writeInputPatternHighlighters(
           c,
@@ -593,7 +605,7 @@ export const applyCustomization = async (
     {
       id: 'conversation-title',
       name: 'conversation title',
-      group: PatchGroup.NEW_FEATURES,
+      group: PatchGroup.FEATURES,
       fn: c => writeConversationTitle(c),
       condition:
         (config.settings.misc?.enableConversationTitle ?? true) &&

@@ -101,7 +101,8 @@ export default function App({
       setNotification({
         message: `Your Claude Code installation was updated from ${startupCheckInfo.oldVersion} to ${startupCheckInfo.newVersion}, and the patching was likely overwritten
 (However, your customization are still remembered in ${CONFIG_FILE}.)
-Please reapply your changes below.`,
+
+Please reapply your changes by running \`${invocationCommand} --apply\`.`,
         type: 'warning',
       });
       // Update settings to trigger changedApplied:false.
