@@ -47,6 +47,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     mcpServerBatchSize: null as number | null,
     tableFormat: 'default' as TableFormat,
     enableSwarmMode: true,
+    preventUpdateToUnsupportedVersions: false,
   };
 
   const ensureMisc = () => {
@@ -321,6 +322,21 @@ export function MiscView({ onSubmit }: MiscViewProps) {
           updateSettings(settings => {
             ensureMisc();
             settings.misc!.enableSwarmMode = !settings.misc!.enableSwarmMode;
+          });
+        },
+      },
+      {
+        id: 'preventUnsupportedUpdates',
+        title: 'Prevent updates to unsupported versions',
+        description:
+          'Blocks Claude Code auto-updates to versions not yet supported by tweakcc.',
+        getValue: () =>
+          settings.misc?.preventUpdateToUnsupportedVersions ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.preventUpdateToUnsupportedVersions =
+              !settings.misc!.preventUpdateToUnsupportedVersions;
           });
         },
       },

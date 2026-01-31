@@ -703,6 +703,7 @@ export const DEFAULT_SETTINGS: Settings = {
     mcpServerBatchSize: null,
     tableFormat: 'default',
     enableSwarmMode: true,
+    preventUpdateToUnsupportedVersions: false,
   },
   toolsets: [],
   defaultToolset: null,

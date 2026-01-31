@@ -66,6 +66,7 @@ import {
   restoreClijsFromBackup,
 } from '../installationBackup';
 import { compareVersions } from '../systemPromptSync';
+import { writePreventUnsupportedUpdates } from './preventUnsupportedUpdates';
 
 export { showDiff, showPositionalDiff, globalReplace } from './patchDiffing';
 export {
@@ -335,6 +336,13 @@ const PATCH_DEFINITIONS = [
     name: 'Conversation title',
     group: PatchGroup.FEATURES,
     description: '/title command will be created & enabled',
+  },
+  {
+    id: 'prevent-unsupported-updates',
+    name: 'prevent unsupported updates',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Auto-updates blocked for CC versions not yet supported by tweakcc',
   },
 ] as const;
 
@@ -714,6 +722,10 @@ export const applyCustomization = async (
           ccInstInfo.version &&
           compareVersions(ccInstInfo.version, '2.0.64') < 0
         ),
+    },
+    'prevent-unsupported-updates': {
+      fn: c => writePreventUnsupportedUpdates(c),
+      condition: !!config.settings.misc?.preventUpdateToUnsupportedVersions,
     },
   };
 
