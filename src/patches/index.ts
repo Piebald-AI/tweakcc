@@ -17,16 +17,16 @@ import { DEFAULT_SETTINGS } from '../defaultSettings';
 
 // Notes to patch-writers:
 //
-// - Always use [\w$]+ instead of \w+ to match identifiers (variable/function names), because at
+// - Always use [$\w]+ instead of \w+ to match identifiers (variable/function names), because at
 //   least in Node.js's regex engine, \w+ does not include $, so ABC$, which is a perfectly valid
 //   identifier, would not be matched.  The way cli.js is minified, $ frequently appears in global
 //   identifiers.
 //
 // - When starting a regular expression with an identifier name, for example if you're matching a
 //   string of the form "someVarName = ...", make sure to put some kind of word boundary at the
-//   beginning, like `\b`.  This can **SIGNIFICANTLY** speed up matching, easily taking a 1.5s
-//   search down to 80ms.  More specific boundaries like explicitly requiring a particular
-//   character such as ',' or ';' can speed up matching even further, e.g. down to 30ms.
+//   beginning, e.g. `,` `;` `}` or `{`.  This can **SIGNIFICANTLY** speed up matching, easily
+//   bringing a 1.5s search down to 30ms.  **DO NOT** use `\b`, because it doesn't properly treat
+//   `$`, which appears in identifiers often, as a word character, so `\b[$\w]+` will NOT match `,$=`.
 //
 
 import { writeShowMoreItemsInSelectMenus } from './showMoreItemsInSelectMenus';
@@ -61,6 +61,7 @@ import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
 import { writeSwarmMode } from './swarmMode';
 import { writeThinkingBlockStyling } from './thinkingBlockStyling';
 import { writeMcpNonBlocking, writeMcpBatchSize } from './mcpStartup';
+import { writeStatuslineUpdateThrottle } from './statuslineUpdateThrottle';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -174,6 +175,12 @@ const PATCH_DEFINITIONS = [
     name: 'Fix LSP support',
     group: PatchGroup.ALWAYS_APPLIED,
     description: 'Enable/fix nascent LSP support',
+  },
+  {
+    id: 'statusline-update-throttle',
+    name: `Statusline update throttling correction`,
+    group: PatchGroup.ALWAYS_APPLIED,
+    description: `Statusline updates will be properly throttled instead of queued (or debounced)`,
   },
   // Misc Configurable
   {
@@ -557,6 +564,15 @@ export const applyCustomization = async (
     },
     'fix-lsp-support': {
       fn: c => writeFixLspSupport(c),
+    },
+    'statusline-update-throttle': {
+      fn: c =>
+        writeStatuslineUpdateThrottle(
+          c,
+          config.settings.misc?.statusLineThrottleMs ?? 300,
+          config.settings.misc?.statusLineUseFixedInterval ?? false
+        ),
+      condition: config.settings.misc?.statusLineThrottleMs != null,
     },
     // Misc Configurable
     'patches-applied-indication': {

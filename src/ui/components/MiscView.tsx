@@ -27,6 +27,12 @@ const MCP_BATCH_SIZE_MIN = 1;
 const MCP_BATCH_SIZE_MAX = 20;
 const MCP_BATCH_SIZE_DEFAULT = 3;
 
+// Status line throttle constraints
+const STATUS_LINE_THROTTLE_MIN = 0;
+const STATUS_LINE_THROTTLE_MAX = 1000;
+const STATUS_LINE_THROTTLE_DEFAULT = 300;
+const STATUS_LINE_THROTTLE_STEP = 50;
+
 export function MiscView({ onSubmit }: MiscViewProps) {
   const { settings, updateSettings } = useContext(SettingsContext);
 
@@ -45,6 +51,8 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     suppressRateLimitOptions: false,
     mcpConnectionNonBlocking: true,
     mcpServerBatchSize: null as number | null,
+    statusLineThrottleMs: null as number | null,
+    statusLineUseFixedInterval: false,
     tableFormat: 'default' as TableFormat,
     enableSwarmMode: true,
   };
@@ -86,6 +94,12 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     if (size <= 3) return `${size} (conservative)`;
     if (size <= 8) return `${size} (recommended)`;
     return `${size} (aggressive)`;
+  };
+
+  const getStatusLineThrottleDisplay = (ms: number | null): string => {
+    if (ms === null) return 'Disabled';
+    if (ms === 0) return '0ms (instant)';
+    return `${ms}ms`;
   };
 
   const items: MiscItem[] = useMemo(
@@ -321,6 +335,64 @@ export function MiscView({ onSubmit }: MiscViewProps) {
           updateSettings(settings => {
             ensureMisc();
             settings.misc!.enableSwarmMode = !settings.misc!.enableSwarmMode;
+          });
+        },
+      },
+      {
+        id: 'statusLineThrottle',
+        title: 'Status line throttle',
+        description: `Throttle status line updates (${STATUS_LINE_THROTTLE_MIN}-${STATUS_LINE_THROTTLE_MAX}ms). Use ←/→ to adjust by ${STATUS_LINE_THROTTLE_STEP}ms. Space to disable. 0 = instant updates.`,
+        getValue: () => settings.misc?.statusLineThrottleMs ?? null,
+        getDisplayValue: () =>
+          getStatusLineThrottleDisplay(
+            settings.misc?.statusLineThrottleMs ?? null
+          ),
+        toggle: () => {
+          // Space toggles between disabled and default
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.statusLineThrottleMs =
+              settings.misc!.statusLineThrottleMs === null
+                ? STATUS_LINE_THROTTLE_DEFAULT
+                : null;
+          });
+        },
+        increment: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            const current =
+              settings.misc!.statusLineThrottleMs ??
+              STATUS_LINE_THROTTLE_DEFAULT;
+            settings.misc!.statusLineThrottleMs = Math.min(
+              STATUS_LINE_THROTTLE_MAX,
+              current + STATUS_LINE_THROTTLE_STEP
+            );
+          });
+        },
+        decrement: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            const current =
+              settings.misc!.statusLineThrottleMs ??
+              STATUS_LINE_THROTTLE_DEFAULT;
+            settings.misc!.statusLineThrottleMs = Math.max(
+              STATUS_LINE_THROTTLE_MIN,
+              current - STATUS_LINE_THROTTLE_STEP
+            );
+          });
+        },
+      },
+      {
+        id: 'statusLineFixedInterval',
+        title: 'Status line fixed interval mode',
+        description:
+          'Use setInterval instead of throttle. Updates happen on a fixed schedule rather than on-demand.',
+        getValue: () => settings.misc?.statusLineUseFixedInterval ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.statusLineUseFixedInterval =
+              !settings.misc!.statusLineUseFixedInterval;
           });
         },
       },

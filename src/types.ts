@@ -119,6 +119,8 @@ export interface MiscConfig {
   suppressRateLimitOptions: boolean;
   mcpConnectionNonBlocking: boolean;
   mcpServerBatchSize: number | null;
+  statusLineThrottleMs: number | null;
+  statusLineUseFixedInterval: boolean;
   tableFormat: TableFormat;
   enableSwarmMode: boolean;
 }
