@@ -45,12 +45,14 @@ const extractBuildTime = (content: string): string | undefined => {
  * @param content - The current content of cli.js
  * @param version - The Claude Code version
  * @param escapeNonAscii - Whether to escape non-ASCII characters (auto-detected if not specified)
+ * @param patchFilter - Optional list of patch/prompt IDs to apply (if provided, only matching prompts are applied)
  * @returns SystemPromptsResult with modified content and per-prompt results
  */
 export const applySystemPrompts = async (
   content: string,
   version: string,
-  escapeNonAscii?: boolean
+  escapeNonAscii?: boolean,
+  patchFilter?: string[] | null
 ): Promise<SystemPromptsResult> => {
   // Auto-detect if we should escape non-ASCII characters based on cli.js content
   const shouldEscapeNonAscii = escapeNonAscii ?? detectUnicodeEscaping(content);
@@ -88,6 +90,18 @@ export const applySystemPrompts = async (
     identifiers,
     identifierMap,
   } of systemPrompts) {
+    // Skip prompts not in the filter (if filter is provided)
+    if (patchFilter && !patchFilter.includes(promptId)) {
+      results.push({
+        id: promptId,
+        name: prompt.name,
+        group: PatchGroup.SYSTEM_PROMPTS,
+        applied: false,
+        skipped: true,
+      });
+      continue;
+    }
+
     debug(`Applying system prompt: ${prompt.name}`);
     const pattern = new RegExp(regex, 'si'); // 's' flag for dotAll mode, 'i' because of casing inconsistencies in unicode escape sequences (e.g. `\u201c` in the regex vs `\u201C` in the file)
     const match = content.match(pattern);
