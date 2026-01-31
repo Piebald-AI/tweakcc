@@ -904,7 +904,7 @@ Greet user as \${SETTINGS.preferredName}!`;
             name: 'Test',
             description: 'Test',
             version: '1.0.0',
-            pieces: ['Usage: ${', '()} ms'],
+            pieces: ['\nUsage: ${', '()} ms'],
             identifiers: [1],
             identifierMap: { '1': 'MAX_TIMEOUT' },
           },
@@ -953,7 +953,7 @@ Usage: \${MAX_TIMEOUT()} ms`;
             name: 'Test',
             description: 'Test',
             version: '1.0.0',
-            pieces: ['Version: <<CCVERSION>>, BUILD_TIME:"<<BUILD_TIME>>"'],
+            pieces: ['\nVersion: <<CCVERSION>>, BUILD_TIME:"<<BUILD_TIME>>"'],
             identifiers: [],
             identifierMap: {},
           },
@@ -989,7 +989,7 @@ Version: <<CCVERSION>>, BUILD_TIME:"<<BUILD_TIME>>"`;
 
       // The regex should match the actual content in cli.js
       const testCliContent =
-        'Version: 1.0.0, BUILD_TIME:"2025-12-09T19:43:43Z"';
+        '\nVersion: 1.0.0, BUILD_TIME:"2025-12-09T19:43:43Z"';
       const regex = new RegExp(results[0].regex);
       const match = testCliContent.match(regex);
 
@@ -997,7 +997,7 @@ Version: <<CCVERSION>>, BUILD_TIME:"<<BUILD_TIME>>"`;
 
       // Simulate matching - the interpolated content should have both placeholders replaced
       const matchResult = [
-        'Version: 1.0.0, BUILD_TIME:"2025-12-09T19:43:43Z"',
+        '\nVersion: 1.0.0, BUILD_TIME:"2025-12-09T19:43:43Z"',
       ] as RegExpMatchArray;
       const interpolated = results[0].getInterpolatedContent(matchResult);
 

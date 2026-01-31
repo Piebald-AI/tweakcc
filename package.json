@@ -67,6 +67,7 @@
   "dependencies": {
     "chalk": "^5.5.0",
     "commander": "^14.0.0",
+    "diff": "^8.0.3",
     "globby": "^14.1.0",
     "gray-matter": "^4.0.3",
     "ink": "^6.1.0",

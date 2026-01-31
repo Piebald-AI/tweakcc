@@ -1,6 +1,6 @@
 // Please see the note about writing patches in ./index
 
-import { escapeIdent, LocationResult, showDiff } from './index';
+import { escapeIdent, globalReplace, LocationResult, showDiff } from './index';
 
 const getOpenDocumentLocation = (oldFile: string): LocationResult | null => {
   // Step 1: Find `ensureServerStarted:[$\w]+`
@@ -107,28 +107,22 @@ export const writeFixLspSupport = (oldFile: string): string | null => {
 
   // Replace first validation
   const beforeReplace1 = content;
-  content = content.replace(validationPattern1, '');
-  if (content !== beforeReplace1) {
-    showDiff(beforeReplace1, content, '', 0, 0);
-  } else {
+  content = globalReplace(content, validationPattern1, '');
+  if (content === beforeReplace1) {
     console.warn('patch: fixLspSupport: restartOnCrash validation not found');
   }
 
   // Replace second validation
   const beforeReplace2 = content;
-  content = content.replace(validationPattern2, '');
-  if (content !== beforeReplace2) {
-    showDiff(beforeReplace2, content, '', 0, 0);
-  } else {
+  content = globalReplace(content, validationPattern2, '');
+  if (content === beforeReplace2) {
     console.warn('patch: fixLspSupport: startupTimeout validation not found');
   }
 
   // Replace third validation
   const beforeReplace3 = content;
-  content = content.replace(validationPattern3, '');
-  if (content !== beforeReplace3) {
-    showDiff(beforeReplace3, content, '', 0, 0);
-  } else {
+  content = globalReplace(content, validationPattern3, '');
+  if (content === beforeReplace3) {
     console.warn('patch: fixLspSupport: shutdownTimeout validation not found');
   }
 

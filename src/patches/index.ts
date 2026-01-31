@@ -1,22 +1,19 @@
 import * as fs from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import * as path from 'node:path';
+
 import {
   CONFIG_DIR,
   NATIVE_BINARY_BACKUP_FILE,
   updateConfigFile,
 } from '../config';
 import { ClaudeCodeInstallationInfo, TweakccConfig } from '../types';
-import {
-  isVerbose,
-  verbose,
-  debug,
-  replaceFileBreakingHardLinks,
-} from '../utils';
+import { debug, replaceFileBreakingHardLinks } from '../utils';
 import {
   extractClaudeJsFromNativeInstallation,
   repackNativeInstallation,
 } from '../nativeInstallationLoader';
+import { DEFAULT_SETTINGS } from '../defaultSettings';
 
 // Notes to patch-writers:
 //
@@ -36,13 +33,12 @@ import { writeShowMoreItemsInSelectMenus } from './showMoreItemsInSelectMenus';
 import { writeThemes } from './themes';
 import { writeContextLimit } from './contextLimit';
 import { writeInputBoxBorder } from './inputBorderBox';
-import { writeSpinnerNoFreeze } from './spinnerNoFreeze';
 import { writeThinkerFormat } from './thinkerFormat';
 import { writeThinkerSymbolMirrorOption } from './thinkerMirrorOption';
 import { writeThinkerSymbolChars } from './thinkerSymbolChars';
 import { writeThinkerSymbolSpeed } from './thinkerSymbolSpeed';
 import { writeThinkerSymbolWidthLocation } from './thinkerSymbolWidth';
-import { writeThinkerVerbs } from './thinkerVerbs';
+import { writeThinkingVerbs } from './thinkingVerbs';
 import { writeUserMessageDisplay } from './userMessageDisplay';
 import { writeInputPatternHighlighters } from './inputPatternHighlighters';
 import { writeVerboseProperty } from './verboseProperty';
@@ -53,11 +49,7 @@ import { writeSubagentModels } from './subagentModels';
 import { writePatchesAppliedIndication } from './patchesAppliedIndication';
 import { applySystemPrompts } from './systemPrompts';
 import { writeFixLspSupport } from './fixLspSupport';
-import {
-  writeToolsets,
-  writeModeChangeUpdateToolset,
-  addSetStateFnAccessAtToolChangeComponentScope,
-} from './toolsets';
+import { writeToolsets } from './toolsets';
 import { writeTableFormat } from './tableFormat';
 import { writeConversationTitle } from './conversationTitle';
 import { writeHideStartupBanner } from './hideStartupBanner';
@@ -67,7 +59,7 @@ import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
 import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
 import { writeSwarmMode } from './swarmMode';
-import { writeThinkingLabel } from './thinkingLabel';
+import { writeThinkingBlockStyling } from './thinkingBlockStyling';
 import { writeMcpNonBlocking, writeMcpBatchSize } from './mcpStartup';
 import {
   restoreNativeBinaryFromBackup,
@@ -75,6 +67,21 @@ import {
 } from '../installationBackup';
 import { compareVersions } from '../systemPromptSync';
 import { writePreventUnsupportedUpdates } from './preventUnsupportedUpdates';
+
+export { showDiff, showPositionalDiff, globalReplace } from './patchDiffing';
+export {
+  findChalkVar,
+  getModuleLoaderFunction,
+  getReactModuleNameNonBun,
+  getReactModuleFunctionBun,
+  getReactVar,
+  clearReactVarCache,
+  findRequireFunc,
+  getRequireFuncName,
+  clearRequireFuncNameCache,
+  findTextComponent,
+  findBoxComponent,
+} from './helpers';
 
 export interface LocationResult {
   startIndex: number;
@@ -88,402 +95,364 @@ export interface ModificationEdit {
   newContent: string;
 }
 
+// =============================================================================
+// Patch Group and Result Types
+// =============================================================================
+
+export enum PatchGroup {
+  SYSTEM_PROMPTS = 'System Prompts',
+  ALWAYS_APPLIED = 'Always Applied',
+  MISC_CONFIGURABLE = 'Misc Configurable',
+  FEATURES = 'Features',
+}
+
+export interface PatchResult {
+  id: string;
+  name: string;
+  group: PatchGroup;
+  applied: boolean;
+  failed?: boolean;
+  skipped?: boolean;
+  details?: string;
+  description?: string;
+}
+
+export interface ApplyCustomizationResult {
+  config: TweakccConfig;
+  results: PatchResult[];
+}
+
+// =============================================================================
+// Patch Definitions (Single Source of Truth)
+// =============================================================================
+
+/**
+ * All patch definitions with their metadata.
+ * This is the single source of truth for patch IDs, names, groups, and descriptions.
+ */
+const PATCH_DEFINITIONS = [
+  // Always Applied
+  {
+    id: 'verbose-property',
+    name: 'Verbose property',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description: 'Token counter will show (2s · ↓ 169 tokens · thinking)',
+  },
+  {
+    id: 'context-limit',
+    name: 'Context limit',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description:
+      'Set the CLAUDE_CODE_CONTEXT_LIMIT env var to change 200k max for custom models',
+  },
+  {
+    id: 'model-customizations',
+    name: 'Model customizations',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description: 'Access all Claude models with /model, not just latest 3',
+  },
+  {
+    id: 'opusplan1m',
+    name: 'Opusplan[1m] support',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description:
+      'Use the "Opus Plan 1M" model: Opus for planning, Sonnet 1M context for building',
+  },
+  {
+    id: 'show-more-items-in-select-menus',
+    name: 'Show more items in select menus',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description: 'Show 25 items in select menus instead of default 5',
+  },
+  {
+    id: 'thinking-block-styling',
+    name: 'Thinking block styling',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description: 'Restore dim/gray + italic styling for thinking blocks',
+  },
+  {
+    id: 'fix-lsp-support',
+    name: 'Fix LSP support',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description: 'Enable/fix nascent LSP support',
+  },
+  // Misc Configurable
+  {
+    id: 'patches-applied-indication',
+    name: 'Patches applied indication',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Show "tweakcc patches applied" and tweakcc version inside CC',
+  },
+  {
+    id: 'table-format',
+    name: 'Table format',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Tables generated by Claude will be rendered more compactly',
+  },
+  {
+    id: 'themes',
+    name: 'Themes',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Your custom themes will be available via /theme',
+  },
+  {
+    id: 'thinking-verbs',
+    name: 'Thinking verbs',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Your custom list of thinking verbs will be cycled through',
+  },
+  {
+    id: 'thinker-format',
+    name: 'Thinker format',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Your custom format string that thinking verbs are wrapped in will be applied',
+  },
+  {
+    id: 'thinker-symbol-chars',
+    name: 'Thinker symbol chars',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Your custom thinking spinner will be rendered',
+  },
+  {
+    id: 'thinker-symbol-speed',
+    name: 'Thinker symbol speed',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'The thinking spinner will play at a custom FPS',
+  },
+  {
+    id: 'thinker-symbol-width',
+    name: 'Thinker symbol width',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'The thinking spinner will be in a box of custom width',
+  },
+  {
+    id: 'thinker-symbol-mirror',
+    name: 'Thinker symbol mirror',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'The thinking spinner will reverse or restart when it finishes',
+  },
+  {
+    id: 'input-box-border',
+    name: 'Input box border',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      "Your custom styles to the main input box's border will be applied",
+  },
+  {
+    id: 'subagent-models',
+    name: 'Subagent models',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Use custom models for Plan, Explore, and General subagents',
+  },
+  {
+    id: 'thinking-visibility',
+    name: 'Thinking block visibility',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Thinking blocks outputted by the model will show without Ctrl+O',
+  },
+  {
+    id: 'hide-startup-banner',
+    name: 'Hide startup banner',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'CC\'s startup banner with "Clawd" and release notes will be hidden',
+  },
+  {
+    id: 'hide-ctrl-g-to-edit',
+    name: 'Hide Ctrl+G to edit',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Note about using Ctrl+G to edit prompt will be hidden',
+  },
+  {
+    id: 'hide-startup-clawd',
+    name: 'Hide startup Clawd',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'The "Clawd" icon on startup will be hidden for a cleaner look',
+  },
+  {
+    id: 'increase-file-read-limit',
+    name: 'Increase file read limit',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Max tokens Claude can read from a file at once will be increased',
+  },
+  {
+    id: 'suppress-line-numbers',
+    name: 'Suppress line numbers',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      '"1→" "2→" etc. prefixes for each line of Read output will be omitted',
+  },
+  {
+    id: 'suppress-rate-limit-options',
+    name: 'Suppress rate limit options',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      "/rate-limit-options won't be injected when limits are reached",
+  },
+  // Features
+  {
+    id: 'swarm-mode',
+    name: 'Swarm mode',
+    group: PatchGroup.FEATURES,
+    description: 'Enable SWARM MODE in Claude Code',
+  },
+  {
+    id: 'toolsets',
+    name: 'Toolsets',
+    group: PatchGroup.FEATURES,
+    description: 'Custom toolsets will be registered',
+  },
+  {
+    id: 'mcp-non-blocking',
+    name: 'MCP non-blocking',
+    group: PatchGroup.FEATURES,
+    description: 'If you have MCP servers, CC startup will be much faster',
+  },
+  {
+    id: 'mcp-batch-size',
+    name: 'MCP batch size',
+    group: PatchGroup.FEATURES,
+    description: 'Change the number of MCP servers started in parallel',
+  },
+  {
+    id: 'user-message-display',
+    name: 'User message display',
+    group: PatchGroup.FEATURES,
+    description: 'User messages in the chat history will be styled',
+  },
+  {
+    id: 'input-pattern-highlighters',
+    name: 'Input pattern highlighters',
+    group: PatchGroup.FEATURES,
+    description: 'Custom input highlighters will be registered',
+  },
+  {
+    id: 'conversation-title',
+    name: 'Conversation title',
+    group: PatchGroup.FEATURES,
+    description: '/title command will be created & enabled',
+  },
+] as const;
+
+/** Union type of all valid patch IDs */
+export type PatchId = (typeof PATCH_DEFINITIONS)[number]['id'];
+
+/** Patch definition interface (derived from PATCH_DEFINITIONS) */
+export interface PatchDefinition {
+  id: PatchId;
+  name: string;
+  group: PatchGroup;
+  description: string;
+}
+
+/**
+ * Returns the list of all available patches with their IDs, names, groups, and descriptions.
+ * Used by --list-patches flag.
+ */
+export const getAllPatchDefinitions = (): PatchDefinition[] => {
+  return [...PATCH_DEFINITIONS];
+};
+
+/** Patch implementation with function and optional condition */
+interface PatchImplementation {
+  fn: (content: string) => string | null;
+  condition?: boolean;
+}
+
+// =============================================================================
+// Legacy types (for backward compatibility with patchesAppliedIndication)
+// =============================================================================
+
 export interface PatchApplied {
   newContent: string;
   items: string[];
 }
 
-// Debug function for showing diffs (requires --verbose flag)
-export const showDiff = (
-  oldFileContents: string,
-  newFileContents: string,
-  injectedText: string,
-  startIndex: number,
-  endIndex: number
-): void => {
-  if (!isVerbose()) {
-    return;
-  }
-
-  const contextStart = Math.max(0, startIndex - 20);
-  const contextEndOld = Math.min(oldFileContents.length, endIndex + 20);
-  const contextEndNew = Math.min(
-    newFileContents.length,
-    startIndex + injectedText.length + 20
-  );
-
-  const oldBefore = oldFileContents.slice(contextStart, startIndex);
-  const oldChanged = oldFileContents.slice(startIndex, endIndex);
-  const oldAfter = oldFileContents.slice(endIndex, contextEndOld);
-
-  const newBefore = newFileContents.slice(contextStart, startIndex);
-  const newChanged = newFileContents.slice(
-    startIndex,
-    startIndex + injectedText.length
-  );
-  const newAfter = newFileContents.slice(
-    startIndex + injectedText.length,
-    contextEndNew
-  );
-
-  if (oldChanged !== newChanged) {
-    verbose('\n--- Diff ---');
-    verbose('OLD:', oldBefore + `\x1b[31m${oldChanged}\x1b[0m` + oldAfter);
-    verbose('NEW:', newBefore + `\x1b[32m${newChanged}\x1b[0m` + newAfter);
-    verbose('--- End Diff ---\n');
-  }
-};
+// =============================================================================
+// Helper Functions
+// =============================================================================
 
 export const escapeIdent = (ident: string): string => {
   return ident.replace(/\$/g, '\\$');
 };
 
-export const findChalkVar = (fileContents: string): string | undefined => {
-  // Find chalk variable using the counting method
-  const chalkPattern =
-    /\b([$\w]+)(?:\.(?:cyan|gray|green|red|yellow|ansi256|bgAnsi256|bgHex|bgRgb|hex|rgb|bold|dim|inverse|italic|strikethrough|underline)\b)+\(/g;
-  const chalkMatches = Array.from(fileContents.matchAll(chalkPattern));
+/**
+ * Apply patches to content using the implementations map, tracking results.
+ * @param patchFilter - Optional list of patch IDs to apply (if provided, only matching patches are applied)
+ */
+const applyPatchImplementations = (
+  content: string,
+  implementations: Record<PatchId, PatchImplementation>,
+  patchFilter?: string[] | null
+): { content: string; results: PatchResult[] } => {
+  const results: PatchResult[] = [];
 
-  // Count occurrences of each variable
-  const chalkCounts: Record<string, number> = {};
-  for (const match of chalkMatches) {
-    const varName = match[1];
-    chalkCounts[varName] = (chalkCounts[varName] || 0) + 1;
-  }
+  // Process patches in the order defined in PATCH_DEFINITIONS
+  for (const def of PATCH_DEFINITIONS) {
+    const impl = implementations[def.id];
 
-  // Find the variable with the most occurrences
-  let chalkVar;
-  let maxCount = 0;
-  for (const [varName, count] of Object.entries(chalkCounts)) {
-    if (count > maxCount) {
-      maxCount = count;
-      chalkVar = varName;
+    // Skip patches not in the filter (if filter is provided)
+    if (patchFilter && !patchFilter.includes(def.id)) {
+      results.push({
+        id: def.id,
+        name: def.name,
+        group: def.group,
+        applied: false,
+        skipped: true,
+        description: def.description,
+      });
+      continue;
     }
-  }
-  return chalkVar;
-};
 
-/**
- * Find the module loader function
- */
-export const getModuleLoaderFunction = (
-  fileContents: string
-): string | undefined => {
-  // Native bundles: look for ,j=(H,$,A)=>{A=H!=null? pattern (module loader)
-  // This is distinct from other 3-param functions because of the H!=null check
-  const nativeLoaderPattern =
-    /[,;]([$\w]+)=\([$\w]+,[$\w]+,[$\w]+\)=>\{[$\w]+=[$\w]+!=null\?/;
-  const nativeMatch = fileContents.slice(0, 2000).match(nativeLoaderPattern);
-  if (nativeMatch) {
-    return nativeMatch[1];
-  }
-
-  // NPM bundles: var T=(H,$,A)=>{ at the start
-  const firstChunk = fileContents.slice(0, 1000);
-  const pattern = /var ([$\w]+)=\([$\w]+,[$\w]+,[$\w]+\)=>\{/;
-  const match = firstChunk.match(pattern);
-  if (match) {
-    return match[1];
-  }
-
-  console.log(
-    'patch: getModuleLoaderFunction: failed to find module loader function'
-  );
-  return undefined;
-};
-
-/**
- * Find the React module name
- */
-export const getReactModuleNameNonBun = (
-  fileContents: string
-): string | undefined => {
-  // Pattern: var X=Y((Z)=>{var W=Symbol.for("react.element") or "react.transitional.element"
-  const pattern =
-    /var ([$\w]+)=[$\w]+\(\([$\w]+\)=>\{var [$\w]+=Symbol\.for\("react\.(transitional\.)?element"\)/;
-  const match = fileContents.match(pattern);
-  if (!match) {
-    console.log(
-      'patch: getReactModuleNameNonBun: failed to find React module name'
-    );
-    return undefined;
-  }
-  return match[1];
-};
-
-/**
- * Find the React module function (Bun variant)
- *
- * Steps:
- * 1. Get "reactModuleNameNonBun" via getReactModuleNameNonBun()
- * 2. Search for /var ([$\w]+)=[$\w]+\(\([$\w]+,[$\w]+\)=>\{[$\w]+\.exports=${reactModuleNameNonBun}\(\)/
- * 3. The first match is it
- *
- * Example code:
- * ```
- * var fH = N((AtM, r7L) => {
- *     r7L.exports = n7L();
- * });
- * ```
- * `n7L` is `reactModuleNameNonBun`, and `fH` is `reactModuleFunctionBun`
- */
-export const getReactModuleFunctionBun = (
-  fileContents: string
-): string | undefined => {
-  const reactModuleNameNonBun = getReactModuleNameNonBun(fileContents);
-  if (!reactModuleNameNonBun) {
-    console.log(
-      '^ patch: getReactModuleFunctionBun: failed to find React module name (Bun)'
-    );
-    return undefined;
-  }
-
-  // Pattern: var X=Y((Z,W)=>{W.exports=reactModuleNameNonBun()
-  const pattern = new RegExp(
-    `var ([$\\w]+)=[$\\w]+\\(\\([$\\w]+,[$\\w]+\\)=>\\{[$\\w]+\\.exports=${escapeIdent(reactModuleNameNonBun)}\\(\\)`
-  );
-  const match = fileContents.match(pattern);
-  if (!match) {
-    console.log(
-      `patch: getReactModuleFunctionBun: failed to find React module function (Bun) (reactModuleNameNonBun=${reactModuleNameNonBun})`
-    );
-    return undefined;
-  }
-  return match[1];
-};
-
-// Cache for React variable to avoid recomputing
-let reactVarCache: string | undefined | null = null;
-
-// Cache for require function name to avoid recomputing
-let requireFuncNameCache: string | null = null;
-
-/**
- * Get the React variable name (cached)
- */
-export const getReactVar = (fileContents: string): string | undefined => {
-  // Return cached value if available
-  if (reactVarCache != null) {
-    return reactVarCache;
-  }
-
-  const moduleLoader = getModuleLoaderFunction(fileContents);
-  if (!moduleLoader) {
-    console.log('^ patch: getReactVar: failed to find moduleLoader');
-    reactVarCache = undefined;
-    return undefined;
-  }
-
-  // Try non-bun first (reactModuleNameNonBun)
-  const reactModuleVarNonBun = getReactModuleNameNonBun(fileContents);
-  if (!reactModuleVarNonBun) {
-    console.log('^ patch: getReactVar: failed to find reactModuleVarNonBun');
-    reactVarCache = undefined;
-    return undefined;
-  }
-
-  // Pattern: X=moduleLoader(reactModule,1)
-  const nonBunPattern = new RegExp(
-    `\\b([$\\w]+)=${escapeIdent(moduleLoader)}\\(${escapeIdent(reactModuleVarNonBun)}\\(\\),1\\)`
-  );
-  const nonBunMatch = fileContents.match(nonBunPattern);
-  if (nonBunMatch) {
-    reactVarCache = nonBunMatch[1];
-    return reactVarCache;
-  } else {
-    // DON'T fail just because we can't find the non-bun pattern.
-  }
-
-  // If reactModuleNameNonBun fails, try reactModuleFunctionBun
-  const reactModuleFunctionBun = getReactModuleFunctionBun(fileContents);
-  if (!reactModuleFunctionBun) {
-    console.log('^ patch: getReactVar: failed to find reactModuleFunctionBun');
-    reactVarCache = undefined;
-    return undefined;
-  }
-  // \b([$\w]+)=T\(fH\(\),1\)
-  // Pattern: X=moduleLoader(reactModuleBun,1)
-  const bunPattern = new RegExp(
-    `\\b([$\\w]+)=${escapeIdent(moduleLoader)}\\(${escapeIdent(reactModuleFunctionBun)}\\(\\),1\\)`
-  );
-  const bunMatch = fileContents.match(bunPattern);
-  if (!bunMatch) {
-    console.log(
-      `patch: getReactVar: failed to find bunPattern (moduleLoader=${moduleLoader}, reactModuleVarNonBun=${reactModuleVarNonBun}, reactModuleFunctionBun=${reactModuleFunctionBun})`
-    );
-    reactVarCache = undefined;
-    return undefined;
-  }
-
-  reactVarCache = bunMatch[1];
-  return reactVarCache;
-};
-
-/**
- * Clear the React var cache (useful for testing or multiple runs)
- */
-export const clearReactVarCache = (): void => {
-  reactVarCache = null;
-};
-
-/**
- * Find the require function variable name (no caching)
- *
- * This finds the variable name used to call require() in esbuild-bundled code.
- * Bun uses "require" directly, but esbuild uses a variable that points to
- * the result of createRequire(import.meta.url).
- *
- * Steps:
- * 1. Find the createRequire import: import{createRequire as X}from"node:module";
- * 2. Find the variable that calls it: var Y=X(import.meta.url)
- * 3. Return Y (the require function variable)
- */
-export const findRequireFunc = (fileContents: string): string | undefined => {
-  // Step 1: Find createRequire import
-  // Pattern: import{createRequire as X}from"node:module";
-  const createRequirePattern =
-    /import\{createRequire as ([$\w]+)\}from"node:module";/;
-  const createRequireMatch = fileContents.match(createRequirePattern);
-  if (!createRequireMatch) {
-    // If this is not found it's not necessarily a bug because we use its absence to detect Bun...
-    // console.log(
-    //   'patch: findRequireFunc: failed to find createRequire import'
-    // );
-    return undefined;
-  }
-  const createRequireVar = createRequireMatch[1];
-
-  // Step 2: Find the variable that calls createRequire
-  // Pattern: var X=createRequireVar(import.meta.url)
-  const requireFuncPattern = new RegExp(
-    `var ([$\\w]+)=${escapeIdent(createRequireVar)}\\(import\\.meta\\.url\\)`
-  );
-  const requireFuncMatch = fileContents.match(requireFuncPattern);
-  if (!requireFuncMatch) {
-    console.log(
-      `patch: findRequireFunc: failed to find require function variable (createRequireVar=${createRequireVar})`
-    );
-    return undefined;
-  }
-
-  return requireFuncMatch[1];
-};
-
-/**
- * Get the appropriate require function name for the current environment (cached)
- *
- * - Bun native installations use "require" directly
- * - esbuild-bundled code uses a variable that points to createRequire(import.meta.url)
- *
- * This function detects which environment we're in and returns the correct name.
- *
- * @param fileContents The file content to analyze
- * @returns "require" for Bun, or the require function variable name for esbuild
- */
-export const getRequireFuncName = (fileContents: string): string => {
-  // Return cached value if available
-  if (requireFuncNameCache != null) {
-    return requireFuncNameCache;
-  }
-
-  // Try to find the esbuild-style require function
-  const requireFunc = findRequireFunc(fileContents);
-
-  // If we found it, we're in esbuild environment
-  if (requireFunc) {
-    requireFuncNameCache = requireFunc;
-    return requireFuncNameCache;
-  }
-
-  // Otherwise, assume Bun environment which uses "require" directly
-  requireFuncNameCache = 'require';
-  return requireFuncNameCache;
-};
-
-/**
- * Clear the require func name cache (useful for testing or multiple runs)
- */
-export const clearRequireFuncNameCache = (): void => {
-  requireFuncNameCache = null;
-};
-
-/**
- * Find the Text component variable name from Ink
- */
-export const findTextComponent = (fileContents: string): string | undefined => {
-  // Find the Text component function definition from Ink
-  // The minified Text component has this signature:
-  // function X({color:A,backgroundColor:B,dimColor:C=!1,bold:D=!1,...})
-  const textComponentPattern =
-    /\bfunction ([$\w]+)\(\{color:[$\w]+,backgroundColor:[$\w]+,dimColor:[$\w]+=![01],bold:[$\w]+=![01]/;
-  const match = fileContents.match(textComponentPattern);
-  if (!match) {
-    console.log('patch: findTextComponent: failed to find text component');
-    return undefined;
-  }
-  return match[1];
-};
-
-/**
- * Find the Box component variable name
- */
-export const findBoxComponent = (fileContents: string): string | undefined => {
-  // Method 1: Search for Box displayName (older CC versions)
-  const boxDisplayNamePattern = /\b([$\w]+)\.displayName="Box"/;
-  const boxDisplayNameMatch = fileContents.match(boxDisplayNamePattern);
-  if (boxDisplayNameMatch) {
-    const boxOrigCompName = boxDisplayNameMatch[1];
-
-    // Search for the variable that equals the original Box component
-    const boxVarPattern = new RegExp(
-      // /[^$\w]/ = /\b/ but considering dollar signs word characters.
-      // Normally /$\b/ does NOT match "$}" but this does.
-      // Because once boxOrigCompName was `LK$` so `_=LK$}` wasn't matching.
-      `\\b([$\\w]+)=${escapeIdent(boxOrigCompName)}[^$\\w]`
-    );
-    const boxVarMatch = fileContents.match(boxVarPattern);
-    if (boxVarMatch) {
-      return boxVarMatch[1];
+    // Skip patches where condition is explicitly false, but record them as skipped
+    if (impl.condition === false) {
+      results.push({
+        id: def.id,
+        name: def.name,
+        group: def.group,
+        applied: false,
+        skipped: true,
+        description: def.description,
+      });
+      continue;
     }
-    console.error(
-      `patch: findBoxComponent: found Box displayName but failed to find Box component variable (boxOrigCompName=${boxOrigCompName})`
-    );
-  }
 
-  // Method 2: Find Box component by its unique function signature (newer CLI versions 2.1.8+)
-  // The internal Box function has a unique signature: function X({children:Y,flexWrap:Z="nowrap",flexDirection:W="row",...
-  const internalBoxPattern =
-    /\bfunction ([$\w]+)\(\{children:[$\w]+,flexWrap:[$\w]+="nowrap",flexDirection:[$\w]+="row",flexGrow:[$\w]+=[0-9]+,flexShrink:[$\w]+=[0-9]+/;
-  const internalBoxMatch = fileContents.match(internalBoxPattern);
-  if (internalBoxMatch) {
-    const internalBoxFn = internalBoxMatch[1];
+    debug(`Applying patch: ${def.name}`);
+    const result = impl.fn(content);
+    const failed = result === null;
+    const applied = !failed && result !== content;
 
-    // Find the variable that's assigned the internal Box function: boxVar=internalBoxFn}
-    // Pattern like: eq=uW8}
-    const boxVarAssignPattern = new RegExp(
-      `\\b([$\\w]+)=${escapeIdent(internalBoxFn)}\\}`
-    );
-    const boxVarAssignMatch = fileContents.match(boxVarAssignPattern);
-    if (boxVarAssignMatch) {
-      return boxVarAssignMatch[1];
+    if (!failed) {
+      content = result;
     }
-    // If no assignment found, the internal function itself might be used directly
-    console.error(
-      `patch: findBoxComponent: found internal Box function (${internalBoxFn}) but no assignment found`
-    );
-    return internalBoxFn;
+
+    results.push({
+      id: def.id,
+      name: def.name,
+      group: def.group,
+      applied,
+      failed,
+      description: def.description,
+    });
   }
 
-  console.error(
-    'patch: findBoxComponent: failed to find Box component (neither displayName nor function signature found)'
-  );
-  return undefined;
+  return { content, results };
 };
+
+// =============================================================================
+// Main Apply Function
+// =============================================================================
 
 export const applyCustomization = async (
   config: TweakccConfig,
-  ccInstInfo: ClaudeCodeInstallationInfo
-): Promise<TweakccConfig> => {
+  ccInstInfo: ClaudeCodeInstallationInfo,
+  patchFilter?: string[] | null
+): Promise<ApplyCustomizationResult> => {
   let content: string;
 
   if (ccInstInfo.nativeInstallationPath) {
@@ -531,252 +500,235 @@ export const applyCustomization = async (
     content = await fs.readFile(ccInstInfo.cliPath, { encoding: 'utf8' });
   }
 
-  const items: string[] = [];
+  // Collect all patch results
+  const allResults: PatchResult[] = [];
 
-  // Apply system prompt customizations
+  // ==========================================================================
+  // Apply system prompt customizations (has its own result format)
+  // ==========================================================================
   const systemPromptsResult = await applySystemPrompts(
     content,
-    ccInstInfo.version
+    ccInstInfo.version,
+    undefined, // escapeNonAscii - auto-detect
+    patchFilter
   );
   content = systemPromptsResult.newContent;
-  items.push(...systemPromptsResult.items);
 
-  let result: string | null = null;
+  // Sort system prompt results alphabetically by name before adding
+  const sortedSystemPromptResults = [...systemPromptsResult.results].sort(
+    (a, b) => a.name.localeCompare(b.name)
+  );
+  allResults.push(...sortedSystemPromptResults);
 
-  // Apply table format preference (inject into system prompt)
+  // Legacy items array for patchesAppliedIndication (backward compatibility)
+  // Escape ANSI codes so they render properly when injected into cli.js
+  const escapeForCliJs = (str: string): string =>
+    str.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+  const legacyItems: string[] = sortedSystemPromptResults
+    .filter(r => r.applied && r.details)
+    .map(r => escapeForCliJs(`${r.name}: ${r.details}`));
+
+  // Extract config values that are used multiple times or need pre-computation
   const tableFormat = config.settings.misc?.tableFormat ?? 'default';
-  if (tableFormat !== 'default') {
-    if ((result = writeTableFormat(content, tableFormat))) content = result;
-  }
-
-  // Apply themes
-  if (config.settings.themes && config.settings.themes.length > 0) {
-    if ((result = writeThemes(content, config.settings.themes)))
-      content = result;
-  }
-
-  // Apply thinking verbs
-  // prettier-ignore
-  if (config.settings.thinkingVerbs) {
-    if ((result = writeThinkerVerbs(content, config.settings.thinkingVerbs.verbs)))
-      content = result;
-    if ((result = writeThinkerFormat(content, config.settings.thinkingVerbs.format)))
-      content = result;
-  }
-
-  // Apply thinking style
-  // prettier-ignore
-  if ((result = writeThinkerSymbolChars(content, config.settings.thinkingStyle.phases)))
-    content = result;
-  // prettier-ignore
-  if ((result = writeThinkerSymbolSpeed(content, config.settings.thinkingStyle.updateInterval)))
-    content = result;
-  // prettier-ignore
-  if ((result = writeThinkerSymbolWidthLocation(content, Math.max(...config.settings.thinkingStyle.phases.map(p => p.length)) + 1)))
-    content = result;
-  // prettier-ignore
-  if ((result = writeThinkerSymbolMirrorOption(content, config.settings.thinkingStyle.reverseMirror)))
-    content = result;
-
-  // Apply user message display customization
-  if (config.settings.userMessageDisplay) {
-    if (
-      (result = writeUserMessageDisplay(
-        content,
-        config.settings.userMessageDisplay.format,
-        config.settings.userMessageDisplay.foregroundColor,
-        config.settings.userMessageDisplay.backgroundColor,
-        config.settings.userMessageDisplay.styling.includes('bold'),
-        config.settings.userMessageDisplay.styling.includes('italic'),
-        config.settings.userMessageDisplay.styling.includes('underline'),
-        config.settings.userMessageDisplay.styling.includes('strikethrough'),
-        config.settings.userMessageDisplay.styling.includes('inverse'),
-        config.settings.userMessageDisplay.borderStyle,
-        config.settings.userMessageDisplay.borderColor,
-        config.settings.userMessageDisplay.paddingX,
-        config.settings.userMessageDisplay.paddingY,
-        config.settings.userMessageDisplay.fitBoxToContent
-      ))
-    ) {
-      content = result;
-    }
-  }
-
-  // Apply input pattern highlighters
-  if (
-    config.settings.inputPatternHighlighters &&
-    config.settings.inputPatternHighlighters.length > 0
-  ) {
-    if (
-      (result = writeInputPatternHighlighters(
-        content,
-        config.settings.inputPatternHighlighters
-      ))
-    ) {
-      content = result;
-    }
-  }
-
-  // Apply input box border customization
-  if (
-    config.settings.inputBox &&
-    typeof config.settings.inputBox.removeBorder === 'boolean'
-  ) {
-    if (
-      (result = writeInputBoxBorder(
-        content,
-        config.settings.inputBox.removeBorder
-      ))
-    )
-      content = result;
-  }
-
-  // Apply verbose property patch (always true by default)
-  if ((result = writeVerboseProperty(content))) content = result;
-
-  // Apply spinner no-freeze patch (always enabled)
-  if ((result = writeSpinnerNoFreeze(content))) content = result;
-
-  // Apply context limit patch (always enabled)
-  if ((result = writeContextLimit(content))) content = result;
-
-  // Apply model customizations (known names, mapping, selector options) (always enabled)
-  if ((result = writeModelCustomizations(content))) content = result;
-
-  // Apply opusplan[1m] support (always enabled)
-  // This adds support for using Opus in plan mode with Sonnet 1M in execution mode
-  if ((result = writeOpusplan1m(content))) content = result;
-
-  // Apply subagent model customizations
-  if (config.settings.subagentModels) {
-    if (
-      (result = writeSubagentModels(content, config.settings.subagentModels))
-    ) {
-      content = result;
-    }
-  }
-
-  // Apply show more items in select menus patch (always enabled)
-  if ((result = writeShowMoreItemsInSelectMenus(content, 25))) content = result;
-
-  // Apply thinking visibility patch (if enabled)
-  if (config.settings.misc?.expandThinkingBlocks ?? true) {
-    if ((result = writeThinkingVisibility(content))) content = result;
-  }
-
-  // Apply thinking label styling patch (always enabled)
-  if ((result = writeThinkingLabel(content))) content = result;
-
-  // Apply patches applied indication
   const showTweakccVersion = config.settings.misc?.showTweakccVersion ?? true;
   const showPatchesApplied = config.settings.misc?.showPatchesApplied ?? true;
-  if (
-    (result = writePatchesAppliedIndication(
-      content,
-      '3.4.0',
-      items,
-      showTweakccVersion,
-      showPatchesApplied
-    ))
-  )
-    content = result;
 
-  // Apply LSP support fixes (always enabled)
-  if ((result = writeFixLspSupport(content))) content = result;
+  // ==========================================================================
+  // Define patch implementations (keyed by PatchId)
+  // ==========================================================================
+  const patchImplementations: Record<PatchId, PatchImplementation> = {
+    // Always Applied
+    'verbose-property': {
+      fn: c => writeVerboseProperty(c),
+    },
+    'context-limit': {
+      fn: c => writeContextLimit(c),
+    },
+    'model-customizations': {
+      fn: c => writeModelCustomizations(c),
+    },
+    opusplan1m: {
+      fn: c => writeOpusplan1m(c),
+    },
+    'show-more-items-in-select-menus': {
+      fn: c => writeShowMoreItemsInSelectMenus(c, 25),
+    },
+    'thinking-block-styling': {
+      fn: c => writeThinkingBlockStyling(c),
+    },
+    'fix-lsp-support': {
+      fn: c => writeFixLspSupport(c),
+    },
+    // Misc Configurable
+    'patches-applied-indication': {
+      fn: c =>
+        writePatchesAppliedIndication(
+          c,
+          '3.4.0',
+          legacyItems,
+          showTweakccVersion,
+          showPatchesApplied
+        ),
+    },
+    'table-format': {
+      fn: c => writeTableFormat(c, tableFormat),
+      condition: tableFormat !== 'default',
+    },
+    themes: {
+      fn: c => writeThemes(c, config.settings.themes!),
+      condition: !!(
+        config.settings.themes &&
+        config.settings.themes.length > 0 &&
+        JSON.stringify(config.settings.themes) !==
+          JSON.stringify(DEFAULT_SETTINGS.themes)
+      ),
+    },
+    'thinking-verbs': {
+      fn: c => writeThinkingVerbs(c, config.settings.thinkingVerbs!.verbs),
+      condition: !!config.settings.thinkingVerbs,
+    },
+    'thinker-format': {
+      fn: c => writeThinkerFormat(c, config.settings.thinkingVerbs!.format),
+      condition: !!config.settings.thinkingVerbs,
+    },
+    'thinker-symbol-chars': {
+      fn: c => writeThinkerSymbolChars(c, config.settings.thinkingStyle.phases),
+      condition:
+        JSON.stringify(config.settings.thinkingStyle.phases) !==
+        JSON.stringify(DEFAULT_SETTINGS.thinkingStyle.phases),
+    },
+    'thinker-symbol-speed': {
+      fn: c =>
+        writeThinkerSymbolSpeed(
+          c,
+          config.settings.thinkingStyle.updateInterval
+        ),
+      condition:
+        config.settings.thinkingStyle.updateInterval !==
+        DEFAULT_SETTINGS.thinkingStyle.updateInterval,
+    },
+    'thinker-symbol-width': {
+      fn: c =>
+        writeThinkerSymbolWidthLocation(
+          c,
+          Math.max(...config.settings.thinkingStyle.phases.map(p => p.length)) +
+            1
+        ),
+      condition:
+        JSON.stringify(config.settings.thinkingStyle.phases) !==
+        JSON.stringify(DEFAULT_SETTINGS.thinkingStyle.phases),
+    },
+    'thinker-symbol-mirror': {
+      fn: c =>
+        writeThinkerSymbolMirrorOption(
+          c,
+          config.settings.thinkingStyle.reverseMirror
+        ),
+      condition:
+        config.settings.thinkingStyle.reverseMirror !==
+        DEFAULT_SETTINGS.thinkingStyle.reverseMirror,
+    },
+    'input-box-border': {
+      fn: c => writeInputBoxBorder(c, config.settings.inputBox!.removeBorder),
+      condition: !!(
+        config.settings.inputBox &&
+        typeof config.settings.inputBox.removeBorder === 'boolean'
+      ),
+    },
+    'subagent-models': {
+      fn: c => writeSubagentModels(c, config.settings.subagentModels!),
+      condition: !!config.settings.subagentModels,
+    },
+    'thinking-visibility': {
+      fn: c => writeThinkingVisibility(c),
+      condition: config.settings.misc?.expandThinkingBlocks ?? true,
+    },
+    'hide-startup-banner': {
+      fn: c => writeHideStartupBanner(c),
+      condition: !!config.settings.misc?.hideStartupBanner,
+    },
+    'hide-ctrl-g-to-edit': {
+      fn: c => writeHideCtrlGToEdit(c),
+      condition: !!config.settings.misc?.hideCtrlGToEdit,
+    },
+    'hide-startup-clawd': {
+      fn: c => writeHideStartupClawd(c),
+      condition: !!config.settings.misc?.hideStartupClawd,
+    },
+    'increase-file-read-limit': {
+      fn: c => writeIncreaseFileReadLimit(c),
+      condition: !!config.settings.misc?.increaseFileReadLimit,
+    },
+    'suppress-line-numbers': {
+      fn: c => writeSuppressLineNumbers(c),
+      condition: !!config.settings.misc?.suppressLineNumbers,
+    },
+    'suppress-rate-limit-options': {
+      fn: c => writeSuppressRateLimitOptions(c),
+      condition: !!config.settings.misc?.suppressRateLimitOptions,
+    },
+    // Features
+    'swarm-mode': {
+      fn: c => writeSwarmMode(c),
+      condition: !!config.settings.misc?.enableSwarmMode,
+    },
+    toolsets: {
+      fn: c =>
+        writeToolsets(
+          c,
+          config.settings.toolsets!,
+          config.settings.defaultToolset,
+          config.settings.planModeToolset
+        ),
+      condition: !!(
+        config.settings.toolsets && config.settings.toolsets.length > 0
+      ),
+    },
+    'mcp-non-blocking': {
+      fn: c => writeMcpNonBlocking(c),
+      condition: !!config.settings.misc?.mcpConnectionNonBlocking,
+    },
+    'mcp-batch-size': {
+      fn: c => writeMcpBatchSize(c, config.settings.misc!.mcpServerBatchSize!),
+      condition: !!config.settings.misc?.mcpServerBatchSize,
+    },
+    'user-message-display': {
+      fn: c => writeUserMessageDisplay(c, config.settings.userMessageDisplay!),
+      condition: !!config.settings.userMessageDisplay,
+    },
+    'input-pattern-highlighters': {
+      fn: c =>
+        writeInputPatternHighlighters(
+          c,
+          config.settings.inputPatternHighlighters!
+        ),
+      condition: !!(
+        config.settings.inputPatternHighlighters &&
+        config.settings.inputPatternHighlighters.length > 0
+      ),
+    },
+    'conversation-title': {
+      fn: c => writeConversationTitle(c),
+      condition:
+        (config.settings.misc?.enableConversationTitle ?? true) &&
+        !!(
+          ccInstInfo.version &&
+          compareVersions(ccInstInfo.version, '2.0.64') < 0
+        ),
+    },
+  };
 
-  // Apply toolset restrictions (enabled if toolsets configured)
-  if (config.settings.toolsets && config.settings.toolsets.length > 0) {
-    if (
-      (result = writeToolsets(
-        content,
-        config.settings.toolsets,
-        config.settings.defaultToolset
-      ))
-    )
-      content = result;
-  }
+  // ==========================================================================
+  // Apply all patches
+  // ==========================================================================
+  const { content: patchedContent, results: patchResults } =
+    applyPatchImplementations(content, patchImplementations, patchFilter);
+  content = patchedContent;
+  allResults.push(...patchResults);
 
-  // Apply mode-change toolset switching (if both toolsets are configured)
-  if (config.settings.planModeToolset && config.settings.defaultToolset) {
-    // First, add setState access at the tool change component scope
-    if ((result = addSetStateFnAccessAtToolChangeComponentScope(content)))
-      content = result;
-
-    // Then, inject the mode change toolset switching code
-    if (
-      (result = writeModeChangeUpdateToolset(
-        content,
-        config.settings.planModeToolset,
-        config.settings.defaultToolset
-      ))
-    )
-      content = result;
-  }
-
-  // Apply conversation title management (if enabled and CC version < 2.0.64)
-  const enableConvTitle = config.settings.misc?.enableConversationTitle ?? true;
-  const isVersionBelow2064 =
-    ccInstInfo.version && compareVersions(ccInstInfo.version, '2.0.64') < 0;
-  if (enableConvTitle && isVersionBelow2064) {
-    if ((result = writeConversationTitle(content))) content = result;
-  }
-
-  // Apply hide startup banner patch (if enabled)
-  if (config.settings.misc?.hideStartupBanner) {
-    if ((result = writeHideStartupBanner(content))) content = result;
-  }
-
-  // Apply hide ctrl-g to edit patch (if enabled)
-  if (config.settings.misc?.hideCtrlGToEdit) {
-    if ((result = writeHideCtrlGToEdit(content))) content = result;
-  }
-
-  // Apply hide startup clawd patch (if enabled)
-  if (config.settings.misc?.hideStartupClawd) {
-    if ((result = writeHideStartupClawd(content))) content = result;
-  }
-
-  // Apply increase file read limit patch (if enabled)
-  if (config.settings.misc?.increaseFileReadLimit) {
-    if ((result = writeIncreaseFileReadLimit(content))) content = result;
-  }
-
-  // Apply suppress line number patch (if enabled)
-  if (config.settings.misc?.suppressLineNumbers) {
-    if ((result = writeSuppressLineNumbers(content))) content = result;
-  }
-
-  // Apply suppress rate limit options patch (if enabled)
-  if (config.settings.misc?.suppressRateLimitOptions) {
-    if ((result = writeSuppressRateLimitOptions(content))) content = result;
-  }
-
-  // Apply prevent update to unsupported versions patch (if enabled)
-  if (config.settings.misc?.preventUpdateToUnsupportedVersions) {
-    if ((result = writePreventUnsupportedUpdates(content))) content = result;
-  }
-
-  // Apply swarm mode patch to enable native multi-agent features (if enabled)
-  // This patches the tengu_brass_pebble statsig flag gate function to always return true
-  if (config.settings.misc?.enableSwarmMode) {
-    if ((result = writeSwarmMode(content))) content = result;
-  }
-
-  // Apply MCP startup optimization (if enabled)
-  if (config.settings.misc?.mcpConnectionNonBlocking) {
-    if ((result = writeMcpNonBlocking(content))) content = result;
-  }
-  if (config.settings.misc?.mcpServerBatchSize) {
-    if (
-      (result = writeMcpBatchSize(
-        content,
-        config.settings.misc.mcpServerBatchSize
-      ))
-    )
-      content = result;
-  }
-
+  // ==========================================================================
   // Write the modified content back
+  // ==========================================================================
   if (ccInstInfo.nativeInstallationPath) {
     // For native installations: repack the modified claude.js back into the binary
     debug(
@@ -803,7 +755,12 @@ export const applyCustomization = async (
     await replaceFileBreakingHardLinks(ccInstInfo.cliPath, content, 'patch');
   }
 
-  return await updateConfigFile(config => {
-    config.changesApplied = true;
+  const updatedConfig = await updateConfigFile(cfg => {
+    cfg.changesApplied = true;
   });
+
+  return {
+    config: updatedConfig,
+    results: allResults,
+  };
 };

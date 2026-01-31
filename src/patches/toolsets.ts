@@ -82,9 +82,9 @@ export const getMainAppComponentBodyStart = (
   fileContents: string
 ): number | null => {
   // Pattern matches the main app component function signature with all its props
-  // Updated for 2.1.x: removed initialPrompt, initialCheckpoints; added mainThreadAgentDefinition, disableSlashCommands
+  // Updated for 2.1.20: added initialAgentName, initialAgentColor, taskListId, remoteSessionConfig, autoTickIntervalMs
   const appComponentPattern =
-    /function ([$\w]+)\(\{(?:(?:commands|debug|initialPrompt|initialTools|initialMessages|initialCheckpoints|initialFileHistorySnapshots|mcpClients|dynamicMcpConfig|mcpCliEndpoint|autoConnectIdeFlag|strictMcpConfig|systemPrompt|appendSystemPrompt|onBeforeQuery|onTurnComplete|disabled|mainThreadAgentDefinition|disableSlashCommands):[$\w]+(?:=(?:[^,]+,|[^}]+\})|[,}]))+\)/g;
+    /function ([$\w]+)\(\{(?:(?:commands|debug|initialPrompt|initialTools|initialMessages|initialCheckpoints|initialFileHistorySnapshots|initialAgentName|initialAgentColor|mcpClients|dynamicMcpConfig|mcpCliEndpoint|autoConnectIdeFlag|strictMcpConfig|systemPrompt|appendSystemPrompt|onBeforeQuery|onTurnComplete|disabled|mainThreadAgentDefinition|disableSlashCommands|taskListId|remoteSessionConfig|autoTickIntervalMs):[$\w]+(?:=(?:[^,]+,|[^}]+\})|[,}]))+\)/g;
 
   const allMatches = Array.from(fileContents.matchAll(appComponentPattern));
   // Filter to only matches that contain 'commands:' - unique to main app component
@@ -562,12 +562,15 @@ export const findShiftTabAppStateVarInsertionPoint = (
     return null;
   }
 
-  // Get 500 chars before the match
-  const lookbackStart = Math.max(0, match.index - 500);
+  // Get 1000 chars before the match (increased from 500 for 2.1.20+
+  // where earlier patches push the function declaration further away)
+  const lookbackStart = Math.max(0, match.index - 1000);
   const chunk = oldFile.slice(lookbackStart, match.index);
 
-  // Find the function declaration pattern: function NAME({...}){
-  const functionPattern = /function ([$\w]+)\(\{[^}]+\}\)\{/g;
+  // Find the function declaration pattern - handles both:
+  // - function NAME({...}){ (older CC, destructured params)
+  // - function NAME(T){ (CC 2.1.20+, single param destructured in body)
+  const functionPattern = /function ([$\w]+)\((?:\{[^}]+\}|[$\w]+)\)\{/g;
   const matches = Array.from(chunk.matchAll(functionPattern));
 
   if (matches.length === 0) {
@@ -805,19 +808,33 @@ export const addSetStateFnAccessAtToolChangeComponentScope = (
 export const findModeChange = (
   fileContents: string
 ): { index: number; modeVar: string } | null => {
-  const pattern =
-    /let [\w$]+=[\w$]+\([\w$]+,\{type:"setMode",mode:([\w$]+),destination:"session"\}\);/;
-  const match = fileContents.match(pattern);
+  // Try the new pattern first (CC 2.1.20+): let w9=_H(A,{type:"setMode",mode:vv(TA),destination:"session"});
+  // The mode may be wrapped in a function call like vv(TA) or be a plain variable
+  const newPattern =
+    /let [\w$]+=[\w$]+\([\w$]+,\{type:"setMode",mode:(?:[\w$]+\()?([\w$]+)\)?,destination:"session"\}\);/;
+  const newMatch = fileContents.match(newPattern);
 
-  if (!match || match.index === undefined) {
-    console.error('patch: findModeChange: failed to find mode change location');
-    return null;
+  if (newMatch && newMatch.index !== undefined) {
+    return {
+      index: newMatch.index,
+      modeVar: newMatch[1],
+    };
   }
 
-  return {
-    index: match.index,
-    modeVar: match[1],
-  };
+  // Fallback: old pattern (CC <2.1.20): let X=Y(Z,{type:"setMode",mode:W,destination:"session"});
+  const oldPattern =
+    /let [\w$]+=[\w$]+\([\w$]+,\{type:"setMode",mode:([\w$]+),destination:"session"\}\);/;
+  const oldMatch = fileContents.match(oldPattern);
+
+  if (oldMatch && oldMatch.index !== undefined) {
+    return {
+      index: oldMatch.index,
+      modeVar: oldMatch[1],
+    };
+  }
+
+  console.error('patch: findModeChange: failed to find mode change location');
+  return null;
 };
 
 /**
@@ -854,11 +871,16 @@ export const writeModeChangeUpdateToolset = (
 
 /**
  * Apply all toolset patches to the file
+ * @param oldFile - The file content to patch
+ * @param toolsets - Array of toolset configurations
+ * @param defaultToolset - The default toolset name (or null)
+ * @param planModeToolset - Optional toolset to switch to when entering plan mode
  */
 export const writeToolsets = (
   oldFile: string,
   toolsets: Toolset[],
-  defaultToolset: string | null
+  defaultToolset: string | null,
+  planModeToolset?: string | null
 ): string | null => {
   // Return null if no toolsets configured
   if (!toolsets || toolsets.length === 0) {
@@ -924,6 +946,31 @@ export const writeToolsets = (
       'patch: toolsets: step 7 failed (appendToolsetToShortcutsDisplay)'
     );
     return null;
+  }
+
+  // Step 8: Mode-change toolset switching (optional)
+  if (planModeToolset && defaultToolset) {
+    // First, add setState access at the tool change component scope
+    result = addSetStateFnAccessAtToolChangeComponentScope(result);
+    if (!result) {
+      console.error(
+        'patch: toolsets: step 8a failed (addSetStateFnAccessAtToolChangeComponentScope)'
+      );
+      return null;
+    }
+
+    // Then, inject the mode change toolset switching code
+    result = writeModeChangeUpdateToolset(
+      result,
+      planModeToolset,
+      defaultToolset
+    );
+    if (!result) {
+      console.error(
+        'patch: toolsets: step 8b failed (writeModeChangeUpdateToolset)'
+      );
+      return null;
+    }
   }
 
   return result;

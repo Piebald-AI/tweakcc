@@ -9,6 +9,7 @@ import { CUSTOM_MODELS } from './patches/modelSelector';
 
 let isDebugModeOn = false;
 let isVerboseModeOn = false;
+let isShowUnchangedOn = false;
 
 export const isDebug = (): boolean => {
   return isDebugModeOn;
@@ -16,12 +17,18 @@ export const isDebug = (): boolean => {
 export const isVerbose = (): boolean => {
   return isVerboseModeOn;
 };
+export const isShowUnchanged = (): boolean => {
+  return isShowUnchangedOn;
+};
 export const enableDebug = (): void => {
   isDebugModeOn = true;
 };
 export const enableVerbose = (): void => {
   isVerboseModeOn = true;
   isDebugModeOn = true; // Verbose implies debug
+};
+export const enableShowUnchanged = (): void => {
+  isShowUnchangedOn = true;
 };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const debug = (message: any, ...optionalParams: any[]) => {
