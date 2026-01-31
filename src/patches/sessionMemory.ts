@@ -18,7 +18,6 @@
 // ```diff
 //  function AQ8() {
 // -  if (!$_("tengu_coral_fern", !1)) return null;
-// +  if (false) return null;
 //    return `# Accessing Past Sessions...
 //  }
 // ```
@@ -29,7 +28,7 @@ import { showDiff } from './index';
  * Patch 1: Bypass tengu_session_memory flag check for extraction
  */
 const patchExtraction = (file: string): string | null => {
-  const pattern = /function [$\w]+\(\)\{return \$_\("tengu_session_memory"/;
+  const pattern = /function [$\w]+\(\)\{return [$\w]+\("tengu_session_memory"/;
   const match = file.match(pattern);
 
   if (!match || match.index === undefined) {
@@ -51,7 +50,7 @@ const patchExtraction = (file: string): string | null => {
  * Patch 2: Bypass tengu_coral_fern flag check for past session search
  */
 const patchPastSessions = (file: string): string | null => {
-  const pattern = /if\(!\$_\("tengu_coral_fern",!1\)\)return null;/;
+  const pattern = /if\(![$\w]+\("tengu_coral_fern",!1\)\)return null;/;
   const match = file.match(pattern);
 
   if (!match || match.index === undefined) {
@@ -59,19 +58,10 @@ const patchPastSessions = (file: string): string | null => {
     return null;
   }
 
-  const replacement = 'if(false)return null;';
   const newFile =
-    file.slice(0, match.index) +
-    replacement +
-    file.slice(match.index + match[0].length);
+    file.slice(0, match.index) + file.slice(match.index + match[0].length);
 
-  showDiff(
-    file,
-    newFile,
-    replacement,
-    match.index,
-    match.index + match[0].length
-  );
+  showDiff(file, newFile, '', match.index, match.index + match[0].length);
   return newFile;
 };
 
@@ -79,11 +69,9 @@ const patchPastSessions = (file: string): string | null => {
  * Combined patch - applies both extraction and past sessions
  */
 export const writeSessionMemory = (oldFile: string): string | null => {
-  console.log('Applying session memory extraction patch...');
-  const afterExtraction = patchExtraction(oldFile);
-  if (!afterExtraction) return null;
+  let newFile = patchExtraction(oldFile);
+  if (!newFile) return null;
 
-  console.log('Applying past sessions search patch...');
-  const afterPastSessions = patchPastSessions(afterExtraction);
-  return afterPastSessions;
+  newFile = patchPastSessions(newFile);
+  return newFile;
 };

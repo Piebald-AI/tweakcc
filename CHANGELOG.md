@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Redesign `--apply` output (#433) - @bl-ue
 - Remove interactive apply in favor of more detailed `--apply` (#434) - @bl-ue
 - Add `--patches`, `--list-patches`, and `--list-system-prompt-patches` for patch-level application (#441) - @bl-ue
+- Add a patch unlocking session memory (#444) - @odysseus0
 
 ## [v3.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.4.0) - 2026-01-18
 
