@@ -55,6 +55,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     statusLineUseFixedInterval: false,
     tableFormat: 'default' as TableFormat,
     enableSwarmMode: true,
+    enableSessionMemory: true,
   };
 
   const ensureMisc = () => {
@@ -393,6 +394,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.statusLineUseFixedInterval =
               !settings.misc!.statusLineUseFixedInterval;
+          });
+        },
+      },
+      {
+        id: 'enableSessionMemory',
+        title: 'Enable session memory',
+        description:
+          'Force-enable session memory (auto-extraction + past session search) by bypassing the tengu_session_memory and tengu_coral_fern statsig flags.',
+        getValue: () => settings.misc?.enableSessionMemory ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableSessionMemory =
+              !settings.misc!.enableSessionMemory;
           });
         },
       },

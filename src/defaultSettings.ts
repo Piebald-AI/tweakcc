@@ -705,6 +705,7 @@ export const DEFAULT_SETTINGS: Settings = {
     statusLineUseFixedInterval: false,
     tableFormat: 'default',
     enableSwarmMode: true,
+    enableSessionMemory: true,
   },
   toolsets: [],
   defaultToolset: null,

@@ -123,6 +123,7 @@ export interface MiscConfig {
   statusLineUseFixedInterval: boolean;
   tableFormat: TableFormat;
   enableSwarmMode: boolean;
+  enableSessionMemory: boolean;
 }
 
 export interface InputPatternHighlighter {
