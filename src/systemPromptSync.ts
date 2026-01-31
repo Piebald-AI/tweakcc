@@ -1000,6 +1000,34 @@ export const preloadStringsFile = async (
 };
 
 /**
+ * System prompt definition for listing
+ */
+export interface SystemPromptDefinition {
+  id: string;
+  name: string;
+  description: string;
+}
+
+/**
+ * Returns the list of all available system prompts for a given CC version.
+ * Requires preloadStringsFile to be called first.
+ * Used by --list-system-prompts flag.
+ */
+export const getSystemPromptDefinitions = ():
+  | SystemPromptDefinition[]
+  | null => {
+  if (!globalStringsFile) {
+    return null;
+  }
+
+  return globalStringsFile.prompts.map(prompt => ({
+    id: prompt.id,
+    name: prompt.name,
+    description: prompt.description,
+  }));
+};
+
+/**
  * Builds a regex pattern from pieces array that will match the original content in cli.js.
  * The regex captures the actual variable names used in the current CC version.
  *

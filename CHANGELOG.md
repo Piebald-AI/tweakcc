@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add a `--restore`/`--revert` flag to undo patches and restore original CC installation (#431) - @bl-ue
 - Redesign `--apply` output (#433) - @bl-ue
 - Remove interactive apply in favor of more detailed `--apply` (#434) - @bl-ue
+- Add `--patches`, `--list-patches`, and `--list-system-prompt-patches` for patch-level application (#441) - @bl-ue
 
 ## [v3.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.4.0) - 2026-01-18
 
