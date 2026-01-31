@@ -121,6 +121,7 @@ export interface MiscConfig {
   mcpServerBatchSize: number | null;
   tableFormat: TableFormat;
   enableSwarmMode: boolean;
+  enableSessionMemory: boolean;
 }
 
 export interface InputPatternHighlighter {

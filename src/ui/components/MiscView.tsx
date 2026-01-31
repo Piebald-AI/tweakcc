@@ -47,6 +47,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     mcpServerBatchSize: null as number | null,
     tableFormat: 'default' as TableFormat,
     enableSwarmMode: true,
+    enableSessionMemory: true,
   };
 
   const ensureMisc = () => {
@@ -321,6 +322,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
           updateSettings(settings => {
             ensureMisc();
             settings.misc!.enableSwarmMode = !settings.misc!.enableSwarmMode;
+          });
+        },
+      },
+      {
+        id: 'enableSessionMemory',
+        title: 'Enable session memory',
+        description:
+          'Force-enable session memory (auto-extraction + past session search) by bypassing the tengu_session_memory and tengu_coral_fern statsig flags.',
+        getValue: () => settings.misc?.enableSessionMemory ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableSessionMemory =
+              !settings.misc!.enableSessionMemory;
           });
         },
       },

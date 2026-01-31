@@ -59,6 +59,7 @@ import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
 import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
 import { writeSwarmMode } from './swarmMode';
+import { writeSessionMemory } from './sessionMemory';
 import { writeThinkingBlockStyling } from './thinkingBlockStyling';
 import { writeMcpNonBlocking, writeMcpBatchSize } from './mcpStartup';
 import {
@@ -299,6 +300,13 @@ const PATCH_DEFINITIONS = [
     name: 'Swarm mode',
     group: PatchGroup.FEATURES,
     description: 'Enable SWARM MODE in Claude Code',
+  },
+  {
+    id: 'session-memory',
+    name: 'Session memory',
+    group: PatchGroup.FEATURES,
+    description:
+      'Enable session memory (auto-extraction + past session search)',
   },
   {
     id: 'toolsets',
@@ -670,6 +678,10 @@ export const applyCustomization = async (
     'swarm-mode': {
       fn: c => writeSwarmMode(c),
       condition: !!config.settings.misc?.enableSwarmMode,
+    },
+    'session-memory': {
+      fn: c => writeSessionMemory(c),
+      condition: !!config.settings.misc?.enableSessionMemory,
     },
     toolsets: {
       fn: c =>
