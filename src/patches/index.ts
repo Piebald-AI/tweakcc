@@ -60,6 +60,7 @@ import { writeSuppressLineNumbers } from './suppressLineNumbers';
 import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
 import { writeSwarmMode } from './swarmMode';
 import { writeSessionMemory } from './sessionMemory';
+import { writeRememberSkill } from './rememberSkill';
 import { writeThinkingBlockStyling } from './thinkingBlockStyling';
 import { writeMcpNonBlocking, writeMcpBatchSize } from './mcpStartup';
 import { writeStatuslineUpdateThrottle } from './statuslineUpdateThrottle';
@@ -308,6 +309,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.MISC_CONFIGURABLE,
     description:
       'Round displayed token counts to the nearest multiple of chosen value',
+  },
+  {
+    id: 'remember-skill',
+    name: 'Remember skill',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Register the built-in "/remember" skill to review session memories and update CLAUDE.local.md',
   },
   // Features
   {
@@ -705,6 +713,10 @@ export const applyCustomization = async (
       fn: c =>
         writeTokenCountRounding(c, config.settings.misc!.tokenCountRounding!),
       condition: !!config.settings.misc?.tokenCountRounding,
+    },
+    'remember-skill': {
+      fn: c => writeRememberSkill(c),
+      condition: !!config.settings.misc?.enableRememberSkill,
     },
     // Features
     'swarm-mode': {
