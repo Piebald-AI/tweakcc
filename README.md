@@ -89,11 +89,36 @@ $ pnpm dlx tweakcc
 
 - [How it works](#how-it-works)
 - [**Features**](#features)
-  - [MCP startup optimization](#mcp-startup-optimization)
-  - [Input pattern highlighters](#input-pattern-highlighters)
-  - [Opus Plan 1M mode](#opus-plan-1m-mode)
-  - [Table format](#table-format)
-  - [Swarm mode (native multi-agent)](#swarm-mode-native-multi-agent)
+  - [System prompts](#system-prompts)
+  - Themes
+  - Thinking verbs customization
+  - Thinking indicator customizations
+  - Context limit
+  - LSP support
+  - Hide "ctrl-g to edit prompt in &lt;editor&gt;"
+  - Hide the startup banner
+  - Hide the startup "Clawd" logo
+  - Increase the max size in tokens for files read via `Read`
+  - Remove the border from the message input box
+  - Add all models to `/model`
+  - tweakcc patches applied indicator
+  - Show more items in select menus
+  - Subagent models
+  - Suppression of `1→  ` prefixes from `Read` output
+  - Suppress `/rate-limit-options` from being injected
+  - Swarm mode
+  - [Toolsets](#toolsets)
+  - User message display customization
+  - Token indicator display
+  - [Input pattern highlighters](#feature-input-pattern-highlighters)
+  - [Opus Plan 1M mode](#feature-opus-plan-1m-mode)
+  - [MCP startup optimization](#feature-mcp-startup-optimization)
+  - [Table format](#feature-table-format)
+  - [Swarm mode (native multi-agent)](#feature-swarm-mode-native-multi-agent)
+  - [Token count rounding](#feature-token-count-rounding)
+  - [Statusline update customization](#feature-statusline-update-customization)
+  - [AGENTS.md support](#feature-agentsmd-support)
+  - _Missing documentation for above features coming soon_
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
 - [Related projects](#related-projects)
@@ -109,11 +134,7 @@ tweakcc works by patching Claude Code's minified `cli.js` file. For npm-based in
 
 tweakcc is verified to work with Claude Code **2.1.2.** In newer or earlier versions various patches might not work. However, if we have the [system prompts for your version](https://github.com/Piebald-AI/tweakcc/tree/main/data/prompts) then system prompt patching is guaranteed to work with that version, even if it's significantly different from the verified CC version. We get the latest system prompts within minutes of each new CC release, so unless you're using a CC version older than 2.0.14, your version is supported.
 
-## Features
-
-_More feature documentation coming soon._
-
-### Input pattern highlighters
+## Feature: Input pattern highlighters
 
 For a few weeks, when you typed the word "ultrathink" into the Claude Code input box, it would be highlighted rainbow. That's gone now, but the underlying highlighting infrastructure is still present in Claude Code today, and tweakcc lets you specify custom highlighters comprised of a **regular expression**, **format string**, and **colors & styling**.
 
@@ -173,7 +194,7 @@ Here's the schema for the object format:
 }
 ```
 
-### Opus Plan 1M mode
+## Feature: Opus Plan 1M mode
 
 tweakcc adds support for a new model alias: **`opusplan[1m]`**. This combines the best of both worlds:
 
@@ -203,9 +224,9 @@ claude --model opusplan[1m]
 | Plan mode (Shift+Tab twice) | Opus 4.5   | 200k           |
 | Execution mode (default)    | Sonnet 4.5 | **1M**         |
 
-### MCP startup optimization
-
 If you use multiple MCP servers, Claude Code's startup can be slow—waiting 10-15+ seconds for all servers to connect before you can start typing.
+
+## Feature: MCP startup optimization
 
 tweakcc fixes this with two optimizations (based on [this blog post](https://cuipengfei.is-a.dev/blog/2026/01/24/claude-code-mcp-startup-optimization/)):
 
@@ -244,7 +265,7 @@ tweakcc fixes this with two optimizations (based on [this blog post](https://cui
 | `mcpConnectionNonBlocking` | `true`                          | Start immediately, connect MCPs in background |
 | `mcpServerBatchSize`       | `null` (uses CC's default of 3) | Number of parallel MCP connections (1-20)     |
 
-### Table format
+## Feature: Table format
 
 Recent Claude Code versions render tables using Unicode box-drawing characters. While these have a more elegant look compared to the traditional plain markdown table rendering, they take up more room due to the row dividers:
 
@@ -312,7 +333,7 @@ tweakcc provides three alternative formats:
 
 Valid values are `"default"`, `"ascii"`, `"clean"`, and `"clean-top-bottom"`.
 
-### Swarm mode (native multi-agent)
+## Feature: Swarm mode (native multi-agent)
 
 Claude Code 2.1.16+ includes native multi-agent features that are gated behind the `tengu_brass_pebble` Statsig flag. tweakcc patches this gate to enable these features for everyone.
 
@@ -345,7 +366,7 @@ Claude Code 2.1.16+ includes native multi-agent features that are gated behind t
 }
 ```
 
-### Token count rounding
+## Feature: Token count rounding
 
 In the generation status, where the thinking verb is displayed, e.g. `✻ Improvising… (35s · ↓ 279 tokens)`, the token count estimate will increase very rapidly at times. While it's helpful to know that the connection isn't stalled, such frequent UI updates can cause rendering issues in slow terminals, and if Claude Code is being run from a network, frequent updates can clog the network.
 
@@ -374,7 +395,7 @@ tweakcc can automatically round the token counters to the nearest multiple of a 
 
 Now token counts will be rounded to the nearest multiple of 123, e.g. 123, 246, 369, etc.
 
-### Statusline update customization
+## Feature: Statusline update customization
 
 Claude Code's statusline feature operates by running a specific command (e.g. a shell script) whenever the conversation history changes (i.e., a message is added), capturing the command's output&mdash;including ANSI escape codes for coloring&mdash;and rendering it in Claude Code under the input box.
 
@@ -407,7 +428,7 @@ Here are two demos showing 1) updates triggered every 150ms, and 2) updates trig
 }
 ```
 
-### AGENTS.md support
+## Feature: AGENTS.md support
 
 <sm><i>Supported Claude Code versions: 1.0.24 (and likely older) to 2.1.29+.</i></sm>
 
