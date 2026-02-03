@@ -65,6 +65,7 @@ import { writeThinkingBlockStyling } from './thinkingBlockStyling';
 import { writeMcpNonBlocking, writeMcpBatchSize } from './mcpStartup';
 import { writeStatuslineUpdateThrottle } from './statuslineUpdateThrottle';
 import { writeTokenCountRounding } from './tokenCountRounding';
+import { writeAgentsMd } from './agentsMd';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -316,6 +317,12 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.MISC_CONFIGURABLE,
     description:
       'Register the built-in "/remember" skill to review session memories and update CLAUDE.local.md',
+  },
+  {
+    id: 'agents-md',
+    name: 'AGENTS.md (and others)',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Support AGENTS.md and others in addition to CLAUDE.md',
   },
   // Features
   {
@@ -717,6 +724,13 @@ export const applyCustomization = async (
     'remember-skill': {
       fn: c => writeRememberSkill(c),
       condition: !!config.settings.misc?.enableRememberSkill,
+    },
+    'agents-md': {
+      fn: c => writeAgentsMd(c, config.settings.claudeMdAltNames!),
+      condition: !!(
+        config.settings.claudeMdAltNames &&
+        config.settings.claudeMdAltNames.length > 0
+      ),
     },
     // Features
     'swarm-mode': {

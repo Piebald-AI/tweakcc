@@ -719,6 +719,15 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   inputPatternHighlighters: [],
   inputPatternHighlightersTestText: 'Type test text here to see highlighting',
+  claudeMdAltNames: [
+    'AGENTS.md',
+    'GEMINI.md',
+    'CRUSH.md',
+    'QWEN.md',
+    'IFLOW.md',
+    'WARP.md',
+    'copilot-instructions.md',
+  ],
 };
 
 /**

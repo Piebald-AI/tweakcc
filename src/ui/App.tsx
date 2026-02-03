@@ -9,6 +9,7 @@ import { InputPatternHighlightersView } from './components/InputPatternHighlight
 import { MiscView } from './components/MiscView';
 import { ToolsetsView } from './components/ToolsetsView';
 import { SubagentModelsView } from './components/SubagentModelsView';
+import { ClaudeMdAltNamesView } from './components/ClaudeMdAltNamesView';
 import {
   MainMenuItem,
   Settings,
@@ -141,6 +142,7 @@ Please reapply your changes by running \`${invocationCommand} --apply\`.`,
       case MainMenuItem.MISC:
       case MainMenuItem.TOOLSETS:
       case MainMenuItem.SUBAGENT_MODELS:
+      case MainMenuItem.CLAUDE_MD_ALT_NAMES:
         setCurrentView(item);
         break;
       case MainMenuItem.VIEW_SYSTEM_PROMPTS:
@@ -215,6 +217,8 @@ Please reapply your changes by running \`${invocationCommand} --apply\`.`,
           <ToolsetsView onBack={handleBack} />
         ) : currentView === MainMenuItem.SUBAGENT_MODELS ? (
           <SubagentModelsView onBack={handleBack} />
+        ) : currentView === MainMenuItem.CLAUDE_MD_ALT_NAMES ? (
+          <ClaudeMdAltNamesView onBack={handleBack} />
         ) : null}
       </Box>
     </SettingsContext.Provider>
