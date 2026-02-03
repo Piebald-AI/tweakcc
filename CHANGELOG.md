@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Extend the `thinkingVerbs` patch to cover past-tense verbs e.g. "Baked" (#454) - @bl-ue
 - Only apply the `thinkingBlockStyling` patch in CC version under 2.1.26 (#455) - @bl-ue
 - Fix `subagentModels` patch to not error when nothing was changed (#456) - @bl-ue
+- AGENTS.md support for CC (#459) - @bl-ue
 
 ## [v3.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.4.0) - 2026-01-18
 

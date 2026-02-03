@@ -407,6 +407,30 @@ Here are two demos showing 1) updates triggered every 150ms, and 2) updates trig
 }
 ```
 
+### AGENTS.md support
+
+<sm><i>Supported Claude Code versions: 1.0.24 (and likely older) to 2.1.29+.</i></sm>
+
+Claude Code is the only coding agent that doesn't support `AGENTS.md`; they only support `CLAUDE.md` and `CLAUDE.local.md`. ([This issue](https://github.com/anthropics/claude-code/issues/6235) has over 2200 upvotes.) tweakcc automatically patches Claude Code to fallback to `AGENTS.md` and several others when `CLAUDE.md` doesn't exist.
+
+The patch happens automatically, with a default set of `AGENTS.md`, `GEMINI.md`, `CRUSH.md`, `QWEN.md`, `IFLOW.md`, `WARP.md`, and `copilot-instructions.md`&mdash;you don't need to configure it specifically. However, if you'd like to support other file names, you can easily:
+
+**Via UI:** Run `npx tweakcc@latest` and go to `CLAUDE.md alternate names`. Use <kbd>e</kbd> to edit a name, <kbd>d</kbd> to delete one, <kbd>n</kbd> to add a new one, <kbd>u</kbd>/<kbd>j</kbd> to move one up/down, and <kbd>ctrl + r</kbd> to reset to the default list mentioned above:
+
+![Screenshot of the CLAUDE.md alternative names list](./assets/agents_md_config.png)
+
+**Via `config.json`:** To configure the list of alternate `CLAUDE.md` names via headlessly, set `settings.claudeMdAltNames` to a list of your desired names, in descending order of priority:
+
+```json
+{
+  "settings": {
+    "claudeMdAltNames": ["AGENTS.md", "context.md", ""]
+  }
+}
+```
+
+Note that `CLAUDE.md` is always used above all alternatives when it's available, so it's not needed to include it in the list.
+
 ## Configuration directory
 
 tweakcc stores its configuration files in one of the following locations, in order of priority:

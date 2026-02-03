@@ -162,6 +162,7 @@ export interface Settings {
   subagentModels: SubagentModelsConfig;
   inputPatternHighlighters: InputPatternHighlighter[];
   inputPatternHighlightersTestText: string; // Global test text for previewing highlighters
+  claudeMdAltNames: string[] | null;
 }
 
 export interface TweakccConfig {
@@ -215,6 +216,7 @@ export enum MainMenuItem {
   MISC = 'Misc',
   TOOLSETS = 'Toolsets',
   SUBAGENT_MODELS = 'Subagent models',
+  CLAUDE_MD_ALT_NAMES = 'CLAUDE.md alternative names',
   VIEW_SYSTEM_PROMPTS = 'View system prompts',
   RESTORE_ORIGINAL = 'Restore original Claude Code (preserves config.json)',
   OPEN_CONFIG = 'Open config.json',

@@ -37,6 +37,10 @@ const baseMenuItems: SelectItem[] = [
     desc: 'Configure which Claude model each subagent uses (Plan, Explore, etc.)',
   },
   {
+    name: MainMenuItem.CLAUDE_MD_ALT_NAMES,
+    desc: 'Configure alternative filenames for CLAUDE.md (e.g., AGENTS.md)',
+  },
+  {
     name: MainMenuItem.VIEW_SYSTEM_PROMPTS,
     desc: "Opens the system prompts directory where you can customize Claude Code's system prompts",
   },
