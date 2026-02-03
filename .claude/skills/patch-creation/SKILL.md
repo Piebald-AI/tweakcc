@@ -187,7 +187,7 @@ return newFile;
 
 ```typescript
 // Replace a hardcoded value
-const pattern = /(someConfig\s*=\s*)\d+/;
+const pattern = /(someConfig=)\d+(;)/;
 const match = file.match(pattern);
 
 if (!match || match.index === undefined) {
@@ -195,7 +195,7 @@ if (!match || match.index === undefined) {
   return null;
 }
 
-const replacement = match[1] + newValue;
+const replacement = match[1] + newValue + match[2];
 const startIndex = match.index;
 const endIndex = startIndex + match[0].length;
 

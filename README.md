@@ -424,7 +424,7 @@ The patch happens automatically, with a default set of `AGENTS.md`, `GEMINI.md`,
 ```json
 {
   "settings": {
-    "claudeMdAltNames": ["AGENTS.md", "context.md", ""]
+    "claudeMdAltNames": ["AGENTS.md", "context.md"]
   }
 }
 ```
