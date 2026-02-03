@@ -74,7 +74,7 @@ Additionally, we're working on features that will allow you to
 
 tweakcc supports Claude Code installed on **Windows, macOS, and Linux**, both **native/binary installations** and those installed via npm, yarn, pnpm, bun, Homebrew/Linuxbrew, nvm, fnm, n, volta, nvs, and nodenv, as well as custom locations.
 
-tweakcc supports Claude Code's **native installation**, which is a large platform-specific native executable containing the same minified/compiled JavaScript code from npm, just packaged up in a [Bun](https://github.com/oven-sh/bun) binary.  We support patching the native binary on macOS, Windows, and Linux, including ad-hoc signing on Apple Silicon, via [**node-lief**](https://github.com/Piebald-AI/node-lief), our Node.js bindings for [LIEF (Library to Instrument Executables)](https://github.com/lief-project/LIEF).
+tweakcc supports Claude Code's **native installation**, which is a large platform-specific native executable containing the same minified/compiled JavaScript code from npm, just packaged up in a [Bun](https://github.com/oven-sh/bun) binary. We support patching the native binary on macOS, Windows, and Linux, including ad-hoc signing on Apple Silicon, via [**node-lief**](https://github.com/Piebald-AI/node-lief), our Node.js bindings for [LIEF (Library to Instrument Executables)](https://github.com/lief-project/LIEF).
 
 Run without installation:
 
@@ -331,7 +331,7 @@ Claude Code 2.1.16+ includes native multi-agent features that are gated behind t
 
 **Enable/disable**
 
-**Via the UI:** Run `npx tweakcc`, go to **Misc**, and check/uncheck **Enable swarm mode (native multi-agent)**.  Then **Apply customizations**.
+**Via the UI:** Run `npx tweakcc`, go to **Misc**, and check/uncheck **Enable swarm mode (native multi-agent)**. Then **Apply customizations**.
 
 **Via `config.json`:**
 
@@ -344,6 +344,35 @@ Claude Code 2.1.16+ includes native multi-agent features that are gated behind t
   }
 }
 ```
+
+### Token count rounding
+
+In the generation status line, where the thinking verb is displayed, e.g. `✻ Improvising… (35s · ↓ 279 tokens)`, the token count estimate will increase very rapidly at times. While it's helpful to know that the connection isn't stalled, such frequent UI updates can cause rendering issues in slow terminals, and if Claude Code is being run from a network, frequent updates can clog the network.
+
+tweakcc can automatically round the token counters to the nearest multiple of a custom base number. For example, here are two demo clips showing the token count rounded to multiples of 50, and multiples of 1000:
+
+| Description           | GIF                                          |
+| --------------------- | -------------------------------------------- |
+| **Multiples of 50**   | ![](./assets/token_count_rounding_by_50.gif) |
+| **Multiples of 1000** | ![](./assets/token_count_rounding_by_1k.gif) |
+
+**Configuration via UI:** Go to _Misc &rarr; Token count rounding_ towards the bottom.
+
+![](./assets/token_count_rounding_setting_ui.png)
+
+**Configuration via `config.json`:** While the tweakcc UI only allows common values like 10, 25, 500, 1000, etc., you can use any integer value for the setting itself in `config.json`. Open `~/.tweakcc/config.json` and set the `settings.misc.tokenCountRounding` field to your desired rounding base:
+
+```json
+{
+  "settings": {
+    "misc": {
+      "tokenCountRounding": 123
+    }
+  }
+}
+```
+
+Now token counts will be rounded to the nearest multiple of 123, e.g. 123, 246, 369, etc.
 
 ## Configuration directory
 
