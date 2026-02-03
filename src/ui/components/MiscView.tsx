@@ -42,6 +42,12 @@ const TOKEN_ROUNDING_OPTIONS: (number | null)[] = [
   1000,
 ];
 
+// Statusline throttle constraints
+const STATUSLINE_THROTTLE_MIN = 0;
+const STATUSLINE_THROTTLE_MAX = 1000;
+const STATUSLINE_THROTTLE_DEFAULT = 300;
+const STATUSLINE_THROTTLE_STEP = 50;
+
 export function MiscView({ onSubmit }: MiscViewProps) {
   const { settings, updateSettings } = useContext(SettingsContext);
 
@@ -60,6 +66,8 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     suppressRateLimitOptions: false,
     mcpConnectionNonBlocking: true,
     mcpServerBatchSize: null as number | null,
+    statuslineThrottleMs: null as number | null,
+    statuslineUseFixedInterval: false,
     tableFormat: 'default' as TableFormat,
     enableSwarmMode: true,
     enableSessionMemory: true,
@@ -103,6 +111,12 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     if (size <= 3) return `${size} (conservative)`;
     if (size <= 8) return `${size} (recommended)`;
     return `${size} (aggressive)`;
+  };
+
+  const getStatusLineThrottleDisplay = (ms: number | null): string => {
+    if (ms === null) return 'Disabled';
+    if (ms === 0) return '0ms (instant)';
+    return `${ms}ms`;
   };
 
   const getTokenRoundingDisplay = (value: number | null): string => {
@@ -362,6 +376,64 @@ export function MiscView({ onSubmit }: MiscViewProps) {
           updateSettings(settings => {
             ensureMisc();
             settings.misc!.enableSwarmMode = !settings.misc!.enableSwarmMode;
+          });
+        },
+      },
+      {
+        id: 'statuslineThrottle',
+        title: 'Statusline throttle',
+        description: `Throttle statusline updates (${STATUSLINE_THROTTLE_MIN}-${STATUSLINE_THROTTLE_MAX}ms). Use ←/→ to adjust by ${STATUSLINE_THROTTLE_STEP}ms. Space to disable. 0 = instant updates.`,
+        getValue: () => settings.misc?.statuslineThrottleMs ?? null,
+        getDisplayValue: () =>
+          getStatusLineThrottleDisplay(
+            settings.misc?.statuslineThrottleMs ?? null
+          ),
+        toggle: () => {
+          // Space toggles between disabled and default
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.statuslineThrottleMs =
+              settings.misc!.statuslineThrottleMs === null
+                ? STATUSLINE_THROTTLE_DEFAULT
+                : null;
+          });
+        },
+        increment: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            const current =
+              settings.misc!.statuslineThrottleMs ??
+              STATUSLINE_THROTTLE_DEFAULT;
+            settings.misc!.statuslineThrottleMs = Math.min(
+              STATUSLINE_THROTTLE_MAX,
+              current + STATUSLINE_THROTTLE_STEP
+            );
+          });
+        },
+        decrement: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            const current =
+              settings.misc!.statuslineThrottleMs ??
+              STATUSLINE_THROTTLE_DEFAULT;
+            settings.misc!.statuslineThrottleMs = Math.max(
+              STATUSLINE_THROTTLE_MIN,
+              current - STATUSLINE_THROTTLE_STEP
+            );
+          });
+        },
+      },
+      {
+        id: 'statuslineFixedInterval',
+        title: 'Statusline fixed interval mode',
+        description:
+          'Use setInterval instead of throttle. Updates happen on a fixed schedule rather than on-demand.',
+        getValue: () => settings.misc?.statuslineUseFixedInterval ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.statuslineUseFixedInterval =
+              !settings.misc!.statuslineUseFixedInterval;
           });
         },
       },

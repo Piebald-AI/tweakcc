@@ -701,6 +701,8 @@ export const DEFAULT_SETTINGS: Settings = {
     suppressRateLimitOptions: false,
     mcpConnectionNonBlocking: true,
     mcpServerBatchSize: null,
+    statuslineThrottleMs: null,
+    statuslineUseFixedInterval: false,
     tableFormat: 'default',
     enableSwarmMode: true,
     enableSessionMemory: true,

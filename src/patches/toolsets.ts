@@ -546,7 +546,7 @@ export const writeToolsetComponentDefinition = (
 };
 
 /**
- * Find where to insert the app state variable getter in the status line component
+ * Find where to insert the app state variable getter in the statusline component
  */
 export const findShiftTabAppStateVarInsertionPoint = (
   oldFile: string
@@ -594,7 +594,7 @@ export const findShiftTabAppStateVarInsertionPoint = (
 };
 
 /**
- * Insert the state getter variable at the start of the status line component
+ * Insert the state getter variable at the start of the statusline component
  */
 export const insertShiftTabAppStateVar = (oldFile: string): string | null => {
   const insertionPoint = findShiftTabAppStateVarInsertionPoint(oldFile);
@@ -923,7 +923,7 @@ export const writeToolsets = (
     return null;
   }
 
-  // Step 5: Insert state getter in status line component
+  // Step 5: Insert state getter in statusline component
   result = insertShiftTabAppStateVar(result);
   if (!result) {
     console.error('patch: toolsets: step 5 failed (insertShiftTabAppStateVar)');
