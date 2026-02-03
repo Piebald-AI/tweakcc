@@ -577,6 +577,9 @@ export const applyCustomization = async (
     },
     'thinking-block-styling': {
       fn: c => writeThinkingBlockStyling(c),
+      condition:
+        ccInstInfo.version == null ||
+        compareVersions(ccInstInfo.version, '2.1.26') < 0,
     },
     'fix-lsp-support': {
       fn: c => writeFixLspSupport(c),
