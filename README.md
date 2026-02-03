@@ -117,8 +117,8 @@ $ pnpm dlx tweakcc
   - [Swarm mode (native multi-agent)](#feature-swarm-mode-native-multi-agent)
   - [Token count rounding](#feature-token-count-rounding)
   - [Statusline update customization](#feature-statusline-update-customization)
-  - [AGENTS.md support](#feature-agents-md-support)
-  - Missing documentation for above features coming soon\_
+  - [AGENTS.md support](#feature-agentsmd-support)
+  - _Missing documentation for above features coming soon_
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
 - [Related projects](#related-projects)
