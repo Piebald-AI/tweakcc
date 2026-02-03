@@ -19,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove interactive apply in favor of more detailed `--apply` (#434) - @bl-ue
 - Add `--patches`, `--list-patches`, and `--list-system-prompt-patches` for patch-level application (#441) - @bl-ue
 - Add a patch unlocking session memory (#444) - @odysseus0
-- Add a patch for throttling of/intervals of statusline updates (#445) - @bl-ue
+- Add a patch to round the token count to the nearest multiple of a specified base (#451) - @bl-ue
+- Add a patch for throttling of/intervals of statusline updates (#452) - @bl-ue
 
 ## [v3.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.4.0) - 2026-01-18
 

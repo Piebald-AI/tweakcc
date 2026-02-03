@@ -63,6 +63,7 @@ import { writeSessionMemory } from './sessionMemory';
 import { writeThinkingBlockStyling } from './thinkingBlockStyling';
 import { writeMcpNonBlocking, writeMcpBatchSize } from './mcpStartup';
 import { writeStatuslineUpdateThrottle } from './statuslineUpdateThrottle';
+import { writeTokenCountRounding } from './tokenCountRounding';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -300,6 +301,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.MISC_CONFIGURABLE,
     description:
       "/rate-limit-options won't be injected when limits are reached",
+  },
+  {
+    id: 'token-count-rounding',
+    name: 'Token count rounding',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Round displayed token counts to the nearest multiple of chosen value',
   },
   // Features
   {
@@ -689,6 +697,11 @@ export const applyCustomization = async (
     'suppress-rate-limit-options': {
       fn: c => writeSuppressRateLimitOptions(c),
       condition: !!config.settings.misc?.suppressRateLimitOptions,
+    },
+    'token-count-rounding': {
+      fn: c =>
+        writeTokenCountRounding(c, config.settings.misc!.tokenCountRounding!),
+      condition: !!config.settings.misc?.tokenCountRounding,
     },
     // Features
     'swarm-mode': {

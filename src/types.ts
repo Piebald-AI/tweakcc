@@ -124,6 +124,7 @@ export interface MiscConfig {
   tableFormat: TableFormat;
   enableSwarmMode: boolean;
   enableSessionMemory: boolean;
+  tokenCountRounding: number | null;
 }
 
 export interface InputPatternHighlighter {

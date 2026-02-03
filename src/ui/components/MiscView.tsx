@@ -27,6 +27,21 @@ const MCP_BATCH_SIZE_MIN = 1;
 const MCP_BATCH_SIZE_MAX = 20;
 const MCP_BATCH_SIZE_DEFAULT = 3;
 
+// Token count rounding options (null = off, then these values)
+const TOKEN_ROUNDING_OPTIONS: (number | null)[] = [
+  null,
+  1,
+  5,
+  10,
+  25,
+  50,
+  100,
+  200,
+  250,
+  500,
+  1000,
+];
+
 // Status line throttle constraints
 const STATUS_LINE_THROTTLE_MIN = 0;
 const STATUS_LINE_THROTTLE_MAX = 1000;
@@ -56,6 +71,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     tableFormat: 'default' as TableFormat,
     enableSwarmMode: true,
     enableSessionMemory: true,
+    tokenCountRounding: null as number | null,
   };
 
   const ensureMisc = () => {
@@ -101,6 +117,30 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     if (ms === null) return 'Disabled';
     if (ms === 0) return '0ms (instant)';
     return `${ms}ms`;
+  };
+
+  const getTokenRoundingDisplay = (value: number | null): string => {
+    if (value === null) return 'Off (exact counts)';
+    return `Round to ${value}`;
+  };
+
+  // Helper to cycle through token rounding options
+  const cycleTokenRounding = (
+    current: number | null,
+    direction: 'next' | 'prev'
+  ): number | null => {
+    const currentIndex = TOKEN_ROUNDING_OPTIONS.indexOf(current);
+    if (currentIndex === -1) return TOKEN_ROUNDING_OPTIONS[0]; // Reset to first if not found
+
+    let newIndex: number;
+    if (direction === 'next') {
+      newIndex = (currentIndex + 1) % TOKEN_ROUNDING_OPTIONS.length;
+    } else {
+      newIndex =
+        (currentIndex - 1 + TOKEN_ROUNDING_OPTIONS.length) %
+        TOKEN_ROUNDING_OPTIONS.length;
+    }
+    return TOKEN_ROUNDING_OPTIONS[newIndex];
   };
 
   const items: MiscItem[] = useMemo(
@@ -408,6 +448,40 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.enableSessionMemory =
               !settings.misc!.enableSessionMemory;
+          });
+        },
+      },
+      {
+        id: 'tokenCountRounding',
+        title: 'Token count rounding',
+        description:
+          'Round displayed token counts to nearest multiple. Use ←/→ to cycle: Off, 1, 5, 10, 25, 50, 100, 200, 250, 500, 1000.',
+        getValue: () => settings.misc?.tokenCountRounding ?? null,
+        getDisplayValue: () =>
+          getTokenRoundingDisplay(settings.misc?.tokenCountRounding ?? null),
+        toggle: () => {
+          // Space resets to off (null)
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.tokenCountRounding = null;
+          });
+        },
+        increment: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.tokenCountRounding = cycleTokenRounding(
+              settings.misc!.tokenCountRounding ?? null,
+              'next'
+            );
+          });
+        },
+        decrement: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.tokenCountRounding = cycleTokenRounding(
+              settings.misc!.tokenCountRounding ?? null,
+              'prev'
+            );
           });
         },
       },
