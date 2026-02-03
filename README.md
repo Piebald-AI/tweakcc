@@ -107,6 +107,8 @@ $ pnpm dlx tweakcc
   - Suppression of `1→  ` prefixes from `Read` output
   - Suppress `/rate-limit-options` from being injected
   - Swarm mode
+  - Session memory
+  - `/remember` skill
   - [Toolsets](#toolsets)
   - User message display customization
   - Token indicator display
