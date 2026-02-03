@@ -76,7 +76,7 @@ export const writeStatuslineUpdateThrottle = (
   // Pattern breakdown:
   // - (\b([$\w]+)=([$\w]+(?:\.default)?)\.useCallback.{0,1000}statusLineText.{0,200}?)
   //   Match[1]: Everything up to and including the statusLineText context (firstPart)
-  //   Match[2]: The status line update function name (statusLineUpdateFn)
+  //   Match[2]: The status line update function name (statuslineUpdateFn)
   //   Match[3]: The React variable, possibly with .default (reactVar)
   //
   // - (\b[$\w]+\(\(\)=>(\2\(([$\w]+)\)),300\)|\b[$\w]+\(\2,300\))
@@ -90,13 +90,13 @@ export const writeStatuslineUpdateThrottle = (
 
   if (!match || match.index === undefined) {
     console.error(
-      'patch: statusLineThrottle: failed to find statusline update throttle pattern'
+      'patch: statuslineUpdateThrottle: failed to find statusline update throttle pattern'
     );
     return null;
   }
 
   const firstPart = match[1];
-  const statusLineUpdateFn = match[2];
+  const statuslineUpdateFn = match[2];
   const reactVar = match[3];
   const callbackVar = match[4];
   // match[4] is the old debounced invocation (being replaced)
@@ -107,16 +107,16 @@ export const writeStatuslineUpdateThrottle = (
   // Determine the function call to make
   // Newer format: match[5] contains "I(A)"
   // Older format: just call the function with no args
-  const call = match[6] ?? `${statusLineUpdateFn}()`;
+  const call = match[6] ?? `${statuslineUpdateFn}()`;
   const argument = match[7];
 
   // Build dependencies array for useCallback/useEffect
   const dependencies = argument
-    ? `${statusLineUpdateFn}, ${argument}`
-    : statusLineUpdateFn;
+    ? `${statuslineUpdateFn}, ${argument}`
+    : statuslineUpdateFn;
 
   // For fixed interval, we only depend on the function, not the argument
-  const intervalDependencies = statusLineUpdateFn;
+  const intervalDependencies = statuslineUpdateFn;
 
   let replacement: string;
 
@@ -130,7 +130,7 @@ export const writeStatuslineUpdateThrottle = (
         `,argRef=${reactVar}.useRef(${argument})` +
         `,unused1=${reactVar}.useEffect(()=>{argRef.current=${argument};},[${argument}])` +
         `,unused2=${reactVar}.useEffect(()=>{` +
-        `const id=setInterval(()=>${statusLineUpdateFn}(argRef.current),${intervalMs});` +
+        `const id=setInterval(()=>${statuslineUpdateFn}(argRef.current),${intervalMs});` +
         `return()=>clearInterval(id);` +
         `},[${intervalDependencies}]),` +
         `${callbackVar}=${reactVar}.useCallback(()=>{},[])`;

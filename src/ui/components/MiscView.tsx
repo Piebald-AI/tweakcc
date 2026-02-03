@@ -42,11 +42,11 @@ const TOKEN_ROUNDING_OPTIONS: (number | null)[] = [
   1000,
 ];
 
-// Status line throttle constraints
-const STATUS_LINE_THROTTLE_MIN = 0;
-const STATUS_LINE_THROTTLE_MAX = 1000;
-const STATUS_LINE_THROTTLE_DEFAULT = 300;
-const STATUS_LINE_THROTTLE_STEP = 50;
+// Statusline throttle constraints
+const STATUSLINE_THROTTLE_MIN = 0;
+const STATUSLINE_THROTTLE_MAX = 1000;
+const STATUSLINE_THROTTLE_DEFAULT = 300;
+const STATUSLINE_THROTTLE_STEP = 50;
 
 export function MiscView({ onSubmit }: MiscViewProps) {
   const { settings, updateSettings } = useContext(SettingsContext);
@@ -66,8 +66,8 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     suppressRateLimitOptions: false,
     mcpConnectionNonBlocking: true,
     mcpServerBatchSize: null as number | null,
-    statusLineThrottleMs: null as number | null,
-    statusLineUseFixedInterval: false,
+    statuslineThrottleMs: null as number | null,
+    statuslineUseFixedInterval: false,
     tableFormat: 'default' as TableFormat,
     enableSwarmMode: true,
     enableSessionMemory: true,
@@ -380,21 +380,21 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         },
       },
       {
-        id: 'statusLineThrottle',
-        title: 'Status line throttle',
-        description: `Throttle status line updates (${STATUS_LINE_THROTTLE_MIN}-${STATUS_LINE_THROTTLE_MAX}ms). Use ←/→ to adjust by ${STATUS_LINE_THROTTLE_STEP}ms. Space to disable. 0 = instant updates.`,
-        getValue: () => settings.misc?.statusLineThrottleMs ?? null,
+        id: 'statuslineThrottle',
+        title: 'Statusline throttle',
+        description: `Throttle statusline updates (${STATUSLINE_THROTTLE_MIN}-${STATUSLINE_THROTTLE_MAX}ms). Use ←/→ to adjust by ${STATUSLINE_THROTTLE_STEP}ms. Space to disable. 0 = instant updates.`,
+        getValue: () => settings.misc?.statuslineThrottleMs ?? null,
         getDisplayValue: () =>
           getStatusLineThrottleDisplay(
-            settings.misc?.statusLineThrottleMs ?? null
+            settings.misc?.statuslineThrottleMs ?? null
           ),
         toggle: () => {
           // Space toggles between disabled and default
           updateSettings(settings => {
             ensureMisc();
-            settings.misc!.statusLineThrottleMs =
-              settings.misc!.statusLineThrottleMs === null
-                ? STATUS_LINE_THROTTLE_DEFAULT
+            settings.misc!.statuslineThrottleMs =
+              settings.misc!.statuslineThrottleMs === null
+                ? STATUSLINE_THROTTLE_DEFAULT
                 : null;
           });
         },
@@ -402,11 +402,11 @@ export function MiscView({ onSubmit }: MiscViewProps) {
           updateSettings(settings => {
             ensureMisc();
             const current =
-              settings.misc!.statusLineThrottleMs ??
-              STATUS_LINE_THROTTLE_DEFAULT;
-            settings.misc!.statusLineThrottleMs = Math.min(
-              STATUS_LINE_THROTTLE_MAX,
-              current + STATUS_LINE_THROTTLE_STEP
+              settings.misc!.statuslineThrottleMs ??
+              STATUSLINE_THROTTLE_DEFAULT;
+            settings.misc!.statuslineThrottleMs = Math.min(
+              STATUSLINE_THROTTLE_MAX,
+              current + STATUSLINE_THROTTLE_STEP
             );
           });
         },
@@ -414,26 +414,26 @@ export function MiscView({ onSubmit }: MiscViewProps) {
           updateSettings(settings => {
             ensureMisc();
             const current =
-              settings.misc!.statusLineThrottleMs ??
-              STATUS_LINE_THROTTLE_DEFAULT;
-            settings.misc!.statusLineThrottleMs = Math.max(
-              STATUS_LINE_THROTTLE_MIN,
-              current - STATUS_LINE_THROTTLE_STEP
+              settings.misc!.statuslineThrottleMs ??
+              STATUSLINE_THROTTLE_DEFAULT;
+            settings.misc!.statuslineThrottleMs = Math.max(
+              STATUSLINE_THROTTLE_MIN,
+              current - STATUSLINE_THROTTLE_STEP
             );
           });
         },
       },
       {
-        id: 'statusLineFixedInterval',
-        title: 'Status line fixed interval mode',
+        id: 'statuslineFixedInterval',
+        title: 'Statusline fixed interval mode',
         description:
           'Use setInterval instead of throttle. Updates happen on a fixed schedule rather than on-demand.',
-        getValue: () => settings.misc?.statusLineUseFixedInterval ?? false,
+        getValue: () => settings.misc?.statuslineUseFixedInterval ?? false,
         toggle: () => {
           updateSettings(settings => {
             ensureMisc();
-            settings.misc!.statusLineUseFixedInterval =
-              !settings.misc!.statusLineUseFixedInterval;
+            settings.misc!.statuslineUseFixedInterval =
+              !settings.misc!.statuslineUseFixedInterval;
           });
         },
       },

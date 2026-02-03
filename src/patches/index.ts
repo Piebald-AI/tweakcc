@@ -585,10 +585,10 @@ export const applyCustomization = async (
       fn: c =>
         writeStatuslineUpdateThrottle(
           c,
-          config.settings.misc?.statusLineThrottleMs ?? 300,
-          config.settings.misc?.statusLineUseFixedInterval ?? false
+          config.settings.misc?.statuslineThrottleMs ?? 300,
+          config.settings.misc?.statuslineUseFixedInterval ?? false
         ),
-      condition: config.settings.misc?.statusLineThrottleMs != null,
+      condition: config.settings.misc?.statuslineThrottleMs != null,
     },
     // Misc Configurable
     'patches-applied-indication': {

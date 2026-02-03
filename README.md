@@ -347,7 +347,7 @@ Claude Code 2.1.16+ includes native multi-agent features that are gated behind t
 
 ### Token count rounding
 
-In the generation status line, where the thinking verb is displayed, e.g. `✻ Improvising… (35s · ↓ 279 tokens)`, the token count estimate will increase very rapidly at times. While it's helpful to know that the connection isn't stalled, such frequent UI updates can cause rendering issues in slow terminals, and if Claude Code is being run from a network, frequent updates can clog the network.
+In the generation status, where the thinking verb is displayed, e.g. `✻ Improvising… (35s · ↓ 279 tokens)`, the token count estimate will increase very rapidly at times. While it's helpful to know that the connection isn't stalled, such frequent UI updates can cause rendering issues in slow terminals, and if Claude Code is being run from a network, frequent updates can clog the network.
 
 tweakcc can automatically round the token counters to the nearest multiple of a custom base number. For example, here are two demo clips showing the token count rounded to multiples of 50, and multiples of 1000:
 
@@ -373,6 +373,39 @@ tweakcc can automatically round the token counters to the nearest multiple of a 
 ```
 
 Now token counts will be rounded to the nearest multiple of 123, e.g. 123, 246, 369, etc.
+
+### Statusline update customization
+
+Claude Code's statusline feature operates by running a specific command (e.g. a shell script) whenever the conversation history changes (i.e., a message is added), capturing the command's output&mdash;including ANSI escape codes for coloring&mdash;and rendering it in Claude Code under the input box.
+
+It's neat functionality but the updates occur at what appear to be sporadic intervals. According to [the docs](https://code.claude.com/docs/en/statusline#:~:text=Updates%20run%20at%20most%20every%20300%20ms), _"Updates run at most every 300 ms,"_ but this is inaccurate&mdash;technically, updates are _queued_ for 300 milliseconds, meaning an update is triggered each time the chat history is updated, but is then delayed before execution for 300ms.
+
+In the majority of cases, this behavior is fine. However, if you have a specialized use case, you may need updates to be throttled at 300ms like the documentation states, or even have updates automatically triggered at a specific interval.
+
+tweakcc can patch Claude Code to correct this erratic queuing behavior, making it properly throttle updates at a customizable interval. It can also pace the updating, making it be performed at a regular interval, independent of changes to the chat history.
+
+Here are two demos showing 1) updates triggered every 150ms, and 2) updates triggered by history updates, throttled at 1s. The `update = X` is a custom statusline, where _X_ increments each time the statusline is re-rendered.
+
+| 150ms interval                                     | 1000ms throttling                               |
+| -------------------------------------------------- | ----------------------------------------------- |
+| ![](./assets/statusline_update_interval_150ms.gif) | ![](./assets/statusline_update_throttle_1s.gif) |
+
+**Configuration via UI:** Go to _Misc &rarr; Statusline throttle_
+
+![](./assets/statusline_ui_config.png)
+
+**Configuration via `config.json`:** While the tweakcc UI only allows increments of 50ms for the statusline update interval, you can use any integer value for it by editing `config.json`. Open `~/.tweakcc/config.json` and set the `settings.misc.statuslineThrottleMs` field to your desired interval, and set `settings.misc.statuslineUseFixedInterval` to `true` for a fixed-pace interval or `false` for throttling.
+
+```json
+{
+  "settings": {
+    "misc": {
+      "statuslineThrottleMs": 500,
+      "statuslineUseFixedInterval": false
+    }
+  }
+}
+```
 
 ## Configuration directory
 
@@ -402,7 +435,7 @@ git clone https://github.com/Piebald-AI/tweakcc.git
 cd tweakcc
 pnpm i
 pnpm build
-node dist/index.js
+node dist/index.mjs
 ```
 
 ## Related projects
