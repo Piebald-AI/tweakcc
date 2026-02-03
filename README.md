@@ -347,7 +347,7 @@ Claude Code 2.1.16+ includes native multi-agent features that are gated behind t
 
 ### Token Count Rounding
 
-In the generation status line, where the thinking verb is displayed, e.g. `✻ Improvising… (35s · ↓ 279 tokens)`, the token count estimate will increase very rapidly at times. While it's helpful to know that the connection isn't stalled, such frequent UI updates can rendering issues in slow terminals, and if Claude Code is being run from a network, frequent updates can clog the network.
+In the generation status line, where the thinking verb is displayed, e.g. `✻ Improvising… (35s · ↓ 279 tokens)`, the token count estimate will increase very rapidly at times. While it's helpful to know that the connection isn't stalled, such frequent UI updates can cause rendering issues in slow terminals, and if Claude Code is being run from a network, frequent updates can clog the network.
 
 tweakcc can automatically round the token counters to the nearest multiplier of a custom base number. For example, here are two demo clips showing the token count rounded to multiples of 50, and multiples of 1000:
 
