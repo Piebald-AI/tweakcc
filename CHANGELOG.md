@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add a patch unlocking session memory (#444) - @odysseus0
 - Add a patch to round the token count to the nearest multiple of a specified base (#451) - @bl-ue
 - Add a patch for throttling/pacing of statusline updates (#453) - @bl-ue
+- Extend the `thinkingVerbs` patch to cover past-tense verbs e.g. Baked (#454) - @bl-ue
 
 ## [v3.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.4.0) - 2026-01-18
 
