@@ -24,8 +24,8 @@ import { showDiff } from './index';
  *  function rs(A){
  * ```
  */
-export const writeThinkingVerbs = (
-  oldFile: string,
+const patchPresentTenseVerbs = (
+  file: string,
   verbs: string[]
 ): string | null => {
   // Special ones:
@@ -36,10 +36,12 @@ export const writeThinkingVerbs = (
   // (e.g., Flambéing stored as Flamb\xE9ing in minified source)
   const pattern = /\[("[A-Z][a-z'é\-\\xA-F0-9]+in[g']",?){50,}\]/;
 
-  const match = oldFile.match(pattern);
+  const match = file.match(pattern);
 
   if (!match || match.index === undefined) {
-    console.error('patch: thinkingVerbs: failed to find thinker verbs pattern');
+    console.error(
+      'patch: thinkingVerbs: failed to find present tense verbs pattern'
+    );
     return null;
   }
 
@@ -49,9 +51,53 @@ export const writeThinkingVerbs = (
   const endIndex = startIndex + match[0].length;
 
   const newFile =
-    oldFile.slice(0, startIndex) + replacement + oldFile.slice(endIndex);
+    file.slice(0, startIndex) + replacement + file.slice(endIndex);
 
-  showDiff(oldFile, newFile, replacement, startIndex, endIndex);
+  showDiff(file, newFile, replacement, startIndex, endIndex);
 
   return newFile;
+};
+
+const patchPastTenseVerbs = (file: string, verbs: string[]): string | null => {
+  const pattern = /\[("[A-Z][a-z'é\-\\xA-F0-9]+ed",?){5,}\]/;
+
+  const match = file.match(pattern);
+
+  if (!match || match.index === undefined) {
+    console.error(
+      'patch: thinkingVerbs: failed to find past tense verbs pattern'
+    );
+    return null;
+  }
+
+  // Convert verbs from "ing" to "ed"
+  const pastTenseVerbs = verbs.map(verb => verb.replace(/ing$/, 'ed'));
+  const replacement = JSON.stringify(pastTenseVerbs);
+
+  const startIndex = match.index;
+  const endIndex = startIndex + match[0].length;
+
+  const newFile =
+    file.slice(0, startIndex) + replacement + file.slice(endIndex);
+
+  showDiff(file, newFile, replacement, startIndex, endIndex);
+
+  return newFile;
+};
+
+export const writeThinkingVerbs = (
+  oldFile: string,
+  verbs: string[]
+): string | null => {
+  const afterPresentTense = patchPresentTenseVerbs(oldFile, verbs);
+  if (afterPresentTense === null) {
+    return null;
+  }
+
+  const afterPastTense = patchPastTenseVerbs(afterPresentTense, verbs);
+  if (afterPastTense === null) {
+    return null;
+  }
+
+  return afterPastTense;
 };
