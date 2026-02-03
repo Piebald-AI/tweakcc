@@ -117,7 +117,8 @@ $ pnpm dlx tweakcc
   - [Swarm mode (native multi-agent)](#feature-swarm-mode-native-multi-agent)
   - [Token count rounding](#feature-token-count-rounding)
   - [Statusline update customization](#feature-statusline-update-customization)
-  - Missing documentation for above features coming soon_
+  - [AGENTS.md support](#feature-agents-md-support)
+  - Missing documentation for above features coming soon\_
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
 - [Related projects](#related-projects)
@@ -223,8 +224,8 @@ claude --model opusplan[1m]
 | Plan mode (Shift+Tab twice) | Opus 4.5   | 200k           |
 | Execution mode (default)    | Sonnet 4.5 | **1M**         |
 
-
 If you use multiple MCP servers, Claude Code's startup can be slow—waiting 10-15+ seconds for all servers to connect before you can start typing.
+
 ## Feature: MCP startup optimization
 
 tweakcc fixes this with two optimizations (based on [this blog post](https://cuipengfei.is-a.dev/blog/2026/01/24/claude-code-mcp-startup-optimization/)):
@@ -427,7 +428,7 @@ Here are two demos showing 1) updates triggered every 150ms, and 2) updates trig
 }
 ```
 
-### AGENTS.md support
+## Feature: AGENTS.md support
 
 <sm><i>Supported Claude Code versions: 1.0.24 (and likely older) to 2.1.29+.</i></sm>
 
