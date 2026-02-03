@@ -64,6 +64,7 @@ import { writeThinkingBlockStyling } from './thinkingBlockStyling';
 import { writeMcpNonBlocking, writeMcpBatchSize } from './mcpStartup';
 import { writeStatuslineUpdateThrottle } from './statuslineUpdateThrottle';
 import { writeTokenCountRounding } from './tokenCountRounding';
+import { writeAgentsMd } from './agentsMd';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -308,6 +309,12 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.MISC_CONFIGURABLE,
     description:
       'Round displayed token counts to the nearest multiple of chosen value',
+  },
+  {
+    id: 'agents-md',
+    name: 'AGENTS.md (and others)',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Support AGENTS.md and others in addition to CLAUDE.md',
   },
   // Features
   {
@@ -705,6 +712,13 @@ export const applyCustomization = async (
       fn: c =>
         writeTokenCountRounding(c, config.settings.misc!.tokenCountRounding!),
       condition: !!config.settings.misc?.tokenCountRounding,
+    },
+    'agents-md': {
+      fn: c => writeAgentsMd(c, config.settings.claudeMdAltNames!),
+      condition: !!(
+        config.settings.claudeMdAltNames &&
+        config.settings.claudeMdAltNames.length > 0
+      ),
     },
     // Features
     'swarm-mode': {
