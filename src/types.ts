@@ -167,6 +167,12 @@ export interface Settings {
   claudeMdAltNames: string[] | null;
 }
 
+export interface RemoteConfig {
+  sourceUrl: string;
+  dateFetched: string;
+  settings: Partial<Settings>;
+}
+
 export interface TweakccConfig {
   ccVersion: string;
   ccInstallationDir?: string | null; // Deprecated: only used for migration from old configs
@@ -175,6 +181,7 @@ export interface TweakccConfig {
   changesApplied: boolean;
   settings: Settings;
   hidePiebaldAnnouncement?: boolean;
+  remoteConfig?: RemoteConfig; // Cached remote config from last --config-url usage
 }
 
 export type InstallationKind = 'npm-based' | 'native-binary';

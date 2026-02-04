@@ -571,6 +571,16 @@ Toolsets can be helpful both for using Claude in different modes, e.g. a researc
 
 To create a toolset, run `npx tweakcc`, go to `Toolsets`, and hit `n` to create a new toolset. Set to apply your customizations, and then run `claude`. If you marked a toolset as the default in tweakcc, it will be automatically selected.
 
+## Remote Config
+
+While tweakcc usually works by applying customizations from your local `~/.tweakcc/config.json`, you can optionally pass the `--config-url <http URL>` flag when you use `tweakcc --apply` to have tweakcc fetch config from a remote URL and apply it to your local Claude Code installation.  This is useful for testing someone else's config when shared via a Gist or pastebin, for example.
+
+Example:
+```
+npx tweakcc@latest --apply --config-url https://gist.githubusercontent.com/bl-ue/27323f9bfd4c18aaab51cad11c1148dc/raw/c1b6875c4b3c3adfaf6332bb69eedff02fa04471/config.json
+```
+Your local config will **not** be overwritten; the remote config will be copied into your `config.json` under under `remoteConfig.settings`.
+
 ## Troubleshooting
 
 tweakcc stores a backup of your Claude Code `cli.js`/binary for when you want to revert your customizations and for reapplying patches. Before it applies your customizations, it restores the original `cli.js`/binary so that it can start from a clean slate. Sometimes things can get confused and your `claude` can be corrupted.
