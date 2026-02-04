@@ -320,6 +320,10 @@ export const writeToolsetFieldToAppState = (
     return null;
   }
 
+  // Show diff for the last modification (representative of all changes)
+  const lastMod = modifications[modifications.length - 1];
+  showDiff(oldFile, newFile, textToInsert, lastMod.index, lastMod.index);
+
   return newFile;
 };
 
@@ -797,6 +801,8 @@ export const addSetStateFnAccessAtToolChangeComponentScope = (
   const newFile =
     oldFile.slice(0, scopeIndex) + injectionCode + oldFile.slice(scopeIndex);
 
+  showDiff(oldFile, newFile, injectionCode, scopeIndex, scopeIndex);
+
   return newFile;
 };
 
@@ -861,6 +867,8 @@ export const writeModeChangeUpdateToolset = (
     oldFile.slice(0, modeChangeIndex) +
     injectionCode +
     oldFile.slice(modeChangeIndex);
+
+  showDiff(oldFile, newFile, injectionCode, modeChangeIndex, modeChangeIndex);
 
   return newFile;
 };
