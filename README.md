@@ -456,7 +456,7 @@ Note that `CLAUDE.md` is always used above all alternatives when it's available,
 
 Here's a demo video of `AGENTS.md` working:
 
-<video src="./assets/agentsmd_demo_video.mp4" width="500"></video>
+https://github.com/user-attachments/assets/27513489-bb89-4174-b62f-ab17b0fce7bd
 
 ## Configuration directory
 
