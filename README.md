@@ -119,7 +119,7 @@ $ pnpm dlx tweakcc
   - [Swarm mode (native multi-agent)](#feature-swarm-mode-native-multi-agent)
   - [Token count rounding](#feature-token-count-rounding)
   - [Statusline update customization](#feature-statusline-update-customization)
-  - [AGENTS.md support](#feature-agentsmd-support)
+  - [AGENTS.md support (with video)](#feature-agentsmd-support)
   - _Missing documentation for above features coming soon_
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
@@ -453,6 +453,10 @@ The patch happens automatically, with a default set of `AGENTS.md`, `GEMINI.md`,
 ```
 
 Note that `CLAUDE.md` is always used above all alternatives when it's available, so it's not needed to include it in the list.
+
+Here's a demo video of `AGENTS.md` working:
+
+<video src="./assets/agentsmd_demo_video.mp4" width="500">
 
 ## Configuration directory
 
