@@ -66,6 +66,7 @@ import { writeMcpNonBlocking, writeMcpBatchSize } from './mcpStartup';
 import { writeStatuslineUpdateThrottle } from './statuslineUpdateThrottle';
 import { writeTokenCountRounding } from './tokenCountRounding';
 import { writeAgentsMd } from './agentsMd';
+import { writeAutoAcceptPlanMode } from './autoAcceptPlanMode';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -323,6 +324,13 @@ const PATCH_DEFINITIONS = [
     name: 'AGENTS.md (and others)',
     group: PatchGroup.MISC_CONFIGURABLE,
     description: 'Support AGENTS.md and others in addition to CLAUDE.md',
+  },
+  {
+    id: 'auto-accept-plan-mode',
+    name: 'Auto-accept plan mode',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Automatically accept plans without the "Ready to code?" confirmation prompt',
   },
   // Features
   {
@@ -731,6 +739,10 @@ export const applyCustomization = async (
         config.settings.claudeMdAltNames &&
         config.settings.claudeMdAltNames.length > 0
       ),
+    },
+    'auto-accept-plan-mode': {
+      fn: c => writeAutoAcceptPlanMode(c),
+      condition: !!config.settings.misc?.autoAcceptPlanMode,
     },
     // Features
     'swarm-mode': {

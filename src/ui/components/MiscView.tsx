@@ -73,6 +73,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableSessionMemory: true,
     enableRememberSkill: false,
     tokenCountRounding: null as number | null,
+    autoAcceptPlanMode: false,
   };
 
   const ensureMisc = () => {
@@ -497,6 +498,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
               settings.misc!.tokenCountRounding ?? null,
               'prev'
             );
+          });
+        },
+      },
+      {
+        id: 'autoAcceptPlanMode',
+        title: 'Auto-accept plan mode',
+        description:
+          'Automatically accept plans without the "Ready to code?" confirmation prompt.',
+        getValue: () => settings.misc?.autoAcceptPlanMode ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.autoAcceptPlanMode =
+              !settings.misc!.autoAcceptPlanMode;
           });
         },
       },
