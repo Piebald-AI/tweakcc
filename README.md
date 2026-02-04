@@ -120,6 +120,7 @@ $ pnpm dlx tweakcc
   - [Token count rounding](#feature-token-count-rounding)
   - [Statusline update customization](#feature-statusline-update-customization)
   - [AGENTS.md support (with video)](#feature-agentsmd-support)
+  - [Auto-accept plan mode](#feature-auto-accept-plan-mode)
   - _Missing documentation for above features coming soon_
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
@@ -457,6 +458,24 @@ Note that `CLAUDE.md` is always used above all alternatives when it's available,
 Here's a demo video of `AGENTS.md` working:
 
 https://github.com/user-attachments/assets/27513489-bb89-4174-b62f-ab17b0fce7bd
+
+## Feature: Auto-accept plan mode
+
+<sm><i>Supported Claude Code versions: 2.1.22 to 2.1.31+.</i></sm>
+
+When Claude finishes writing a plan and calls `ExitPlanMode`, you're normally shown a "Ready to code?" dialog with options to approve or continue editing. This patch automatically selects "Yes, clear context and auto-accept edits" without requiring user interaction.
+
+**Configuration via `config.json`:** Set `settings.misc.autoAcceptPlanMode` to `true`:
+
+```json
+{
+  "settings": {
+    "misc": {
+      "autoAcceptPlanMode": true
+    }
+  }
+}
+```
 
 ## Configuration directory
 
