@@ -22,7 +22,7 @@
 //  }
 // ```
 
-import { showDiff } from './index';
+import { showDiff, globalReplace } from './index';
 
 /**
  * Patch 1: Bypass tengu_session_memory flag check for extraction
@@ -66,12 +66,85 @@ const patchPastSessions = (file: string): string | null => {
 };
 
 /**
- * Combined patch - applies both extraction and past sessions
+ * Patch 3: Make per-section and total file token limits configurable via env vars
+ */
+const patchTokenLimits = (file: string): string | null => {
+  // Pattern matches: =2000 ... =12000 ... # Session Title
+  const pattern =
+    /(=)2000((?:.|\n){0,15}?=)12000((?:.|\n){0,20}# Session Title)/;
+  const match = file.match(pattern);
+
+  if (!match || match.index === undefined) {
+    console.error('patch: sessionMemory: failed to find token limits pattern');
+    return null;
+  }
+
+  const perSectionCode = 'Number(process.env.CC_SM_PER_SECTION_TOKENS??2000)';
+  const totalFileCode = 'Number(process.env.CM_SM_TOTAL_FILE_LIMIT??12000)';
+
+  const replacement =
+    match[1] + perSectionCode + match[2] + totalFileCode + match[3];
+  const startIndex = match.index;
+  const endIndex = startIndex + match[0].length;
+
+  const newFile =
+    file.slice(0, startIndex) + replacement + file.slice(endIndex);
+
+  showDiff(file, newFile, replacement, startIndex, endIndex);
+  return newFile;
+};
+
+/**
+ * Patch 4: Make session memory update thresholds configurable via env vars
+ */
+const patchUpdateThresholds = (file: string): string | null => {
+  let newFile = file;
+
+  // Replace minimumMessageTokensToInit
+  newFile = globalReplace(
+    newFile,
+    /minimumMessageTokensToInit:1e4,/g,
+    'minimumMessageTokensToInit:Number(process.env.CC_SM_MINIMUM_MESSAGE_TOKENS_TO_INIT??1e4),'
+  );
+
+  // Replace minimumTokensBetweenUpdate
+  newFile = globalReplace(
+    newFile,
+    /minimumTokensBetweenUpdate:5000,/g,
+    'minimumTokensBetweenUpdate:Number(process.env.CC_SM_MINIMUM_TOKENS_BETWEEN_UPDATE??5000),'
+  );
+
+  // Replace toolCallsBetweenUpdates
+  newFile = globalReplace(
+    newFile,
+    /toolCallsBetweenUpdates:3,/g,
+    'toolCallsBetweenUpdates:Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES??3),'
+  );
+
+  // Check if any replacements were made
+  if (newFile === file) {
+    console.error(
+      'patch: sessionMemory: failed to find update thresholds patterns'
+    );
+    return null;
+  }
+
+  return newFile;
+};
+
+/**
+ * Combined patch - applies extraction, past sessions, token limits, and update thresholds
  */
 export const writeSessionMemory = (oldFile: string): string | null => {
   let newFile = patchExtraction(oldFile);
   if (!newFile) return null;
 
   newFile = patchPastSessions(newFile);
+  if (!newFile) return null;
+
+  newFile = patchTokenLimits(newFile);
+  if (!newFile) return null;
+
+  newFile = patchUpdateThresholds(newFile);
   return newFile;
 };

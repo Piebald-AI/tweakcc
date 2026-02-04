@@ -226,9 +226,9 @@ claude --model opusplan[1m]
 | Plan mode (Shift+Tab twice) | Opus 4.5   | 200k           |
 | Execution mode (default)    | Sonnet 4.5 | **1M**         |
 
-If you use multiple MCP servers, Claude Code's startup can be slow—waiting 10-15+ seconds for all servers to connect before you can start typing.
-
 ## Feature: MCP startup optimization
+
+If you use multiple MCP servers, Claude Code's startup can be slow—waiting 10-15+ seconds for all servers to connect before you can start typing.
 
 tweakcc fixes this with two optimizations (based on [this blog post](https://cuipengfei.is-a.dev/blog/2026/01/24/claude-code-mcp-startup-optimization/)):
 
