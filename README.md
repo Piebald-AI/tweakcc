@@ -465,7 +465,9 @@ https://github.com/user-attachments/assets/27513489-bb89-4174-b62f-ab17b0fce7bd
 
 When Claude finishes writing a plan and calls `ExitPlanMode`, you're normally shown a "Ready to code?" dialog with options to approve or continue editing. This patch automatically selects "Yes, clear context and auto-accept edits" without requiring user interaction.
 
-**Configuration via `config.json`:** Set `settings.misc.autoAcceptPlanMode` to `true`:
+**Via UI:** Run `npx tweakcc@latest` and navigate to `Miscellaneous Settings`. Scroll down to find `Auto-accept plan mode` and press space to enable it.
+
+**Via `config.json`:** Set `settings.misc.autoAcceptPlanMode` to `true`:
 
 ```json
 {
