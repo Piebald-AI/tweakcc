@@ -119,7 +119,7 @@ $ pnpm dlx tweakcc
   - [Swarm mode (native multi-agent)](#feature-swarm-mode-native-multi-agent)
   - [Token count rounding](#feature-token-count-rounding)
   - [Statusline update customization](#feature-statusline-update-customization)
-  - [AGENTS.md support](#feature-agentsmd-support)
+  - [AGENTS.md support (with video)](#feature-agentsmd-support)
   - _Missing documentation for above features coming soon_
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
@@ -454,6 +454,10 @@ The patch happens automatically, with a default set of `AGENTS.md`, `GEMINI.md`,
 
 Note that `CLAUDE.md` is always used above all alternatives when it's available, so it's not needed to include it in the list.
 
+Here's a demo video of `AGENTS.md` working:
+
+https://github.com/user-attachments/assets/27513489-bb89-4174-b62f-ab17b0fce7bd
+
 ## Configuration directory
 
 tweakcc stores its configuration files in one of the following locations, in order of priority:
@@ -615,4 +619,4 @@ Could you have forgotten to actually set Claude Code's theme to your new theme? 
 
 [MIT](https://github.com/Piebald-AI/tweakcc/blob/main/LICENSE)
 
-Copyright © 2025 [Piebald LLC](https://piebald.ai).
+Copyright © 2026 [Piebald LLC](https://piebald.ai).
