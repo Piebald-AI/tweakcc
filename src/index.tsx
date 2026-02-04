@@ -4,7 +4,12 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 
 import App from './ui/App';
-import { CONFIG_FILE, readConfigFile, updateConfigFile } from './config';
+import {
+  CONFIG_FILE,
+  readConfigFile,
+  updateConfigFile,
+  fetchConfigFromUrl,
+} from './config';
 import {
   enableDebug,
   enableVerbose,
@@ -166,6 +171,10 @@ const main = async () => {
     .option(
       '--list-system-prompts [version]',
       'list all available system prompts for a CC version'
+    )
+    .option(
+      '--config-url <url>',
+      'fetch configuration from a URL instead of local config.json'
     );
   program.parse();
   const options = program.opts();
@@ -209,8 +218,23 @@ const main = async () => {
     const patchFilter = options.patches
       ? (options.patches as string).split(',').map((id: string) => id.trim())
       : null;
-    await handleApplyMode(patchFilter);
+    await handleApplyMode(patchFilter, options.configUrl);
     return;
+  }
+
+  // --config-url is only valid with --apply
+  if (options.configUrl) {
+    console.error(
+      chalk.red('Error: --config-url can only be used with --apply.')
+    );
+    console.error(
+      chalk.gray('The interactive TUI is for editing local configuration only.')
+    );
+    console.error(chalk.gray('To apply a remote config, use:'));
+    console.error(
+      chalk.gray(`  ${getInvocationCommand()} --apply --config-url <url>`)
+    );
+    process.exit(1);
   }
 
   // Handle --restore or --revert flags for non-interactive mode
@@ -227,22 +251,40 @@ const main = async () => {
  * Handles the --apply flag for non-interactive mode.
  * All errors in detection will throw with detailed messages.
  * @param patchFilter - Optional list of patch IDs to apply (if null, apply all)
+ * @param configUrl - Optional URL to fetch configuration from
  */
-async function handleApplyMode(patchFilter: string[] | null): Promise<void> {
+async function handleApplyMode(
+  patchFilter: string[] | null,
+  configUrl?: string
+): Promise<void> {
   console.log('Applying saved customizations to Claude Code...');
-  console.log(`Configuration saved at: ${CONFIG_FILE}`);
 
-  // Read the saved configuration
-  const config = await readConfigFile();
+  // Read the configuration (from URL or local file)
+  let config;
+  if (configUrl) {
+    console.log(`Fetching configuration from: ${configUrl}`);
+    try {
+      config = await fetchConfigFromUrl(configUrl);
+      console.log('Configuration fetched successfully.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(chalk.red(`Error: ${message}`));
+      process.exit(1);
+    }
+  } else {
+    console.log(`Configuration saved at: ${CONFIG_FILE}`);
+    config = await readConfigFile();
+  }
 
   if (!config.settings || Object.keys(config.settings).length === 0) {
-    console.error('No saved customizations found in ' + CONFIG_FILE);
+    const source = configUrl ? configUrl : CONFIG_FILE;
+    console.error('No saved customizations found in ' + source);
     process.exit(1);
   }
 
   try {
     // Find Claude Code installation (non-interactive mode throws on ambiguity)
-    const result = await startupCheck({ interactive: false });
+    const result = await startupCheck({ interactive: false }, config);
 
     if (!result.startupCheckInfo || !result.startupCheckInfo.ccInstInfo) {
       // This shouldn't happen in non-interactive mode (should throw instead),
@@ -581,6 +623,10 @@ async function handleListSystemPrompts(
 
 /**
  * Handles interactive mode with the full UI.
+ * The TUI is for editing local configuration only - remote config URLs are
+ * only supported with --apply mode.
+ *
+ * @param configMigrated - Whether the config was migrated
  */
 async function handleInteractiveMode(configMigrated: boolean): Promise<void> {
   try {
@@ -614,6 +660,9 @@ async function handleInteractiveMode(configMigrated: boolean): Promise<void> {
 
 /**
  * Handles the case where multiple installations are found and user needs to select one.
+ *
+ * @param candidates - List of installation candidates
+ * @param configMigrated - Whether the config was migrated
  */
 async function handleInstallationSelection(
   candidates: InstallationCandidate[],
@@ -657,6 +706,10 @@ async function handleInstallationSelection(
 
 /**
  * Starts the main app with the given startup info.
+ * The TUI always uses local configuration only.
+ *
+ * @param startupCheckInfo - Startup check result
+ * @param configMigrated - Whether the config was migrated
  */
 async function startApp(
   startupCheckInfo: StartupCheckInfo,

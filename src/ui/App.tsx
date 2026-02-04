@@ -54,7 +54,8 @@ export default function App({
   });
   const [showPiebaldAnnouncement, setShowPiebaldAnnouncement] = useState(false);
 
-  // Load the config file.
+  // Load the config file from local storage.
+  // The TUI is for editing local configuration only.
   useEffect(() => {
     const loadConfig = async () => {
       const loadedConfig = await readConfigFile();

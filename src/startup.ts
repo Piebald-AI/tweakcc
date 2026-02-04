@@ -33,12 +33,14 @@ export interface StartupCheckResult {
  * it's been updated.
  *
  * @param options - Options for installation detection (interactive mode flag)
+ * @param providedConfig - Optional pre-loaded config (e.g., from URL). If not provided, reads from local file.
  * @returns StartupCheckResult with either startupCheckInfo or pendingCandidates for UI selection
  */
 export async function startupCheck(
-  options: FindInstallationOptions
+  options: FindInstallationOptions,
+  providedConfig?: TweakccConfig
 ): Promise<StartupCheckResult> {
-  const config = await readConfigFile();
+  const config = providedConfig ?? (await readConfigFile());
 
   const ccInstInfo = await findClaudeCodeInstallation(config, options);
   if (!ccInstInfo) {
