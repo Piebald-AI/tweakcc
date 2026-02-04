@@ -619,4 +619,4 @@ Could you have forgotten to actually set Claude Code's theme to your new theme? 
 
 [MIT](https://github.com/Piebald-AI/tweakcc/blob/main/LICENSE)
 
-Copyright © 2025 [Piebald LLC](https://piebald.ai).
+Copyright © 2026 [Piebald LLC](https://piebald.ai).
