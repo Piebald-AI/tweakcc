@@ -501,6 +501,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
           });
         },
       },
+      {
+        id: 'autoAcceptPlanMode',
+        title: 'Auto-accept plan mode',
+        description:
+          'Automatically accept plans without the "Ready to code?" confirmation prompt.',
+        getValue: () => settings.misc?.autoAcceptPlanMode ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.autoAcceptPlanMode =
+              !settings.misc!.autoAcceptPlanMode;
+          });
+        },
+      },
     ],
     [settings, updateSettings]
   );
