@@ -66,6 +66,7 @@ import { writeMcpNonBlocking, writeMcpBatchSize } from './mcpStartup';
 import { writeStatuslineUpdateThrottle } from './statuslineUpdateThrottle';
 import { writeTokenCountRounding } from './tokenCountRounding';
 import { writeAgentsMd } from './agentsMd';
+import { writeAutoAcceptPlanMode } from './autoAcceptPlanMode';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -185,6 +186,12 @@ const PATCH_DEFINITIONS = [
     name: `Statusline update throttling correction`,
     group: PatchGroup.ALWAYS_APPLIED,
     description: `Statusline updates will be properly throttled instead of queued (or debounced)`,
+  },
+  {
+    id: 'auto-accept-plan-mode',
+    name: 'Auto-accept plan mode',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description: 'Automatically accept plans without confirmation prompt',
   },
   // Misc Configurable
   {
@@ -607,6 +614,9 @@ export const applyCustomization = async (
           config.settings.misc?.statuslineUseFixedInterval ?? false
         ),
       condition: config.settings.misc?.statuslineThrottleMs != null,
+    },
+    'auto-accept-plan-mode': {
+      fn: c => writeAutoAcceptPlanMode(c),
     },
     // Misc Configurable
     'patches-applied-indication': {
