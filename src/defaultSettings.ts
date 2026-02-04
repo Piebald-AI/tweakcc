@@ -708,6 +708,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableSessionMemory: true,
     enableRememberSkill: false,
     tokenCountRounding: null,
+    autoAcceptPlanMode: false,
   },
   toolsets: [],
   defaultToolset: null,

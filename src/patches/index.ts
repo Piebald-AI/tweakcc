@@ -187,12 +187,6 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.ALWAYS_APPLIED,
     description: `Statusline updates will be properly throttled instead of queued (or debounced)`,
   },
-  {
-    id: 'auto-accept-plan-mode',
-    name: 'Auto-accept plan mode',
-    group: PatchGroup.ALWAYS_APPLIED,
-    description: 'Automatically accept plans without confirmation prompt',
-  },
   // Misc Configurable
   {
     id: 'patches-applied-indication',
@@ -330,6 +324,13 @@ const PATCH_DEFINITIONS = [
     name: 'AGENTS.md (and others)',
     group: PatchGroup.MISC_CONFIGURABLE,
     description: 'Support AGENTS.md and others in addition to CLAUDE.md',
+  },
+  {
+    id: 'auto-accept-plan-mode',
+    name: 'Auto-accept plan mode',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Automatically accept plans without the "Ready to code?" confirmation prompt',
   },
   // Features
   {
@@ -615,9 +616,6 @@ export const applyCustomization = async (
         ),
       condition: config.settings.misc?.statuslineThrottleMs != null,
     },
-    'auto-accept-plan-mode': {
-      fn: c => writeAutoAcceptPlanMode(c),
-    },
     // Misc Configurable
     'patches-applied-indication': {
       fn: c =>
@@ -741,6 +739,10 @@ export const applyCustomization = async (
         config.settings.claudeMdAltNames &&
         config.settings.claudeMdAltNames.length > 0
       ),
+    },
+    'auto-accept-plan-mode': {
+      fn: c => writeAutoAcceptPlanMode(c),
+      condition: !!config.settings.misc?.autoAcceptPlanMode,
     },
     // Features
     'swarm-mode': {

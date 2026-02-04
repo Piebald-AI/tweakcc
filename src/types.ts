@@ -126,6 +126,7 @@ export interface MiscConfig {
   enableSessionMemory: boolean;
   enableRememberSkill: boolean;
   tokenCountRounding: number | null;
+  autoAcceptPlanMode: boolean;
 }
 
 export interface InputPatternHighlighter {

@@ -73,6 +73,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableSessionMemory: true,
     enableRememberSkill: false,
     tokenCountRounding: null as number | null,
+    autoAcceptPlanMode: false,
   };
 
   const ensureMisc = () => {
