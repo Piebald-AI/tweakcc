@@ -71,6 +71,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     tableFormat: 'default' as TableFormat,
     enableSwarmMode: true,
     enableSessionMemory: true,
+    enableRememberSkill: false,
     tokenCountRounding: null as number | null,
   };
 
@@ -448,6 +449,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.enableSessionMemory =
               !settings.misc!.enableSessionMemory;
+          });
+        },
+      },
+      {
+        id: 'enableRememberSkill',
+        title: 'Enable remember skill',
+        description:
+          'Register a "remember" skill to review session memories and update CLAUDE.local.md with learnings from past sessions.',
+        getValue: () => settings.misc?.enableRememberSkill ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableRememberSkill =
+              !settings.misc!.enableRememberSkill;
           });
         },
       },
