@@ -130,7 +130,7 @@ $ pnpm dlx tweakcc
 
 tweakcc works by patching Claude Code's minified `cli.js` file. For npm-based installations this file is modified directly, but for native installation it's extracted from the binary, patched, and then the binary is repacked. When you update your Claude Code installation, your customizations will be overwritten, but they're remembered in your configuration file, so they can be reapplied by just running `npx tweakcc --apply`.
 
-tweakcc is verified to work with Claude Code **2.1.31.** In newer or earlier versions various patches might not work. However, if we have the [system prompts for your version](https://github.com/Piebald-AI/tweakcc/tree/main/data/prompts) then system prompt patching is guaranteed to work with that version, even if it's significantly different from the verified CC version&mdash;the version number stated above is only relevant for the non-system-prompt patches. We get the latest system prompts within minutes of each new CC release, so unless you're using a CC version older than 2.0.14, your version is supported.
+tweakcc is verified to work with Claude Code **2.1.32.** In newer or earlier versions various patches might not work. However, if we have the [system prompts for your version](https://github.com/Piebald-AI/tweakcc/tree/main/data/prompts) then system prompt patching is guaranteed to work with that version, even if it's significantly different from the verified CC version&mdash;the version number stated above is only relevant for the non-system-prompt patches. We get the latest system prompts within minutes of each new CC release, so unless you're using a CC version older than 2.0.14, your version is supported.
 
 ## Feature: Input pattern highlighters
 
@@ -428,7 +428,7 @@ Here are two demos showing 1) updates triggered every 150ms, and 2) updates trig
 
 ## Feature: AGENTS.md support
 
-<sm><i>Supported Claude Code versions: 1.0.24 (and likely older) to 2.1.29+.</i></sm>
+<sm><i>Supported Claude Code versions: 1.0.24 (and likely older) to 2.1.32+.</i></sm>
 
 Claude Code is the only coding agent that doesn't support `AGENTS.md`; they only support `CLAUDE.md` and `CLAUDE.local.md`. ([This issue](https://github.com/anthropics/claude-code/issues/6235) has over 2200 upvotes.) tweakcc automatically patches Claude Code to fallback to `AGENTS.md` and several others when `CLAUDE.md` doesn't exist.
 
@@ -456,7 +456,7 @@ https://github.com/user-attachments/assets/27513489-bb89-4174-b62f-ab17b0fce7bd
 
 ## Feature: Auto-accept plan mode
 
-<sm><i>Supported Claude Code versions: 2.1.22 to 2.1.31+.</i></sm>
+<sm><i>Supported Claude Code versions: 2.1.22 to 2.1.32+.</i></sm>
 
 When Claude finishes writing a plan and calls `ExitPlanMode`, you're normally shown a "Ready to code?" dialog with options to approve or continue editing. This patch automatically selects "Yes, clear context and auto-accept edits" without requiring user interaction.
 
