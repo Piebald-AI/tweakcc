@@ -70,7 +70,7 @@ const patchModeSwitchingFunction = (oldFile: string): string | null => {
 const patchModelAliasesList = (oldFile: string): string | null => {
   // Pattern matches the model aliases array assignment
   const pattern =
-    /(\["sonnet","opus","haiku",(?:"best",)?"sonnet\[1m\]","opusplan")/;
+    /(\["sonnet","opus","haiku",(?:"best",)?"sonnet\[1m\]",(?:"opus\[1m\]",)?"opusplan")/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
@@ -111,7 +111,7 @@ const patchModelAliasesList = (oldFile: string): string | null => {
 const patchDescriptionFunction = (oldFile: string): string | null => {
   // Pattern matches: if (VAR === "opusplan") return "Opus 4.5 in plan mode, else Sonnet 4.5";
   const pattern =
-    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*"Opus 4\.5 in plan mode, else Sonnet 4\.5";)/;
+    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*"Opus 4\.\d+ in plan mode, else Sonnet 4\.5";)/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
@@ -286,69 +286,68 @@ const patchAlwaysShowInModelSelector = (oldFile: string): string | null => {
  */
 export const writeOpusplan1m = (oldFile: string): string | null => {
   let newFile = oldFile;
-  let applied = false;
 
   // Patch 1: Mode switching function
-  const result1 = patchModeSwitchingFunction(newFile);
-  if (result1) {
-    newFile = result1;
-    applied = true;
+  let result = patchModeSwitchingFunction(newFile);
+  if (result) {
+    newFile = result;
   } else {
     console.error('patch: opusplan1m: failed to apply mode switching patch');
+    return null;
   }
 
   // Patch 2: Model aliases list
-  const result2 = patchModelAliasesList(newFile);
-  if (result2) {
-    newFile = result2;
-    applied = true;
+  result = patchModelAliasesList(newFile);
+  if (result) {
+    newFile = result;
   } else {
     console.error(
       'patch: opusplan1m: failed to apply model aliases list patch'
     );
+    return null;
   }
 
   // Patch 3: Description function
-  const result3 = patchDescriptionFunction(newFile);
-  if (result3) {
-    newFile = result3;
-    applied = true;
+  result = patchDescriptionFunction(newFile);
+  if (result) {
+    newFile = result;
   } else {
     console.error(
       'patch: opusplan1m: failed to apply description function patch'
     );
+    return null;
   }
 
   // Patch 4: Label function
-  const result4 = patchLabelFunction(newFile);
-  if (result4) {
-    newFile = result4;
-    applied = true;
+  result = patchLabelFunction(newFile);
+  if (result) {
+    newFile = result;
   } else {
     console.error('patch: opusplan1m: failed to apply label function patch');
+    return null;
   }
 
   // Patch 5: Model selector options (conditional show when selected)
-  const result5 = patchModelSelectorOptions(newFile);
-  if (result5) {
-    newFile = result5;
-    applied = true;
+  result = patchModelSelectorOptions(newFile);
+  if (result) {
+    newFile = result;
   } else {
     console.error(
       'patch: opusplan1m: failed to apply model selector options patch'
     );
+    return null;
   }
 
   // Patch 6: Always show in model selector (push to list)
-  const result6 = patchAlwaysShowInModelSelector(newFile);
-  if (result6) {
-    newFile = result6;
-    applied = true;
+  result = patchAlwaysShowInModelSelector(newFile);
+  if (result) {
+    newFile = result;
   } else {
     console.error(
       'patch: opusplan1m: failed to apply always-show-in-selector patch'
     );
+    return null;
   }
 
-  return applied ? newFile : null;
+  return newFile;
 };
