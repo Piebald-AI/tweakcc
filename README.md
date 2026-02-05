@@ -130,7 +130,7 @@ $ pnpm dlx tweakcc
 
 tweakcc works by patching Claude Code's minified `cli.js` file. For npm-based installations this file is modified directly, but for native installation it's extracted from the binary, patched, and then the binary is repacked. When you update your Claude Code installation, your customizations will be overwritten, but they're remembered in your configuration file, so they can be reapplied by just running `npx tweakcc --apply`.
 
-tweakcc is verified to work with Claude Code **2.1.2.** In newer or earlier versions various patches might not work. However, if we have the [system prompts for your version](https://github.com/Piebald-AI/tweakcc/tree/main/data/prompts) then system prompt patching is guaranteed to work with that version, even if it's significantly different from the verified CC version. We get the latest system prompts within minutes of each new CC release, so unless you're using a CC version older than 2.0.14, your version is supported.
+tweakcc is verified to work with Claude Code **2.1.31.** In newer or earlier versions various patches might not work. However, if we have the [system prompts for your version](https://github.com/Piebald-AI/tweakcc/tree/main/data/prompts) then system prompt patching is guaranteed to work with that version, even if it's significantly different from the verified CC version&mdash;the version number stated above is only relevant for the non-system-prompt patches. We get the latest system prompts within minutes of each new CC release, so unless you're using a CC version older than 2.0.14, your version is supported.
 
 ## Feature: Input pattern highlighters
 
