@@ -62,15 +62,10 @@ tweakcc also
 
 - Fixes a bug where the **spinner animation** is frozen if you have the `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` environment variable set ([#46](https://github.com/Piebald-AI/tweakcc/issues/46))
 - Allows you to **change the context limit** (default: 200k tokens) used with models from custom Anthropic-compatible APIs with a new environment variable, `CLAUDE_CODE_CONTEXT_LIMIT`
-- Adds the **`opusplan[1m]`** model alias, combining Opus for planning with Sonnet's 1M context for execution—reducing "[context anxiety](#opus-plan-1m-mode)" ([#108](https://github.com/Piebald-AI/tweakcc/issues/108))
+- Adds the **`opusplan[1m]`** model alias, combining Opus for planning with Sonnet's 1M context for execution—reducing "[context anxiety](#feature-opus-plan-1m-mode)" ([#108](https://github.com/Piebald-AI/tweakcc/issues/108))
 - Adds a message to Claude Code's startup banner indicating that you're running the patched version of CC (configurable)
 - Speeds up Claude Code startup by **~50%** with non-blocking MCP connections and configurable parallel connection batch size ([#406](https://github.com/Piebald-AI/tweakcc/issues/406))
 - Enables native multi-agent/swarm mode (TeammateTool, delegate mode, swarm spawning) by bypassing the `tengu_brass_pebble` Statsig flag.
-
-Additionally, we're working on features that will allow you to
-
-- Pick from over **70+ spinning/thinking animations** from [`cli-spinners`](https://github.com/sindresorhus/cli-spinners)
-- Apply **custom styling** to the markdown elements in Claude's responses like code, bold, headers, etc
 
 tweakcc supports Claude Code installed on **Windows, macOS, and Linux**, both **native/binary installations** and those installed via npm, yarn, pnpm, bun, Homebrew/Linuxbrew, nvm, fnm, n, volta, nvs, and nodenv, as well as custom locations.
 
@@ -135,7 +130,7 @@ $ pnpm dlx tweakcc
 
 tweakcc works by patching Claude Code's minified `cli.js` file. For npm-based installations this file is modified directly, but for native installation it's extracted from the binary, patched, and then the binary is repacked. When you update your Claude Code installation, your customizations will be overwritten, but they're remembered in your configuration file, so they can be reapplied by just running `npx tweakcc --apply`.
 
-tweakcc is verified to work with Claude Code **2.1.2.** In newer or earlier versions various patches might not work. However, if we have the [system prompts for your version](https://github.com/Piebald-AI/tweakcc/tree/main/data/prompts) then system prompt patching is guaranteed to work with that version, even if it's significantly different from the verified CC version. We get the latest system prompts within minutes of each new CC release, so unless you're using a CC version older than 2.0.14, your version is supported.
+tweakcc is verified to work with Claude Code **2.1.31.** In newer or earlier versions various patches might not work. However, if we have the [system prompts for your version](https://github.com/Piebald-AI/tweakcc/tree/main/data/prompts) then system prompt patching is guaranteed to work with that version, even if it's significantly different from the verified CC version&mdash;the version number stated above is only relevant for the non-system-prompt patches. We get the latest system prompts within minutes of each new CC release, so unless you're using a CC version older than 2.0.14, your version is supported.
 
 ## Feature: Input pattern highlighters
 
@@ -573,12 +568,14 @@ To create a toolset, run `npx tweakcc`, go to `Toolsets`, and hit `n` to create 
 
 ## Remote Config
 
-While tweakcc usually works by applying customizations from your local `~/.tweakcc/config.json`, you can optionally pass the `--config-url <http URL>` flag when you use `tweakcc --apply` to have tweakcc fetch config from a remote URL and apply it to your local Claude Code installation.  This is useful for testing someone else's config when shared via a Gist or pastebin, for example.
+While tweakcc usually works by applying customizations from your local `~/.tweakcc/config.json`, you can optionally pass the `--config-url <http URL>` flag when you use `tweakcc --apply` to have tweakcc fetch config from a remote URL and apply it to your local Claude Code installation. This is useful for testing someone else's config when shared via a Gist or pastebin, for example.
 
 Example:
+
 ```
-npx tweakcc@latest --apply --config-url https://gist.githubusercontent.com/bl-ue/27323f9bfd4c18aaab51cad11c1148dc/raw/c1b6875c4b3c3adfaf6332bb69eedff02fa04471/config.json
+npx tweakcc@latest --apply --config-url https://gist.githubusercontent.com/bl-ue/27323f9bfd4c18aaab51cad11c1148dc/raw/b132c20387568536cf6586c2324e2f4491bb07df/config.json
 ```
+
 Your local config will **not** be overwritten; the remote config will be copied into your `config.json` under under `remoteConfig.settings`.
 
 ## Troubleshooting

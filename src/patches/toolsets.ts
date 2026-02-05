@@ -25,7 +25,7 @@ export const findSelectComponentName = (
 ): string | null => {
   // Pattern matches the Select component's function signature
   const selectPattern =
-    /function ([$\w]+)\(\{(?:(?:isDisabled|hideIndexes|visibleOptionCount|highlightText|options|defaultValue|onCancel|onChange|onFocus|focusValue|layout|disableSelection):[$\w]+(?:=(?:[^,]+,|[^}]+\})|[,}]))+\)/g;
+    /function ([$\w]+)(?:\([$\w]+\)\{let [$\w]+=[$\w]+\(\d+\),\{(?:(?:isDisabled|hideIndexes|visibleOptionCount|highlightText|options|defaultValue|onCancel|onChange|onFocus|defaultFocusValue|layout|disableSelection|inlineDescriptions|onUpFromFirstItem|onDownFromLastItem|onInputModeToggle|onOpenEditor):[$\w]+,?)+\}=|\(\{(?:(?:isDisabled|hideIndexes|visibleOptionCount|highlightText|options|defaultValue|onCancel|onChange|onFocus|defaultFocusValue|layout|disableSelection|inlineDescriptions|onUpFromFirstItem|onDownFromLastItem|onInputModeToggle|onOpenEditor):[$\w]+(?:=(?:[^,]+,|[^}]+\})|[,}]))+\))/g;
 
   const matches = Array.from(fileContents.matchAll(selectPattern));
   if (matches.length === 0) {
@@ -53,8 +53,9 @@ export const findDividerComponentName = (
   fileContents: string
 ): string | null => {
   // Pattern matches the Divider component's function signature
+  // TODO: this could be refactored to a single function that takes a list of params, and maybe even finds and returns the longest match.
   const dividerPattern =
-    /function ([$\w]+)\(\{(?:(?:orientation|title|width|padding|titlePadding|titleColor|titleDimColor|dividerChar|dividerColor|dividerDimColor|boxProps):[$\w]+(?:=(?:[^,]+,|[^}]+\})|[,}]))+\)/g;
+    /function ([$\w]+)(?:\([$\w]+\)\{let [$\w]+=[$\w]+\(\d+\),\{(?:(?:orientation|title|width|padding|titlePadding|titleColor|titleDimColor|dividerChar|dividerColor|dividerDimColor|boxProps):[$\w]+,?)+\}=|\(\{(?:(?:orientation|title|width|padding|titlePadding|titleColor|titleDimColor|dividerChar|dividerColor|dividerDimColor|boxProps):[$\w]+(?:=(?:[^,]+,|[^}]+\})|[,}]))+\))/g;
 
   const matches = Array.from(fileContents.matchAll(dividerPattern));
   if (matches.length === 0) {
@@ -143,6 +144,29 @@ export const getAppStateVarAndGetterFunction = (
   return {
     appStateVar: match[1],
     appStateGetterFunction: match[2],
+  };
+};
+
+/**
+ * Get app state selector and useState function names
+ */
+export const getAppStateSelectorAndUseState = (
+  fileContents: string
+): { appStateUseSelectorFn: string; appStateSetState: string } | null => {
+  const pattern =
+    /function ([$\w]+)\(.{0,110}`Your selector in.{0,1000}?function ([$\w]+)\(\)\{return [$\w]+\(\)\.setState\}/;
+  const match = fileContents.match(pattern);
+
+  if (!match) {
+    console.error(
+      'patch: getAppStateSelectorAndUseState: failed to find pattern'
+    );
+    return null;
+  }
+
+  return {
+    appStateUseSelectorFn: match[1],
+    appStateSetState: match[2],
   };
 };
 
@@ -320,6 +344,10 @@ export const writeToolsetFieldToAppState = (
     return null;
   }
 
+  // Show diff for the last modification (representative of all changes)
+  const lastMod = modifications[modifications.length - 1];
+  showDiff(oldFile, newFile, textToInsert, lastMod.index, lastMod.index);
+
   return newFile;
 };
 
@@ -330,30 +358,27 @@ export const writeToolFetchingUseMemo = (
   oldFile: string,
   toolsets: Toolset[]
 ): string | null => {
-  const useMemoLoc = getToolFetchingUseMemoLocation(oldFile);
-  if (!useMemoLoc) {
+  const stateInfo = getAppStateSelectorAndUseState(oldFile);
+  if (!stateInfo) {
     console.error(
-      'patch: toolsets: failed to find tool fetching useMemo location'
+      'patch: toolsets: toolFetchingMemo: failed to find app state info'
     );
     return null;
   }
 
-  const stateInfo = getAppStateVarAndGetterFunction(oldFile);
-  if (!stateInfo) {
-    console.error('patch: toolsets: failed to find app state info');
+  const { appStateUseSelectorFn } = stateInfo;
+
+  // Pattern to find: let toolAggregationVar=toolAggregationCode(arg1,arg2.tools,arg3);
+  const pattern = /let ([$\w]+)=([$\w]+\([$\w]+,[$\w]+\.tools,[$\w]+\)),/;
+  const match = oldFile.match(pattern);
+
+  if (!match || match.index === undefined) {
+    console.error('patch: toolsets: failed to find tool aggregation pattern');
     return null;
   }
 
-  const { appStateVar } = stateInfo;
-  const {
-    startIndex,
-    endIndex,
-    outputVarName,
-    reactVarName,
-    toolFilterFunction,
-    toolPermissionContextVar,
-    needsSemicolonPrefix,
-  } = useMemoLoc;
+  const toolAggregationVar = match[1];
+  const toolAggregationCode = match[2];
 
   // Create toolsets mapping: { "toolset-name": ["tool1", "tool2", ...] }
   const toolsetsJSON = JSON.stringify(
@@ -365,29 +390,28 @@ export const writeToolFetchingUseMemo = (
     )
   );
 
-  // Generate the new useMemo code
-  // Use semicolon prefix when replacing comma-separated declaration to properly terminate previous statement
-  const prefix = needsSemicolonPrefix ? ';' : '';
-  const newUseMemo = `${prefix}let ${outputVarName} = ${reactVarName}.useMemo(() => {
-    const toolsets = ${toolsetsJSON};
-    if (toolsets.hasOwnProperty(${appStateVar}.toolset)) {
-      const allowedTools = toolsets[${appStateVar}.toolset];
-      if (allowedTools === "*") {
-        return ${toolFilterFunction}(${toolPermissionContextVar});
-      } else {
-        return ${toolFilterFunction}(${toolPermissionContextVar}).filter(toolDef =>
-          allowedTools.includes(toolDef.name)
-        );
-      }
-    } else {
-      return ${toolFilterFunction}(${toolPermissionContextVar});
-    }
-  }, [${toolFilterFunction}, ${appStateVar}.toolset])`;
+  // Generate the replacement code
+  const replacement = `let currentToolset = ${appStateUseSelectorFn}(state => state.toolset);
+let ${toolAggregationVar} = undefined;
+const toolsets = ${toolsetsJSON};
+if (toolsets.hasOwnProperty(currentToolset)) {
+  const allowedTools = toolsets[currentToolset];
+  if (allowedTools === "*") {
+    ${toolAggregationVar} = ${toolAggregationCode};
+  } else {
+    ${toolAggregationVar} = ${toolAggregationCode}.filter((toolDef) => allowedTools.includes(toolDef.name));
+  }
+} else {
+  ${toolAggregationVar} = ${toolAggregationCode};
+}let `;
+
+  const startIndex = match.index;
+  const endIndex = startIndex + match[0].length;
 
   const newFile =
-    oldFile.slice(0, startIndex) + newUseMemo + oldFile.slice(endIndex);
+    oldFile.slice(0, startIndex) + replacement + oldFile.slice(endIndex);
 
-  showDiff(oldFile, newFile, newUseMemo, startIndex, endIndex);
+  showDiff(oldFile, newFile, replacement, startIndex, endIndex);
 
   return newFile;
 };
@@ -437,7 +461,7 @@ export const writeToolsetComponentDefinition = (
     return null;
   }
 
-  const stateInfo = getAppStateVarAndGetterFunction(oldFile);
+  const stateInfo = getAppStateSelectorAndUseState(oldFile);
   if (!stateInfo) {
     console.error('patch: toolsets: failed to find app state getter');
     return null;
@@ -449,7 +473,7 @@ export const writeToolsetComponentDefinition = (
     return null;
   }
 
-  const { appStateGetterFunction } = stateInfo;
+  const { appStateUseSelectorFn, appStateSetState } = stateInfo;
 
   // Generate toolset names array
   const toolsetNames = JSON.stringify(toolsets.map(ts => ts.name));
@@ -470,7 +494,9 @@ export const writeToolsetComponentDefinition = (
 
   // Generate the component code
   const componentCode = `const toolsetComp = ({ onExit, input }) => {
-  const [state, setState] = ${appStateGetterFunction}();
+  const currentToolset = ${appStateUseSelectorFn}(state => state.toolset);
+
+  const setState = ${appStateSetState}();
 
   // Handle command-line argument
   if (input !== "" && input != null) {
@@ -518,7 +544,7 @@ export const writeToolsetComponentDefinition = (
       ),
       ${reactVar}.createElement(${boxComponent}, { marginBottom: 1 },
         ${reactVar}.createElement(${textComponent}, null, "Current toolset: "),
-        ${reactVar}.createElement(${textComponent}, { bold: true }, state.toolset || "undefined")
+        ${reactVar}.createElement(${textComponent}, { bold: true }, currentToolset || "undefined")
       ),
       ${reactVar}.createElement(${boxComponent}, { marginBottom: 1 },
         ${reactVar}.createElement(${selectComponent}, {
@@ -527,7 +553,7 @@ export const writeToolsetComponentDefinition = (
             setState(prev => ({ ...prev, toolset: input }));
             onExit(\`Toolset changed to \${${chalkVar}.bold(input)}\`);
           },
-          onCancel: () => onExit(\`Toolset not changed (left as \${${chalkVar}.bold(state.toolset)})\`)
+          onCancel: () => onExit(\`Toolset not changed (left as \${${chalkVar}.bold(currentToolset)})\`)
         })
       ),
       ${reactVar}.createElement(${textComponent}, { dimColor: true, italic: true }, "Enter to confirm · Esc to exit")
@@ -562,9 +588,9 @@ export const findShiftTabAppStateVarInsertionPoint = (
     return null;
   }
 
-  // Get 1000 chars before the match (increased from 500 for 2.1.20+
+  // Get 10000 chars before the match
   // where earlier patches push the function declaration further away)
-  const lookbackStart = Math.max(0, match.index - 1000);
+  const lookbackStart = Math.max(0, match.index - 10000);
   const chunk = oldFile.slice(lookbackStart, match.index);
 
   // Find the function declaration pattern - handles both:
@@ -595,6 +621,7 @@ export const findShiftTabAppStateVarInsertionPoint = (
 
 /**
  * Insert the state getter variable at the start of the statusline component
+ * This is for appendToolsetToModeDisplay which injects `currentTool` but can't define it itself.
  */
 export const insertShiftTabAppStateVar = (oldFile: string): string | null => {
   const insertionPoint = findShiftTabAppStateVarInsertionPoint(oldFile);
@@ -605,7 +632,7 @@ export const insertShiftTabAppStateVar = (oldFile: string): string | null => {
     return null;
   }
 
-  const stateInfo = getAppStateVarAndGetterFunction(oldFile);
+  const stateInfo = getAppStateSelectorAndUseState(oldFile);
   if (!stateInfo) {
     console.error(
       'patch: toolsets: insertShiftTabAppStateVar: failed to find app state getter'
@@ -613,8 +640,8 @@ export const insertShiftTabAppStateVar = (oldFile: string): string | null => {
     return null;
   }
 
-  const { appStateGetterFunction } = stateInfo;
-  const codeToInsert = `let[state]=${appStateGetterFunction}();`;
+  const { appStateUseSelectorFn } = stateInfo;
+  const codeToInsert = `let currentToolset=${appStateUseSelectorFn}(state => state.toolset);`;
 
   const newFile =
     oldFile.slice(0, insertionPoint) +
@@ -632,7 +659,7 @@ export const insertShiftTabAppStateVar = (oldFile: string): string | null => {
 export const appendToolsetToModeDisplay = (oldFile: string): string | null => {
   // Find the pattern where mode text is rendered
   // Looking for: tl(Y).toLowerCase(), " on"
-  // We want to change it to: tl(Y).toLowerCase(), " on: ", state.toolset || "undefined"
+  // We want to change it to: tl(Y).toLowerCase(), " on: ", currentToolset || "undefined"
 
   const modeDisplayPattern = /([$\w]+)\((\w+)\)\.toLowerCase\(\)," on"/;
   const match = oldFile.match(modeDisplayPattern);
@@ -649,7 +676,8 @@ export const appendToolsetToModeDisplay = (oldFile: string): string | null => {
 
   // Replace with the new pattern that includes toolset
   const oldText = match[0];
-  const newText = `${tlFunction}(${modeVar}).toLowerCase()," on [",state.toolset||"undefined","]"`;
+  // insertShiftTabAppStateVar provides the definition for currentToolset.
+  const newText = `${tlFunction}(${modeVar}).toLowerCase()," on [",currentToolset||"undefined","]"`;
 
   const newFile = oldFile.replace(oldText, newText);
 
@@ -771,9 +799,9 @@ export const findToolChangeComponentScope = (
 
 /**
  * Add setState function access at the tool change component scope
- * Injects: const [state, setState] = appStateGetterFn();
+ * So that writeModeChangeUpdateToolset can use them.
  */
-export const addSetStateFnAccessAtToolChangeComponentScope = (
+export const addCurrentToolsetAtToolChangeComponentScope = (
   oldFile: string
 ): string | null => {
   const scopeIndex = findToolChangeComponentScope(oldFile);
@@ -781,60 +809,62 @@ export const addSetStateFnAccessAtToolChangeComponentScope = (
     return null;
   }
 
-  const stateInfo = getAppStateVarAndGetterFunction(oldFile);
+  const stateInfo = getAppStateSelectorAndUseState(oldFile);
   if (!stateInfo) {
     console.error(
-      'patch: addSetStateFnAccessAtToolChangeComponentScope: failed to get app state getter function'
+      'patch: addCurrentToolsetAtToolChangeComponentScope: failed to get app state getter function'
     );
     return null;
   }
 
-  const { appStateGetterFunction } = stateInfo;
+  const { appStateUseSelectorFn } = stateInfo;
 
-  // Inject the setState access right at the start of the component scope
-  const injectionCode = `const [state, setState] = ${appStateGetterFunction}();`;
+  // Inject the currentToolset access right at the start of the component scope
+  const injectionCode = `const currentToolset = ${appStateUseSelectorFn}(state => state.toolset);`;
 
   const newFile =
     oldFile.slice(0, scopeIndex) + injectionCode + oldFile.slice(scopeIndex);
+
+  showDiff(oldFile, newFile, injectionCode, scopeIndex, scopeIndex);
 
   return newFile;
 };
 
 /**
  * Find the mode change location in the code
- * Pattern: let X=Y(Z,{type:"setMode",mode:W,destination:"session"});
- * Returns the start index and the mode variable (W)
+ * Pattern: if(X==="acceptEdits")Y("auto-accept-mode");...mode:Z
+ * Returns the index after the semicolon (insertion point) and the mode variable
  */
 export const findModeChange = (
   fileContents: string
-): { index: number; modeVar: string } | null => {
-  // Try the new pattern first (CC 2.1.20+): let w9=_H(A,{type:"setMode",mode:vv(TA),destination:"session"});
-  // The mode may be wrapped in a function call like vv(TA) or be a plain variable
-  const newPattern =
-    /let [\w$]+=[\w$]+\([\w$]+,\{type:"setMode",mode:(?:[\w$]+\()?([\w$]+)\)?,destination:"session"\}\);/;
-  const newMatch = fileContents.match(newPattern);
+): { index: number; modeVar: string; setStateVar: string } | null => {
+  const pattern =
+    /if\([$\w]+==="acceptEdits"\)[$\w]+\("auto-accept-mode"\);.{0,100}\(([$\w]+)\(\([$\w]+\)=>\(\{\.\.\.[$\w]+,toolPermissionContext.{0,200}?mode:([$\w]+)/;
+  const match = fileContents.match(pattern);
 
-  if (newMatch && newMatch.index !== undefined) {
-    return {
-      index: newMatch.index,
-      modeVar: newMatch[1],
-    };
+  if (!match || match.index === undefined) {
+    console.error('patch: findModeChange: failed to find mode change location');
+    return null;
   }
 
-  // Fallback: old pattern (CC <2.1.20): let X=Y(Z,{type:"setMode",mode:W,destination:"session"});
-  const oldPattern =
-    /let [\w$]+=[\w$]+\([\w$]+,\{type:"setMode",mode:([\w$]+),destination:"session"\}\);/;
-  const oldMatch = fileContents.match(oldPattern);
+  // Find where the semicolon is (end of the if statement, before the .{0,200}?mode: part)
+  const semicolonPattern =
+    /if\([$\w]+==="acceptEdits"\)[$\w]+\("auto-accept-mode"\);/;
+  const semicolonMatch = fileContents.match(semicolonPattern);
 
-  if (oldMatch && oldMatch.index !== undefined) {
-    return {
-      index: oldMatch.index,
-      modeVar: oldMatch[1],
-    };
+  if (!semicolonMatch || semicolonMatch.index === undefined) {
+    console.error('patch: findModeChange: failed to find semicolon position');
+    return null;
   }
 
-  console.error('patch: findModeChange: failed to find mode change location');
-  return null;
+  return {
+    index: semicolonMatch.index + semicolonMatch[0].length,
+    modeVar: match[2],
+    // We can't get a setState ourselves because it's a hook that gets it and this code is not in
+    // the top-level component.But there's already an instantiation 600+ lines back (as of 2.1.31,
+    // and it's `h1 = h7()`), but even simpler, in newer versions they use in like the next line.
+    setStateVar: match[1],
+  };
 };
 
 /**
@@ -851,16 +881,18 @@ export const writeModeChangeUpdateToolset = (
     return null;
   }
 
-  const { index: modeChangeIndex, modeVar } = modeChangeResult;
+  const { index: modeChangeIndex, modeVar, setStateVar } = modeChangeResult;
 
   // Build the injection code using setState directly
-  const injectionCode = `if(${modeVar}==="plan"){setState((prev)=>({...prev,toolset:${JSON.stringify(planModeToolset)}}));}else{setState((prev)=>({...prev,toolset:${JSON.stringify(defaultToolset)}}));}`;
+  const injectionCode = `if(${modeVar}==="plan"){${setStateVar}((prev)=>({...prev,toolset:${JSON.stringify(planModeToolset)}}));}else{${setStateVar}((prev)=>({...prev,toolset:${JSON.stringify(defaultToolset)}}));}`;
 
   // Inject right before the mode change
   const newFile =
     oldFile.slice(0, modeChangeIndex) +
     injectionCode +
     oldFile.slice(modeChangeIndex);
+
+  showDiff(oldFile, newFile, injectionCode, modeChangeIndex, modeChangeIndex);
 
   return newFile;
 };
@@ -882,9 +914,9 @@ export const writeToolsets = (
   defaultToolset: string | null,
   planModeToolset?: string | null
 ): string | null => {
-  // Return null if no toolsets configured
+  // Return if no toolsets are configured
   if (!toolsets || toolsets.length === 0) {
-    return null;
+    return oldFile;
   }
 
   let result: string | null = oldFile;
@@ -951,10 +983,10 @@ export const writeToolsets = (
   // Step 8: Mode-change toolset switching (optional)
   if (planModeToolset && defaultToolset) {
     // First, add setState access at the tool change component scope
-    result = addSetStateFnAccessAtToolChangeComponentScope(result);
+    result = addCurrentToolsetAtToolChangeComponentScope(result);
     if (!result) {
       console.error(
-        'patch: toolsets: step 8a failed (addSetStateFnAccessAtToolChangeComponentScope)'
+        'patch: toolsets: step 8a failed (addCurrentToolsetAtToolChangeComponentScope)'
       );
       return null;
     }

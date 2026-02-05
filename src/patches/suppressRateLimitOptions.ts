@@ -6,7 +6,7 @@ export const writeSuppressRateLimitOptions = (
   oldFile: string
 ): string | null => {
   const pattern =
-    /\bshowAllInTranscript:[$\w]+,agentDefinitions:[$\w]+,onOpenRateLimitOptions:([$\w]+)/;
+    /\.createElement.{0,500},showAllInTranscript:[$\w]+,agentDefinitions:[$\w]+,onOpenRateLimitOptions:([$\w]+)/;
 
   const match = oldFile.match(pattern);
 

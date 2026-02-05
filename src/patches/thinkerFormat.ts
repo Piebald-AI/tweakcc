@@ -15,28 +15,54 @@ const getThinkerFormatLocation = (oldFile: string): LocationResult | null => {
   // Search within a range of 1000 characters to support CC 2.0.76+
   const searchSection = oldFile.slice(
     approxAreaMatch.index,
-    approxAreaMatch.index + 1000
+    approxAreaMatch.index + 10000
   );
 
   // New nullish format: N=(Y??C?.activeForm??L)+"…"
-  const formatPattern = /([$\w]+)(=\(([^;]{1,200}?)\)\+"(?:…|\\u2026)")/;
-  const formatMatch = searchSection.match(formatPattern);
+  const formatPatternOld = /,([$\w]+)(=\(([^;]{1,200}?)\)\+"(?:…|\\u2026)")/;
+  const formatMatchOld = searchSection.match(formatPatternOld);
 
-  if (!formatMatch || formatMatch.index == undefined) {
-    console.error('patch: thinker format: failed to find formatMatch');
-    return null;
+  if (formatMatchOld && formatMatchOld.index != undefined) {
+    return {
+      startIndex:
+        approxAreaMatch.index +
+        formatMatchOld.index +
+        formatMatchOld[1].length +
+        1, // + 1 for the comma
+      endIndex:
+        approxAreaMatch.index +
+        formatMatchOld.index +
+        formatMatchOld[1].length +
+        formatMatchOld[2].length +
+        1, // + 1 for the comma
+      identifiers: [formatMatchOld[3]],
+    };
   }
 
-  return {
-    startIndex:
-      approxAreaMatch.index + formatMatch.index + formatMatch[1].length,
-    endIndex:
-      approxAreaMatch.index +
-      formatMatch.index +
-      formatMatch[1].length +
-      formatMatch[2].length,
-    identifiers: [formatMatch[3]],
-  };
+  // Fallback pattern: =($a&&!$b.isIdle?$c.spinnerVerb??$d:$e)+"…"
+  const formatPatternNew =
+    /,([$\w]+)(=(\([$\w]+&&![$\w]+\.isIdle\?[$\w]+\.spinnerVerb\?\?[$\w]+:[$\w]+\))\+"(?:…|\\u2026)")/;
+  const formatMatchNew = searchSection.match(formatPatternNew);
+
+  if (formatMatchNew && formatMatchNew.index != undefined) {
+    return {
+      startIndex:
+        approxAreaMatch.index +
+        formatMatchNew.index +
+        formatMatchNew[1].length +
+        1, // + 1 for the comma
+      endIndex:
+        approxAreaMatch.index +
+        formatMatchNew.index +
+        formatMatchNew[1].length +
+        formatMatchNew[2].length +
+        1, // + 1 for the comma
+      identifiers: [formatMatchNew[3]],
+    };
+  }
+
+  console.error('patch: thinker format: failed to find formatMatch');
+  return null;
 };
 
 export const writeThinkerFormat = (

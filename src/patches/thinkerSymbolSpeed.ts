@@ -3,6 +3,7 @@
 import { showDiff } from './index';
 
 // This patch works with Claude Code versions at least as early as 1.0.24 and at least as late as 2.1.15.
+// This patch is skipped for CC version 2.1.27 and newer (the issue was fixed upstream).
 
 /**
  * Fixes an issue where the spinner freezes if the CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC
