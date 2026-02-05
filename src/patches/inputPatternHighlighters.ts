@@ -138,7 +138,7 @@ const findUseMemoInsertLocation = (
 
   // Look back from matchPushesIndex to find the last useMemo call
   // We want to insert AFTER the last useMemo's closing bracket and comma
-  const searchStart = Math.max(0, matchPushesIndex - 500);
+  const searchStart = Math.max(0, matchPushesIndex - 2000);
   const searchWindow = oldFile.slice(searchStart, matchPushesIndex);
 
   // Find the last useMemo pattern and where it ends (after the dependency array)

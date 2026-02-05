@@ -69,9 +69,8 @@ const patchModeSwitchingFunction = (oldFile: string): string | null => {
  */
 const patchModelAliasesList = (oldFile: string): string | null => {
   // Pattern matches the model aliases array assignment
-  // Looking for: ["sonnet", "opus", "haiku", "sonnet[1m]", "opusplan"]
   const pattern =
-    /(\[\s*"sonnet"\s*,\s*"opus"\s*,\s*"haiku"\s*,\s*"sonnet\[1m\]"\s*,\s*"opusplan"\s*\])/;
+    /(\["sonnet","opus","haiku",(?:"best",)?"sonnet\[1m\]","opusplan")/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
@@ -82,8 +81,7 @@ const patchModelAliasesList = (oldFile: string): string | null => {
   }
 
   // Add opusplan[1m] to the list
-  const replacement =
-    '["sonnet","opus","haiku","sonnet[1m]","opusplan","opusplan[1m]"]';
+  const replacement = match[0] + ',"opusplan[1m]"';
 
   const newFile =
     oldFile.slice(0, match.index) +

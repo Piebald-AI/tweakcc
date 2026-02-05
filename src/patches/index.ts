@@ -662,7 +662,9 @@ export const applyCustomization = async (
         ),
       condition:
         config.settings.thinkingStyle.updateInterval !==
-        DEFAULT_SETTINGS.thinkingStyle.updateInterval,
+          DEFAULT_SETTINGS.thinkingStyle.updateInterval &&
+        (ccInstInfo.version == null ||
+          compareVersions(ccInstInfo.version, '2.1.27') < 0),
     },
     'thinker-symbol-width': {
       fn: c =>
