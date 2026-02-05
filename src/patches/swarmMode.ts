@@ -22,6 +22,16 @@
 //  }
 // ```
 
+// CC 2.1.32:
+// ```diff
+//  function F8() {
+// +  return true;
+//    if (!$6(process.env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS)) return !1;
+//    if (!x8("tengu_amber_flint", !1)) return !1;
+//    return !0;
+//  }
+// ```
+
 import { showDiff } from './index';
 
 /**
@@ -32,7 +42,7 @@ export const writeSwarmMode = (oldFile: string): string | null => {
   // Match: function XX(){if(Yz(process.env.CLAUDE_CODE_AGENT_SWARMS))...
   // Capture group 1 is the 'i' in 'if' - we insert before it
   const pattern =
-    /function [$\w]+\(\)\{if\([$\w]+\(process.env.CLAUDE_CODE_AGENT_SWARMS\)\)/;
+    /function [$\w]+\(\)\{if\(!?[$\w]+\(process.env.(?:CLAUDE_CODE_AGENT_SWARMS|CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS)\)\)/;
 
   const match = oldFile.match(pattern);
 

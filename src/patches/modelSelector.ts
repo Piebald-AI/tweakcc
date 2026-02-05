@@ -5,6 +5,7 @@ import { escapeIdent, showDiff } from './index';
 // Models to inject/make available.
 // prettier-ignore
 export const CUSTOM_MODELS: { value: string; label: string; description: string }[] = [
+  { value: 'claude-opus-4-6',            label: 'Opus 4.6',             description: "Claude Opus 4.6 (February 2026)" },
   { value: 'claude-opus-4-5-20251101',   label: 'Opus 4.5',             description: "Claude Opus 4.5 (November 2025)" },
   { value: 'claude-sonnet-4-5-20250929', label: 'Sonnet 4.5',           description: "Claude Sonnet 4.5 (September 2025)" },
   { value: 'claude-opus-4-1-20250805',   label: 'Opus 4.1',             description: "Claude Opus 4.1 (August 2025)" },
@@ -23,7 +24,7 @@ const findCustomModelListInsertionPoint = (
 ): { insertionIndex: number; modelListVar: string } | null => {
   // 1. Find the custom model push pattern
   const pushPattern =
-    /\b([$\w]+)\.push\(\{value:[$\w]+,label:[$\w]+,description:"Custom model"\}\)/;
+    / ([$\w]+)\.push\(\{value:[$\w]+,label:[$\w]+,description:"Custom model"\}\)/;
   const pushMatch = fileContents.match(pushPattern);
   if (!pushMatch || pushMatch.index === undefined) {
     console.error(
@@ -41,7 +42,7 @@ const findCustomModelListInsertionPoint = (
 
   // 4. Find the LAST occurrence of the function with let modelListVar=...;
   const funcPattern = new RegExp(
-    `function [$\\w]+\\(\\)\\{let ${escapeIdent(modelListVar)}=.+?;`,
+    `function [$\\w]+\\([^)]*\\)\\{let ${escapeIdent(modelListVar)}=.+?;`,
     'g'
   );
   let lastMatch: RegExpExecArray | null = null;
