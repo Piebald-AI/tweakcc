@@ -74,6 +74,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableRememberSkill: false,
     tokenCountRounding: null as number | null,
     autoAcceptPlanMode: false,
+    enableWinterTheme: false,
   };
 
   const ensureMisc = () => {
@@ -512,6 +513,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.autoAcceptPlanMode =
               !settings.misc!.autoAcceptPlanMode;
+          });
+        },
+      },
+      {
+        id: 'enableWinterTheme',
+        title: 'Enable Winter Theme',
+        description:
+          'Apply a seasonal winter theme with ice-blue colors and snowflake-decorated logo.',
+        getValue: () => settings.misc?.enableWinterTheme ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableWinterTheme =
+              !settings.misc!.enableWinterTheme;
           });
         },
       },

@@ -67,6 +67,7 @@ import { writeStatuslineUpdateThrottle } from './statuslineUpdateThrottle';
 import { writeTokenCountRounding } from './tokenCountRounding';
 import { writeAgentsMd } from './agentsMd';
 import { writeAutoAcceptPlanMode } from './autoAcceptPlanMode';
+import { writeWinterTheme } from './winterTheme';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -331,6 +332,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.MISC_CONFIGURABLE,
     description:
       'Automatically accept plans without the "Ready to code?" confirmation prompt',
+  },
+  {
+    id: 'winter-theme',
+    name: 'Winter theme',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Seasonal winter theme with ice-blue colors and snowflake-decorated logo',
   },
   // Features
   {
@@ -743,6 +751,10 @@ export const applyCustomization = async (
     'auto-accept-plan-mode': {
       fn: c => writeAutoAcceptPlanMode(c),
       condition: !!config.settings.misc?.autoAcceptPlanMode,
+    },
+    'winter-theme': {
+      fn: c => writeWinterTheme(c),
+      condition: !!config.settings.misc?.enableWinterTheme,
     },
     // Features
     'swarm-mode': {

@@ -127,6 +127,7 @@ export interface MiscConfig {
   enableRememberSkill: boolean;
   tokenCountRounding: number | null;
   autoAcceptPlanMode: boolean;
+  enableWinterTheme: boolean;
 }
 
 export interface InputPatternHighlighter {
