@@ -107,6 +107,7 @@ $ pnpm dlx tweakcc
   - [Toolsets](#toolsets)
   - User message display customization
   - Token indicator display
+  - Add support for dangerously bypassing permissions in sudo
   - [Input pattern highlighters](#feature-input-pattern-highlighters)
   - [Opus Plan 1M mode](#feature-opus-plan-1m-mode)
   - [MCP startup optimization](#feature-mcp-startup-optimization)
