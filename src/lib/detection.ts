@@ -14,7 +14,7 @@ import {
   resolvePathToInstallationType,
   extractVersion,
 } from '../installationDetection';
-import { readConfigFile, CONFIG_DIR } from '../config';
+import { readConfigFile, CONFIG_FILE } from '../config';
 import { InstallationPicker } from '../ui/components/InstallationPicker';
 import { InstallationCandidate, ClaudeCodeInstallationInfo } from '../types';
 import { Installation } from './types';
@@ -81,16 +81,17 @@ export interface DetectInstallationOptions {
 }
 
 /**
- * Smart detection with auto-selection when unambiguous.
- *
- * Priority:
- * 1. options.path (explicit)
- * 2. tweakcc's ccInstallationPath from config (if exists)
- * 3. `claude` on PATH
- * 4. Common install locations
- *
- * @throws If no installation found
- * @throws If multiple found and interactive=false
+ * Attempts to detect the user's preferred Claude Code installation.  Detection procedure:
+ * 0. options.path
+ * 1. Uses $TWEAKCC_CC_INSTALLATION_PATH if set.
+ * 2. Uses ccInstallationPath in tweakcc config.
+ * 3. Discovers installation from `claude` in PATH
+ * 4. Looks in hard-coded search paths:
+ *   a. If the search yields one installation, uses it
+ *   b. If it yields multiple and options.interactive is true, display a picker
+ *      via showInteractiveInstallationPicker().
+ * @returns The selected installation.
+ * @throws If user cancels via Esc.
  */
 export async function tryDetectInstallation(
   options: DetectInstallationOptions = {}
@@ -139,7 +140,7 @@ export async function tryDetectInstallation(
       throw new Error(
         `Multiple Claude Code installations found:\n${list}\n\n` +
           `Pass { interactive: true } to show a picker, or { path: "..." } to specify explicitly.\n` +
-          `Alternatively, set "ccInstallationPath" in ${CONFIG_DIR} to the path to a Claude Code installation.`
+          `Alternatively, set "ccInstallationPath" in ${CONFIG_FILE} to the path to a Claude Code installation.`
       );
     }
 
@@ -157,17 +158,8 @@ export async function tryDetectInstallation(
 }
 
 /**
- * Attempts to detect the user's preferred Claude Code installation.  Detection procedure:
- * 0. options.path
- * 1. Uses $TWEAKCC_CC_INSTALLATION_PATH if set.
- * 2. Uses ccInstallationPath in tweakcc config.
- * 3. Discovers installation from `claude` in PATH
- * 4. Looks in hard-coded search paths:
- *   a. If the search yields one installation, uses it
- *   b. If it yields multiple and options.interactive is true, display a picker
- *      via showInteractiveInstallationPicker().
- * @returns The selected installation.
- * @throws If user cancels via Esc.
+ * Prompts the user to select one of the specified Claude Code installations
+ * interactively using the same UI tweakcc uses, powered by [Ink + React](https://github.com/vadimdemedes/ink).
  */
 export async function showInteractiveInstallationPicker(
   candidates: Installation[]

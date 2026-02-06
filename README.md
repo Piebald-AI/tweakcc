@@ -578,6 +578,8 @@ npx tweakcc@latest --apply --config-url https://gist.githubusercontent.com/bl-ue
 
 Your local config will **not** be overwritten; the remote config will be copied into your `config.json` under under `remoteConfig.settings`.
 
+<!--
+
 ## API
 
 ### Config
@@ -661,7 +663,7 @@ async function showInteractiveInstallationPicker(candidates: Installation[]): Pr
  *   b. If it yields multiple and options.interactive is true, display a picker
  *      via showInteractiveInstallationPicker().
  */
-export async function tryDetectInstallation(
+async function tryDetectInstallation(
     options: DetectInstallationOptions = {}
 ): Promise<Installation>
 ```
@@ -718,7 +720,7 @@ Functions to read and write the content of an npm-based or native (Bun-based) in
  * - npm installs: reads cli.js directly
  * - native installs: extracts embedded JS from binary
  */
-export async function readContent(installation: Installation): Promise<string>;
+async function readContent(installation: Installation): Promise<string>;
 
 /**
  * Write modified JavaScript content back to Claude Code.
@@ -726,7 +728,7 @@ export async function readContent(installation: Installation): Promise<string>;
  * - npm installs: writes to cli.js (handles permissions, hard links)
  * - native installs: repacks JS into binary
  */
-export async function writeContent(
+async function writeContent(
   installation: Installation,
   content: string
 ): Promise<void>;
@@ -763,7 +765,7 @@ Simple utilities to handle creating and restoring backups of the native binary o
  * Backup a file to a specified location, creating parent directories if needed.
  * Leaves the original file untouched.
  */
-export async function backupFile(
+async function backupFile(
   sourcePath: string,
   backupPath: string
 ): Promise<void>;
@@ -772,7 +774,7 @@ export async function backupFile(
  * Restore a file from a backup, breaks hard links, which are common with pnpm/bun
  * installations, and preserving execute permissions.
  */
-export async function restoreBackup(
+async function restoreBackup(
   backupPath: string,
   targetPath: string
 ): Promise<void>;
@@ -795,8 +797,10 @@ undefined
 31          // <-- Original was successfully modified.
 
 // Restore the backup:
-> await tweakcc.restoreBackup
+> await tweakcc.restoreBackup(backupPath, native2076Inst.)
 ```
+
+-->
 
 ## Troubleshooting
 
