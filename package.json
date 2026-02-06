@@ -66,6 +66,7 @@
   },
   "dependencies": {
     "chalk": "^5.5.0",
+    "cli-spinners": "^3.4.0",
     "commander": "^14.0.0",
     "diff": "^8.0.3",
     "globby": "^14.1.0",
