@@ -127,6 +127,7 @@ export interface MiscConfig {
   enableRememberSkill: boolean;
   tokenCountRounding: number | null;
   autoAcceptPlanMode: boolean;
+  allowBypassPermissionsInSudo: boolean | null;
 }
 
 export interface InputPatternHighlighter {

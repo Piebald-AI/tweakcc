@@ -67,6 +67,7 @@ import { writeStatuslineUpdateThrottle } from './statuslineUpdateThrottle';
 import { writeTokenCountRounding } from './tokenCountRounding';
 import { writeAgentsMd } from './agentsMd';
 import { writeAutoAcceptPlanMode } from './autoAcceptPlanMode';
+import { writeAllowBypassPermsInSudo } from './allowBypassPermsInSudo';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -331,6 +332,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.MISC_CONFIGURABLE,
     description:
       'Automatically accept plans without the "Ready to code?" confirmation prompt',
+  },
+  {
+    id: 'allow-sudo-bypass-permissions',
+    name: 'Allow bypassing permissions with --dangerously-skip-permissions in sudo',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Allow bypassing permissions with --dangerously-skip-permissions even when running with root/sudo privileges',
   },
   // Features
   {
@@ -745,6 +753,10 @@ export const applyCustomization = async (
     'auto-accept-plan-mode': {
       fn: c => writeAutoAcceptPlanMode(c),
       condition: !!config.settings.misc?.autoAcceptPlanMode,
+    },
+    'allow-sudo-bypass-permissions': {
+      fn: c => writeAllowBypassPermsInSudo(c),
+      condition: !!config.settings.misc?.allowBypassPermissionsInSudo,
     },
     // Features
     'swarm-mode': {

@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `--config-url` flag to fetch configuration from a URL (#465) - @bl-ue & @basekevin
 - Fix ALL the patching errors for 2.1.31 (#466) - @bl-ue
 - Add CLI spinners (#470) - @bl-ue
+- Add support for dangerously bypassing permissions in sudo with new setting and patch (#478) - @brrock
 
 ## [v3.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.4.0) - 2026-01-18
 
