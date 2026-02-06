@@ -386,7 +386,7 @@ function extractVersionFromFilename(filePath: string): string | null {
 /**
  * Extracts version from an installation based on its kind.
  */
-async function extractVersion(
+export async function extractVersion(
   filePath: string,
   kind: InstallationKind
 ): Promise<string> {
@@ -412,7 +412,7 @@ async function extractVersion(
 /**
  * Collects all installation candidates from hardcoded search paths.
  */
-async function collectCandidates(): Promise<InstallationCandidate[]> {
+export async function collectCandidates(): Promise<InstallationCandidate[]> {
   const candidates: InstallationCandidate[] = [];
 
   const seenPaths = new Set<string>();
