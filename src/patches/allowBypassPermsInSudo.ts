@@ -14,7 +14,7 @@ export const writeAllowBypassPermsInSudo = (file: string): string | null => {
 
   if (!match || match.index === undefined) {
     console.error(
-      'patch: disableSudoBypassPermissions: failed to find pattern'
+      'patch: allowBypassPermsInSudo: failed to find pattern'
     );
     return null;
   }
