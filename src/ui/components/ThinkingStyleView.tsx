@@ -1,5 +1,6 @@
 import { useState, useEffect, useContext } from 'react';
 import { Box, Text, useInput } from 'ink';
+import cliSpinners from 'cli-spinners';
 
 import { getCurrentClaudeCodeTheme } from '@/utils';
 import { DEFAULT_SETTINGS } from '@/defaultSettings';
@@ -11,19 +12,45 @@ interface ThinkingStyleViewProps {
   onBack: () => void;
 }
 
-const PRESETS = [
+interface SpinnerPreset {
+  name: string;
+  phases: string[];
+  reverseMirror: boolean;
+  updateInterval?: number;
+}
+
+/** Convert camelCase spinner names to Title Case (e.g. "bouncingBall" → "Bouncing Ball") */
+const formatSpinnerName = (name: string): string =>
+  name
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z])([A-Z][a-z])/g, '$1 $2')
+    .replace(/(\d+)/g, ' $1 ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^./, c => c.toUpperCase());
+
+/** Pad all phases to the width of the longest one so the spinner doesn't flicker. */
+const padPhases = (phases: string[]): string[] => {
+  const maxLen = Math.max(...phases.map(p => p.length));
+  return phases.map(p => p.padEnd(maxLen));
+};
+
+/** Build cli-spinners presets, trimming trailing whitespace from frames. */
+const cliSpinnerPresets: SpinnerPreset[] = Object.entries(cliSpinners).map(
+  ([name, spinner]) => ({
+    name: formatSpinnerName(name),
+    phases: spinner.frames.map((f: string) => f.trimEnd()),
+    reverseMirror: false,
+    updateInterval: spinner.interval,
+  })
+);
+
+const PRESETS: SpinnerPreset[] = [
   {
     name: 'Default',
     phases: DEFAULT_SETTINGS.thinkingStyle.phases,
     reverseMirror: DEFAULT_SETTINGS.thinkingStyle.reverseMirror,
   },
-  { name: 'Basic', phases: ['|', '/', '-', '\\'], reverseMirror: false },
-  {
-    name: 'Braille',
-    phases: ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'],
-    reverseMirror: false,
-  },
-  { name: 'Circle', phases: ['◐', '◓', '◑', '◒'], reverseMirror: false },
   {
     name: 'Wave',
     phases: ['▁', '▃', '▄', '▅', '▆', '▇', '█'],
@@ -36,37 +63,11 @@ const PRESETS = [
     reverseMirror: true,
   },
   {
-    name: 'Clock',
-    phases: [
-      '🕛',
-      '🕐',
-      '🕑',
-      '🕒',
-      '🕓',
-      '🕔',
-      '🕕',
-      '🕖',
-      '🕗',
-      '🕘',
-      '🕙',
-      '🕚',
-    ],
-    reverseMirror: false,
-  },
-  { name: 'Globe', phases: ['🌍', '🌎', '🌏'], reverseMirror: false },
-  { name: 'Arc', phases: ['◜', '◠', '◝', '◞', '◡', '◟'], reverseMirror: false },
-  { name: 'Triangle', phases: ['◤', '◥', '◢', '◣'], reverseMirror: false },
-  {
-    name: 'Bouncing',
-    phases: ['⠁', '⠂', '⠄', '⡀', '⢀', '⠠', '⠐', '⠈'],
-    reverseMirror: false,
-  },
-  { name: 'Dots', phases: ['.', '..', '...'], reverseMirror: false },
-  {
     name: 'Colors',
     phases: ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣'],
     reverseMirror: false,
   },
+  ...cliSpinnerPresets,
 ];
 
 export function ThinkingStyleView({ onBack }: ThinkingStyleViewProps) {
@@ -150,7 +151,7 @@ export function ThinkingStyleView({ onBack }: ThinkingStyleViewProps) {
             );
 
         updateSettings(settings => {
-          settings.thinkingStyle.phases = newPhases;
+          settings.thinkingStyle.phases = padPhases(newPhases);
         });
         setEditingPhase(false);
         setPhaseInput('');
@@ -176,8 +177,11 @@ export function ThinkingStyleView({ onBack }: ThinkingStyleViewProps) {
         // Apply selected preset
         const preset = PRESETS[selectedPresetIndex];
         updateSettings(settings => {
-          settings.thinkingStyle.phases = [...preset.phases]; // Copy phases to avoid mutation later on.
+          settings.thinkingStyle.phases = padPhases([...preset.phases]);
           settings.thinkingStyle.reverseMirror = preset.reverseMirror;
+          if (preset.updateInterval !== undefined) {
+            settings.thinkingStyle.updateInterval = preset.updateInterval;
+          }
         });
       } else if (selectedOption === 'reverseMirror') {
         updateSettings(settings => {
@@ -234,8 +238,8 @@ export function ThinkingStyleView({ onBack }: ThinkingStyleViewProps) {
     } else if (input === 'd' && selectedOption === 'phases') {
       if (phases.length > 1) {
         updateSettings(settings => {
-          settings.thinkingStyle.phases = phases.filter(
-            (_, index) => index !== selectedPhaseIndex
+          settings.thinkingStyle.phases = padPhases(
+            phases.filter((_, index) => index !== selectedPhaseIndex)
           );
         });
         if (selectedPhaseIndex >= phases.length) {
@@ -511,14 +515,15 @@ export function ThinkingStyleView({ onBack }: ThinkingStyleViewProps) {
 
         {selectedOption === 'presets' && (
           <Text dimColor>
-            {'  '}Selecting one will overwrite your choice of phases
+            {'  '}Selecting one will overwrite your choice of phases and
+            interval
           </Text>
         )}
 
         <Box marginLeft={2} marginBottom={1}>
           <Box flexDirection="column">
             {(() => {
-              const maxVisible = 8; // Show 8 presets at a time
+              const maxVisible = 12; // Show 12 presets at a time (more room for the larger list)
               const startIndex = Math.max(
                 0,
                 selectedPresetIndex - Math.floor(maxVisible / 2)
@@ -534,6 +539,12 @@ export function ThinkingStyleView({ onBack }: ThinkingStyleViewProps) {
                 endIndex
               );
 
+              /** Show a compact preview of frames, truncating if too long */
+              const previewFrames = (preset: SpinnerPreset): string => {
+                const joined = preset.phases.join('');
+                return joined.length > 30 ? joined.slice(0, 27) + '…' : joined;
+              };
+
               return (
                 <>
                   {adjustedStartIndex > 0 && (
@@ -544,21 +555,16 @@ export function ThinkingStyleView({ onBack }: ThinkingStyleViewProps) {
                   )}
                   {visiblePresets.map((preset, visibleIndex) => {
                     const actualIndex = adjustedStartIndex + visibleIndex;
+                    const isSelected =
+                      selectedOption === 'presets' &&
+                      actualIndex === selectedPresetIndex;
                     return (
                       <Text
                         key={actualIndex}
-                        color={
-                          selectedOption === 'presets' &&
-                          actualIndex === selectedPresetIndex
-                            ? 'cyan'
-                            : undefined
-                        }
+                        color={isSelected ? 'cyan' : undefined}
                       >
-                        {selectedOption === 'presets' &&
-                        actualIndex === selectedPresetIndex
-                          ? '❯ '
-                          : '  '}
-                        {preset.name} {preset.phases.join('')}
+                        {isSelected ? '❯ ' : '  '}
+                        {preset.name} {previewFrames(preset)}
                       </Text>
                     );
                   })}
