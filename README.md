@@ -457,6 +457,32 @@ https://github.com/user-attachments/assets/27513489-bb89-4174-b62f-ab17b0fce7bd
 
 ## Feature: Bypass permissions check in sudo
 
+⚠️ **Warning**: This feature disables a security check. Only enable it if you understand the implications.
+
+By default, Claude Code prevents the use of `--dangerously-skip-permissions` when running under `sudo` to avoid accidental system-wide permission bypasses. This patch removes that restriction.
+
+**Why you might need this**: Some system administration tasks or automated deployment scripts may require running Claude Code with elevated privileges while also bypassing permission checks. For example, when deploying to restricted directories or modifying system configuration files.
+
+**Security implications**: When enabled, you can run Claude Code with sudo and bypass permission checks, potentially allowing Claude to perform system-level operations without prompts. Use extreme caution.
+
+**Via the UI:** Run `npx tweakcc`, go to **Misc**, and toggle **Allow bypass permissions in sudo**.
+
+**Via `config.json`:**
+
+```json
+{
+  "settings": {
+    "misc": {
+      "allowBypassPermissionsInSudo": true
+    }
+  }
+}
+```
+
+**Usage:**
+
+`sudo claude --dangerously-skip-permissions`
+
 ## Feature: Auto-accept plan mode
 
 <sm><i>Supported Claude Code versions: 2.1.22 to 2.1.32+.</i></sm>
@@ -495,32 +521,6 @@ mkdir -p ~/.claude/tweakcc
 # For existing users
 mv ~/.tweakcc ~/.claude/tweakcc
 ```
-
-⚠️ **Warning**: This feature disables a security check. Only enable it if you understand the implications.
-
-By default, Claude Code prevents the use of `--dangerously-skip-permissions` when running under `sudo` to avoid accidental system-wide permission bypasses. This patch removes that restriction.
-
-**Why you might need this**: Some system administration tasks or automated deployment scripts may require running Claude Code with elevated privileges while also bypassing permission checks. For example, when deploying to restricted directories or modifying system configuration files.
-
-**Security implications**: When enabled, you can run Claude Code with sudo and bypass permission checks, potentially allowing Claude to perform system-level operations without prompts. Use extreme caution.
-
-**Via the UI:** Run `npx tweakcc`, go to **Misc**, and toggle **Allow bypass permissions in sudo**.
-
-**Via `config.json`:**
-
-```json
-{
-  "settings": {
-    "misc": {
-      "allowBypassPermissionsInSudo": true
-    }
-  }
-}
-```
-
-**Usage:**
-
-`sudo claude --dangerously-skip-permissions`
 
 ## Building from source
 
