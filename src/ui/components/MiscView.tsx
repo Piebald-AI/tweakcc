@@ -74,6 +74,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableRememberSkill: false,
     tokenCountRounding: null as number | null,
     autoAcceptPlanMode: false,
+    allowBypassPermissionsInSudo: false,
   };
 
   const ensureMisc = () => {
@@ -512,6 +513,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.autoAcceptPlanMode =
               !settings.misc!.autoAcceptPlanMode;
+          });
+        },
+      },
+      {
+        id: 'allowBypassPermissionsInSudo',
+        title: 'Allow bypassing permissions in sudo',
+        description:
+          'Allow bypassing permissions in sudo commands with --dangerously-skip-permissions.',
+        getValue: () => settings.misc?.allowBypassPermissionsInSudo ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.allowBypassPermissionsInSudo =
+              !settings.misc!.allowBypassPermissionsInSudo;
           });
         },
       },
