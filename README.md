@@ -607,6 +607,230 @@ npx tweakcc@latest --apply --config-url https://gist.githubusercontent.com/bl-ue
 
 Your local config will **not** be overwritten; the remote config will be copied into your `config.json` under under `remoteConfig.settings`.
 
+<!--
+
+## API
+
+### Config
+
+Functions to access tweakcc's own config, if it exists on the machine.
+
+```js
+/**
+ * Returns the absolute path to tweakcc's config dir.  By default it's
+ * `~/.tweakcc` but it also can use `~/.claude/tweakcc` and it also respects
+ * `XDG_CONFIG_HOME`—see [Configuration Directory](#configuration-directory).
+ */
+function getTweakccConfigDir(): string;
+
+/**
+ * Returns the absolute path to tweakcc's config file.  It's named `config.json`
+ * and lives in the config dir as returned by `getTweakccConfigDir`.
+ */
+function getTweakccConfigPath(): string;
+
+/**
+ * Returns the absolute path to the directory containing the user-editable
+ * system prompt markdown files.  It's named `system-prompts/` and lives in the
+ * config dir.
+ */
+function getTweakccSystemPromptsDir(): string;
+
+/**
+ * Reads and returns the tweakcc config (as determined by `getTweakccConfigDir`).
+ */
+function readTweakccConfig(): Promise<TweakccConfig | null>;
+```
+
+Demo:
+
+```js
+> tweakcc.getTweakccConfigDir()
+'/home/user/.tweakcc'
+
+> tweakcc.getTweakccConfigPath()
+'/home/user/.tweakcc/config.json'
+
+> tweakcc.getTweakccSystemPromptsDir()
+'/home/user/.tweakcc/system-prompts'
+
+> await tweakcc.readTweakccConfig()
+{
+  ccVersion: '2.1.32',
+  ccInstallationPath: '/home/user/.local/bin/claude',
+  lastModified: '2026-02-05T21:18:48.551Z',
+  changesApplied: true,
+  settings: { ... }
+}
+```
+
+### Installation
+
+Utilities to find installed versions of Claude Code.
+
+```js
+/**
+ * Finds all Claude Code installations on the machine via `$PATH` and hard-coded
+ * search directories.
+ */
+async function findAllInstallations(): Promise<Installation[]>;
+
+/**
+ * Prompts the user to select one of the specified Claude Code installations
+ * interactively using the same UI tweakcc uses, powered by [Ink + React](https://github.com/vadimdemedes/ink).
+ */
+async function showInteractiveInstallationPicker(candidates: Installation[]): Promise<Installation | null>;
+
+/**
+ * Attempts to detect the user's preferred Claude Code installation.  Detection procedure:
+ * 0. options.path
+ * 1. Uses $TWEAKCC_CC_INSTALLATION_PATH if set.
+ * 2. Uses ccInstallationPath in tweakcc config.
+ * 3. Discovers installation from `claude` in PATH
+ * 4. Looks in hard-coded search paths:
+ *   a. If the search yields one installation, uses it
+ *   b. If it yields multiple and options.interactive is true, display a picker
+ *      via showInteractiveInstallationPicker().
+ */
+async function tryDetectInstallation(
+    options: DetectInstallationOptions = {}
+): Promise<Installation>
+```
+
+Demo:
+
+```js
+> const insts = await tweakcc.findAllInstallations()
+[
+  {
+    path: 'C:\\Users\\user\\.local\\share\\claude\\versions\\2.0.60',
+    version: '2.0.60',
+    kind: 'native'
+  },
+  {
+    path: 'C:\\Users\\user\\.local\\share\\claude\\versions\\2.0.76',
+    version: '2.0.76',
+    kind: 'native'
+  },
+  {
+    path: 'C:\\Users\\user\\AppData\\Local\\Volta\\tools\\image\\packages\\@anthropic-ai\\claude-code\\node_modules\\@anthropic-ai\\claude-code\\cli.js',
+    version: '2.1.32',
+    kind: 'npm'
+  }
+]
+
+> await tweakcc.tryDetectInstallation()
+{
+  path: 'C:\\Users\\user\\AppData\\Local\\Volta\\tools\\image\\packages\\@anthropic-ai\\claude-code\\node_modules\\@anthropic-ai\\claude-code\\cli.js',
+  version: '2.1.32',
+  kind: 'npm'
+}
+
+> await tweakcc.showInteractiveInstallationPicker(insts)
+No claude executable was found in PATH, but multiple Claude Code installations were found on this machine. Please select one:
+
+❯ C:\Users\user\.local\share\claude\versions\2.0.60 (native-binary, v2.0.60)
+  C:\Users\user\.local\share\claude\versions\2.0.76 (native-binary, v2.0.76)
+  C:\Users\user\AppData\Local\Volta\tools\image\packages\@anthropic-ai\claude-code\node_modules\@anthropic-ai\claude-code\cli.js (npm-based, v2.1.32)
+
+Your choice will be saved to ccInstallationPath in ~\.tweakcc/config.json.
+
+Use ↑↓ arrows to navigate, Enter to select, Esc to quit
+```
+
+### I/O
+
+Functions to read and write the content of an npm-based or native (Bun-based) installation.
+
+```js
+/**
+ * Read Claude Code's JavaScript content.
+ *
+ * - npm installs: reads cli.js directly
+ * - native installs: extracts embedded JS from binary
+ */
+async function readContent(installation: Installation): Promise<string>;
+
+/**
+ * Write modified JavaScript content back to Claude Code.
+ *
+ * - npm installs: writes to cli.js (handles permissions, hard links)
+ * - native installs: repacks JS into binary
+ */
+async function writeContent(
+  installation: Installation,
+  content: string
+): Promise<void>;
+```
+
+Demo:
+
+```js
+> const native2076Inst = { path: 'C:\\Users\\user\\.local\\share\\claude\\versions\\2.0.76', kind: 'native' };
+
+// Reading native content:
+> let content = await tweakcc.readContent(native2076Inst);
+> content.length
+10639722  // 10.6 MB
+> content.slice(4153122, 4153122+236)
+"var be$=\"You are Claude Code, Anthropic's official CLI for Claude.\",UBD=\"You are Claude Code, Anthropic's official CLI for Claude, running within the Claude Agent SDK.\",GBD=\"You are a Claude agent, built on Anthropic's Claude Agent SDK.\""
+
+// Updating and re-reading native content:
+> content = content.replace(/Claude Code/g, 'My App')
+> content = content.replace(/Anthropic(?: PBC)?/g, 'My Corp')
+> await tweakcc.writeContent(native2076Inst, content)
+undefined
+> (await tweakcc.readContent(native2076Inst)).slice(4153122+16, 4153122+172)
+"var be$=\"You are My App, My Corp's official CLI for Claude.\",UBD=\"You are My App, My Corp's official CLI for Claude, running within the Claude Agent SDK.\",GBD=\"You are a Claude agent, built on My Corp's Claude Agent SDK.\""
+
+```
+
+### Backup
+
+Simple utilities to handle creating and restoring backups of the native binary of `cli.js` in order to revert patches.
+
+```js
+/**
+ * Backup a file to a specified location, creating parent directories if needed.
+ * Leaves the original file untouched.
+ */
+async function backupFile(
+  sourcePath: string,
+  backupPath: string
+): Promise<void>;
+
+/**
+ * Restore a file from a backup, breaks hard links, which are common with pnpm/bun
+ * installations, and preserving execute permissions.
+ */
+async function restoreBackup(
+  backupPath: string,
+  targetPath: string
+): Promise<void>;
+```
+
+Demo:
+
+```js
+// Make a backup of the original install:
+> const native2076Inst = { path: 'C:\\Users\\user\\.local\\share\\claude\\versions\\2.0.76', kind: 'native' };
+> const backupPath = path.join(os.homedir(), ".myapp", `cc-${native2076Inst.kind}-backup`);
+> await tweakcc.backupFile(native2076Inst.path, backupPath);
+undefined
+> fs.statSync(backupPath).size
+234454688   // <-- It was made successfully; 234.5 MB.
+
+// Now patch the original:
+> await tweakcc.writeContent(native2076Inst, "(function(){console.log(\"Hi\")})");
+> (await tweakcc.readContent(native2076Inst)).length
+31          // <-- Original was successfully modified.
+
+// Restore the backup:
+> await tweakcc.restoreBackup(backupPath, native2076Inst.)
+```
+
+-->
+
 ## Troubleshooting
 
 tweakcc stores a backup of your Claude Code `cli.js`/binary for when you want to revert your customizations and for reapplying patches. Before it applies your customizations, it restores the original `cli.js`/binary so that it can start from a clean slate. Sometimes things can get confused and your `claude` can be corrupted.

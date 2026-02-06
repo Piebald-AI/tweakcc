@@ -1,3 +1,4 @@
 *
 !dist/*.mjs
+!dist/**/*.mjs
 !package.json

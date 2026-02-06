@@ -270,6 +270,17 @@ export const clearRequireFuncNameCache = (): void => {
 };
 
 /**
+ * Clear all helper caches.
+ *
+ * Call this when processing multiple different cli.js files in one session.
+ * The caches store minified variable names that are specific to each file.
+ */
+export const clearCaches = (): void => {
+  clearReactVarCache();
+  clearRequireFuncNameCache();
+};
+
+/**
  * Find the Text component variable name from Ink
  */
 export const findTextComponent = (fileContents: string): string | undefined => {

@@ -8,17 +8,23 @@ import { CONFIG_DIR } from '@/config';
 interface InstallationPickerProps {
   candidates: InstallationCandidate[];
   onSelect: (candidate: InstallationCandidate) => void;
+  onCancel?: () => void;
 }
 
 export function InstallationPicker({
   candidates,
   onSelect,
+  onCancel,
 }: InstallationPickerProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   useInput((input, key) => {
     if (key.escape) {
-      process.exit(0);
+      if (onCancel) {
+        onCancel();
+      } else {
+        process.exit(0);
+      }
     } else if (key.upArrow) {
       setSelectedIndex(i => (i > 0 ? i - 1 : candidates.length - 1));
     } else if (key.downArrow) {
@@ -31,8 +37,8 @@ export function InstallationPicker({
   return (
     <Box flexDirection="column">
       <Text bold color="yellow">
-        No claude executable was found in PATH, and multiple Claude Code
-        installations were found. Please select one:
+        No claude executable was found in PATH, but multiple Claude Code
+        installations were found on this machine. Please select one:
       </Text>
       <Text> </Text>
       {candidates.map((candidate, index) => (
