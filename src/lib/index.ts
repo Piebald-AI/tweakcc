@@ -13,7 +13,7 @@
  *   writeContent,
  *   backupFile,
  *   helpers,
- * } from 'tweakcc/lib';
+ * } from 'tweakcc';
  *
  * // Find Claude Code
  * const installation = await tryDetectInstallation({ interactive: true });

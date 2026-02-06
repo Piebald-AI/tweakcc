@@ -3,17 +3,13 @@
   "version": "3.4.0",
   "type": "module",
   "description": "Command-line tool to customize your Claude Code theme colors, thinking verbs and more.",
-  "main": "dist/index.mjs",
-  "types": "dist/index.d.ts",
+  "main": "dist/lib/index.mjs",
+  "types": "dist/lib/index.d.ts",
   "bin": {
     "tweakcc": "./dist/index.mjs"
   },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.mjs"
-    },
-    "./lib": {
       "types": "./dist/lib/index.d.ts",
       "default": "./dist/lib/index.mjs"
     }
