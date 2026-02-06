@@ -120,6 +120,7 @@ $ pnpm dlx tweakcc
   - _Missing documentation for above features coming soon_
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
+- [Contributing](#contributing)
 - [Related projects](#related-projects)
 - [System prompts](#system-prompts)
 - [Toolsets](#toolsets)
@@ -132,6 +133,114 @@ $ pnpm dlx tweakcc
 tweakcc works by patching Claude Code's minified `cli.js` file. For npm-based installations this file is modified directly, but for native installation it's extracted from the binary, patched, and then the binary is repacked. When you update your Claude Code installation, your customizations will be overwritten, but they're remembered in your configuration file, so they can be reapplied by just running `npx tweakcc --apply`.
 
 tweakcc is verified to work with Claude Code **2.1.32.** In newer or earlier versions various patches might not work. However, if we have the [system prompts for your version](https://github.com/Piebald-AI/tweakcc/tree/main/data/prompts) then system prompt patching is guaranteed to work with that version, even if it's significantly different from the verified CC version&mdash;the version number stated above is only relevant for the non-system-prompt patches. We get the latest system prompts within minutes of each new CC release, so unless you're using a CC version older than 2.0.14, your version is supported.
+
+## Feature: Thinking verbs customization
+
+Customize the thinking verbs that appear while Claude is generating responses, along with the format string. You can change from the default `"Thinking… "` format to something more fun like `"Claude is {verb}ing..."` or anything else you prefer.
+
+Here's a demo showing a custom thinking verb format in action:
+
+![Claude Code showing "Claude is Baking..." as the thinking verb](./assets/demo.gif)
+
+To customize thinking verbs, you can use the tweakcc UI or edit [`~/.tweakcc/config.json`](#configuration-directory) manually.
+
+**Via the UI:**
+
+1. Run `npx tweakcc`
+2. Navigate to the **"Thinking verbs"** section
+3. Use the tab key to switch between **Format** and **Verbs** sections
+4. Edit the format string: the `{}` placeholder will be replaced with a randomly selected verb
+5. Add, edit, or remove verbs from the list
+6. Apply changes when satisfied
+
+**Via `config.json`:**
+
+In `.settings.thinkingVerbs`, configure the `format` and `verbs`:
+
+```json
+"thinkingVerbs": {
+  "format": "{}… ",
+  "verbs": [
+    "Accomplishing",
+    "Baking",
+    "Cogitating",
+    "Fermenting",
+    "Moonwalking",
+    "Noodling"
+  ]
+}
+```
+
+Here's the schema:
+
+```typescript
+{
+  format: string;    // Format string, use {} as placeholder for the verb
+  verbs: string[];   // Array of verbs (Claude randomly selects one)
+}
+```
+
+**Examples of different formats:**
+
+- Default format: `"{}… "` → displays as `"Thinking… "`
+- Custom format: `"Claude is {verb}ing..."` → displays as `"Claude is Baking..."`
+- Custom format: `"✻ {verb} (generating)"` → displays as `"✻ Baking (generating)"`
+- Custom format: `"<{verb}> "` → displays as `"<Baking> "`
+
+**Reset to defaults:**
+
+To reset to the default verbs and format, run `npx tweakcc`, navigate to **Thinking verbs**, and press `Ctrl+R` to restore defaults (which include 200+ fun verbs like "Beboppin'", "Fermenting", "Moonwalking", etc.).
+
+## Feature: Thinking indicator customizations
+
+Customize the thinking indicator (spinner) animation that appears alongside the thinking verb. You can change the animation phases, speed, and whether it reverses direction.
+
+The thinking indicator consists of a sequence of characters that cycle through while Claude is thinking, displayed alongside the thinking verb (e.g., `Thinking·` → `Thinking✢` → `Thinking✳` → etc.).
+
+**Via `config.json`:**
+
+In `.settings.thinkingStyle`, configure the animation:
+
+```json
+"thinkingStyle": {
+  "updateInterval": 120,
+  "phases": [
+    "·",
+    "✢",
+    "✳",
+    "✶",
+    "✻",
+    "✽"
+  ],
+  "reverseMirror": true
+}
+```
+
+Here's the schema:
+
+```typescript
+{
+  updateInterval: number;   // Animation speed in milliseconds (lower = faster)
+  phases: string[];          // Array of characters that cycle through
+  reverseMirror: boolean;    // Whether to reverse the animation sequence
+}
+```
+
+**Examples of different animations:**
+
+| Animation       | Phases                                               | Description                  |
+| --------------- | ---------------------------------------------------- | ---------------------------- |
+| Default stars   | `['·', '✢', '✳', '✶', '✻', '✽']`                     | Classic star burst animation |
+| Simple dots     | `['.', '..', '...']`                                 | Classic loading dots         |
+| Braille spinner | `['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']` | Braille-style spinner        |
+| Arrow spinner   | `['←', '↖', '↑', '↗', '→', '↘', '↓', '↙']`           | Rotating arrow               |
+| Minimal         | `['○', '◐', '◑', '●']`                               | Minimal circle animation     |
+
+**Speed customization:**
+
+- `updateInterval: 60` → Very fast animation (60ms per phase)
+- `updateInterval: 120` → Default speed (120ms per phase)
+- `updateInterval: 250` → Slower animation (250ms per phase)
 
 ## Feature: Input pattern highlighters
 
@@ -533,6 +642,19 @@ pnpm i
 pnpm build
 node dist/index.mjs
 ```
+
+## Contributing
+
+Contributions are welcome! Whether you're fixing a bug, adding a new feature, improving documentation, or adding tests, we appreciate your help.
+
+For detailed guidelines on development setup, code style, testing, and submitting pull requests, see the [CONTRIBUTING.md](https://github.com/Piebald-AI/tweakcc/blob/main/CONTRIBUTING.md) file.
+
+### Quick Start
+
+1. Fork the repository and create a new branch
+2. Make your changes following the code style guidelines
+3. Run tests and linting: `pnpm test && pnpm lint`
+4. Submit a pull request with a clear description
 
 ## Related projects
 
