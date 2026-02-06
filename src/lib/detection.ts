@@ -58,11 +58,8 @@ function infoToInstallation(info: ClaudeCodeInstallationInfo): Installation {
 // ============================================================================
 
 /**
- * Find all Claude Code installations on the system.
- *
- * Searches PATH and common install locations.
- *
- * @returns Array of found installations, sorted by version (newest first)
+ * Find all Claude Code installations on the system by searching in PATH and
+ * common install locations.
  */
 export async function findAllInstallations(): Promise<Installation[]> {
   const candidates = await collectCandidates();
