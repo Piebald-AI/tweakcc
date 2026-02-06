@@ -500,7 +500,7 @@ mv ~/.tweakcc ~/.claude/tweakcc
 
 By default, Claude Code prevents the use of `--dangerously-skip-permissions` when running under `sudo` to avoid accidental system-wide permission bypasses. This patch removes that restriction.
 
-**Why you might need this**: [Yo might want to modify system related things]
+**Why you might need this**: Some system administration tasks or automated deployment scripts may require running Claude Code with elevated privileges while also bypassing permission checks. For example, when deploying to restricted directories or modifying system configuration files.
 
 **Security implications**: When enabled, you can run Claude Code with sudo and bypass permission checks, potentially allowing Claude to perform system-level operations without prompts. Use extreme caution.
 
