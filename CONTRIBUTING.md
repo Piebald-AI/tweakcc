@@ -218,8 +218,8 @@ When reporting bugs, please include:
 
 ## Getting Help
 
-- Check existing [Issues](https://github.com/anomalyco/tweakcc/issues) for similar problems
-- Read the [README](https://github.com/anomalyco/tweakcc#readme) for usage documentation
+- Check existing [Issues](https://github.com/Piebald-AI/tweakcc/issues) for similar problems
+- Read the [README](https://github.com/Piebald-AI/tweakcc#readme) for usage documentation
 - Ask questions in a new issue with the `question` label
 
 Thank you for contributing! 🙌
