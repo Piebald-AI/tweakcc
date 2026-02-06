@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Add comprehensive documentation for thinking verbs and thinking indicator customizations
+- Add contributing guidelines and AGENTS.md for developer experience
 - Add a fallback for WASMagic when it's not available (#399) - @signadou
 - Add opusplan[1m] model alias for 1M context support (#404) - @mike1858
 - Add MCP startup optimization settings (#407) - @mike1858
