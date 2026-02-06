@@ -13,9 +13,7 @@ export const writeAllowBypassPermsInSudo = (file: string): string | null => {
   const match = file.match(pattern);
 
   if (!match || match.index === undefined) {
-    console.error(
-      'patch: allowBypassPermsInSudo: failed to find pattern'
-    );
+    console.error('patch: allowBypassPermsInSudo: failed to find pattern');
     return null;
   }
 
