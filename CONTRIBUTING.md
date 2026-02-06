@@ -127,7 +127,7 @@ Test files are located in:
 
 Follow these conventions for clear, meaningful commit messages:
 
-```
+```text
 <type> <subject> (#<issue-number>)
 
 <body>
