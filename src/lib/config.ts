@@ -31,8 +31,6 @@ export function getTweakccConfigDir(): string {
 
 /**
  * Get tweakcc's config file path.
- *
- * @returns Absolute path to config.json
  */
 export function getTweakccConfigPath(): string {
   return CONFIG_FILE;
@@ -42,8 +40,6 @@ export function getTweakccConfigPath(): string {
  * Get tweakcc's system prompts directory.
  *
  * This is where tweakcc stores editable markdown files for system prompts.
- *
- * @returns Absolute path to system-prompts directory
  */
 export function getTweakccSystemPromptsDir(): string {
   return SYSTEM_PROMPTS_DIR;
@@ -51,20 +47,7 @@ export function getTweakccSystemPromptsDir(): string {
 
 /**
  * Read tweakcc's config file.
- *
- * Returns null if the config file doesn't exist.
- *  *
- * @returns The config object, or null if file doesn't exist
  */
-export async function readTweakccConfig(): Promise<TweakccConfig | null> {
-  try {
-    // Use the internal function which handles defaults
-    const config = await readConfigFile();
-    return config;
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      return null;
-    }
-    throw error;
-  }
+export async function readTweakccConfig(): Promise<TweakccConfig> {
+  return await readConfigFile();
 }

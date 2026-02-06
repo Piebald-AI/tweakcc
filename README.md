@@ -650,7 +650,7 @@ async function findAllInstallations(): Promise<Installation[]>;
  * Prompts the user to select one of the specified Claude Code installations
  * interactively using the same UI tweakcc uses, powered by [Ink + React](https://github.com/vadimdemedes/ink).
  */
-async function showInteractiveInstallationPicker(candidates: Installation[]): Promise<Installation>;
+async function showInteractiveInstallationPicker(candidates: Installation[]): Promise<Installation | null>;
 
 /**
  * Attempts to detect the user's preferred Claude Code installation.  Detection procedure:

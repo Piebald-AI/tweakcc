@@ -61,7 +61,6 @@ function infoToInstallation(info: ClaudeCodeInstallationInfo): Installation {
  * Find all Claude Code installations on the system.
  *
  * Searches PATH and common install locations.
- * Never throws - returns empty array if none found.
  *
  * @returns Array of found installations, sorted by version (newest first)
  */
@@ -171,36 +170,55 @@ export async function showInteractiveInstallationPicker(
     kind: inst.kind === 'npm' ? 'npm-based' : 'native-binary',
   }));
 
-  return new Promise(resolve => {
-    const handleSelect = (candidate: InstallationCandidate) => {
-      instance.unmount();
+  return new Promise((resolve, reject) => {
+    let instance: ReturnType<typeof render>;
+
+    const cleanup = () => {
+      try {
+        instance.unmount();
+      } catch {
+        // Already unmounted or never mounted — ignore.
+      }
       // Ink unrefs stdin on unmount, which can cause the process to exit
       // if there are no other referenced handles keeping the event loop alive.
       // Re-ref it so the caller's process stays alive.
       // Without this the node REPL would exit ~250ms or so after this function
-      // succesfully returns.
+      // successfully returns.
       process.stdin.ref();
+    };
+
+    const handleSelect = (candidate: InstallationCandidate) => {
+      cleanup();
       resolve(candidateToInstallation(candidate));
     };
 
     const handleCancel = () => {
-      instance.unmount();
-      // Ink unrefs stdin on unmount, which can cause the process to exit
-      // if there are no other referenced handles keeping the event loop alive.
-      // Re-ref it so the caller's process stays alive.
-      // Without this the node REPL would exit ~250ms or so after this function
-      // succesfully returns.
-      process.stdin.ref();
+      cleanup();
       resolve(null);
     };
 
-    const instance = render(
-      React.createElement(InstallationPicker, {
-        candidates: internalCandidates,
-        onSelect: handleSelect,
-        onCancel: handleCancel,
-      }),
-      { exitOnCtrlC: false }
-    );
+    try {
+      instance = render(
+        React.createElement(InstallationPicker, {
+          candidates: internalCandidates,
+          onSelect: handleSelect,
+          onCancel: handleCancel,
+        }),
+        { exitOnCtrlC: false }
+      );
+
+      // If the Ink instance exposes waitUntilExit, use it to catch async
+      // render errors (e.g. a component throwing during a later re-render).
+      instance.waitUntilExit().catch((err: unknown) => {
+        cleanup();
+        reject(err instanceof Error ? err : new Error(String(err)));
+      });
+    } catch (err) {
+      // render() itself threw synchronously (e.g. component throws during
+      // initial render).  Clean up and reject so the caller isn't left
+      // hanging on a Promise that never settles.
+      process.stdin.ref();
+      reject(err instanceof Error ? err : new Error(String(err)));
+    }
   });
 }

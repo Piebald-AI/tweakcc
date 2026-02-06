@@ -4,17 +4,24 @@
   "type": "module",
   "description": "Command-line tool to customize your Claude Code theme colors, thinking verbs and more.",
   "main": "dist/index.mjs",
+  "types": "dist/index.d.ts",
   "bin": {
     "tweakcc": "./dist/index.mjs"
   },
   "exports": {
-    ".": "./dist/index.mjs",
-    "./lib": "./dist/lib/index.mjs"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.mjs"
+    },
+    "./lib": {
+      "types": "./dist/lib/index.d.ts",
+      "default": "./dist/lib/index.mjs"
+    }
   },
   "scripts": {
-    "build": "tsc --noEmit && tsdown --minify src/index.tsx src/lib/index.ts",
-    "build:dev": "tsdown src/index.tsx src/lib/index.ts",
-    "watch": "tsdown --watch src/index.tsx src/lib/index.ts",
+    "build": "tsc --noEmit && tsdown --minify --dts src/index.tsx src/lib/index.ts",
+    "build:dev": "tsdown --dts src/index.tsx src/lib/index.ts",
+    "watch": "tsdown --watch --dts src/index.tsx src/lib/index.ts",
     "start": "node dist/index.mjs",
     "lint": "tsc --noEmit && eslint src",
     "test": "vitest run",
