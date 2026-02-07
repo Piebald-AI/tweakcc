@@ -9,7 +9,7 @@ export const writeSuppressNativeInstallerWarning = (
   const match = file.match(pattern);
 
   if (!match || match.index === undefined) {
-    console.error(
+    console.warning(
       'patch: suppressNativeInstallerWarning: failed to find pattern'
     );
     return null;
