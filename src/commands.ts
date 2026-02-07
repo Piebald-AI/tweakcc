@@ -31,14 +31,25 @@ import {
 
 function askYesNo(prompt: string): Promise<boolean> {
   return new Promise(resolve => {
+    let settled = false;
+    const settle = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      rl.close();
+      resolve(value);
+    };
+
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stderr,
     });
+
+    rl.on('close', () => settle(false));
+    rl.on('SIGINT', () => settle(false));
+
     rl.question(prompt, answer => {
-      rl.close();
       const trimmed = answer.trim().toLowerCase();
-      resolve(trimmed === '' || trimmed === 'y' || trimmed === 'yes');
+      settle(trimmed === '' || trimmed === 'y' || trimmed === 'yes');
     });
   });
 }
@@ -77,10 +88,10 @@ export async function promptUserForDiffApproval(
   if (!result) {
     console.log(
       chalk.yellow(
-        'Could not generate formatted diff (oxfmt unavailable or parse error). Proceeding.'
+        'Could not generate formatted diff (oxfmt unavailable or parse error).'
       )
     );
-    return true;
+    return askYesNo(chalk.bold('\nApply changes without diff preview? [Y/n] '));
   }
 
   if (result.changeCount === 0) {

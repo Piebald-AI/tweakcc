@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `unpack`, `repack`, and `adhoc-patch --string/regex/script` subcommands (#481)
 - Offer to set edited theme as Claude Code's current theme when exiting editor (#482) - @brrock
 - Add a patch to suppress the native installer warning (#483) - @brrock
-- Show lighting fast formatted patch changes via oxfmt before applying patch scripts (#489) - @bl-ue
+- Show lightning fast formatted patch changes via oxfmt before applying patch scripts (#489) - @bl-ue
 
 ## [v3.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.4.0) - 2026-01-18
 
