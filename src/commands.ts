@@ -5,9 +5,12 @@
  */
 
 import * as fs from 'node:fs/promises';
+import * as readline from 'node:readline';
 import { spawn } from 'node:child_process';
 
 import chalk from 'chalk';
+
+import { formatAndDiff } from './formatAndDiff';
 
 import { tryDetectInstallation } from './lib/detection';
 import { readContent, writeContent } from './lib/content';
@@ -23,27 +26,85 @@ import {
 } from './patches/helpers';
 
 // =============================================================================
-// Diff Approval Stub
+// Diff Approval
 // =============================================================================
 
-/**
- * Prompt the user for approval after showing a diff of the changes.
- *
- * Currently a stub that always returns true.
- * Future: format both versions (e.g. with oxc), generate a diff,
- * and present an accept/reject prompt.
- *
- * @param _originalJs - The original JavaScript content
- * @param _modifiedJs - The modified JavaScript content
- * @returns true to proceed with the write, false to abort
- */
+function askYesNo(prompt: string): Promise<boolean> {
+  return new Promise(resolve => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stderr,
+    });
+    rl.question(prompt, answer => {
+      rl.close();
+      const trimmed = answer.trim().toLowerCase();
+      resolve(trimmed === '' || trimmed === 'y' || trimmed === 'yes');
+    });
+  });
+}
+
+function renderDiffToConsole(
+  hunks: { oldStart: number; newStart: number; lines: string[] }[]
+): void {
+  for (const hunk of hunks) {
+    console.log(chalk.cyan(`@@ -${hunk.oldStart} +${hunk.newStart} @@`));
+    for (const line of hunk.lines) {
+      if (line.startsWith('+')) {
+        console.log(chalk.green(line));
+      } else if (line.startsWith('-')) {
+        console.log(chalk.red(line));
+      } else {
+        console.log(chalk.gray(line));
+      }
+    }
+    console.log();
+  }
+}
+
 export async function promptUserForDiffApproval(
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _originalJs: string,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _modifiedJs: string
+  originalJs: string,
+  modifiedJs: string,
+  skipConfirmation = false
 ): Promise<boolean> {
-  return true;
+  if (skipConfirmation) return true;
+
+  console.log(chalk.gray('Formatting for diff preview...'));
+
+  const result = await formatAndDiff(originalJs, modifiedJs, {
+    contextLines: 10,
+  });
+
+  if (!result) {
+    console.log(
+      chalk.yellow(
+        'Could not generate formatted diff (oxfmt unavailable or parse error). Proceeding.'
+      )
+    );
+    return true;
+  }
+
+  if (result.changeCount === 0) {
+    console.log(
+      chalk.yellow('No visible differences after formatting. Proceeding.')
+    );
+    return true;
+  }
+
+  console.log(
+    chalk.gray(
+      `Formatted ${result.formattedLines.toLocaleString()} lines in ${result.timings.formatMs.toFixed(0)}ms\n`
+    )
+  );
+
+  renderDiffToConsole(result.hunks);
+
+  console.log(
+    chalk.gray(
+      `${result.changeCount} change(s) across ${result.formattedLines.toLocaleString()} formatted lines (${result.timings.totalMs.toFixed(0)}ms)`
+    )
+  );
+
+  return askYesNo(chalk.bold('\nApply these changes? [Y/n] '));
 }
 
 // =============================================================================
@@ -337,7 +398,8 @@ async function handleAdhocPatchString(
   oldString: string,
   newString: string,
   index: number | undefined,
-  installation: Installation
+  installation: Installation,
+  skipConfirmation = false
 ): Promise<void> {
   const content = await readContent(installation);
 
@@ -389,7 +451,11 @@ async function handleAdhocPatchString(
     modified = parts.join(newString);
   }
 
-  const approved = await promptUserForDiffApproval(content, modified);
+  const approved = await promptUserForDiffApproval(
+    content,
+    modified,
+    skipConfirmation
+  );
   if (!approved) {
     console.log(chalk.yellow('Aborted.'));
     return;
@@ -458,7 +524,8 @@ async function handleAdhocPatchRegex(
   rawPattern: string,
   replacement: string,
   index: number | undefined,
-  installation: Installation
+  installation: Installation,
+  skipConfirmation = false
 ): Promise<void> {
   const content = await readContent(installation);
 
@@ -524,7 +591,11 @@ async function handleAdhocPatchRegex(
     }
   }
 
-  const approved = await promptUserForDiffApproval(content, modified);
+  const approved = await promptUserForDiffApproval(
+    content,
+    modified,
+    skipConfirmation
+  );
   if (!approved) {
     console.log(chalk.yellow('Aborted.'));
     return;
@@ -544,7 +615,8 @@ async function handleAdhocPatchRegex(
  */
 async function handleAdhocPatchScriptImpl(
   scriptArg: string,
-  installation: Installation
+  installation: Installation,
+  skipConfirmation = false
 ): Promise<void> {
   const content = await readContent(installation);
 
@@ -580,7 +652,11 @@ async function handleAdhocPatchScriptImpl(
     return;
   }
 
-  const approved = await promptUserForDiffApproval(content, modified);
+  const approved = await promptUserForDiffApproval(
+    content,
+    modified,
+    skipConfirmation
+  );
   if (!approved) {
     console.log(chalk.yellow('Aborted.'));
     return;
@@ -607,6 +683,7 @@ export async function handleAdhocPatch(options: {
   script?: string;
   index?: number;
   path?: string;
+  confirmPossibleDangerousPatch?: boolean;
 }): Promise<void> {
   // Validate that exactly one mode is specified
   const modes = [options.string, options.regex, options.script].filter(
@@ -627,6 +704,7 @@ export async function handleAdhocPatch(options: {
     process.exit(1);
   }
 
+  const skipConfirmation = !!options.confirmPossibleDangerousPatch;
   const installation = await resolveInstallation(options.path);
 
   console.log(
@@ -646,7 +724,8 @@ export async function handleAdhocPatch(options: {
       options.string[0],
       options.string[1],
       options.index,
-      installation
+      installation,
+      skipConfirmation
     );
   } else if (options.regex) {
     if (options.regex.length !== 2) {
@@ -661,13 +740,18 @@ export async function handleAdhocPatch(options: {
       options.regex[0],
       options.regex[1],
       options.index,
-      installation
+      installation,
+      skipConfirmation
     );
   } else if (options.script) {
     if (options.index !== undefined) {
       console.error(chalk.red('Error: --index cannot be used with --script.'));
       process.exit(1);
     }
-    await handleAdhocPatchScriptImpl(options.script, installation);
+    await handleAdhocPatchScriptImpl(
+      options.script,
+      installation,
+      skipConfirmation
+    );
   }
 }
