@@ -55,6 +55,17 @@ export function getCurrentClaudeCodeTheme(): string {
   return 'dark';
 }
 
+export function setCurrentClaudeCodeTheme(themeId: string): void {
+  try {
+    const ccConfigPath = path.join(os.homedir(), '.claude.json');
+    const ccConfig = JSON.parse(fsSync.readFileSync(ccConfigPath, 'utf8'));
+    ccConfig.theme = themeId;
+    fsSync.writeFileSync(ccConfigPath, JSON.stringify(ccConfig, null, 2));
+  } catch {
+    // Do nothing.
+  }
+}
+
 export function getClaudeSubscriptionType(): string {
   try {
     const credentialsPath = path.join(
