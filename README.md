@@ -120,12 +120,16 @@ $ pnpm dlx tweakcc
   - _Missing documentation for above features coming soon_
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
-- [Contributing](#contributing)
+- [CLI Commands](#cli-commands)
+  - [`unpack`](#unpack)
+  - [`repack`](#repack)
+  - [`adhoc-patch`](#adhoc-patch)
 - [Related projects](#related-projects)
 - [System prompts](#system-prompts)
 - [Toolsets](#toolsets)
 - [Troubleshooting](#troubleshooting)
 - [FAQ](#faq)
+- [Contributing](#contributing)
 - [License](#license)
 
 ## How it works
@@ -230,10 +234,10 @@ Here's the schema:
 
 | Animation       | Phases                                               | Description                  |
 | --------------- | ---------------------------------------------------- | ---------------------------- |
-| Default stars   | `['·', '✢', '✳', '✶', '✻', '✽']`                     | Classic star burst animation |
+| Default stars   | `['·', '✢', '✳', '✶', '✻', '✽']`                    | Classic star burst animation |
 | Simple dots     | `['.', '..', '...']`                                 | Classic loading dots         |
 | Braille spinner | `['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']` | Braille-style spinner        |
-| Arrow spinner   | `['←', '↖', '↑', '↗', '→', '↘', '↓', '↙']`           | Rotating arrow               |
+| Arrow spinner   | `['←', '↖', '↑', '↗', '→', '↘', '↓', '↙']`       | Rotating arrow               |
 | Minimal         | `['○', '◐', '◑', '●']`                               | Minimal circle animation     |
 
 **Speed customization:**
@@ -643,18 +647,112 @@ pnpm build
 node dist/index.mjs
 ```
 
-## Contributing
+## CLI Commands
 
-Contributions are welcome! Whether you're fixing a bug, adding a new feature, improving documentation, or adding tests, we appreciate your help.
+In addition to the interactive TUI (`npx tweakcc`) and the `--apply` flag, tweakcc provides three subcommands for advanced use: `unpack`, `repack`, and `adhoc-patch`.
 
-For detailed guidelines on development setup, code style, testing, and submitting pull requests, see the [CONTRIBUTING.md](https://github.com/Piebald-AI/tweakcc/blob/main/CONTRIBUTING.md) file.
+### `unpack`
 
-### Quick Start
+Extract the embedded JavaScript from a native Claude Code binary and write it to a file. This is useful for inspecting Claude Code's source, writing custom patches, or making manual edits before repacking. Note that `unpack` only works with native/binary installations; it will error if pointed at an npm-based installation (`cli.js`), because it can already be read directly from disk. `unpack` takes the path to the JS file to write to, and an optional path to a native binary, which if omitted will default to the current installation.
 
-1. Fork the repository and create a new branch
-2. Make your changes following the code style guidelines
-3. Run tests and linting: `pnpm test && pnpm lint`
-4. Submit a pull request with a clear description
+```bash
+npx tweakcc unpack <output-js-path> [binary-path]
+```
+
+### `repack`
+
+Read a JavaScript file and embed it back into a native Claude Code binary. This is the counterpart to `unpack` — after inspecting or modifying the extracted JS, use `repack` to write it back. Like `unpack`, this only works with native installations. `repack` takes a path to a JS file to read from, and an optional path to a native binary, which if omitted, as above, will default to the current installation.
+
+```bash
+npx tweakcc repack <input-js-path> [binary-path]
+```
+
+Example:
+
+```bash
+# Extract, edit, and repack
+npx tweakcc unpack ./claude-code.js
+# ... make your edits to claude-code.js ...
+npx tweakcc repack ./claude-code.js
+```
+
+### `adhoc-patch`
+
+Apply a one-off or ad-hoc patch to a Claude Code installation without going through the tweakcc UI or config system. It supports three modes and works both native and npm-based installations.
+
+> [!CAUTION]
+> This API does not create a backup of the Claude Code installation that is modified. You'll need to copy the original file to a separate location to allow if you want to revert any changes you made&mdash;due to the lack of a backup, `tweakc --revert/--restore` will NOT work (unless you happen to have run `tweakcc --apply` before you use `adhoc-patch`).
+
+3 modes of patching are supported.
+
+#### `--string`
+
+A fixed/static old string is replaced with a fixed/static new string, analagous to `grep -F`.
+
+- By default, all instances of the old string are replaced, but you can use `--index` to specify a particular occurence by index, e.g. `--index 0` to replace only the first, `--index 1` to replace only the second, etc.
+
+#### `--regex`
+
+All matches of a regular expression are replaced with a new string.
+
+- The new string can contain `$D` replacements, where `D` is the 0-based index of a group matched by the regular expression; `$0` = the entire matched text, `$1` = the first used-defined match group, etc.
+
+- The regular expression must begin and end with a forward slash in JavaScript style, e.g. `/my.+regex/`. An optional list of flags&mdash;characters from the set `g`, `i`, `m`, `s`, `e`, and `y`&mdash;may be appended after the last delimiting forward slash, e.g. `/claude/ig`
+
+- Like `--string`, `--regex` supports the use of `--index` to specify by index which occurence to replace, without which all occurences are replaced.
+
+#### `--script`
+
+This is the most powerful option. A short snippet of JavaScript code running in Node.js takes the JavaScript content of the CC installation as input and returns the entire input, modified as output.
+
+- **Security:** The script is run in a sandboxed/isolated `node` child process with the [`--experimental-permission`](https://nodejs.org/api/permissions.html) option to prevent the script from using file system and network APIs. This option requires that you have Node.js 20+ installed and on your `PATH`. Due to this sandboxing, scripts themselves (including those downloaded from HTTP URLs) are safe to run without prior review; however, because the scripts are patching Claude Code, which is an executable, it's technically possible for a script to patch malicious code into your Claude Code executable that would execute when you run `claude`. As a result, it's highlight advised to review the diff tweakcc prints when it asks you if you'd like to apply the changes proposed by the patch.
+
+- **Input/output:** Claude Code's JavaScript code is passed to the script via a global variable, `js`, available inside the script's execution context. To return the modified file content, simple use the `return` keyword. For example, to write a very simple script that replaced all instances of `"Claude Code"` with `"My App"`, you could write the following:
+
+  ```js
+  js = js.replace(/"Claude Code"/g, '"My App"');
+  return js;
+  ```
+
+- **Utility vars:** Because complicated patches may need to make use of common functions and global variables like `chalk`, `React`, `require`, and the low-level module loader function, and also common [Ink/React](https://github.com/vadimdemedes/ink) components like `Text` and `Box`, tweakcc also provides a `vars` global variable to the script. `vars` is an object containing the names of the common variables listed above; here's an example:
+
+  ```js
+  const vars = {
+    chalkVar: "K6",
+    moduleLoaderFunction: "s",
+    reactVar: "Yt8",
+    requireFuncName: "C1",
+    textComponent: "f",
+    boxComponent: "NZ5"
+  };
+  ```
+
+- **Script source:** Scripts can be passed in 3 ways: directly on the command-line, via a local file on disk, and via an HTTP URL. In order to specify a file, pass the path to the file prefixed with `@` (similar to `curl -d`). To specify an HTTP URL, use `@` and ensure the URL is prefixed with `http://` or `https://`. HTTP scripts themselves are safe to run as a result of our sandboxing, with one notable pitfall, as mentioned above.
+
+#### Usage
+
+```bash
+# Replace a fixed string with another string:
+npx tweakcc adhoc-patch --string '"Claude Code"' '"My App"'
+
+# Replace all CSS-style RGB colors with bright red:
+npx tweakcc adhoc-patch --regex 'rgb\(\d+,\d+,\d+\)' 'rgb(255,0,0)'
+
+# Erase all of CC's code and replace it with a simple console.log:
+npx tweakcc adhoc-patch --script $'return "(function(){console.log(\"Hi\")})()"'
+
+# Run a script from a local file:
+npx tweakcc adhoc-patch --script '@path/to/script.js'
+
+# Run a script from an HTTP URL (warning: this script makes everything in CC blue and changes "Claude Code" to "ABC Code CLI", which BREAKS CC):
+# It's contents are:
+#
+#   js = js.replace(/Claude Code/g, "ABC Code CLI")
+#   js = js.replace(/rgb\(\d+,\d+,\d+\)/g, "rgb(0,128,255)")
+#   return js
+#
+npx tweakcc adhoc-patch --script '@https://gist.githubusercontent.com/bl-ue/2402a16b966176c994ea7bd5d11b0b09/raw/eeb0b78a6387f0e6a15182eeabd95f0e84e4ccd7/patch_cc.js'
+```
 
 ## Related projects
 
@@ -1017,6 +1115,19 @@ Could you have forgotten to actually set Claude Code's theme to your new theme? 
 [tweakcn](https://github.com/jnsahaj/tweakcn), though similarly named, is unrelated to tweakcc or Claude Code. It's a tool for editing your [shadcn/ui](https://github.com/shadcn-ui/ui) themes. Check it out!
 
 </details>
+
+## Contributing
+
+Contributions are welcome! Whether you're fixing a bug, adding a new feature, improving documentation, or adding tests, we appreciate your help.
+
+For detailed guidelines on development setup, code style, testing, and submitting pull requests, see the [CONTRIBUTING.md](https://github.com/Piebald-AI/tweakcc/blob/main/CONTRIBUTING.md) file.
+
+**Quick Start:**
+
+1. Fork the repository and create a new branch
+2. Make your changes following the code style guidelines
+3. Run tests and linting: `pnpm test && pnpm lint`
+4. Submit a pull request with a clear description
 
 ## License
 
