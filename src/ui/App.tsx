@@ -16,12 +16,7 @@ import {
   StartupCheckInfo,
   TweakccConfig,
 } from '../types';
-import {
-  CONFIG_FILE,
-  readConfigFile,
-  SYSTEM_PROMPTS_DIR,
-  updateConfigFile,
-} from '../config';
+import { CONFIG_FILE, SYSTEM_PROMPTS_DIR, updateConfigFile } from '../config';
 import { openInExplorer, revealFileInExplorer } from '../utils';
 import { DEFAULT_SETTINGS } from '../defaultSettings';
 import {
@@ -41,30 +36,17 @@ export default function App({
   startupCheckInfo,
   configMigrated,
   invocationCommand,
+  initialConfig,
 }: {
   startupCheckInfo: StartupCheckInfo;
   configMigrated: boolean;
   invocationCommand: string;
+  initialConfig: TweakccConfig;
 }) {
-  const [config, setConfig] = useState<TweakccConfig>({
-    settings: DEFAULT_SETTINGS,
-    changesApplied: false,
-    ccVersion: '',
-    lastModified: '',
-  });
-  const [showPiebaldAnnouncement, setShowPiebaldAnnouncement] = useState(false);
-
-  // Load the config file from local storage.
-  // The TUI is for editing local configuration only.
-  useEffect(() => {
-    const loadConfig = async () => {
-      const loadedConfig = await readConfigFile();
-      setConfig(loadedConfig);
-      // Show the Piebald announcement only if not hidden in config
-      setShowPiebaldAnnouncement(!loadedConfig.hidePiebaldAnnouncement);
-    };
-    loadConfig();
-  }, []);
+  const [config, setConfig] = useState<TweakccConfig>(initialConfig);
+  const [showPiebaldAnnouncement, setShowPiebaldAnnouncement] = useState(
+    !initialConfig.hidePiebaldAnnouncement
+  );
 
   // Function to update the settings, automatically updated changesApplied.
   const updateSettings = useCallback(

@@ -34,7 +34,11 @@ import {
   selectAndSaveInstallation,
 } from './installationDetection';
 import { InstallationPicker } from './ui/components/InstallationPicker';
-import { InstallationCandidate, StartupCheckInfo } from './types';
+import {
+  InstallationCandidate,
+  StartupCheckInfo,
+  TweakccConfig,
+} from './types';
 import { handleUnpack, handleRepack, handleAdhocPatch } from './commands';
 import {
   restoreClijsFromBackup,
@@ -710,7 +714,6 @@ async function handleInteractiveMode(configMigrated: boolean): Promise<void> {
   try {
     const result = await startupCheck({ interactive: true });
 
-    // Check if we need user to select from multiple candidates
     if (result.pendingCandidates) {
       await handleInstallationSelection(
         result.pendingCandidates,
@@ -719,14 +722,12 @@ async function handleInteractiveMode(configMigrated: boolean): Promise<void> {
       return;
     }
 
-    // Check if we found an installation
     if (!result.startupCheckInfo) {
       console.error(chalk.red(formatNotFoundError()));
       process.exit(1);
     }
 
-    // We have a valid installation, start the app
-    await startApp(result.startupCheckInfo, configMigrated);
+    await startApp(result.startupCheckInfo, configMigrated, result.config);
   } catch (error) {
     if (error instanceof InstallationDetectionError) {
       console.error(chalk.red(`Error: ${error.message}`));
@@ -749,10 +750,8 @@ async function handleInstallationSelection(
   return new Promise((resolve, reject) => {
     const handleSelect = async (candidate: InstallationCandidate) => {
       try {
-        // Save the selection and get the installation info
         const ccInstInfo = await selectAndSaveInstallation(candidate);
 
-        // Complete the startup check with the selected installation
         const config = await readConfigFile();
         const startupCheckInfo = await completeStartupCheck(config, ccInstInfo);
 
@@ -765,11 +764,9 @@ async function handleInstallationSelection(
           process.exit(1);
         }
 
-        // Clear the picker and start the main app
-        // We need to unmount the picker first
         pickerInstance.unmount();
 
-        await startApp(startupCheckInfo, configMigrated);
+        await startApp(startupCheckInfo, configMigrated, config);
         resolve();
       } catch (error) {
         reject(error);
@@ -782,18 +779,11 @@ async function handleInstallationSelection(
   });
 }
 
-/**
- * Starts the main app with the given startup info.
- * The TUI always uses local configuration only.
- *
- * @param startupCheckInfo - Startup check result
- * @param configMigrated - Whether the config was migrated
- */
 async function startApp(
   startupCheckInfo: StartupCheckInfo,
-  configMigrated: boolean
+  configMigrated: boolean,
+  initialConfig: TweakccConfig
 ): Promise<void> {
-  // Preload strings file for system prompts (for interactive mode)
   const result = await preloadStringsFile(startupCheckInfo.ccInstInfo.version);
   if (!result.success) {
     console.log(chalk.red('\n✖ Error downloading system prompts:'));
@@ -812,6 +802,7 @@ async function startApp(
       startupCheckInfo={startupCheckInfo}
       configMigrated={configMigrated}
       invocationCommand={invocationCommand}
+      initialConfig={initialConfig}
     />
   );
 }
