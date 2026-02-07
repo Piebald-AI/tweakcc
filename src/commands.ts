@@ -121,6 +121,7 @@ async function runSandboxedScript(
     process.stdin.on('end', async () => {
       try {
         const vars = ${JSON.stringify(vars)};
+        process.env = {};
         const fn = new Function('js', 'vars', ${JSON.stringify(script)});
         const result = fn(input, vars);
         process.stdout.write(JSON.stringify({"r": result}));
@@ -348,7 +349,7 @@ async function handleAdhocPatchString(
       const found = content.indexOf(oldString, pos);
       if (found === -1) break;
       occurrences.push(found);
-      pos = found + 1;
+      pos = found + oldString.length;
     }
 
     if (occurrences.length === 0) {

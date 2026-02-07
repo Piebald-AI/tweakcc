@@ -691,7 +691,7 @@ npx tweakcc repack ./claude-code.js
 
 ### `adhoc-patch`
 
-Apply a one-off or ad-hoc patch to a Claude Code installation without going through the tweakcc UI or config system. It supports three modes and works both native and npm-based installations.
+Apply a one-off or ad-hoc patch to a Claude Code installation without going through the tweakcc UI or config system. It supports three modes and works with both native and npm-based installations.
 
 > [!CAUTION]
 > This API does not create a backup of the Claude Code installation that is modified. You'll need to copy the original file to a separate location to allow if you want to revert any changes you made&mdash;due to the lack of a backup, `tweakcc --revert/--restore` will NOT work (unless you happen to have run `tweakcc --apply` before you use `adhoc-patch`).
@@ -720,7 +720,7 @@ This is the most powerful option. A short snippet of JavaScript code running in 
 
 - **Security:** The script is run in a sandboxed/isolated `node` child process with the [`--experimental-permission`](https://nodejs.org/api/permissions.html) option to prevent the script from using file system and network APIs. This option requires that you have Node.js 20+ installed and on your `PATH`. Due to this sandboxing, scripts themselves (including those downloaded from HTTP URLs) are safe to run without prior review; however, because the scripts are patching Claude Code, which is an executable, it's technically possible for a script to patch malicious code into your Claude Code executable that would execute when you run `claude`. As a result, it's highlight advised to review the diff tweakcc prints when it asks you if you'd like to apply the changes proposed by the patch.
 
-- **Input/output:** Claude Code's JavaScript code is passed to the script via a global variable, `js`, available inside the script's execution context. To return the modified file content, simple use the `return` keyword. For example, to write a very simple script that replaced all instances of `"Claude Code"` with `"My App"`, you could write the following:
+- **Input/output:** Claude Code's JavaScript code is passed to the script via a global variable, `js`, available inside the script's execution context. To return the modified file content, simply use the `return` keyword. For example, to write a very simple script that replaced all instances of `"Claude Code"` with `"My App"`, you could write the following:
 
   ```js
   js = js.replace(/"Claude Code"/g, '"My App"');
