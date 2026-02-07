@@ -522,7 +522,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         id: 'allowBypassPermissionsInSudo',
         title: 'Allow bypassing permissions in sudo',
         description:
-          '⚠️ WARNING: Disables security check. When enabled, Claude can perform system-level operations without prompts. Use extreme caution. We are not responsible for any damage caused.',
+          '⚠️ WARNING: Disables a security check. When enabled, Claude can perform system-level operations without prompts. Use extreme caution.',
         getValue: () => settings.misc?.allowBypassPermissionsInSudo ?? false,
         toggle: () => {
           const currentValue =
@@ -613,7 +613,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
           >
             <Box marginBottom={1}>
               <Text bold color="yellow">
-                ⚠️ SECURITY WARNING ⚠️
+                SECURITY WARNING
               </Text>
             </Box>
             <Box marginBottom={1}>
@@ -629,19 +629,12 @@ export function MiscView({ onSubmit }: MiscViewProps) {
               </Text>
             </Box>
             <Box marginBottom={1}>
-              <Text bold color="red">
-                WE ARE NOT RESPONSIBLE FOR ANY DAMAGE CAUSED.
-              </Text>
+              <Text bold>Use with extreme caution.</Text>
             </Box>
-            <Box marginBottom={1}>
-              <Text dimColor>
-                Only proceed if you fully understand and accept the risks.
-              </Text>
-            </Box>
-            <Box marginTop={1}>
+            <Box>
               <Text>
-                Press <Text color="green">Enter</Text> to enable,{' '}
-                <Text color="red">Escape</Text> to cancel
+                Press <Text color="red">Enter</Text> to enable,{' '}
+                <Text color="green">Escape</Text> to cancel
               </Text>
             </Box>
           </Box>

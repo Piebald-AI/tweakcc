@@ -277,7 +277,7 @@ tweakcc can be used as an npm dependency and provides an easy API that projects 
 <details>
 <summary><b>Config</b>&nbsp;&bull;&nbsp; Functions to access tweakcc's own config, if it exists on the machine.</summary>
 
-```js
+```ts
 /**
  * Returns the absolute path to tweakcc's config dir.  By default it's
  * `~/.tweakcc` but it also can use `~/.claude/tweakcc` and it also respects
@@ -331,7 +331,7 @@ Demo:
 <details>
 <summary><b>Installation</b>&nbsp;&nbsp;&bull;&nbsp;&nbsp; Utilities to find installed versions of Claude Code.</summary>
 
-```js
+```ts
 /**
  * Finds all Claude Code installations on the machine via `$PATH` and hard-coded
  * search directories.
@@ -342,7 +342,9 @@ async function findAllInstallations(): Promise<Installation[]>;
  * Prompts the user to select one of the specified Claude Code installations
  * interactively using the same UI tweakcc uses, powered by [Ink + React](https://github.com/vadimdemedes/ink).
  */
-async function showInteractiveInstallationPicker(candidates: Installation[]): Promise<Installation | null>;
+async function showInteractiveInstallationPicker(
+  candidates: Installation[]
+): Promise<Installation | null>;
 
 /**
  * Attempts to detect the user's preferred Claude Code installation.  Detection procedure:
@@ -356,8 +358,8 @@ async function showInteractiveInstallationPicker(candidates: Installation[]): Pr
  *      via showInteractiveInstallationPicker().
  */
 async function tryDetectInstallation(
-    options: DetectInstallationOptions = {}
-): Promise<Installation>
+  options: DetectInstallationOptions = {}
+): Promise<Installation>;
 ```
 
 Demo:
@@ -406,7 +408,7 @@ Use ↑↓ arrows to navigate, Enter to select, Esc to quit
 <details>
 <summary><b>I/O</b>&nbsp;&nbsp;&bull;&nbsp;&nbsp; Functions to read and write the content of an npm-based or native (Bun-based) installation.</summary>
 
-```js
+```ts
 /**
  * Read Claude Code's JavaScript content.
  *
@@ -454,7 +456,7 @@ undefined
 <details>
 <summary><b>Backup</b>&nbsp;&nbsp;&bull;&nbsp;&nbsp; Simple utilities to handle creating and restoring backups of the native binary or `cli.js` in order to revert patches.</summary>
 
-```js
+```ts
 /**
  * Backup a file to a specified location, creating parent directories if needed.
  * Leaves the original file untouched.
@@ -501,7 +503,7 @@ undefined
 <details>
 <summary><b>Utilities</b>&nbsp;&nbsp;&bull;&nbsp;&nbsp; General utilities to help with patching.</summary>
 
-````js
+````
 // Utilities to find various commonly-used variables in CC's code.
 // See the docs for `tweakcc adhoc-patch --script` above for more details.
 findChalkVar(fileContents: string): string | undefined;
