@@ -24,7 +24,8 @@ const BUN_TRAILER = Buffer.from('\n---- Bun! ----\n');
 // Size constants for binary structures
 const SIZEOF_OFFSETS = 32;
 const SIZEOF_STRING_POINTER = 8;
-const SIZEOF_MODULE = 4 * SIZEOF_STRING_POINTER + 4;
+const SIZEOF_MODULE_V1 = 4 * SIZEOF_STRING_POINTER + 4; // 36 bytes: Bun < 1.3.9
+const SIZEOF_MODULE_V2 = 6 * SIZEOF_STRING_POINTER + 4; // 52 bytes: Bun >= 1.3.9 (2 extra StringPointers)
 
 // Types
 interface StringPointer {
@@ -44,6 +45,8 @@ interface BunModule {
   contents: StringPointer;
   sourcemap: StringPointer;
   bytecode: StringPointer;
+  extra1: StringPointer;
+  extra2: StringPointer;
   encoding: number;
   loader: number;
   moduleFormat: number;
@@ -93,6 +96,12 @@ function isClaudeModule(moduleName: string): boolean {
  * Iterates over modules in the Bun data and calls visitor for each.
  * Handles all module parsing and iteration logic in one place.
  */
+function detectModuleSize(modulesListLength: number): number {
+  if (modulesListLength % SIZEOF_MODULE_V2 === 0) return SIZEOF_MODULE_V2;
+  if (modulesListLength % SIZEOF_MODULE_V1 === 0) return SIZEOF_MODULE_V1;
+  return SIZEOF_MODULE_V1;
+}
+
 function mapModules<T>(
   bunData: Buffer,
   bunOffsets: BunOffsets,
@@ -106,11 +115,16 @@ function mapModules<T>(
     bunData,
     bunOffsets.modulesPtr
   );
-  const modulesListCount = Math.floor(modulesListBytes.length / SIZEOF_MODULE);
+  const moduleSize = detectModuleSize(modulesListBytes.length);
+  const modulesListCount = Math.floor(modulesListBytes.length / moduleSize);
 
   for (let i = 0; i < modulesListCount; i++) {
-    const offset = i * SIZEOF_MODULE;
-    const module = parseCompiledModuleGraphFile(modulesListBytes, offset);
+    const offset = i * moduleSize;
+    const module = parseCompiledModuleGraphFile(
+      modulesListBytes,
+      offset,
+      moduleSize
+    );
     const moduleName = getStringPointerContent(bunData, module.name).toString(
       'utf-8'
     );
@@ -139,7 +153,8 @@ function parseOffsets(buffer: Buffer): BunOffsets {
 
 function parseCompiledModuleGraphFile(
   buffer: Buffer,
-  offset: number
+  offset: number,
+  moduleSize: number
 ): BunModule {
   let pos = offset;
   const name = parseStringPointer(buffer, pos);
@@ -150,6 +165,16 @@ function parseCompiledModuleGraphFile(
   pos += 8;
   const bytecode = parseStringPointer(buffer, pos);
   pos += 8;
+
+  let extra1: StringPointer = { offset: 0, length: 0 };
+  let extra2: StringPointer = { offset: 0, length: 0 };
+  if (moduleSize >= SIZEOF_MODULE_V2) {
+    extra1 = parseStringPointer(buffer, pos);
+    pos += 8;
+    extra2 = parseStringPointer(buffer, pos);
+    pos += 8;
+  }
+
   const encoding = buffer.readUInt8(pos);
   pos += 1;
   const loader = buffer.readUInt8(pos);
@@ -163,6 +188,8 @@ function parseCompiledModuleGraphFile(
     contents,
     sourcemap,
     bytecode,
+    extra1,
+    extra2,
     encoding,
     loader,
     moduleFormat,
@@ -497,6 +524,14 @@ function rebuildBunData(
   bunOffsets: BunOffsets,
   modifiedClaudeJs: Buffer | null
 ): Buffer {
+  const modulesListBytes = getStringPointerContent(
+    bunData,
+    bunOffsets.modulesPtr
+  );
+  const moduleSize = detectModuleSize(modulesListBytes.length);
+  const hasExtraFields = moduleSize >= SIZEOF_MODULE_V2;
+  const stringsPerModule = hasExtraFields ? 6 : 4;
+
   // Phase 1: Collect all string data
   const stringsData: Buffer[] = [];
   const modulesMetadata: Array<{
@@ -504,6 +539,8 @@ function rebuildBunData(
     contents: Buffer;
     sourcemap: Buffer;
     bytecode: Buffer;
+    extra1: Buffer;
+    extra2: Buffer;
     encoding: number;
     loader: number;
     moduleFormat: number;
@@ -524,12 +561,16 @@ function rebuildBunData(
 
     const sourcemapBytes = getStringPointerContent(bunData, module.sourcemap);
     const bytecodeBytes = getStringPointerContent(bunData, module.bytecode);
+    const extra1Bytes = getStringPointerContent(bunData, module.extra1);
+    const extra2Bytes = getStringPointerContent(bunData, module.extra2);
 
     modulesMetadata.push({
       name: nameBytes,
       contents: contentsBytes,
       sourcemap: sourcemapBytes,
       bytecode: bytecodeBytes,
+      extra1: extra1Bytes,
+      extra2: extra2Bytes,
       encoding: module.encoding,
       loader: module.loader,
       moduleFormat: module.moduleFormat,
@@ -537,6 +578,9 @@ function rebuildBunData(
     });
 
     stringsData.push(nameBytes, contentsBytes, sourcemapBytes, bytecodeBytes);
+    if (hasExtraFields) {
+      stringsData.push(extra1Bytes, extra2Bytes);
+    }
     return undefined;
   });
 
@@ -552,7 +596,7 @@ function rebuildBunData(
 
   // Module structures
   const modulesListOffset = currentOffset;
-  const modulesListSize = modulesMetadata.length * SIZEOF_MODULE;
+  const modulesListSize = modulesMetadata.length * moduleSize;
   currentOffset += modulesListSize;
 
   // compileExecArgv
@@ -600,54 +644,40 @@ function rebuildBunData(
   // Build and write module structures
   for (let i = 0; i < modulesMetadata.length; i++) {
     const metadata = modulesMetadata[i];
-    const baseStringIdx = i * 4;
-
-    const moduleStruct: BunModule = {
-      name: {
-        offset: stringOffsets[baseStringIdx].offset,
-        length: stringOffsets[baseStringIdx].length,
-      },
-      contents: {
-        offset: stringOffsets[baseStringIdx + 1].offset,
-        length: stringOffsets[baseStringIdx + 1].length,
-      },
-      sourcemap: {
-        offset: stringOffsets[baseStringIdx + 2].offset,
-        length: stringOffsets[baseStringIdx + 2].length,
-      },
-      bytecode: {
-        offset: stringOffsets[baseStringIdx + 3].offset,
-        length: stringOffsets[baseStringIdx + 3].length,
-      },
-      encoding: metadata.encoding,
-      loader: metadata.loader,
-      moduleFormat: metadata.moduleFormat,
-      side: metadata.side,
-    };
+    const baseStringIdx = i * stringsPerModule;
 
     // Serialize module structure inline
-    const moduleOffset = modulesListOffset + i * SIZEOF_MODULE;
+    const moduleOffset = modulesListOffset + i * moduleSize;
     let pos = moduleOffset;
 
     // Write StringPointers
-    newBuffer.writeUInt32LE(moduleStruct.name.offset, pos);
-    newBuffer.writeUInt32LE(moduleStruct.name.length, pos + 4);
+    newBuffer.writeUInt32LE(stringOffsets[baseStringIdx].offset, pos);
+    newBuffer.writeUInt32LE(stringOffsets[baseStringIdx].length, pos + 4);
     pos += 8;
-    newBuffer.writeUInt32LE(moduleStruct.contents.offset, pos);
-    newBuffer.writeUInt32LE(moduleStruct.contents.length, pos + 4);
+    newBuffer.writeUInt32LE(stringOffsets[baseStringIdx + 1].offset, pos);
+    newBuffer.writeUInt32LE(stringOffsets[baseStringIdx + 1].length, pos + 4);
     pos += 8;
-    newBuffer.writeUInt32LE(moduleStruct.sourcemap.offset, pos);
-    newBuffer.writeUInt32LE(moduleStruct.sourcemap.length, pos + 4);
+    newBuffer.writeUInt32LE(stringOffsets[baseStringIdx + 2].offset, pos);
+    newBuffer.writeUInt32LE(stringOffsets[baseStringIdx + 2].length, pos + 4);
     pos += 8;
-    newBuffer.writeUInt32LE(moduleStruct.bytecode.offset, pos);
-    newBuffer.writeUInt32LE(moduleStruct.bytecode.length, pos + 4);
+    newBuffer.writeUInt32LE(stringOffsets[baseStringIdx + 3].offset, pos);
+    newBuffer.writeUInt32LE(stringOffsets[baseStringIdx + 3].length, pos + 4);
     pos += 8;
 
+    if (hasExtraFields) {
+      newBuffer.writeUInt32LE(stringOffsets[baseStringIdx + 4].offset, pos);
+      newBuffer.writeUInt32LE(stringOffsets[baseStringIdx + 4].length, pos + 4);
+      pos += 8;
+      newBuffer.writeUInt32LE(stringOffsets[baseStringIdx + 5].offset, pos);
+      newBuffer.writeUInt32LE(stringOffsets[baseStringIdx + 5].length, pos + 4);
+      pos += 8;
+    }
+
     // Write flags
-    newBuffer.writeUInt8(moduleStruct.encoding, pos);
-    newBuffer.writeUInt8(moduleStruct.loader, pos + 1);
-    newBuffer.writeUInt8(moduleStruct.moduleFormat, pos + 2);
-    newBuffer.writeUInt8(moduleStruct.side, pos + 3);
+    newBuffer.writeUInt8(metadata.encoding, pos);
+    newBuffer.writeUInt8(metadata.loader, pos + 1);
+    newBuffer.writeUInt8(metadata.moduleFormat, pos + 2);
+    newBuffer.writeUInt8(metadata.side, pos + 3);
   }
 
   // Build and write Offsets structure inline
@@ -908,7 +938,6 @@ function repackELF(
 ): void {
   try {
     // Build new overlay: [bunData][totalByteCount (8 bytes)]
-    // Note: newBunBuffer already includes offsets and trailer
     const newOverlay = Buffer.allocUnsafe(newBunBuffer.length + 8);
     newBunBuffer.copy(newOverlay, 0);
     newOverlay.writeBigUInt64LE(
