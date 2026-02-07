@@ -126,7 +126,7 @@ async function runSandboxedScript(
         const result = fn(input, vars);
         process.stdout.write(JSON.stringify({"r": result}));
       } catch (e) {
-        process.stderr.write(e instanceof Error ? e.message : String(e)
+        process.stderr.write(e instanceof Error ? e.message : String(e));
         process.exitCode = 1;
       }
     });
