@@ -52,6 +52,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
   const { settings, updateSettings } = useContext(SettingsContext);
 
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [showSudoWarning, setShowSudoWarning] = useState(false);
 
   const defaultMisc = {
     showTweakccVersion: true,
@@ -520,14 +521,19 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         id: 'allowBypassPermissionsInSudo',
         title: 'Allow bypassing permissions in sudo',
         description:
-          'Allow bypassing permissions in sudo commands with --dangerously-skip-permissions.',
+          '⚠️ WARNING: Disables security check. When enabled, Claude can perform system-level operations without prompts. Use extreme caution. We are not responsible for any damage caused.',
         getValue: () => settings.misc?.allowBypassPermissionsInSudo ?? false,
         toggle: () => {
-          updateSettings(settings => {
-            ensureMisc();
-            settings.misc!.allowBypassPermissionsInSudo =
-              !settings.misc!.allowBypassPermissionsInSudo;
-          });
+          const currentValue =
+            settings.misc?.allowBypassPermissionsInSudo ?? false;
+          if (!currentValue) {
+            setShowSudoWarning(true);
+          } else {
+            updateSettings(settings => {
+              ensureMisc();
+              settings.misc!.allowBypassPermissionsInSudo = false;
+            });
+          }
         },
       },
     ],
@@ -553,118 +559,177 @@ export function MiscView({ onSubmit }: MiscViewProps) {
   const hasMoreBelow = scrollOffset + ITEMS_PER_PAGE < totalItems;
 
   useInput((input, key) => {
-    if (key.return || key.escape) {
-      onSubmit();
-    } else if (key.upArrow) {
-      setSelectedIndex(prev => Math.max(0, prev - 1));
-    } else if (key.downArrow) {
-      setSelectedIndex(prev => Math.min(maxIndex, prev + 1));
-    } else if (input === ' ') {
-      items[selectedIndex]?.toggle();
-    } else if (key.rightArrow) {
-      items[selectedIndex]?.increment?.();
-    } else if (key.leftArrow) {
-      items[selectedIndex]?.decrement?.();
+    if (showSudoWarning) {
+      if (key.return) {
+        updateSettings(settings => {
+          ensureMisc();
+          settings.misc!.allowBypassPermissionsInSudo = true;
+        });
+        setShowSudoWarning(false);
+      } else if (key.escape) {
+        setShowSudoWarning(false);
+      }
+    } else {
+      if (key.return || key.escape) {
+        onSubmit();
+      } else if (key.upArrow) {
+        setSelectedIndex(prev => Math.max(0, prev - 1));
+      } else if (key.downArrow) {
+        setSelectedIndex(prev => Math.min(maxIndex, prev + 1));
+      } else if (input === ' ') {
+        items[selectedIndex]?.toggle();
+      } else if (key.rightArrow) {
+        items[selectedIndex]?.increment?.();
+      } else if (key.leftArrow) {
+        items[selectedIndex]?.decrement?.();
+      }
     }
   });
 
   return (
     <Box flexDirection="column">
-      <Box marginBottom={1}>
-        <Header>Miscellaneous Settings</Header>
-      </Box>
-
-      <Box marginBottom={1}>
-        <Text dimColor>
-          Use ↑/↓ to navigate, space to toggle, ←/→ to adjust numbers, enter to
-          go back.
-        </Text>
-      </Box>
-
-      {/* Scroll indicator - more above */}
-      {hasMoreAbove && (
-        <Box>
-          <Text dimColor> ↑ {scrollOffset} more above</Text>
-        </Box>
-      )}
-
-      {/* Visible items */}
-      {visibleItems.map((item, i) => {
-        const actualIndex = scrollOffset + i;
-        const isSelected = actualIndex === selectedIndex;
-        const value = item.getValue();
-        const hasCustomDisplay = !!item.getDisplayValue;
-        const isNumeric = !!item.increment;
-
-        // Determine checkbox/indicator
-        let indicator: string;
-        if (isNumeric) {
-          indicator = '◆'; // Diamond for numeric
-        } else if (hasCustomDisplay) {
-          indicator = '◉'; // Filled circle for multi-value
-        } else {
-          indicator = value ? '☑' : '☐'; // Checkbox for boolean
-        }
-
-        // Determine status text
-        let statusText: string;
-        if (hasCustomDisplay) {
-          statusText = item.getDisplayValue!();
-        } else if (typeof value === 'boolean') {
-          statusText = value ? 'Enabled' : 'Disabled';
-        } else {
-          statusText = String(value ?? 'Default');
-        }
-
-        // Show arrow hints for numeric items when selected
-        const arrowHint = isSelected && isNumeric ? ' ← → ' : '';
-
-        return (
-          <Box key={item.id} flexDirection="column">
-            <Box>
-              <Text>
-                <Text color={isSelected ? 'cyan' : undefined}>
-                  {isSelected ? '❯ ' : '  '}
-                </Text>
-                <Text bold color={isSelected ? 'cyan' : undefined}>
-                  {item.title}
-                </Text>
+      {showSudoWarning ? (
+        <Box flexDirection="column" paddingX={2}>
+          <Box
+            borderStyle="double"
+            borderColor="yellow"
+            padding={2}
+            flexDirection="column"
+          >
+            <Box marginBottom={1}>
+              <Text bold color="yellow">
+                ⚠️ SECURITY WARNING ⚠️
               </Text>
             </Box>
-
-            <Box>
+            <Box marginBottom={1}>
+              <Text>
+                You are about to enable a feature that allows Claude Code to
+                bypass permission checks when running with sudo privileges.
+              </Text>
+            </Box>
+            <Box marginBottom={1}>
+              <Text color="red">
+                This means Claude can perform system-level operations without
+                any prompts or confirmation.
+              </Text>
+            </Box>
+            <Box marginBottom={1}>
+              <Text bold color="red">
+                WE ARE NOT RESPONSIBLE FOR ANY DAMAGE CAUSED.
+              </Text>
+            </Box>
+            <Box marginBottom={1}>
               <Text dimColor>
-                {'  '}
-                {item.description}
+                Only proceed if you fully understand and accept the risks.
               </Text>
             </Box>
-
-            <Box marginLeft={4} marginBottom={1}>
+            <Box marginTop={1}>
               <Text>
-                {indicator} {statusText}
-                <Text dimColor>{arrowHint}</Text>
+                Press <Text color="green">Enter</Text> to enable,{' '}
+                <Text color="red">Escape</Text> to cancel
               </Text>
             </Box>
           </Box>
-        );
-      })}
-
-      {/* Scroll indicator - more below */}
-      {hasMoreBelow && (
-        <Box>
-          <Text dimColor>
-            {' '}
-            ↓ {totalItems - scrollOffset - ITEMS_PER_PAGE} more below
-          </Text>
         </Box>
-      )}
+      ) : (
+        <>
+          <Box marginBottom={1}>
+            <Header>Miscellaneous Settings</Header>
+          </Box>
 
-      {/* Page indicator */}
-      <Box marginTop={1}>
-        <Text dimColor>
-          Item {selectedIndex + 1} of {totalItems}
-        </Text>
-      </Box>
+          <Box marginBottom={1}>
+            <Text dimColor>
+              Use ↑/↓ to navigate, space to toggle, ←/→ to adjust numbers, enter
+              to go back.
+            </Text>
+          </Box>
+
+          {/* Scroll indicator - more above */}
+          {hasMoreAbove && (
+            <Box>
+              <Text dimColor> ↑ {scrollOffset} more above</Text>
+            </Box>
+          )}
+
+          {/* Visible items */}
+          {visibleItems.map((item, i) => {
+            const actualIndex = scrollOffset + i;
+            const isSelected = actualIndex === selectedIndex;
+            const value = item.getValue();
+            const hasCustomDisplay = !!item.getDisplayValue;
+            const isNumeric = !!item.increment;
+
+            // Determine checkbox/indicator
+            let indicator: string;
+            if (isNumeric) {
+              indicator = '◆'; // Diamond for numeric
+            } else if (hasCustomDisplay) {
+              indicator = '◉'; // Filled circle for multi-value
+            } else {
+              indicator = value ? '☑' : '☐'; // Checkbox for boolean
+            }
+
+            // Determine status text
+            let statusText: string;
+            if (hasCustomDisplay) {
+              statusText = item.getDisplayValue!();
+            } else if (typeof value === 'boolean') {
+              statusText = value ? 'Enabled' : 'Disabled';
+            } else {
+              statusText = String(value ?? 'Default');
+            }
+
+            // Show arrow hints for numeric items when selected
+            const arrowHint = isSelected && isNumeric ? ' ← → ' : '';
+
+            return (
+              <Box key={item.id} flexDirection="column">
+                <Box>
+                  <Text>
+                    <Text color={isSelected ? 'cyan' : undefined}>
+                      {isSelected ? '❯ ' : '  '}
+                    </Text>
+                    <Text bold color={isSelected ? 'cyan' : undefined}>
+                      {item.title}
+                    </Text>
+                  </Text>
+                </Box>
+
+                <Box>
+                  <Text dimColor>
+                    {'  '}
+                    {item.description}
+                  </Text>
+                </Box>
+
+                <Box marginLeft={4} marginBottom={1}>
+                  <Text>
+                    {indicator} {statusText}
+                    <Text dimColor>{arrowHint}</Text>
+                  </Text>
+                </Box>
+              </Box>
+            );
+          })}
+
+          {/* Scroll indicator - more below */}
+          {hasMoreBelow && (
+            <Box>
+              <Text dimColor>
+                {' '}
+                ↓ {totalItems - scrollOffset - ITEMS_PER_PAGE} more below
+              </Text>
+            </Box>
+          )}
+
+          {/* Page indicator */}
+          <Box marginTop={1}>
+            <Text dimColor>
+              Item {selectedIndex + 1} of {totalItems}
+            </Text>
+          </Box>
+        </>
+      )}
     </Box>
   );
 }
