@@ -123,7 +123,7 @@ async function runSandboxedScript(
         const vars = ${JSON.stringify(vars)};
         process.env = {};
         const fn = new Function('js', 'vars', ${JSON.stringify(script)});
-        const result = fn(input, vars);
+        const result = await fn(input, vars);
         process.stdout.write(JSON.stringify({"r": result}));
       } catch (e) {
         process.stderr.write(e instanceof Error ? e.message : String(e));
