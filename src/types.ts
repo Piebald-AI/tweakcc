@@ -128,6 +128,7 @@ export interface MiscConfig {
   tokenCountRounding: number | null;
   autoAcceptPlanMode: boolean;
   allowBypassPermissionsInSudo: boolean | null;
+  suppressNativeInstallerWarning: boolean;
 }
 
 export interface InputPatternHighlighter {

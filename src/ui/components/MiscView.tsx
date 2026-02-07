@@ -75,6 +75,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     tokenCountRounding: null as number | null,
     autoAcceptPlanMode: false,
     allowBypassPermissionsInSudo: false,
+    suppressNativeInstallerWarning: false,
   };
 
   const ensureMisc = () => {
@@ -527,6 +528,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.allowBypassPermissionsInSudo =
               !settings.misc!.allowBypassPermissionsInSudo;
+          });
+        },
+      },
+      {
+        id: 'suppressNativeInstallerWarning',
+        title: 'Suppress native installer warning',
+        description:
+          'Suppress the native installer warning message at startup.',
+        getValue: () => settings.misc?.suppressNativeInstallerWarning ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.suppressNativeInstallerWarning =
+              !settings.misc!.suppressNativeInstallerWarning;
           });
         },
       },

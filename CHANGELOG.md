@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add CLI spinners (#470) - @bl-ue
 - Add support for dangerously bypassing permissions in sudo with new setting and patch (#478) - @brrock
 - Add `unpack`, `repack`, and `adhoc-patch --string/regex/script` subcommands (#481)
+- Add a patch to suppress the native installer warning (#483) - @brrock
 
 ## [v3.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.4.0) - 2026-01-18
 
