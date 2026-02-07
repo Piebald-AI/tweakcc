@@ -289,7 +289,7 @@ export async function handleRepack(
   if (installation.kind === 'npm') {
     console.error(
       chalk.red(
-        'Error: Cannot repack into an npm-based installation (cli.js). Only native binaries can be unpacked.'
+        'Error: Cannot repack into an npm-based installation (cli.js). Only native binaries can be repacked.'
       )
     );
     console.error(

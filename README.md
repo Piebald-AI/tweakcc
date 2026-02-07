@@ -694,7 +694,7 @@ npx tweakcc repack ./claude-code.js
 Apply a one-off or ad-hoc patch to a Claude Code installation without going through the tweakcc UI or config system. It supports three modes and works both native and npm-based installations.
 
 > [!CAUTION]
-> This API does not create a backup of the Claude Code installation that is modified. You'll need to copy the original file to a separate location to allow if you want to revert any changes you made&mdash;due to the lack of a backup, `tweakc --revert/--restore` will NOT work (unless you happen to have run `tweakcc --apply` before you use `adhoc-patch`).
+> This API does not create a backup of the Claude Code installation that is modified. You'll need to copy the original file to a separate location to allow if you want to revert any changes you made&mdash;due to the lack of a backup, `tweakcc --revert/--restore` will NOT work (unless you happen to have run `tweakcc --apply` before you use `adhoc-patch`).
 
 3 modes of patching are supported.
 
@@ -702,7 +702,7 @@ Apply a one-off or ad-hoc patch to a Claude Code installation without going thro
 
 A fixed/static old string is replaced with a fixed/static new string, analagous to `grep -F`.
 
-- By default, all instances of the old string are replaced, but you can use `--index` to specify a particular occurence by index, e.g. `--index 0` to replace only the first, `--index 1` to replace only the second, etc.
+- By default, all instances of the old string are replaced, but you can use `--index` to specify a particular occurence by 1-based index, e.g. `--index 1` to replace only the first, `--index 2` to replace only the second, etc.
 
 #### `--regex`
 
