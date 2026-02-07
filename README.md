@@ -718,12 +718,12 @@ This is the most powerful option. A short snippet of JavaScript code running in 
 
   ```js
   const vars = {
-    chalkVar: "K6",
-    moduleLoaderFunction: "s",
-    reactVar: "Yt8",
-    requireFuncName: "C1",
-    textComponent: "f",
-    boxComponent: "NZ5"
+    chalkVar: 'K6',
+    moduleLoaderFunction: 's',
+    reactVar: 'Yt8',
+    requireFuncName: 'C1',
+    textComponent: 'f',
+    boxComponent: 'NZ5',
   };
   ```
 
@@ -827,9 +827,9 @@ npx tweakcc@latest --apply --config-url https://gist.githubusercontent.com/bl-ue
 
 Your local config will **not** be overwritten; the remote config will be copied into your `config.json` under under `remoteConfig.settings`.
 
-<!--
-
 ## API
+
+tweakcc can be used as an npm dependency and provides an easy API that projects can use to patch Claude Code without worrying about where it's installed and whether it's native or npm-based. The functions are divided into 5 groups: config, installation, I/O, backup, and utilities.
 
 ### Config
 
@@ -1046,10 +1046,99 @@ undefined
 31          // <-- Original was successfully modified.
 
 // Restore the backup:
-> await tweakcc.restoreBackup(backupPath, native2076Inst.)
+> await tweakcc.restoreBackup(backupPath, native2076Inst.path)
+> (await tweakcc.readContent(native2076Inst)).length
+234454688   // Original, unpatched size.
 ```
 
--->
+### Utilities
+
+General utilities to help with patching.
+
+````js
+// Utilities to find various commonly-used variables in CC's code.
+// See the docs for `tweakcc adhoc-patch --script` above for more details.
+findChalkVar(fileContents: string): string | undefined;
+getModuleLoaderFunction(fileContents: string): string | undefined;
+getReactVar(fileContents: string): string | undefined;
+getRequireFuncName(fileContents: string): string | undefined;
+findTextComponent(fileContents: string): string | undefined;
+findBoxComponent(fileContents: string): string | undefined;
+/**
+ * Clears the process-global caches that some of the above functions populate
+ * to speed up subsequent repeated calls.  Use this when processing multiple CC
+ * installs in one process.
+ */
+clearCaches(): void;
+
+/**
+ * Debug function for showing diffs between old and new file contents using smart word-level diffing.
+ *
+ * Uses the `diff` library to compute word-level differences and displays them with
+ * chalk-styled colors: green background for additions, red background for removals, and
+ * dim text for unchanged portions.
+ *
+ * Only outputs when --verbose flag is set.
+ *
+ * @param oldFileContents - The original file content before modification
+ * @param newFileContents - The modified file content after patching
+ * @param injectedText - The text that was injected (used to calculate context window)
+ * @param startIndex - The start index where the modification occurred
+ * @param endIndex - The end index of the original content that was replaced
+ * @param numContextChars - Number of context characters to show before and after diff.
+ */
+export const showDiff = (
+  oldFileContents: string,
+  newFileContents: string,
+  injectedText: string,
+  startIndex: number,
+  endIndex: number,
+  numContextChars: number = 40
+): void;
+
+/**
+ * Performs a global replace on a string, finding all matches first, then replacing
+ * them in reverse order (to preserve indices), and calling showDiff for each replacement.
+ *
+ * @param content - The string to perform replacements on
+ * @param pattern - The regex pattern to match (should have 'g' flag for multiple matches)
+ * @param replacement - Either a string or a replacer function (same as String.replace)
+ * @returns The modified string with all replacements applied
+ *
+ * @example
+ * ```ts
+ * const result = globalReplace(
+ *   content,
+ *   /throw Error\(`something`\);/g,
+ *   ''
+ * );
+ * ```
+ */
+export const globalReplace = (
+  content: string,
+  pattern: RegExp,
+  replacement: string | ((substring: string, ...args: unknown[]) => string)
+): string;
+````
+
+Demo of `showDiff`:
+
+```js
+const pattern = /function [$\w]+\(\)\{return [$\w]+\("my_feature_flag"/;
+const match = file.match(pattern)!;
+const insertIndex = match.index + match[0].indexOf('{') + 1;
+const insertion = 'return true;';
+
+const newFile = file.slice(0, insertIndex) + insertion + file.slice(insertIndex);
+
+showDiff(file, newFile, insertion, insertIndex, insertIndex);
+```
+
+Demo of `globalReplace`:
+
+```js
+newFile = globalReplace(newFile, /"Claude Code",/g, '"My App"');
+```
 
 ## Troubleshooting
 
