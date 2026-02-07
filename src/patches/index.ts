@@ -68,6 +68,7 @@ import { writeTokenCountRounding } from './tokenCountRounding';
 import { writeAgentsMd } from './agentsMd';
 import { writeAutoAcceptPlanMode } from './autoAcceptPlanMode';
 import { writeAllowBypassPermsInSudo } from './allowBypassPermsInSudo';
+import { writeSuppressNativeInstallerWarning } from './suppressNativeInstallerWarning';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -339,6 +340,12 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.MISC_CONFIGURABLE,
     description:
       'Allow bypassing permissions with --dangerously-skip-permissions even when running with root/sudo privileges',
+  },
+  {
+    id: 'suppress-native-installer-warning',
+    name: 'Suppress native installer warning',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Suppress the native installer warning message at startup',
   },
   // Features
   {
@@ -757,6 +764,10 @@ export const applyCustomization = async (
     'allow-sudo-bypass-permissions': {
       fn: c => writeAllowBypassPermsInSudo(c),
       condition: !!config.settings.misc?.allowBypassPermissionsInSudo,
+    },
+    'suppress-native-installer-warning': {
+      fn: c => writeSuppressNativeInstallerWarning(c),
+      condition: !!config.settings.misc?.suppressNativeInstallerWarning,
     },
     // Features
     'swarm-mode': {
