@@ -647,6 +647,19 @@ pnpm build
 node dist/index.mjs
 ```
 
+## Contributing
+
+Contributions are welcome! Whether you're fixing a bug, adding a new feature, improving documentation, or adding tests, we appreciate your help.
+
+For detailed guidelines on development setup, code style, testing, and submitting pull requests, see the [CONTRIBUTING.md](https://github.com/Piebald-AI/tweakcc/blob/main/CONTRIBUTING.md) file.
+
+**Quick Start:**
+
+1. Fork the repository and create a new branch
+2. Make your changes following the code style guidelines
+3. Run tests and linting: `pnpm test && pnpm lint`
+4. Submit a pull request with a clear description
+
 ## CLI Commands
 
 In addition to the interactive TUI (`npx tweakcc`) and the `--apply` flag, tweakcc provides three subcommands for advanced use: `unpack`, `repack`, and `adhoc-patch`.
@@ -1204,19 +1217,6 @@ Could you have forgotten to actually set Claude Code's theme to your new theme? 
 [tweakcn](https://github.com/jnsahaj/tweakcn), though similarly named, is unrelated to tweakcc or Claude Code. It's a tool for editing your [shadcn/ui](https://github.com/shadcn-ui/ui) themes. Check it out!
 
 </details>
-
-## Contributing
-
-Contributions are welcome! Whether you're fixing a bug, adding a new feature, improving documentation, or adding tests, we appreciate your help.
-
-For detailed guidelines on development setup, code style, testing, and submitting pull requests, see the [CONTRIBUTING.md](https://github.com/Piebald-AI/tweakcc/blob/main/CONTRIBUTING.md) file.
-
-**Quick Start:**
-
-1. Fork the repository and create a new branch
-2. Make your changes following the code style guidelines
-3. Run tests and linting: `pnpm test && pnpm lint`
-4. Submit a pull request with a clear description
 
 ## License
 
