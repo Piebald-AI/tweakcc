@@ -2,13 +2,18 @@ import { useState, useContext, useCallback } from 'react';
 import { Box, Text, useInput } from 'ink';
 
 import { Theme } from '@/types';
-import { isValidColorFormat, normalizeColorToRgb } from '@/utils';
+import {
+  isValidColorFormat,
+  normalizeColorToRgb,
+  setCurrentClaudeCodeTheme,
+} from '@/utils';
 
 import { SettingsContext } from '../App';
 import { ThemePreview, ColoredText } from './ThemePreview';
 import { ColoredColorName } from './ColoredColorName';
 import { ColorPicker } from './ColorPicker';
 import Header from './Header';
+import { SelectInput } from './SelectInput';
 
 interface ThemeEditViewProps {
   onBack: () => void;
@@ -36,6 +41,8 @@ export function ThemeEditView({ onBack, themeId }: ThemeEditViewProps) {
   );
   const [editingValue, setEditingValue] = useState('');
   const [originalValue, setOriginalValue] = useState('');
+  const [showExitDialog, setShowExitDialog] = useState(false);
+  const [exitDialogIndex, setExitDialogIndex] = useState(0);
 
   const updateTheme = useCallback(
     (updateFn: (theme: Theme) => void) => {
@@ -64,6 +71,26 @@ export function ThemeEditView({ onBack, themeId }: ThemeEditViewProps) {
   };
 
   useInput((input, key) => {
+    if (showExitDialog) {
+      if (key.upArrow) {
+        setExitDialogIndex(prev => (prev > 0 ? prev - 1 : 1));
+      } else if (key.downArrow) {
+        setExitDialogIndex(prev => (prev < 1 ? prev + 1 : 0));
+      } else if (key.return) {
+        if (exitDialogIndex === 0) {
+          // User selected "Yes" - set theme
+          setCurrentClaudeCodeTheme(currentTheme.id);
+        }
+        setShowExitDialog(false);
+        onBack();
+      } else if (key.escape) {
+        // User selected "No" - just go back
+        setShowExitDialog(false);
+        onBack();
+      }
+      return;
+    }
+
     if (editingColorIndex === null && editingNameId === null) {
       // Handle pasted text (multi-character input indicates paste)
       if (input.length > 1 && !key.ctrl && !key.meta) {
@@ -73,7 +100,8 @@ export function ThemeEditView({ onBack, themeId }: ThemeEditViewProps) {
 
       // Handle navigation when not editing
       if (key.escape) {
-        onBack();
+        setShowExitDialog(true);
+        setExitDialogIndex(0);
       } else if (key.ctrl && input === 'a') {
         setColorFormat(prev => {
           if (prev === 'rgb') return 'hex';
@@ -299,7 +327,32 @@ export function ThemeEditView({ onBack, themeId }: ThemeEditViewProps) {
           </Header>
         </Box>
 
-        {editingColorIndex === null && editingNameId === null ? (
+        {showExitDialog ? (
+          <Box flexDirection="column" marginTop={1}>
+            <Box marginBottom={1}>
+              <Text bold>
+                Would you like to make &ldquo;{currentTheme.name}&rdquo; your
+                current Claude Code theme?
+              </Text>
+            </Box>
+            <SelectInput
+              items={[
+                { name: 'Yes', desc: `Set ${currentTheme.id} as active theme` },
+                { name: 'No', desc: 'Go back without changing theme' },
+              ]}
+              selectedIndex={exitDialogIndex}
+              onSelect={setExitDialogIndex}
+              onSubmit={() => {
+                if (exitDialogIndex === 0) {
+                  setCurrentClaudeCodeTheme(currentTheme.id);
+                }
+                setShowExitDialog(false);
+                onBack();
+              }}
+            />
+            <Text dimColor>enter to select, esc to cancel</Text>
+          </Box>
+        ) : editingColorIndex === null && editingNameId === null ? (
           <>
             <Box marginBottom={1} flexDirection="column">
               <Text dimColor>enter to edit theme name, id, or color</Text>
