@@ -552,7 +552,7 @@ The patch happens automatically, with a default set of `AGENTS.md`, `GEMINI.md`,
 
 ![Screenshot of the CLAUDE.md alternative names list](./assets/agents_md_config.png)
 
-**Via `config.json`:** To configure the list of alternate `CLAUDE.md` names via headlessly, set `settings.claudeMdAltNames` to a list of your desired names, in descending order of priority:
+**Via `config.json`:** To configure the list of alternate `CLAUDE.md` names headlessly, set `settings.claudeMdAltNames` to a list of your desired names, in descending order of priority:
 
 ```json
 {
@@ -694,15 +694,15 @@ npx tweakcc repack ./claude-code.js
 Apply a one-off or ad-hoc patch to a Claude Code installation without going through the tweakcc UI or config system. It supports three modes and works with both native and npm-based installations.
 
 > [!CAUTION]
-> This API does not create a backup of the Claude Code installation that is modified. You'll need to copy the original file to a separate location to allow if you want to revert any changes you made&mdash;due to the lack of a backup, `tweakcc --revert/--restore` will NOT work (unless you happen to have run `tweakcc --apply` before you use `adhoc-patch`).
+> This API does not create a backup of the Claude Code installation that is modified. You'll need to copy the original file to a separate location if you want to revert any changes you made&mdash;due to the lack of a backup, `tweakcc --revert/--restore` will NOT work (unless you happen to have run `tweakcc --apply` before you use `adhoc-patch`).
 
 3 modes of patching are supported.
 
 #### `--string`
 
-A fixed/static old string is replaced with a fixed/static new string, analagous to `grep -F`.
+A fixed/static old string is replaced with a fixed/static new string, analogous to `grep -F`.
 
-- By default, all instances of the old string are replaced, but you can use `--index` to specify a particular occurence by 1-based index, e.g. `--index 1` to replace only the first, `--index 2` to replace only the second, etc.
+- By default, all instances of the old string are replaced, but you can use `--index` to specify a particular occurrence by 1-based index, e.g. `--index 1` to replace only the first, `--index 2` to replace only the second, etc.
 
 #### `--regex`
 
@@ -712,13 +712,13 @@ All matches of a regular expression are replaced with a new string.
 
 - The regular expression must begin and end with a forward slash in JavaScript style, e.g. `/my.+regex/`. An optional list of flags&mdash;characters from the set `g`, `i`, `m`, `s`, `e`, and `y`&mdash;may be appended after the last delimiting forward slash, e.g. `/claude/ig`
 
-- Like `--string`, `--regex` supports the use of `--index` to specify by index which occurence to replace, without which all occurences are replaced.
+- Like `--string`, `--regex` supports the use of `--index` to specify by index which occurrence to replace, without which all occurrences are replaced.
 
 #### `--script`
 
 This is the most powerful option. A short snippet of JavaScript code running in Node.js takes the JavaScript content of the CC installation as input and returns the entire input, modified as output.
 
-- **Security:** The script is run in a sandboxed/isolated `node` child process with the [`--experimental-permission`](https://nodejs.org/api/permissions.html) option to prevent the script from using file system and network APIs. This option requires that you have Node.js 20+ installed and on your `PATH`. Due to this sandboxing, scripts themselves (including those downloaded from HTTP URLs) are safe to run without prior review; however, because the scripts are patching Claude Code, which is an executable, it's technically possible for a script to patch malicious code into your Claude Code executable that would execute when you run `claude`. As a result, it's highlight advised to review the diff tweakcc prints when it asks you if you'd like to apply the changes proposed by the patch.
+- **Security:** The script is run in a sandboxed/isolated `node` child process with the [`--experimental-permission`](https://nodejs.org/api/permissions.html) option to prevent the script from using file system and network APIs. This option requires that you have Node.js 20+ installed and on your `PATH`. Due to this sandboxing, scripts themselves (including those downloaded from HTTP URLs) are safe to run without prior review; however, because the scripts are patching Claude Code, which is an executable, it's technically possible for a script to patch malicious code into your Claude Code executable that would execute when you run `claude`. As a result, it's highly advised to review the diff tweakcc prints when it asks you if you'd like to apply the changes proposed by the patch.
 
 - **Input/output:** Claude Code's JavaScript code is passed to the script via a global variable, `js`, available inside the script's execution context. To return the modified file content, simply use the `return` keyword. For example, to write a very simple script that replaced all instances of `"Claude Code"` with `"My App"`, you could write the following:
 
@@ -838,7 +838,7 @@ Example:
 npx tweakcc@latest --apply --config-url https://gist.githubusercontent.com/bl-ue/27323f9bfd4c18aaab51cad11c1148dc/raw/b132c20387568536cf6586c2324e2f4491bb07df/config.json
 ```
 
-Your local config will **not** be overwritten; the remote config will be copied into your `config.json` under under `remoteConfig.settings`.
+Your local config will **not** be overwritten; the remote config will be copied into your `config.json` under `remoteConfig.settings`.
 
 ## API
 
@@ -1157,7 +1157,7 @@ newFile = globalReplace(newFile, /"Claude Code",/g, '"My App"');
 
 tweakcc stores a backup of your Claude Code `cli.js`/binary for when you want to revert your customizations and for reapplying patches. Before it applies your customizations, it restores the original `cli.js`/binary so that it can start from a clean slate. Sometimes things can get confused and your `claude` can be corrupted.
 
-In particular, you may run into a situation where you have a tweakcc-patched (or maybe a formatted) `claude` but no tweakcc backup. And then it makes a backup of that modified `claude`. If you then try to reinstall Claude Code and apply your customizations, tweakcc will restore its backup of the old _modified_ `claude`.
+In particular, you may run into a situation where you have a tweakcc-patched (or maybe a prettier-formatted) `claude` but no tweakcc backup. And then it makes a backup of that modified `claude`. If you then try to reinstall Claude Code and apply your customizations, tweakcc will restore its backup of the old _modified_ `claude`.
 
 To break out of this loop you can install a different version of Claude Code, which will cause tweakcc to discard its existing backup and take a fresh backup of the new `claude` file. Or you can simply delete tweakcc's backup file (located at `~/.tweakcc/cli.backup.js` or `~/.tweakcc/native-binary.backup`). If you do delete `cli.backup.js` or `native-binary.backup`, make sure you reinstall Claude Code _before_ you run tweakcc again, because if your `claude` is still the modified version, it will get into the same loop again.
 

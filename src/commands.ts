@@ -126,7 +126,7 @@ async function runSandboxedScript(
         const result = fn(input, vars);
         process.stdout.write(JSON.stringify({"r": result}));
       } catch (e) {
-        process.stderr.write(e.message);
+        process.stderr.write(e instanceof Error ? e.message : String(e)
         process.exitCode = 1;
       }
     });
@@ -148,6 +148,9 @@ async function runSandboxedScript(
       stderr = '';
     child.stdout.on('data', (d: Buffer) => (stdout += d));
     child.stderr.on('data', (d: Buffer) => (stderr += d));
+
+    child.on('error', reject);
+    child.stdin.on('error', () => {});
 
     child.on('close', code => {
       if (code !== 0)
