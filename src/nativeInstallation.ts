@@ -18,13 +18,18 @@ import { isDebug, debug } from './utils';
  * - modulesPtr:  { u32 offset, u32 length } into [data...] for modules table
  * - entryPointId: u32
  * - compileExecArgvPtr: { u32 offset, u32 length }
+ * - flags: u32
  */
 const BUN_TRAILER = Buffer.from('\n---- Bun! ----\n');
 
 // Size constants for binary structures
 const SIZEOF_OFFSETS = 32;
 const SIZEOF_STRING_POINTER = 8;
-const SIZEOF_MODULE = 4 * SIZEOF_STRING_POINTER + 4;
+// Module struct sizes vary by Bun version:
+// - Old format (pre-ESM bytecode, before Bun ~1.3.7): 4 StringPointers + 4 u8s = 36 bytes
+// - New format (ESM bytecode, Bun ~1.3.7+): 6 StringPointers + 4 u8s = 52 bytes
+const SIZEOF_MODULE_OLD = 4 * SIZEOF_STRING_POINTER + 4;
+const SIZEOF_MODULE_NEW = 6 * SIZEOF_STRING_POINTER + 4;
 
 // Types
 interface StringPointer {
@@ -37,6 +42,7 @@ interface BunOffsets {
   modulesPtr: StringPointer;
   entryPointId: number;
   compileExecArgvPtr: StringPointer;
+  flags: number;
 }
 
 interface BunModule {
@@ -44,6 +50,8 @@ interface BunModule {
   contents: StringPointer;
   sourcemap: StringPointer;
   bytecode: StringPointer;
+  moduleInfo: StringPointer;
+  bytecodeOriginPath: StringPointer;
   encoding: number;
   loader: number;
   moduleFormat: number;
@@ -55,6 +63,8 @@ interface BunData {
   bunData: Buffer;
   /** Header size used in section format: 4 for old format (Bun < 1.3.4), 8 for new format. Only for Mach-O and PE. */
   sectionHeaderSize?: number;
+  /** Detected module struct size: SIZEOF_MODULE_OLD (36) or SIZEOF_MODULE_NEW (52). */
+  moduleStructSize: number;
 }
 
 /**
@@ -90,12 +100,38 @@ function isClaudeModule(moduleName: string): boolean {
 }
 
 /**
+ * Detects the module struct size from the modules list byte length.
+ * Returns SIZEOF_MODULE_NEW (52) or SIZEOF_MODULE_OLD (36).
+ */
+function detectModuleStructSize(modulesListLength: number): number {
+  const fitsNew = modulesListLength % SIZEOF_MODULE_NEW === 0;
+  const fitsOld = modulesListLength % SIZEOF_MODULE_OLD === 0;
+
+  if (fitsNew && !fitsOld) return SIZEOF_MODULE_NEW;
+  if (fitsOld && !fitsNew) return SIZEOF_MODULE_OLD;
+  if (fitsNew && fitsOld) {
+    // Ambiguous — prefer new format (more likely with recent Bun versions)
+    debug(
+      `detectModuleStructSize: Ambiguous module list length ${modulesListLength}, assuming new format`
+    );
+    return SIZEOF_MODULE_NEW;
+  }
+
+  // Neither fits cleanly — try new format as default
+  debug(
+    `detectModuleStructSize: Module list length ${modulesListLength} doesn't cleanly divide by either struct size, assuming new format`
+  );
+  return SIZEOF_MODULE_NEW;
+}
+
+/**
  * Iterates over modules in the Bun data and calls visitor for each.
  * Handles all module parsing and iteration logic in one place.
  */
 function mapModules<T>(
   bunData: Buffer,
   bunOffsets: BunOffsets,
+  moduleStructSize: number,
   visitor: (
     module: BunModule,
     moduleName: string,
@@ -106,11 +142,17 @@ function mapModules<T>(
     bunData,
     bunOffsets.modulesPtr
   );
-  const modulesListCount = Math.floor(modulesListBytes.length / SIZEOF_MODULE);
+  const modulesListCount = Math.floor(
+    modulesListBytes.length / moduleStructSize
+  );
 
   for (let i = 0; i < modulesListCount; i++) {
-    const offset = i * SIZEOF_MODULE;
-    const module = parseCompiledModuleGraphFile(modulesListBytes, offset);
+    const offset = i * moduleStructSize;
+    const module = parseCompiledModuleGraphFile(
+      modulesListBytes,
+      offset,
+      moduleStructSize
+    );
     const moduleName = getStringPointerContent(bunData, module.name).toString(
       'utf-8'
     );
@@ -133,13 +175,16 @@ function parseOffsets(buffer: Buffer): BunOffsets {
   const entryPointId = buffer.readUInt32LE(pos);
   pos += 4;
   const compileExecArgvPtr = parseStringPointer(buffer, pos);
+  pos += 8;
+  const flags = buffer.readUInt32LE(pos);
 
-  return { byteCount, modulesPtr, entryPointId, compileExecArgvPtr };
+  return { byteCount, modulesPtr, entryPointId, compileExecArgvPtr, flags };
 }
 
 function parseCompiledModuleGraphFile(
   buffer: Buffer,
-  offset: number
+  offset: number,
+  moduleStructSize: number
 ): BunModule {
   let pos = offset;
   const name = parseStringPointer(buffer, pos);
@@ -150,6 +195,19 @@ function parseCompiledModuleGraphFile(
   pos += 8;
   const bytecode = parseStringPointer(buffer, pos);
   pos += 8;
+
+  let moduleInfo: StringPointer;
+  let bytecodeOriginPath: StringPointer;
+  if (moduleStructSize === SIZEOF_MODULE_NEW) {
+    moduleInfo = parseStringPointer(buffer, pos);
+    pos += 8;
+    bytecodeOriginPath = parseStringPointer(buffer, pos);
+    pos += 8;
+  } else {
+    moduleInfo = { offset: 0, length: 0 };
+    bytecodeOriginPath = { offset: 0, length: 0 };
+  }
+
   const encoding = buffer.readUInt8(pos);
   pos += 1;
   const loader = buffer.readUInt8(pos);
@@ -163,6 +221,8 @@ function parseCompiledModuleGraphFile(
     contents,
     sourcemap,
     bytecode,
+    moduleInfo,
+    bytecodeOriginPath,
     encoding,
     loader,
     moduleFormat,
@@ -177,6 +237,7 @@ function parseCompiledModuleGraphFile(
 function parseBunDataBlob(bunDataContent: Buffer): {
   bunOffsets: BunOffsets;
   bunData: Buffer;
+  moduleStructSize: number;
 } {
   if (bunDataContent.length < SIZEOF_OFFSETS + BUN_TRAILER.length) {
     throw new Error('BUN data is too small to contain trailer and offsets');
@@ -203,10 +264,12 @@ function parseBunDataBlob(bunDataContent: Buffer): {
     offsetsStart + SIZEOF_OFFSETS
   );
   const bunOffsets = parseOffsets(offsetsBytes);
+  const moduleStructSize = detectModuleStructSize(bunOffsets.modulesPtr.length);
 
   return {
     bunOffsets,
     bunData: bunDataContent,
+    moduleStructSize,
   };
 }
 
@@ -284,9 +347,15 @@ function extractBunDataFromSection(sectionData: Buffer): BunData {
     `extractBunDataFromSection: bunDataContent.length=${bunDataContent.length}`
   );
 
-  const { bunOffsets, bunData } = parseBunDataBlob(bunDataContent);
+  const { bunOffsets, bunData, moduleStructSize } =
+    parseBunDataBlob(bunDataContent);
 
-  return { bunOffsets, bunData, sectionHeaderSize: headerSize };
+  return {
+    bunOffsets,
+    bunData,
+    sectionHeaderSize: headerSize,
+    moduleStructSize,
+  };
 }
 
 /**
@@ -375,10 +444,12 @@ function extractBunDataFromELFOverlay(elfBinary: LIEF.ELF.Binary): BunData {
 
   // Reconstruct full blob [data][offsets][trailer] to match other formats
   const bunDataBlob = Buffer.concat([dataRegion, offsetsBytes, trailerBytes]);
+  const moduleStructSize = detectModuleStructSize(bunOffsets.modulesPtr.length);
 
   return {
     bunOffsets,
     bunData: bunDataBlob,
+    moduleStructSize,
   };
 }
 
@@ -441,15 +512,16 @@ export function extractClaudeJsFromNativeInstallation(
   try {
     LIEF.logging.disable();
     const binary = LIEF.parse(nativeInstallationPath);
-    const { bunOffsets, bunData } = getBunData(binary);
+    const { bunOffsets, bunData, moduleStructSize } = getBunData(binary);
 
     debug(
-      `extractClaudeJsFromNativeInstallation: Got bunData, size=${bunData.length} bytes`
+      `extractClaudeJsFromNativeInstallation: Got bunData, size=${bunData.length} bytes, moduleStructSize=${moduleStructSize}`
     );
 
     const result = mapModules(
       bunData,
       bunOffsets,
+      moduleStructSize,
       (module, moduleName, index) => {
         debug(
           `extractClaudeJsFromNativeInstallation: Module ${index}: ${moduleName}`
@@ -495,7 +567,8 @@ export function extractClaudeJsFromNativeInstallation(
 function rebuildBunData(
   bunData: Buffer,
   bunOffsets: BunOffsets,
-  modifiedClaudeJs: Buffer | null
+  modifiedClaudeJs: Buffer | null,
+  moduleStructSize: number
 ): Buffer {
   // Phase 1: Collect all string data
   const stringsData: Buffer[] = [];
@@ -504,6 +577,8 @@ function rebuildBunData(
     contents: Buffer;
     sourcemap: Buffer;
     bytecode: Buffer;
+    moduleInfo: Buffer;
+    bytecodeOriginPath: Buffer;
     encoding: number;
     loader: number;
     moduleFormat: number;
@@ -511,7 +586,7 @@ function rebuildBunData(
   }> = [];
 
   // Use mapModules to iterate and collect module data
-  mapModules(bunData, bunOffsets, (module, moduleName) => {
+  mapModules(bunData, bunOffsets, moduleStructSize, (module, moduleName) => {
     const nameBytes = getStringPointerContent(bunData, module.name);
 
     // Check if this is claude.js and we have modified contents
@@ -524,21 +599,41 @@ function rebuildBunData(
 
     const sourcemapBytes = getStringPointerContent(bunData, module.sourcemap);
     const bytecodeBytes = getStringPointerContent(bunData, module.bytecode);
+    const moduleInfoBytes = getStringPointerContent(bunData, module.moduleInfo);
+    const bytecodeOriginPathBytes = getStringPointerContent(
+      bunData,
+      module.bytecodeOriginPath
+    );
 
     modulesMetadata.push({
       name: nameBytes,
       contents: contentsBytes,
       sourcemap: sourcemapBytes,
       bytecode: bytecodeBytes,
+      moduleInfo: moduleInfoBytes,
+      bytecodeOriginPath: bytecodeOriginPathBytes,
       encoding: module.encoding,
       loader: module.loader,
       moduleFormat: module.moduleFormat,
       side: module.side,
     });
 
-    stringsData.push(nameBytes, contentsBytes, sourcemapBytes, bytecodeBytes);
+    if (moduleStructSize === SIZEOF_MODULE_NEW) {
+      stringsData.push(
+        nameBytes,
+        contentsBytes,
+        sourcemapBytes,
+        bytecodeBytes,
+        moduleInfoBytes,
+        bytecodeOriginPathBytes
+      );
+    } else {
+      stringsData.push(nameBytes, contentsBytes, sourcemapBytes, bytecodeBytes);
+    }
     return undefined;
   });
+
+  const stringsPerModule = moduleStructSize === SIZEOF_MODULE_NEW ? 6 : 4;
 
   // Phase 2: Calculate buffer layout
   let currentOffset = 0;
@@ -552,7 +647,7 @@ function rebuildBunData(
 
   // Module structures
   const modulesListOffset = currentOffset;
-  const modulesListSize = modulesMetadata.length * SIZEOF_MODULE;
+  const modulesListSize = modulesMetadata.length * moduleStructSize;
   currentOffset += modulesListSize;
 
   // compileExecArgv
@@ -600,25 +695,21 @@ function rebuildBunData(
   // Build and write module structures
   for (let i = 0; i < modulesMetadata.length; i++) {
     const metadata = modulesMetadata[i];
-    const baseStringIdx = i * 4;
+    const baseStringIdx = i * stringsPerModule;
 
     const moduleStruct: BunModule = {
-      name: {
-        offset: stringOffsets[baseStringIdx].offset,
-        length: stringOffsets[baseStringIdx].length,
-      },
-      contents: {
-        offset: stringOffsets[baseStringIdx + 1].offset,
-        length: stringOffsets[baseStringIdx + 1].length,
-      },
-      sourcemap: {
-        offset: stringOffsets[baseStringIdx + 2].offset,
-        length: stringOffsets[baseStringIdx + 2].length,
-      },
-      bytecode: {
-        offset: stringOffsets[baseStringIdx + 3].offset,
-        length: stringOffsets[baseStringIdx + 3].length,
-      },
+      name: stringOffsets[baseStringIdx],
+      contents: stringOffsets[baseStringIdx + 1],
+      sourcemap: stringOffsets[baseStringIdx + 2],
+      bytecode: stringOffsets[baseStringIdx + 3],
+      moduleInfo:
+        moduleStructSize === SIZEOF_MODULE_NEW
+          ? stringOffsets[baseStringIdx + 4]
+          : { offset: 0, length: 0 },
+      bytecodeOriginPath:
+        moduleStructSize === SIZEOF_MODULE_NEW
+          ? stringOffsets[baseStringIdx + 5]
+          : { offset: 0, length: 0 },
       encoding: metadata.encoding,
       loader: metadata.loader,
       moduleFormat: metadata.moduleFormat,
@@ -626,10 +717,10 @@ function rebuildBunData(
     };
 
     // Serialize module structure inline
-    const moduleOffset = modulesListOffset + i * SIZEOF_MODULE;
+    const moduleOffset = modulesListOffset + i * moduleStructSize;
     let pos = moduleOffset;
 
-    // Write StringPointers
+    // Write StringPointers (common to both formats)
     newBuffer.writeUInt32LE(moduleStruct.name.offset, pos);
     newBuffer.writeUInt32LE(moduleStruct.name.length, pos + 4);
     pos += 8;
@@ -643,7 +734,17 @@ function rebuildBunData(
     newBuffer.writeUInt32LE(moduleStruct.bytecode.length, pos + 4);
     pos += 8;
 
-    // Write flags
+    // Write new-format-only StringPointers
+    if (moduleStructSize === SIZEOF_MODULE_NEW) {
+      newBuffer.writeUInt32LE(moduleStruct.moduleInfo.offset, pos);
+      newBuffer.writeUInt32LE(moduleStruct.moduleInfo.length, pos + 4);
+      pos += 8;
+      newBuffer.writeUInt32LE(moduleStruct.bytecodeOriginPath.offset, pos);
+      newBuffer.writeUInt32LE(moduleStruct.bytecodeOriginPath.length, pos + 4);
+      pos += 8;
+    }
+
+    // Write enum fields
     newBuffer.writeUInt8(moduleStruct.encoding, pos);
     newBuffer.writeUInt8(moduleStruct.loader, pos + 1);
     newBuffer.writeUInt8(moduleStruct.moduleFormat, pos + 2);
@@ -662,6 +763,7 @@ function rebuildBunData(
       offset: compileExecArgvOffset,
       length: compileExecArgvLength,
     },
+    flags: bunOffsets.flags,
   };
 
   let offsetsPos = offsetsOffset;
@@ -678,6 +780,8 @@ function rebuildBunData(
   offsetsPos += 4;
   newBuffer.writeUInt32LE(newOffsets.compileExecArgvPtr.offset, offsetsPos);
   newBuffer.writeUInt32LE(newOffsets.compileExecArgvPtr.length, offsetsPos + 4);
+  offsetsPos += 8;
+  newBuffer.writeUInt32LE(newOffsets.flags, offsetsPos);
 
   // Write trailer
   BUN_TRAILER.copy(newBuffer, trailerOffset);
@@ -944,8 +1048,14 @@ export function repackNativeInstallation(
   const binary = LIEF.parse(binPath);
 
   // Extract Bun data and rebuild with modified claude.js
-  const { bunOffsets, bunData, sectionHeaderSize } = getBunData(binary);
-  const newBuffer = rebuildBunData(bunData, bunOffsets, modifiedClaudeJs);
+  const { bunOffsets, bunData, sectionHeaderSize, moduleStructSize } =
+    getBunData(binary);
+  const newBuffer = rebuildBunData(
+    bunData,
+    bunOffsets,
+    modifiedClaudeJs,
+    moduleStructSize
+  );
 
   switch (binary.format) {
     case 'MachO':
