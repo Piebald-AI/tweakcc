@@ -124,7 +124,7 @@ $ pnpm dlx tweakcc
   - [Statusline update customization](#feature-statusline-update-customization)
   - [AGENTS.md support (with video)](#feature-agentsmd-support)
   - [Auto-accept plan mode](#feature-auto-accept-plan-mode)
-  - [Suppress native installer warning](`#feature-suppress-native-installer-warning`)
+  - [Suppress native installer warning](#feature-suppress-native-installer-warning)
   - _Missing documentation for above features coming soon_
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
