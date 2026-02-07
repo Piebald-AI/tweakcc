@@ -18,9 +18,9 @@ export const writeSuppressNativeInstallerWarning = (
   const startIndex = match.index;
   const endIndex = startIndex + match[0].length;
 
-  const newFile = file.slice(0, startIndex) + `` + file.slice(endIndex);
+  const newFile = file.slice(0, startIndex) + file.slice(endIndex);
 
-  showDiff(file, newFile, ``, startIndex, endIndex);
+  showDiff(file, newFile, '', startIndex, endIndex);
 
   return newFile;
 };
