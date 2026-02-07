@@ -72,21 +72,10 @@ export function ThemeEditView({ onBack, themeId }: ThemeEditViewProps) {
 
   useInput((input, key) => {
     if (showExitDialog) {
-      if (key.upArrow) {
-        setExitDialogIndex(prev => (prev > 0 ? prev - 1 : 1));
-      } else if (key.downArrow) {
-        setExitDialogIndex(prev => (prev < 1 ? prev + 1 : 0));
-      } else if (key.return) {
-        if (exitDialogIndex === 0) {
-          // User selected "Yes" - set theme
-          setCurrentClaudeCodeTheme(currentTheme.id);
-        }
+      if (key.escape) {
         setShowExitDialog(false);
         onBack();
-      } else if (key.escape) {
-        // User selected "No" - just go back
-        setShowExitDialog(false);
-        onBack();
+        return;
       }
       return;
     }
