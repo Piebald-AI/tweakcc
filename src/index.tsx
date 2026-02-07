@@ -35,6 +35,7 @@ import {
 } from './installationDetection';
 import { InstallationPicker } from './ui/components/InstallationPicker';
 import { InstallationCandidate, StartupCheckInfo } from './types';
+import { handleUnpack, handleRepack, handleAdhocPatch } from './commands';
 import {
   restoreClijsFromBackup,
   restoreNativeBinaryFromBackup,
@@ -175,76 +176,148 @@ const main = async () => {
     .option(
       '--config-url <url>',
       'fetch configuration from a URL instead of local config.json'
+    )
+    .action(async () => {
+      // This action handles the default case (no subcommand).
+      // All the --flag handling lives here so that Commander's subcommand
+      // support doesn't swallow the no-args invocation.
+      const options = program.opts();
+
+      if (options.verbose) {
+        enableVerbose();
+      } else if (options.debug) {
+        enableDebug();
+      }
+
+      if (options.showUnchanged) {
+        enableShowUnchanged();
+      }
+
+      // Migrate old ccInstallationDir config to ccInstallationPath if needed
+      const configMigrated = await migrateConfigIfNeeded();
+
+      // Check for conflicting flags
+      if (options.apply && (options.restore || options.revert)) {
+        console.error(
+          chalk.red(
+            'Error: Cannot use --apply and --restore/--revert together.'
+          )
+        );
+        process.exit(1);
+      }
+
+      // Handle --list-patches flag
+      if (options.listPatches) {
+        handleListPatches();
+        return;
+      }
+
+      // Handle --list-system-prompts flag
+      if (options.listSystemPrompts !== undefined) {
+        await handleListSystemPrompts(
+          options.listSystemPrompts as string | true
+        );
+        return;
+      }
+
+      // Handle --apply flag for non-interactive mode
+      if (options.apply) {
+        // Parse patch filter if provided
+        const patchFilter = options.patches
+          ? (options.patches as string)
+              .split(',')
+              .map((id: string) => id.trim())
+          : null;
+        await handleApplyMode(patchFilter, options.configUrl);
+        return;
+      }
+
+      // --config-url is only valid with --apply
+      if (options.configUrl) {
+        console.error(
+          chalk.red('Error: --config-url can only be used with --apply.')
+        );
+        console.error(
+          chalk.gray(
+            'The interactive TUI is for editing local configuration only.'
+          )
+        );
+        console.error(chalk.gray('To apply a remote config, use:'));
+        console.error(
+          chalk.gray(`  ${getInvocationCommand()} --apply --config-url <url>`)
+        );
+        process.exit(1);
+      }
+
+      // Handle --restore or --revert flags for non-interactive mode
+      if (options.restore || options.revert) {
+        await handleRestoreMode();
+        return;
+      }
+
+      // Interactive mode
+      await handleInteractiveMode(configMigrated);
+    });
+
+  // =========================================================================
+  // Subcommands
+  // =========================================================================
+
+  program
+    .command('unpack')
+    .argument('<output-js-path>', 'path to write extracted JS')
+    .argument('[binary-path]', 'path to native binary (default: auto-detect)')
+    .description('Extract JS from a native Claude Code binary')
+    .action(async (outputJsPath: string, binaryPath?: string) => {
+      await handleUnpack(outputJsPath, binaryPath);
+      process.exit(0);
+    });
+
+  program
+    .command('repack')
+    .argument('<input-js-path>', 'path to JS file to embed')
+    .argument('[binary-path]', 'path to native binary (default: auto-detect)')
+    .description('Embed JS into a native Claude Code binary')
+    .action(async (inputJsPath: string, binaryPath?: string) => {
+      await handleRepack(inputJsPath, binaryPath);
+      process.exit(0);
+    });
+
+  program
+    .command('adhoc-patch')
+    .description('Apply an ad-hoc patch to Claude Code')
+    .option(
+      '-s, --string <values...>',
+      'replace string: <old-string> <new-string>'
+    )
+    .option('-r, --regex <values...>', 'replace regex: <pattern> <replacement>')
+    .option(
+      '--script <script>',
+      'run a patch script (prefix with @ for file/URL)'
+    )
+    .option(
+      '-i, --index <number>',
+      'replace only the Nth occurrence (1-based)',
+      parseInt
+    )
+    .option(
+      '-p, --path <path>',
+      'path to cli.js or native binary (default: auto-detect)'
+    )
+    .action(
+      async (options: {
+        string?: string[];
+        regex?: string[];
+        script?: string;
+        index?: number;
+        path?: string;
+      }) => {
+        await handleAdhocPatch(options);
+        process.exit(0);
+      }
     );
+
   program.parse();
-  const options = program.opts();
-
-  if (options.verbose) {
-    enableVerbose();
-  } else if (options.debug) {
-    enableDebug();
-  }
-
-  if (options.showUnchanged) {
-    enableShowUnchanged();
-  }
-
-  // Migrate old ccInstallationDir config to ccInstallationPath if needed
-  const configMigrated = await migrateConfigIfNeeded();
-
-  // Check for conflicting flags
-  if (options.apply && (options.restore || options.revert)) {
-    console.error(
-      chalk.red('Error: Cannot use --apply and --restore/--revert together.')
-    );
-    process.exit(1);
-  }
-
-  // Handle --list-patches flag
-  if (options.listPatches) {
-    handleListPatches();
-    return;
-  }
-
-  // Handle --list-system-prompts flag
-  if (options.listSystemPrompts !== undefined) {
-    await handleListSystemPrompts(options.listSystemPrompts as string | true);
-    return;
-  }
-
-  // Handle --apply flag for non-interactive mode
-  if (options.apply) {
-    // Parse patch filter if provided
-    const patchFilter = options.patches
-      ? (options.patches as string).split(',').map((id: string) => id.trim())
-      : null;
-    await handleApplyMode(patchFilter, options.configUrl);
-    return;
-  }
-
-  // --config-url is only valid with --apply
-  if (options.configUrl) {
-    console.error(
-      chalk.red('Error: --config-url can only be used with --apply.')
-    );
-    console.error(
-      chalk.gray('The interactive TUI is for editing local configuration only.')
-    );
-    console.error(chalk.gray('To apply a remote config, use:'));
-    console.error(
-      chalk.gray(`  ${getInvocationCommand()} --apply --config-url <url>`)
-    );
-    process.exit(1);
-  }
-
-  // Handle --restore or --revert flags for non-interactive mode
-  if (options.restore || options.revert) {
-    await handleRestoreMode();
-    return;
-  }
-
-  // Interactive mode
-  await handleInteractiveMode(configMigrated);
 };
 
 /**

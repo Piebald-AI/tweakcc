@@ -120,12 +120,16 @@ $ pnpm dlx tweakcc
   - _Missing documentation for above features coming soon_
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
-- [Contributing](#contributing)
+- [CLI Commands](#cli-commands)
+  - [`unpack`](#unpack)
+  - [`repack`](#repack)
+  - [`adhoc-patch`](#adhoc-patch)
 - [Related projects](#related-projects)
 - [System prompts](#system-prompts)
 - [Toolsets](#toolsets)
 - [Troubleshooting](#troubleshooting)
 - [FAQ](#faq)
+- [Contributing](#contributing)
 - [License](#license)
 
 ## How it works
@@ -230,10 +234,10 @@ Here's the schema:
 
 | Animation       | Phases                                               | Description                  |
 | --------------- | ---------------------------------------------------- | ---------------------------- |
-| Default stars   | `['·', '✢', '✳', '✶', '✻', '✽']`                     | Classic star burst animation |
+| Default stars   | `['·', '✢', '✳', '✶', '✻', '✽']`                    | Classic star burst animation |
 | Simple dots     | `['.', '..', '...']`                                 | Classic loading dots         |
 | Braille spinner | `['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']` | Braille-style spinner        |
-| Arrow spinner   | `['←', '↖', '↑', '↗', '→', '↘', '↓', '↙']`           | Rotating arrow               |
+| Arrow spinner   | `['←', '↖', '↑', '↗', '→', '↘', '↓', '↙']`       | Rotating arrow               |
 | Minimal         | `['○', '◐', '◑', '●']`                               | Minimal circle animation     |
 
 **Speed customization:**
@@ -548,7 +552,7 @@ The patch happens automatically, with a default set of `AGENTS.md`, `GEMINI.md`,
 
 ![Screenshot of the CLAUDE.md alternative names list](./assets/agents_md_config.png)
 
-**Via `config.json`:** To configure the list of alternate `CLAUDE.md` names via headlessly, set `settings.claudeMdAltNames` to a list of your desired names, in descending order of priority:
+**Via `config.json`:** To configure the list of alternate `CLAUDE.md` names headlessly, set `settings.claudeMdAltNames` to a list of your desired names, in descending order of priority:
 
 ```json
 {
@@ -649,12 +653,119 @@ Contributions are welcome! Whether you're fixing a bug, adding a new feature, im
 
 For detailed guidelines on development setup, code style, testing, and submitting pull requests, see the [CONTRIBUTING.md](https://github.com/Piebald-AI/tweakcc/blob/main/CONTRIBUTING.md) file.
 
-### Quick Start
+**Quick Start:**
 
 1. Fork the repository and create a new branch
 2. Make your changes following the code style guidelines
 3. Run tests and linting: `pnpm test && pnpm lint`
 4. Submit a pull request with a clear description
+
+## CLI Commands
+
+In addition to the interactive TUI (`npx tweakcc`) and the `--apply` flag, tweakcc provides three subcommands for advanced use: `unpack`, `repack`, and `adhoc-patch`.
+
+### `unpack`
+
+Extract the embedded JavaScript from a native Claude Code binary and write it to a file. This is useful for inspecting Claude Code's source, writing custom patches, or making manual edits before repacking. Note that `unpack` only works with native/binary installations; it will error if pointed at an npm-based installation (`cli.js`), because it can already be read directly from disk. `unpack` takes the path to the JS file to write to, and an optional path to a native binary, which if omitted will default to the current installation.
+
+```bash
+npx tweakcc unpack <output-js-path> [binary-path]
+```
+
+### `repack`
+
+Read a JavaScript file and embed it back into a native Claude Code binary. This is the counterpart to `unpack` — after inspecting or modifying the extracted JS, use `repack` to write it back. Like `unpack`, this only works with native installations. `repack` takes a path to a JS file to read from, and an optional path to a native binary, which if omitted, as above, will default to the current installation.
+
+```bash
+npx tweakcc repack <input-js-path> [binary-path]
+```
+
+Example:
+
+```bash
+# Extract, edit, and repack
+npx tweakcc unpack ./claude-code.js
+# ... make your edits to claude-code.js ...
+npx tweakcc repack ./claude-code.js
+```
+
+### `adhoc-patch`
+
+Apply a one-off or ad-hoc patch to a Claude Code installation without going through the tweakcc UI or config system. It supports three modes and works with both native and npm-based installations.
+
+> [!CAUTION]
+> This API does not create a backup of the Claude Code installation that is modified. You'll need to copy the original file to a separate location if you want to revert any changes you made&mdash;due to the lack of a backup, `tweakcc --revert/--restore` will NOT work (unless you happen to have run `tweakcc --apply` before you use `adhoc-patch`).
+
+3 modes of patching are supported.
+
+#### `--string`
+
+A fixed/static old string is replaced with a fixed/static new string, analogous to `grep -F`.
+
+- By default, all instances of the old string are replaced, but you can use `--index` to specify a particular occurrence by 1-based index, e.g. `--index 1` to replace only the first, `--index 2` to replace only the second, etc.
+
+#### `--regex`
+
+All matches of a regular expression are replaced with a new string.
+
+- The new string can contain `$D` replacements, where `D` is the 0-based index of a group matched by the regular expression; `$0` = the entire matched text, `$1` = the first used-defined match group, etc.
+
+- The regular expression must begin and end with a forward slash in JavaScript style, e.g. `/my.+regex/`. An optional list of flags&mdash;characters from the set `g`, `i`, `m`, `s`, `e`, and `y`&mdash;may be appended after the last delimiting forward slash, e.g. `/claude/ig`
+
+- Like `--string`, `--regex` supports the use of `--index` to specify by index which occurrence to replace, without which all occurrences are replaced.
+
+#### `--script`
+
+This is the most powerful option. A short snippet of JavaScript code running in Node.js takes the JavaScript content of the CC installation as input and returns the entire input, modified as output.
+
+- **Security:** The script is run in a sandboxed/isolated `node` child process with the [`--experimental-permission`](https://nodejs.org/api/permissions.html) option to prevent the script from using file system and network APIs. This option requires that you have Node.js 20+ installed and on your `PATH`. Due to this sandboxing, scripts themselves (including those downloaded from HTTP URLs) are safe to run without prior review; however, because the scripts are patching Claude Code, which is an executable, it's technically possible for a script to patch malicious code into your Claude Code executable that would execute when you run `claude`. As a result, it's highly advised to review the diff tweakcc prints when it asks you if you'd like to apply the changes proposed by the patch.
+
+- **Input/output:** Claude Code's JavaScript code is passed to the script via a global variable, `js`, available inside the script's execution context. To return the modified file content, simply use the `return` keyword. For example, to write a very simple script that replaced all instances of `"Claude Code"` with `"My App"`, you could write the following:
+
+  ```js
+  js = js.replace(/"Claude Code"/g, '"My App"');
+  return js;
+  ```
+
+- **Utility vars:** Because complicated patches may need to make use of common functions and global variables like `chalk`, `React`, `require`, and the low-level module loader function, and also common [Ink/React](https://github.com/vadimdemedes/ink) components like `Text` and `Box`, tweakcc also provides a `vars` global variable to the script. `vars` is an object containing the names of the common variables listed above; here's an example:
+
+  ```js
+  const vars = {
+    chalkVar: 'K6',
+    moduleLoaderFunction: 's',
+    reactVar: 'Yt8',
+    requireFuncName: 'C1',
+    textComponent: 'f',
+    boxComponent: 'NZ5',
+  };
+  ```
+
+- **Script source:** Scripts can be passed in 3 ways: directly on the command-line, via a local file on disk, and via an HTTP URL. In order to specify a file, pass the path to the file prefixed with `@` (similar to `curl -d`). To specify an HTTP URL, use `@` and ensure the URL is prefixed with `http://` or `https://`. HTTP scripts themselves are safe to run as a result of our sandboxing, with one notable pitfall, as mentioned above.
+
+#### Usage
+
+```bash
+# Replace a fixed string with another string:
+npx tweakcc adhoc-patch --string '"Claude Code"' '"My App"'
+
+# Replace all CSS-style RGB colors with bright red:
+npx tweakcc adhoc-patch --regex 'rgb\(\d+,\d+,\d+\)' 'rgb(255,0,0)'
+
+# Erase all of CC's code and replace it with a simple console.log:
+npx tweakcc adhoc-patch --script $'return "(function(){console.log(\"Hi\")})()"'
+
+# Run a script from a local file:
+npx tweakcc adhoc-patch --script '@path/to/script.js'
+
+# Run a script from an HTTP URL (warning: this script makes everything in CC blue and changes "Claude Code" to "ABC Code CLI", which BREAKS CC):
+# It's contents are:
+#
+#   js = js.replace(/Claude Code/g, "ABC Code CLI")
+#   js = js.replace(/rgb\(\d+,\d+,\d+\)/g, "rgb(0,128,255)")
+#   return js
+#
+npx tweakcc adhoc-patch --script '@https://gist.githubusercontent.com/bl-ue/2402a16b966176c994ea7bd5d11b0b09/raw/eeb0b78a6387f0e6a15182eeabd95f0e84e4ccd7/patch_cc.js'
+```
 
 ## Related projects
 
@@ -727,11 +838,11 @@ Example:
 npx tweakcc@latest --apply --config-url https://gist.githubusercontent.com/bl-ue/27323f9bfd4c18aaab51cad11c1148dc/raw/b132c20387568536cf6586c2324e2f4491bb07df/config.json
 ```
 
-Your local config will **not** be overwritten; the remote config will be copied into your `config.json` under under `remoteConfig.settings`.
-
-<!--
+Your local config will **not** be overwritten; the remote config will be copied into your `config.json` under `remoteConfig.settings`.
 
 ## API
+
+tweakcc can be used as an npm dependency and provides an easy API that projects can use to patch Claude Code without worrying about where it's installed and whether it's native or npm-based. The functions are divided into 5 groups: config, installation, I/O, backup, and utilities.
 
 ### Config
 
@@ -948,16 +1059,105 @@ undefined
 31          // <-- Original was successfully modified.
 
 // Restore the backup:
-> await tweakcc.restoreBackup(backupPath, native2076Inst.)
+> await tweakcc.restoreBackup(backupPath, native2076Inst.path)
+> (await tweakcc.readContent(native2076Inst)).length
+234454688   // Original, unpatched size.
 ```
 
--->
+### Utilities
+
+General utilities to help with patching.
+
+````js
+// Utilities to find various commonly-used variables in CC's code.
+// See the docs for `tweakcc adhoc-patch --script` above for more details.
+findChalkVar(fileContents: string): string | undefined;
+getModuleLoaderFunction(fileContents: string): string | undefined;
+getReactVar(fileContents: string): string | undefined;
+getRequireFuncName(fileContents: string): string | undefined;
+findTextComponent(fileContents: string): string | undefined;
+findBoxComponent(fileContents: string): string | undefined;
+/**
+ * Clears the process-global caches that some of the above functions populate
+ * to speed up subsequent repeated calls.  Use this when processing multiple CC
+ * installs in one process.
+ */
+clearCaches(): void;
+
+/**
+ * Debug function for showing diffs between old and new file contents using smart word-level diffing.
+ *
+ * Uses the `diff` library to compute word-level differences and displays them with
+ * chalk-styled colors: green background for additions, red background for removals, and
+ * dim text for unchanged portions.
+ *
+ * Only outputs when --verbose flag is set.
+ *
+ * @param oldFileContents - The original file content before modification
+ * @param newFileContents - The modified file content after patching
+ * @param injectedText - The text that was injected (used to calculate context window)
+ * @param startIndex - The start index where the modification occurred
+ * @param endIndex - The end index of the original content that was replaced
+ * @param numContextChars - Number of context characters to show before and after diff.
+ */
+export const showDiff = (
+  oldFileContents: string,
+  newFileContents: string,
+  injectedText: string,
+  startIndex: number,
+  endIndex: number,
+  numContextChars: number = 40
+): void;
+
+/**
+ * Performs a global replace on a string, finding all matches first, then replacing
+ * them in reverse order (to preserve indices), and calling showDiff for each replacement.
+ *
+ * @param content - The string to perform replacements on
+ * @param pattern - The regex pattern to match (should have 'g' flag for multiple matches)
+ * @param replacement - Either a string or a replacer function (same as String.replace)
+ * @returns The modified string with all replacements applied
+ *
+ * @example
+ * ```ts
+ * const result = globalReplace(
+ *   content,
+ *   /throw Error\(`something`\);/g,
+ *   ''
+ * );
+ * ```
+ */
+export const globalReplace = (
+  content: string,
+  pattern: RegExp,
+  replacement: string | ((substring: string, ...args: unknown[]) => string)
+): string;
+````
+
+Demo of `showDiff`:
+
+```js
+const pattern = /function [$\w]+\(\)\{return [$\w]+\("my_feature_flag"/;
+const match = file.match(pattern)!;
+const insertIndex = match.index + match[0].indexOf('{') + 1;
+const insertion = 'return true;';
+
+const newFile = file.slice(0, insertIndex) + insertion + file.slice(insertIndex);
+
+showDiff(file, newFile, insertion, insertIndex, insertIndex);
+```
+
+Demo of `globalReplace`:
+
+```js
+newFile = globalReplace(newFile, /"Claude Code",/g, '"My App"');
+```
 
 ## Troubleshooting
 
 tweakcc stores a backup of your Claude Code `cli.js`/binary for when you want to revert your customizations and for reapplying patches. Before it applies your customizations, it restores the original `cli.js`/binary so that it can start from a clean slate. Sometimes things can get confused and your `claude` can be corrupted.
 
-In particular, you may run into a situation where you have a tweakcc-patched (or maybe a formatted) `claude` but no tweakcc backup. And then it makes a backup of that modified `claude`. If you then try to reinstall Claude Code and apply your customizations, tweakcc will restore its backup of the old _modified_ `claude`.
+In particular, you may run into a situation where you have a tweakcc-patched (or maybe a prettier-formatted) `claude` but no tweakcc backup. And then it makes a backup of that modified `claude`. If you then try to reinstall Claude Code and apply your customizations, tweakcc will restore its backup of the old _modified_ `claude`.
 
 To break out of this loop you can install a different version of Claude Code, which will cause tweakcc to discard its existing backup and take a fresh backup of the new `claude` file. Or you can simply delete tweakcc's backup file (located at `~/.tweakcc/cli.backup.js` or `~/.tweakcc/native-binary.backup`). If you do delete `cli.backup.js` or `native-binary.backup`, make sure you reinstall Claude Code _before_ you run tweakcc again, because if your `claude` is still the modified version, it will get into the same loop again.
 

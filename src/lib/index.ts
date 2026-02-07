@@ -85,8 +85,6 @@ import {
   findTextComponent,
   findBoxComponent,
   clearCaches,
-  clearReactVarCache,
-  clearRequireFuncNameCache,
 } from '../patches/helpers';
 
 import { globalReplace, showDiff } from '../patches/patchDiffing';
@@ -122,8 +120,6 @@ export const helpers = {
 
   // Cache management
   clearCaches,
-  clearReactVarCache,
-  clearRequireFuncNameCache,
 
   // Diff utilities
   globalReplace,
