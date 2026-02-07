@@ -1117,8 +1117,7 @@ When Claude finishes writing a plan and calls `ExitPlanMode`, you're normally sh
 
 ## Feature: Suppress native installer warning
 
-When Claude Code detects that you've switched from npm to the native installer, it shows a warning message at startup suggesting you run `claude install` or visit the documentation for more options. This patch suppresses that warning.
-
+When Claude Code detects that you've installed via npm, it warns you to use the native installer.
 **Via the UI:** Run `npx tweakcc`, go to **Misc**, and toggle **Suppress native installer warning**.
 
 **Via `config.json`:**
