@@ -304,6 +304,10 @@ const main = async () => {
       '-p, --path <path>',
       'path to cli.js or native binary (default: auto-detect)'
     )
+    .option(
+      '--confirm-possible-dangerous-patch',
+      'skip diff preview and apply immediately'
+    )
     .action(
       async (options: {
         string?: string[];
@@ -311,6 +315,7 @@ const main = async () => {
         script?: string;
         index?: number;
         path?: string;
+        confirmPossibleDangerousPatch?: boolean;
       }) => {
         await handleAdhocPatch(options);
         process.exit(0);
