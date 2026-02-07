@@ -117,6 +117,7 @@ $ pnpm dlx tweakcc
   - [Statusline update customization](#feature-statusline-update-customization)
   - [AGENTS.md support (with video)](#feature-agentsmd-support)
   - [Auto-accept plan mode](#feature-auto-accept-plan-mode)
+  - [Suppress native installer warning](`#feature-suppress-native-installer-warning`)
   - _Missing documentation for above features coming soon_
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
@@ -611,6 +612,24 @@ When Claude finishes writing a plan and calls `ExitPlanMode`, you're normally sh
   "settings": {
     "misc": {
       "autoAcceptPlanMode": true
+    }
+  }
+}
+```
+
+## Feature: Suppress native installer warning
+
+When Claude Code detects that you've switched from npm to the native installer, it shows a warning message at startup suggesting you run `claude install` or visit the documentation for more options. This patch suppresses that warning.
+
+**Via the UI:** Run `npx tweakcc`, go to **Misc**, and toggle **Suppress native installer warning**.
+
+**Via `config.json`:**
+
+```json
+{
+  "settings": {
+    "misc": {
+      "suppressNativeInstallerWarning": true
     }
   }
 }
