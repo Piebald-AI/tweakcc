@@ -252,20 +252,21 @@ export const readConfigFile = async (): Promise<TweakccConfig> => {
     const content = await fs.readFile(CONFIG_FILE, 'utf8');
     const config: TweakccConfig = { ...defaultConfig, ...JSON.parse(content) };
 
-    // Apply migrations and normalize the config
+    const beforeNormalize = JSON.stringify(config);
+
     normalizeConfig(config);
 
-    // Check if system prompts have been modified since they were last applied
-    // If so, mark changesApplied as false to show the "*Apply customizations" indicator
     const hasSystemPromptChanges =
       await hasUnappliedSystemPromptChanges(SYSTEM_PROMPTS_DIR);
     if (hasSystemPromptChanges) {
       config.changesApplied = false;
     }
 
-    // Save the merged config back to disk so missing properties are persisted
-    // This auto-fixes config files that are missing required properties
-    await saveConfig(config);
+    const changed =
+      JSON.stringify(config) !== beforeNormalize || hasSystemPromptChanges;
+    if (changed) {
+      await saveConfig(config);
+    }
 
     lastConfig = config;
     return config;

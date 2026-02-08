@@ -26,6 +26,7 @@ import { backupClijs, backupNativeBinary } from './installationBackup';
 export interface StartupCheckResult {
   startupCheckInfo: StartupCheckInfo | null;
   pendingCandidates: InstallationCandidate[] | null;
+  config: TweakccConfig;
 }
 
 /**
@@ -44,18 +45,18 @@ export async function startupCheck(
 
   const ccInstInfo = await findClaudeCodeInstallation(config, options);
   if (!ccInstInfo) {
-    return { startupCheckInfo: null, pendingCandidates: null };
+    return { startupCheckInfo: null, pendingCandidates: null, config };
   }
 
-  // Check if we have pending candidates that need user selection
   const pendingCandidates = getPendingCandidates(ccInstInfo);
   if (pendingCandidates) {
-    return { startupCheckInfo: null, pendingCandidates };
+    return { startupCheckInfo: null, pendingCandidates, config };
   }
 
   return {
     startupCheckInfo: await completeStartupCheck(config, ccInstInfo),
     pendingCandidates: null,
+    config,
   };
 }
 

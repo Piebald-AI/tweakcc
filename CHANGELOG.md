@@ -37,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Offer to set edited theme as Claude Code's current theme when exiting editor (#482) - @brrock
 - Add a patch to suppress the native installer warning (#483) - @brrock
 - Show lightning fast formatted patch changes via oxfmt before applying patch scripts (#489) - @bl-ue
+- Fix native installation support for newer CC versions (#492) - @signadou
+- Fix 2 config file saves on TUI startup (#494) - @bl-ue
 
 ## [v3.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.4.0) - 2026-01-18
 
