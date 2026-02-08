@@ -1,8 +1,6 @@
 import { showDiff } from './index';
 
-const getScrollEscapeSequenceFilterLocation = (
-  oldFile: string
-): number | null => {
+const getScrollEscapeSequenceFilterLocation = (oldFile: string): number => {
   const lines = oldFile.split('\n');
   let injectionIndex = 0;
 
@@ -28,28 +26,16 @@ export const writeScrollEscapeSequenceFilter = (
   oldFile: string
 ): string | null => {
   const index = getScrollEscapeSequenceFilterLocation(oldFile);
-  if (index === null) {
-    console.error(
-      'patch: scrollEscapeSequenceFilter: failed to find injection point'
-    );
-    return null;
-  }
 
   const filterCode = `// SCROLLING FIX PATCH START
 const _origStdoutWrite=process.stdout.write;
 process.stdout.write=function(chunk,encoding,cb){
-const data=typeof chunk==='string'?chunk:chunk.toString(encoding||'utf8');
-const filtered=data
-.replace(/\\x1b\\[1\\[H/g,'')
-.replace(/\\x1b\\[1\\[A/g,'')
-.replace(/\\x1b\\[0\\[H/g,'')
-.replace(/\\x1b\\[0\\[A/g,'')
-.replace(/\\x1b\\[H/g,'')
-.replace(/\\x1b\\[A/g,'')
-.replace(/\\033\\[1\\[H/g,'')
-.replace(/\\033\\[1\\[A/g,'')
-.replace(/\\u001b\\[1\\[H/g,'')
-.replace(/\\u001b\\[1\\[A/g,'');
+if(typeof chunk!=='string'){
+return _origStdoutWrite.call(process.stdout,chunk,encoding,cb);
+}
+const filtered=chunk
+.replace(/\\x1b\\[(?:\\d+;?\\d*)?H/g,'')
+.replace(/\\x1b\\[\\d*A/g,'');
 return _origStdoutWrite.call(process.stdout,filtered,encoding,cb);
 };
 // SCROLLING FIX PATCH END
