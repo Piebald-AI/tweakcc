@@ -7,6 +7,7 @@ import { ThinkingStyleView } from './components/ThinkingStyleView';
 import { UserMessageDisplayView } from './components/UserMessageDisplayView';
 import { InputPatternHighlightersView } from './components/InputPatternHighlightersView';
 import { MiscView } from './components/MiscView';
+import { VSCodeExtensionView } from './components/VSCodeExtensionView';
 import { ToolsetsView } from './components/ToolsetsView';
 import { SubagentModelsView } from './components/SubagentModelsView';
 import { ClaudeMdAltNamesView } from './components/ClaudeMdAltNamesView';
@@ -26,7 +27,6 @@ import {
 
 export const SettingsContext = createContext({
   settings: DEFAULT_SETTINGS,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   updateSettings: (_updateFn: (settings: Settings) => void) => {},
   changesApplied: false,
   ccVersion: '',
@@ -123,6 +123,7 @@ Please reapply your changes by running \`${invocationCommand} --apply\`.`,
       case MainMenuItem.USER_MESSAGE_DISPLAY:
       case MainMenuItem.INPUT_PATTERN_HIGHLIGHTERS:
       case MainMenuItem.MISC:
+      case MainMenuItem.VS_CODE_EXTENSION:
       case MainMenuItem.TOOLSETS:
       case MainMenuItem.SUBAGENT_MODELS:
       case MainMenuItem.CLAUDE_MD_ALT_NAMES:
@@ -196,6 +197,8 @@ Please reapply your changes by running \`${invocationCommand} --apply\`.`,
           <InputPatternHighlightersView onBack={handleBack} />
         ) : currentView === MainMenuItem.MISC ? (
           <MiscView onSubmit={handleBack} />
+        ) : currentView === MainMenuItem.VS_CODE_EXTENSION ? (
+          <VSCodeExtensionView onBack={handleBack} />
         ) : currentView === MainMenuItem.TOOLSETS ? (
           <ToolsetsView onBack={handleBack} />
         ) : currentView === MainMenuItem.SUBAGENT_MODELS ? (

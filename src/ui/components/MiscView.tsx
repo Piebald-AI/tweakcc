@@ -75,6 +75,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableRememberSkill: false,
     tokenCountRounding: null as number | null,
     autoAcceptPlanMode: false,
+    removeNewSessionShortcut: false,
     allowBypassPermissionsInSudo: false,
     suppressNativeInstallerWarning: false,
   };
@@ -515,6 +516,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.autoAcceptPlanMode =
               !settings.misc!.autoAcceptPlanMode;
+          });
+        },
+      },
+      {
+        id: 'removeNewSessionShortcut',
+        title: 'Remove Ctrl-L (new session) shortcut',
+        description:
+          'Removes the Ctrl-L global shortcut for starting a new session to prevent accidental triggers.',
+        getValue: () => settings.misc?.removeNewSessionShortcut ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.removeNewSessionShortcut =
+              !settings.misc!.removeNewSessionShortcut;
           });
         },
       },

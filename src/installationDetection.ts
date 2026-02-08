@@ -13,7 +13,7 @@ import {
 import { extractClaudeJsFromNativeInstallation } from './nativeInstallationLoader';
 import { CLIJS_SEARCH_PATHS, NATIVE_SEARCH_PATHS } from './installationPaths';
 import { CONFIG_FILE, updateConfigFile } from './config';
-import {
+import type {
   ClaudeCodeInstallationInfo,
   FindInstallationOptions,
   InstallationCandidate,
@@ -21,6 +21,13 @@ import {
   InstallationSource,
   TweakccConfig,
 } from './types';
+
+export type {
+  ClaudeCodeInstallationInfo,
+  InstallationCandidate,
+  InstallationKind,
+  InstallationSource,
+};
 
 // ============================================================================
 // Types
@@ -336,7 +343,9 @@ function extractVersionFromContent(content: string): string | null {
 /**
  * Extracts version from a cli.js file.
  */
-async function extractVersionFromJsFile(cliPath: string): Promise<string> {
+export async function extractVersionFromJsFile(
+  cliPath: string
+): Promise<string> {
   const content = await fs.readFile(cliPath, 'utf8');
   const version = extractVersionFromContent(content);
 

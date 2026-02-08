@@ -473,6 +473,7 @@ export const DEFAULT_SETTINGS: Settings = {
     },
   ],
   thinkingVerbs: {
+    enabled: true,
     format: '{}… ',
     verbs: [
       'Accomplishing',
@@ -663,6 +664,7 @@ export const DEFAULT_SETTINGS: Settings = {
     ],
   },
   thinkingStyle: {
+    hideSpinner: false,
     updateInterval: 120,
     phases:
       // On Windows one of these can be an emoji with an ugly green background, which is likely the
@@ -709,8 +711,18 @@ export const DEFAULT_SETTINGS: Settings = {
     enableRememberSkill: false,
     tokenCountRounding: null,
     autoAcceptPlanMode: false,
+    removeNewSessionShortcut: false,
     allowBypassPermissionsInSudo: false,
     suppressNativeInstallerWarning: false,
+  },
+  vscodeExtensions: {
+    enableConversationTitle: true,
+    hideStartupBanner: false,
+    hideCtrlGToEdit: false,
+    removeNewSessionShortcut: false,
+    tableFormat: 'default',
+    enableSwarmMode: true,
+    tokenCountRounding: null,
   },
   toolsets: [],
   defaultToolset: null,

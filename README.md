@@ -58,6 +58,47 @@ With tweakcc, you can
 - Configure which Claude **model** each **subagent** (Plan, Explore, and general-purpose) uses
 - Switch between **table formats** - Claude Code default, Unicode (`┌─┬─┐`), ASCII/markdown (`|---|`), Unicode without top/bottom borders.
 
+## VS Code Extension Support
+
+tweakcc now supports patching **Claude Code's VS Code extension** across multiple forks: **VS Code, Cursor, Windsurf, VS Codium, and Antigravity**.
+
+### Supported VS Code Forks
+
+| Fork        | Extension Directory       | CLI Command                    | Marketplace               |
+| ----------- | ------------------------- | ------------------------------ | ------------------------- |
+| VS Code     | `~/.vscode/extensions/`   | `code --install-extension`     | Visual Studio Marketplace |
+| Cursor      | `~/.cursor/extensions/`   | `cursor --install-extension`   | Visual Studio Marketplace |
+| Windsurf    | `~/.windsurf/extensions/` | `windsurf --install-extension` | Visual Studio Marketplace |
+| VS Codium   | `~/.vscodium/extensions/` | `codium --install-extension`   | OpenVSX (OpenVSX.org)     |
+| Antigravity | Varies (app bundle path)  | `editor --install-extension`   | OpenVSX (OpenVSX.org)     |
+
+### How It Works for VS Code Extensions
+
+For VS Code extensions, tweakcc works similarly to CLI installations:
+
+- Detects installed Claude Code extensions across all supported forks
+- Reads and patches two bundled files: `extension.js` (extension host) and `webview/index.js` (UI)
+- Applies to same settings and patches used for CLI (thinking verbs, table format, swarm mode, etc.)
+- Tracks versions per installation to warn if extension has been updated since last patch
+
+### VSIX File Support
+
+You can also patch VSIX files directly:
+
+```bash
+# Extract VSIX
+npx tweakcc unpack ./claude-code.vsix
+
+# Patch the extracted extension directory
+# (Then use "Apply customizations" in TUI)
+
+# Repack into a new VSIX
+npx tweakcc repack ./extracted-extension/
+
+# Install to your VS Code fork
+code --install-extension ./claude-code-patched.vsix
+```
+
 tweakcc also
 
 - Fixes a bug where the **spinner animation** is frozen if you have the `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` environment variable set ([#46](https://github.com/Piebald-AI/tweakcc/issues/46))
@@ -85,6 +126,7 @@ $ pnpm dlx tweakcc
 ## Table of contents
 
 - [How it works](#how-it-works)
+- [VS Code Extension Support](#vs-code-extension-support)
 - [Remote config](#remote-config)
 - [CLI Commands (`unpack`, `repack`, `adhoc-patch`)](#cli-commands)
 - [API](#cli-commands)
@@ -141,6 +183,73 @@ tweakcc works by patching Claude Code's minified `cli.js` file, reading customiz
 tweakcc is verified to work with Claude Code **2.1.32.** In newer or earlier versions various patches might not work. However, if we have the [system prompts for your version](https://github.com/Piebald-AI/tweakcc/tree/main/data/prompts) then system prompt patching is guaranteed to work with that version, even if it's significantly different from the verified CC version&mdash;the version number stated above is only relevant for the non-system-prompt patches. We get the latest system prompts within minutes of each new CC release, so unless you're using a CC version older than 2.0.14, your version is supported.
 
 You can also create custom patches using tweakcc without having to fork it or open a PR. [`tweakcc adhoc-patch`](#cli-commands) supports using custom scripts that work with native and npm-based installs and that automatically detect your Claude Code installation.
+
+## VS Code Extension Support
+
+tweakcc now supports patching **Claude Code's VS Code extension** across multiple VS Code-based editors: **VS Code, Cursor, Windsurf, VS Codium, and Antigravity**.
+
+### Supported Features
+
+All CLI features are now available for VS Code extensions:
+
+- **Thinking customization** - Customize thinking verbs, thinking indicator style, thinking block styling
+- **Session management** - Add `/title` command for manual session naming, remove Ctrl-L shortcut
+- **UI customization** - Hide startup banner, hide "ctrl-g to edit" prompt, remove new session shortcut
+- **Table formatting** - ASCII, Clean, or Clean-top-bottom table styles
+- **Advanced features** - Enable swarm mode (native multi-agent), token count rounding
+- **Toolsets** - Custom toolsets with auto-accept plan mode support
+- **Themes** - Full theme customization with user message display colors
+
+### How it Works
+
+tweakcc patches the VS Code extension's bundled JavaScript files:
+
+- `extension.js` - Main extension host logic
+- `webview/index.js` - UI rendering (most customizations live here)
+
+Patches are applied directly to the installed extension files in:
+
+- `~/.vscode/extensions/anthropic.claude-code-<version>-<platform>/`
+- `~/.cursor/extensions/anthropic.claude-code-<version>-<platform>/`
+- `~/.windsurf/extensions/anthropic.claude-code-<version>-<platform>/`
+- And other VS Code fork directories
+
+### VSIX File Support
+
+tweakcc can also patch VSIX files before installation:
+
+```bash
+# Load and patch a VSIX file
+npx tweakcc
+
+# Select "Load from VSIX" option
+# Choose your .vsix file path
+# Apply patches
+# Install to desired fork
+```
+
+### Unified Patching Flow
+
+tweakcc provides a **single unified interface** for patching both CLI and VS Code extensions:
+
+1. Run `npx tweakcc`
+2. Select installations to patch (CLI + extensions)
+3. Configure settings in respective UI sections
+4. Apply customizations
+5. Restart installations
+
+### UI Navigation
+
+All VS Code extension patches are organized in the TUI:
+
+- **Thinking** - Thinking verbs, thinking indicator, thinking block styling
+- **Misc** - Conversation title, hide startup banner, table format, swarm mode, token rounding
+- **Toolsets** - Custom toolsets with auto-accept plan mode
+- **Themes** - Full theme customization
+
+### Version Tracking
+
+tweakcc tracks the last patched version for each installation and warns if your extension has been updated since the last patch. Simply reapply patches after updates.
 
 ## Remote Config
 

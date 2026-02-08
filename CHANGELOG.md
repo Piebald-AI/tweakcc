@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Add VS Code extension patching support for Claude Code (@anthropic-ai/claude-code) - @bl-ue
+  - Patch Claude Code's VS Code extension across 5 forks: VS Code, Cursor, Windsurf, VS Codium, Antigravity
+  - Supports patching from installed extensions and VSIX files
+  - UI customizations: thinking verbs, conversation title (/title command), table format, swarm mode, token rounding, misc UI elements
+  - Single unified flow for patching CLI and VS Code installations
+  - Parallel patching support for multiple installations
+  - Version-aware tracking per installation
 - Add comprehensive documentation for thinking verbs and thinking indicator customizations
 - Add contributing guidelines and AGENTS.md for developer experience
 - Add a fallback for WASMagic when it's not available (#399) - @signadou

@@ -10,18 +10,8 @@ import {
   updateConfigFile,
   fetchConfigFromUrl,
 } from './config';
-import {
-  enableDebug,
-  enableVerbose,
-  enableShowUnchanged,
-  isShowUnchanged,
-} from './utils';
-import {
-  applyCustomization,
-  PatchResult,
-  PatchGroup,
-  getAllPatchDefinitions,
-} from './patches/index';
+import { enableDebug, enableVerbose, enableShowUnchanged } from './utils';
+import { PatchGroup, getAllPatchDefinitions } from './patches/index';
 import {
   preloadStringsFile,
   getSystemPromptDefinitions,
@@ -39,6 +29,13 @@ import {
   StartupCheckInfo,
   TweakccConfig,
 } from './types';
+import {
+  findAllInstallations,
+  toUnifiedInstallations,
+} from './unifiedDetection';
+import { applyPatchesToSelected } from './unifiedApply';
+import { checkVersion } from './versionCheck';
+import { promptRestartInstallations } from './vscode/restartHandler';
 import { handleUnpack, handleRepack, handleAdhocPatch } from './commands';
 import {
   restoreClijsFromBackup,
@@ -89,65 +86,30 @@ function getInvocationCommand(): string {
  * @param results - The patch results to display
  * @param patchFilter - Optional list of explicitly requested patch IDs (always shown even if skipped)
  */
-function printPatchResults(
-  results: PatchResult[],
-  patchFilter?: string[] | null
+function printUnifiedPatchResults(
+  results: {
+    path: string;
+    success: boolean;
+    error?: string;
+    patchesApplied?: string[];
+  }[]
 ): void {
-  // Define group order for display
-  const groupOrder = [
-    PatchGroup.SYSTEM_PROMPTS,
-    PatchGroup.ALWAYS_APPLIED,
-    PatchGroup.MISC_CONFIGURABLE,
-    PatchGroup.FEATURES,
-  ];
+  console.log('\nPatches applied:');
 
-  // Group results by PatchGroup
-  const byGroup = new Map<PatchGroup, PatchResult[]>();
-  for (const group of groupOrder) {
-    byGroup.set(group, []);
-  }
   for (const result of results) {
-    const groupResults = byGroup.get(result.group);
-    if (groupResults) {
-      groupResults.push(result);
+    if (result.success) {
+      const patches = result.patchesApplied?.join(', ') || 'none';
+      console.log(`  ${chalk.green('✓')} ${result.path}`);
+      if (patches !== 'none') {
+        console.log(`    ${chalk.dim(patches)}`);
+      }
+    } else {
+      console.log(`  ${chalk.red('✗')} ${result.path}`);
+      if (result.error) {
+        console.log(`    ${chalk.red(result.error)}`);
+      }
     }
   }
-
-  console.log(
-    '\nPatches applied (run with --show-unchanged to show all patches):'
-  );
-
-  for (const group of groupOrder) {
-    const groupResults = byGroup.get(group)!;
-
-    // Filter based on --show-unchanged (but always show applied, failed, or explicitly requested)
-    const filtered = groupResults.filter(
-      r =>
-        r.applied ||
-        r.failed ||
-        isShowUnchanged() ||
-        (patchFilter && patchFilter.includes(r.id))
-    );
-    if (filtered.length === 0) continue;
-
-    console.log(`\n  ${chalk.bold(group)}:`);
-
-    for (const result of filtered) {
-      const status = result.failed
-        ? chalk.red('✗')
-        : result.applied
-          ? chalk.green('✓')
-          : chalk.dim('○');
-      const details = result.details ? `: ${result.details}` : '';
-      // Show description in gray on the same line for applied patches only
-      const description =
-        result.applied && result.description
-          ? ` ${chalk.gray('—')} ${chalk.gray(result.description)}`
-          : '';
-      console.log(`    ${status} ${result.name}${details}${description}`);
-    }
-  }
-
   console.log('');
 }
 
@@ -171,6 +133,10 @@ const main = async () => {
     .option(
       '--patches <ids>',
       'comma-separated list of patch IDs to apply (use with --apply)'
+    )
+    .option(
+      '--installations <paths>',
+      'comma-separated list of installation paths to patch (use with --apply)'
     )
     .option('--list-patches', 'list all available patches with their IDs')
     .option(
@@ -226,13 +192,21 @@ const main = async () => {
 
       // Handle --apply flag for non-interactive mode
       if (options.apply) {
-        // Parse patch filter if provided
         const patchFilter = options.patches
           ? (options.patches as string)
               .split(',')
               .map((id: string) => id.trim())
           : null;
-        await handleApplyMode(patchFilter, options.configUrl);
+        const installationFilter = options.installations
+          ? (options.installations as string)
+              .split(',')
+              .map((p: string) => p.trim())
+          : null;
+        await handleApplyMode(
+          patchFilter,
+          installationFilter,
+          options.configUrl
+        );
         return;
       }
 
@@ -337,6 +311,7 @@ const main = async () => {
  */
 async function handleApplyMode(
   patchFilter: string[] | null,
+  installationFilter: string[] | null,
   configUrl?: string
 ): Promise<void> {
   console.log('Applying saved customizations to Claude Code...');
@@ -365,59 +340,97 @@ async function handleApplyMode(
   }
 
   try {
-    // Find Claude Code installation (non-interactive mode throws on ambiguity)
-    const result = await startupCheck({ interactive: false }, config);
+    // Detect all installations (CLI + VS Code extensions)
+    const { cli, extensions } = await findAllInstallations();
 
-    if (!result.startupCheckInfo || !result.startupCheckInfo.ccInstInfo) {
-      // This shouldn't happen in non-interactive mode (should throw instead),
-      // but handle it just in case
-      console.error(formatNotFoundError());
+    // Convert to unified format
+    const allInstallations = toUnifiedInstallations(cli, extensions);
+
+    if (allInstallations.length === 0) {
+      console.error(chalk.red('Error: No Claude Code installations found.'));
       process.exit(1);
     }
 
-    const { ccInstInfo } = result.startupCheckInfo;
+    // Filter installations if filter provided
+    const installationsToPatch = installationFilter
+      ? allInstallations.filter(inst => installationFilter.includes(inst.path))
+      : allInstallations;
 
-    if (ccInstInfo.nativeInstallationPath) {
-      console.log(
-        `Found Claude Code (native installation): ${ccInstInfo.nativeInstallationPath}`
+    if (installationsToPatch.length === 0) {
+      console.error(
+        chalk.red('Error: No installations match the provided filter.')
       );
-    } else {
-      console.log(`Found Claude Code at: ${ccInstInfo.cliPath}`);
-    }
-    console.log(`Version: ${ccInstInfo.version}`);
-
-    // Preload strings file for system prompts
-    console.log('Loading system prompts...');
-    const preloadResult = await preloadStringsFile(ccInstInfo.version);
-    if (!preloadResult.success) {
-      console.log(chalk.red('\n✖ Error downloading system prompts:'));
-      console.log(chalk.red(`  ${preloadResult.errorMessage}`));
-      console.log(
-        chalk.yellow(
-          '\n⚠ System prompts not available - skipping system prompt customizations'
-        )
-      );
+      process.exit(1);
     }
 
-    // Apply the customizations
-    console.log('Applying customizations...');
-    const { results } = await applyCustomization(
-      config,
-      ccInstInfo,
-      patchFilter
+    console.log(
+      `Found ${installationsToPatch.length} installation(s) to patch:`
     );
+    for (const inst of installationsToPatch) {
+      console.log(
+        `  ${inst.type === 'cli' ? '📟 CLI' : '🧩 Extension'} ${inst.version} (${inst.path})`
+      );
+    }
+
+    // Check for version changes
+    for (const inst of installationsToPatch) {
+      const checkResult = await checkVersion(inst, config);
+      if (checkResult.needsUpdate) {
+        console.log(
+          chalk.yellow(
+            `\n⚠ Installation at ${inst.path} has been updated since last patch:`
+          )
+        );
+        console.log(
+          chalk.yellow(`    Current version: ${checkResult.currentVersion}`)
+        );
+        console.log(
+          chalk.yellow(
+            `    Last patched version: ${checkResult.lastPatchedVersion}`
+          )
+        );
+        console.log(
+          chalk.yellow(
+            '    Patches will be reapplied. Run with --restore to keep original version.'
+          )
+        );
+      }
+    }
+
+    // Preload strings file for CLI installations
+    const cliInstallations = installationsToPatch.filter(
+      inst => inst.type === 'cli'
+    );
+    if (cliInstallations.length > 0) {
+      const version = cliInstallations[0].version;
+      console.log('Loading system prompts...');
+      const preloadResult = await preloadStringsFile(version);
+      if (!preloadResult.success) {
+        console.log(chalk.red('\n✖ Error downloading system prompts:'));
+        console.log(chalk.red(`  ${preloadResult.errorMessage}`));
+        console.log(
+          chalk.yellow(
+            '\n⚠ System prompts not available - skipping system prompt customizations'
+          )
+        );
+      }
+    }
+
+    // Apply the customizations to all selected installations
+    console.log('\nApplying customizations...');
+    const results = await applyPatchesToSelected(installationsToPatch, config);
 
     // Print patch results
-    printPatchResults(results, patchFilter);
+    printUnifiedPatchResults(results);
 
     // Check if any patches failed
-    const hasFailures = results.some(r => r.failed);
-    const hasSystemPromptChanges = results.some(
-      r => r.group === PatchGroup.SYSTEM_PROMPTS && r.applied
+    const hasFailures = results.some(r => !r.success);
+    const hasSystemPromptChanges = results.some(r =>
+      r.patchesApplied?.includes('system-prompt')
     );
 
     if (hasFailures) {
-      console.log(chalk.yellow('Customizations applied with some failures.'));
+      console.log(chalk.yellow('\nCustomizations applied with some failures.'));
       console.log(
         chalk.dim(
           'These patching errors do not affect your system prompt patches.'
@@ -436,11 +449,15 @@ async function handleApplyMode(
         )
       );
     } else {
-      console.log(chalk.green('Customizations applied successfully!'));
+      console.log(chalk.green('\n✓ Customizations applied successfully!'));
     }
+
+    // Prompt to restart running installations
+    await promptRestartInstallations(installationsToPatch);
+
     console.log(
       chalk.dim(
-        'Run with --restore/--revert to revert Claude Code to its original state.'
+        '\nRun with --restore/--revert to revert installations to their original state.'
       )
     );
     process.exit(0);
@@ -514,7 +531,12 @@ async function handleRestoreMode(): Promise<void> {
     console.log(chalk.blue('Original Claude Code restored successfully!'));
     console.log(
       chalk.gray(
-        `Your customizations are still saved in ${CONFIG_FILE} and can be reapplied with --apply.`
+        `\nYour customizations are still saved in ${CONFIG_FILE} and can be reapplied with --apply.`
+      )
+    );
+    console.log(
+      chalk.gray(
+        `To restore VS Code extensions, delete the extension and reinstall it from the marketplace.`
       )
     );
     process.exit(0);
