@@ -41,7 +41,7 @@ export const writeRememberSkill = (oldFile: string): string | null => {
 
   // Find the injection point pattern
   const pattern =
-    /(function ([$\w]+)\(.{0,500}\}function [$\w]+\(\)\{)return(\}var ([$\w]+)=`# Remember Skill)/;
+    /(function ([$\w]+)\(.{0,500}\}function [$\w]+\(\)\{)return(\}.{0,10}[, ]([$\w]+)=`# Remember Skill)/;
   const match = oldFile.match(pattern);
 
   if (!match || match.index === undefined) {
