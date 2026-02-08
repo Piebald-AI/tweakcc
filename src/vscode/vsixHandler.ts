@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import archiver from 'archiver';
-import { open as yauzlOpen } from 'yauzl';
+import { open as yauzlOpen, Entry, ZipFile } from 'yauzl';
 import { debug } from '../utils';
 import { VSIXInfo, VSCodeFork } from './extensionTypes';
 
@@ -21,48 +21,65 @@ export async function extractVSIX(
   await fsPromises.mkdir(extractDir, { recursive: true });
 
   await new Promise<void>((resolve, reject) => {
-    yauzlOpen(vsixPath, { lazyEntries: true }, (err, zipfile) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-
-      zipfile.on('entry', entry => {
-        if (entry.isDirectory) {
-          zipfile.readEntry();
+    yauzlOpen(
+      vsixPath,
+      { lazyEntries: true },
+      (err: Error | null, zipfile: ZipFile | null) => {
+        if (err) {
+          reject(err);
           return;
         }
 
-        const outputPath = path.join(extractDir, entry.fileName);
-        const outputDir = path.dirname(outputPath);
+        if (!zipfile) {
+          reject(new Error('Failed to open zipfile'));
+          return;
+        }
 
-        fsPromises
-          .mkdir(outputDir, { recursive: true })
-          .then(() => {
-            zipfile.openReadStream(entry, (err, stream) => {
-              if (err) {
-                reject(err);
-                return;
-              }
+        zipfile.on('entry', (entry: Entry) => {
+          if (entry.uncompressedSize === 0 || entry.fileName.endsWith('/')) {
+            zipfile.readEntry();
+            return;
+          }
 
-              const writeStream = fs.createWriteStream(outputPath);
-              stream.pipe(writeStream);
+          const outputPath = path.join(extractDir, entry.fileName);
+          const outputDir = path.dirname(outputPath);
 
-              writeStream.on('finish', () => {
-                zipfile.readEntry();
-              });
+          fsPromises
+            .mkdir(outputDir, { recursive: true })
+            .then(() => {
+              zipfile.openReadStream(
+                entry,
+                (err: Error | null, stream: NodeJS.ReadableStream | null) => {
+                  if (err) {
+                    reject(err);
+                    return;
+                  }
 
-              writeStream.on('error', reject);
-              stream.on('error', reject);
-            });
-          })
-          .catch(reject);
-      });
+                  if (!stream) {
+                    reject(new Error('Failed to open read stream'));
+                    return;
+                  }
 
-      zipfile.on('end', resolve);
-      zipfile.on('error', reject);
-      zipfile.readEntry();
-    });
+                  const writeStream = fs.createWriteStream(outputPath);
+                  stream.pipe(writeStream);
+
+                  writeStream.on('finish', () => {
+                    zipfile.readEntry();
+                  });
+
+                  writeStream.on('error', reject);
+                  stream.on('error', reject);
+                }
+              );
+            })
+            .catch(reject);
+        });
+
+        zipfile.on('end', resolve);
+        zipfile.on('error', reject);
+        zipfile.readEntry();
+      }
+    );
   });
 
   const packageJsonPath = path.join(extractDir, 'extension', 'package.json');
@@ -117,7 +134,7 @@ export async function installVSIX(
   return new Promise((resolve, reject) => {
     exec(
       `"${command}" --install-extension "${vsixPath}"`,
-      (error, stdout, stderr) => {
+      (error: Error | null, stdout: string, stderr: string) => {
         if (error) {
           debug(`Error installing VSIX:`, error);
           reject(

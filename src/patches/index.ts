@@ -595,6 +595,7 @@ export interface PatchDefinition {
   group: PatchGroup;
   description: string;
   appliesTo?: 'cli' | 'extension' | 'both';
+  condition?: (config: TweakccConfig) => boolean;
 }
 
 /**
