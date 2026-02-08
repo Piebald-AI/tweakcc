@@ -69,6 +69,7 @@ import { writeAgentsMd } from './agentsMd';
 import { writeAutoAcceptPlanMode } from './autoAcceptPlanMode';
 import { writeAllowBypassPermsInSudo } from './allowBypassPermsInSudo';
 import { writeSuppressNativeInstallerWarning } from './suppressNativeInstallerWarning';
+import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -346,6 +347,13 @@ const PATCH_DEFINITIONS = [
     name: 'Suppress native installer warning',
     group: PatchGroup.MISC_CONFIGURABLE,
     description: 'Suppress the native installer warning message at startup',
+  },
+  {
+    id: 'filter-scroll-escape-sequences',
+    name: 'Filter scroll escape sequences',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Filter out terminal escape sequences that cause unwanted scrolling',
   },
   // Features
   {
@@ -768,6 +776,10 @@ export const applyCustomization = async (
     'suppress-native-installer-warning': {
       fn: c => writeSuppressNativeInstallerWarning(c),
       condition: !!config.settings.misc?.suppressNativeInstallerWarning,
+    },
+    'filter-scroll-escape-sequences': {
+      fn: c => writeScrollEscapeSequenceFilter(c),
+      condition: !!config.settings.misc?.filterScrollEscapeSequences,
     },
     // Features
     'swarm-mode': {

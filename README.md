@@ -125,6 +125,7 @@ $ pnpm dlx tweakcc
   - [AGENTS.md support (with video)](#feature-agentsmd-support)
   - [Auto-accept plan mode](#feature-auto-accept-plan-mode)
   - [Suppress native installer warning](#feature-suppress-native-installer-warning)
+  - [Scroll escape sequence filter](#feature-scroll-escape-sequence-filter)
   - _Missing documentation for above features coming soon_
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
@@ -1127,6 +1128,24 @@ When Claude Code detects that you've installed via npm, it warns you to use the 
   "settings": {
     "misc": {
       "suppressNativeInstallerWarning": true
+    }
+  }
+}
+```
+
+## Feature: Scroll escape sequence filter
+
+Some terminals may experience unwanted scrolling behavior caused by certain cursor positioning escape sequences (e.g., `\x1b[H` and `\x1b[A`). This patch filters out these problematic escape sequences from Claude Code's output to prevent scrolling issues.
+
+**Via the UI:** Run `npx tweakcc`, go to **Misc**, and toggle **Filter scroll escape sequences**.
+
+**Via `config.json`:**
+
+```json
+{
+  "settings": {
+    "misc": {
+      "filterScrollEscapeSequences": true
     }
   }
 }

@@ -711,6 +711,7 @@ export const DEFAULT_SETTINGS: Settings = {
     autoAcceptPlanMode: false,
     allowBypassPermissionsInSudo: false,
     suppressNativeInstallerWarning: false,
+    filterScrollEscapeSequences: false,
   },
   toolsets: [],
   defaultToolset: null,
