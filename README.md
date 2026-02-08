@@ -149,7 +149,7 @@ While tweakcc usually works by applying customizations from your local `~/.tweak
 Example:
 
 ```
-npx tweakcc@latest --apply --config-url https://gist.githubusercontent.com/bl-ue/27323f9bfd4c18aaab51cad11c1148dc/raw/b132c20387568536cf6586c2324e2f4491bb07df/config.json
+npx tweakcc@latest --apply --config-url https://gist.githubusercontent.com/bl-ue/27323f9bfd4c18aaab51cad11c1148dc/raw/b24b5fe08874ce50f4be6c093d9589d184f91a70/config.json
 ```
 
 Your local config will **not** be overwritten; the remote config will be copied into your `config.json` under `remoteConfig.settings`.
