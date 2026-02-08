@@ -39,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Show lightning fast formatted patch changes via oxfmt before applying patch scripts (#489) - @bl-ue
 - Fix native installation support for newer CC versions (#492) - @signadou
 - Fix 2 config file saves on TUI startup (#494) - @bl-ue
-- Fix 2.1.37 patching errors in native JS (#496) - @bl-ue
+- Fix 2.1.37 patching errors in native JS (#497) - @bl-ue
 
 ## [v3.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.4.0) - 2026-01-18
 
