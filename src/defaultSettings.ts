@@ -714,6 +714,7 @@ export const DEFAULT_SETTINGS: Settings = {
     removeNewSessionShortcut: false,
     allowBypassPermissionsInSudo: false,
     suppressNativeInstallerWarning: false,
+    filterScrollEscapeSequences: false,
   },
   vscodeExtensions: {
     enableConversationTitle: true,

@@ -7,13 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-- Add VS Code extension patching support for Claude Code (@anthropic-ai/claude-code) - @bl-ue
-  - Patch Claude Code's VS Code extension across 5 forks: VS Code, Cursor, Windsurf, VS Codium, Antigravity
-  - Supports patching from installed extensions and VSIX files
-  - UI customizations: thinking verbs, conversation title (/title command), table format, swarm mode, token rounding, misc UI elements
-  - Single unified flow for patching CLI and VS Code installations
-  - Parallel patching support for multiple installations
-  - Version-aware tracking per installation
+- Add VS Code extension patching support for Claude Code (#498) - @brrock
+- Add a patch to filter out escape sequences that cause unwanted terminal scrolling (#496) - @brrock
 - Add comprehensive documentation for thinking verbs and thinking indicator customizations
 - Add contributing guidelines and AGENTS.md for developer experience
 - Add a fallback for WASMagic when it's not available (#399) - @signadou
@@ -46,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Show lightning fast formatted patch changes via oxfmt before applying patch scripts (#489) - @bl-ue
 - Fix native installation support for newer CC versions (#492) - @signadou
 - Fix 2 config file saves on TUI startup (#494) - @bl-ue
+- Fix 2.1.37 patching errors in native JS (#497) - @bl-ue
 
 ## [v3.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v3.4.0) - 2026-01-18
 

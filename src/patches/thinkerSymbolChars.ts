@@ -2,28 +2,26 @@
 
 import { LocationResult, showDiff } from './index';
 
-const getThinkerSymbolCharsLocation = (oldFile: string): LocationResult[] => {
-  const results = [];
+export const writeThinkerSymbolChars = (
+  oldFile: string,
+  symbols: string[]
+): string | null => {
+  const locations: LocationResult[] = [];
+  const arrayPattern =
+    /\["(?:[·✢*✳✶✻✽]|\\u00b7|\\xb7|\\u2722|\\x2a|\\u002a|\\u2733|\\u2736|\\u273b|\\u273d)",\s*(?:"(?:[·✢*✳✶✻✽]|\\u00b7|\\xb7|\\u2722|\\x2a|\\u002a|\\u2733|\\u2736|\\u273b|\\u273d)",?\s*)+\]/gi;
 
-  // Find all arrays that look like symbol arrays with the dot character
-  const arrayPattern = /\["[·✢*✳✶✻✽]",\s*(?:"[·✢*✳✶✻✽]",?\s*)+\]/g;
   let match;
   while ((match = arrayPattern.exec(oldFile)) !== null) {
-    results.push({
+    locations.push({
       startIndex: match.index,
       endIndex: match.index + match[0].length,
     });
   }
 
-  return results;
-};
-
-export const writeThinkerSymbolChars = (
-  oldFile: string,
-  symbols: string[]
-): string | null => {
-  const locations = getThinkerSymbolCharsLocation(oldFile);
   if (locations.length === 0) {
+    console.error(
+      'patch: thinkerSymbolChars: could not find any thinker symbol char arrays'
+    );
     return null;
   }
 

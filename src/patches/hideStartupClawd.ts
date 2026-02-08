@@ -17,15 +17,11 @@ import { showDiff } from './index';
 const findStartupClawdComponents = (oldFile: string): number[] => {
   const indices: number[] = [];
 
-  // The Clawd ASCII art header - these are special unicode characters
-  const clawdPattern = '▛███▜';
+  const clawdPattern = /▛███▜|\\u259B\\u2588\\u2588\\u2588\\u259C/gi;
 
-  let searchPos = 0;
-  while (true) {
-    const clawdIndex = oldFile.indexOf(clawdPattern, searchPos);
-    if (clawdIndex === -1) {
-      break;
-    }
+  let clawdMatch: RegExpExecArray | null;
+  while ((clawdMatch = clawdPattern.exec(oldFile)) !== null) {
+    const clawdIndex = clawdMatch.index;
 
     // Get 2000 chars before this occurrence
     const lookbackStart = Math.max(0, clawdIndex - 2000);
@@ -50,9 +46,6 @@ const findStartupClawdComponents = (oldFile: string): number[] => {
         `patch: hideStartupClawd: failed to find function pattern before Clawd at position ${clawdIndex}`
       );
     }
-
-    // Move to search after this occurrence
-    searchPos = clawdIndex + clawdPattern.length;
   }
 
   return indices;

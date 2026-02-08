@@ -78,6 +78,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     removeNewSessionShortcut: false,
     allowBypassPermissionsInSudo: false,
     suppressNativeInstallerWarning: false,
+    filterScrollEscapeSequences: false,
   };
 
   const ensureMisc = () => {
@@ -563,6 +564,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.suppressNativeInstallerWarning =
               !settings.misc!.suppressNativeInstallerWarning;
+          });
+        },
+      },
+      {
+        id: 'filterScrollEscapeSequences',
+        title: 'Filter scroll escape sequences',
+        description:
+          'Filter out terminal escape sequences that cause unwanted scrolling.',
+        getValue: () => settings.misc?.filterScrollEscapeSequences ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.filterScrollEscapeSequences =
+              !settings.misc!.filterScrollEscapeSequences;
           });
         },
       },

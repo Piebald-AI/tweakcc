@@ -134,6 +134,7 @@ export interface MiscConfig {
   removeNewSessionShortcut: boolean;
   allowBypassPermissionsInSudo: boolean | null;
   suppressNativeInstallerWarning: boolean;
+  filterScrollEscapeSequences: boolean;
 }
 
 export interface TableConfig {
