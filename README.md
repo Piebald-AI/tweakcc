@@ -268,8 +268,12 @@ npx tweakcc adhoc-patch --script '@https://gist.githubusercontent.com/bl-ue/2402
 
 </details>
 
+Here's a demo of `adhoc-patch` using a script from an HTTP URL ([link to Gist](https://gist.githubusercontent.com/bl-ue/13973d1510a0612dfa99fabf4c20df3b/raw/ef106a2033dfb07d754fa8d27f06979ec2fe3831/demo_change.js)):
+
+https://github.com/user-attachments/assets/221ce577-933e-41d9-ae14-88ce5457a321
+
 > [!CAUTION]
-> `adhoc-patch` does not create a backup of the Claude Code installation that is modified. You'll need to copy the original file to a separate location if you want to revert any changes you made&mdash;due to the lack of a backup, `tweakcc --revert/--restore` will NOT work (unless you happen to have run `tweakcc --apply` before you use `adhoc-patch`).
+> `adhoc-patch` does not create a backup of the Claude Code installation that is modified. You'll need to use `--apply` first to get a backup created if you want to be able to use `--restore`/`--revert` after an `adhoc-patch`.
 
 ## API
 
@@ -504,7 +508,7 @@ undefined
 <details>
 <summary><b>Utilities</b>&nbsp;&nbsp;&bull;&nbsp;&nbsp; General utilities to help with patching.</summary>
 
-````
+```js
 // Utilities to find various commonly-used variables in CC's code.
 // See the docs for `tweakcc adhoc-patch --script` above for more details.
 findChalkVar(fileContents: string): string | undefined;
@@ -568,7 +572,7 @@ export const globalReplace = (
   pattern: RegExp,
   replacement: string | ((substring: string, ...args: unknown[]) => string)
 ): string;
-````
+```
 
 Demo of `showDiff`:
 
