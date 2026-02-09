@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import * as readline from 'node:readline';
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 
 import chalk from 'chalk';
 
@@ -173,19 +173,28 @@ function resolveVars(content: string): ResolvedVars {
  *
  * The script must return the modified JavaScript content.
  *
- * The sandbox uses Node's --experimental-permission flag with no grants,
- * meaning the script cannot read/write files, make network calls, or spawn
- * child processes.
+ * The sandbox uses Node's permission model with no grants, meaning the script
+ * cannot read/write files, make network calls, or spawn child processes.
+ *
+ * Compatibility: tries `--permission` first (Node 24+), falls back to
+ * `--experimental-permission` (Node 20–23). If neither is recognised the
+ * user is told to upgrade to Node 20+ or rerun with
+ * `--dangerous-no-script-sandbox`.
+ *
+ * When `noSandbox` is true the script runs without any permission flag at all
+ * (useful for Node < 20 where neither flag exists).
  *
  * @param script - The script body to execute
  * @param inputCode - The JavaScript content to pass as the `code` parameter
  * @param vars - Pre-resolved minified variable names
+ * @param noSandbox - If true, skip the permission sandbox entirely
  * @returns The modified JavaScript content returned by the script
  */
 async function runSandboxedScript(
   script: string,
   inputCode: string,
-  vars: ResolvedVars
+  vars: ResolvedVars,
+  noSandbox = false
 ): Promise<string> {
   const wrapper = `
     let input = '';
@@ -204,17 +213,74 @@ async function runSandboxedScript(
     });
   `;
 
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      'node',
-      [
-        '--experimental-permission',
-        // grant nothing — pure computation only
-        '-e',
-        wrapper,
-      ],
-      { stdio: ['pipe', 'pipe', 'pipe'] }
+  if (noSandbox) {
+    return spawnNodeWithWrapper([], wrapper, inputCode);
+  }
+
+  // Try --permission first (Node 24+)
+  try {
+    return await spawnNodeWithWrapper(['--permission'], wrapper, inputCode);
+  } catch (error) {
+    if (isBadOptionError(error)) {
+      // Fall through to try the older flag
+    } else {
+      throw error;
+    }
+  }
+
+  // Try --experimental-permission (Node 20–23)
+  try {
+    return await spawnNodeWithWrapper(
+      ['--experimental-permission'],
+      wrapper,
+      inputCode
     );
+  } catch (error) {
+    if (isBadOptionError(error)) {
+      // Neither flag works — the Node version is too old
+      const nodeVersion = getNodeVersion();
+      throw new Error(
+        `Your Node.js version (${nodeVersion}) does not support the permission model.\n` +
+          'Please either upgrade to Node.js 20+ or rerun with --dangerous-no-script-sandbox.'
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Returns true when an error from a spawned node process indicates that a CLI
+ * flag was not recognised ("bad option").
+ */
+function isBadOptionError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return error.message.includes('bad option');
+}
+
+/**
+ * Gets the current Node.js version string (e.g. "v18.17.0").
+ */
+function getNodeVersion(): string {
+  try {
+    return execSync('node --version', { encoding: 'utf8' }).trim();
+  } catch {
+    return 'unknown';
+  }
+}
+
+/**
+ * Spawns a node process with the given extra CLI flags, feeds `inputCode` on
+ * stdin, and resolves with the JSON-wrapped result from stdout.
+ */
+function spawnNodeWithWrapper(
+  extraArgs: string[],
+  wrapper: string,
+  inputCode: string
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('node', [...extraArgs, '-e', wrapper], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
 
     let stdout = '',
       stderr = '';
@@ -627,7 +693,8 @@ async function handleAdhocPatchRegex(
 async function handleAdhocPatchScriptImpl(
   scriptArg: string,
   installation: Installation,
-  skipConfirmation = false
+  skipConfirmation = false,
+  dangerousNoScriptSandbox = false
 ): Promise<void> {
   const content = await readContent(installation);
 
@@ -636,10 +703,19 @@ async function handleAdhocPatchScriptImpl(
   console.log('Resolving variables...');
   const vars = resolveVars(content);
 
-  console.log('Running patch script in sandbox...');
+  console.log(
+    dangerousNoScriptSandbox
+      ? 'Running patch script WITHOUT sandbox (--dangerous-no-script-sandbox)...'
+      : 'Running patch script in sandbox...'
+  );
   let modified: string;
   try {
-    modified = await runSandboxedScript(script, content, vars);
+    modified = await runSandboxedScript(
+      script,
+      content,
+      vars,
+      dangerousNoScriptSandbox
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(chalk.red(`Error: Script execution failed:`));
@@ -695,6 +771,7 @@ export async function handleAdhocPatch(options: {
   index?: number;
   path?: string;
   confirmPossibleDangerousPatch?: boolean;
+  dangerousNoScriptSandbox?: boolean;
 }): Promise<void> {
   // Validate that exactly one mode is specified
   const modes = [options.string, options.regex, options.script].filter(
@@ -762,7 +839,8 @@ export async function handleAdhocPatch(options: {
     await handleAdhocPatchScriptImpl(
       options.script,
       installation,
-      skipConfirmation
+      skipConfirmation,
+      !!options.dangerousNoScriptSandbox
     );
   }
 }
