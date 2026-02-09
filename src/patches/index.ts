@@ -644,7 +644,7 @@ export const applyCustomization = async (
       fn: c =>
         writePatchesAppliedIndication(
           c,
-          '3.4.0',
+          '4.0.0',
           legacyItems,
           showTweakccVersion,
           showPatchesApplied
