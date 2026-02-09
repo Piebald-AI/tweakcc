@@ -286,6 +286,10 @@ const main = async () => {
       '--confirm-possible-dangerous-patch',
       'skip diff preview and apply immediately'
     )
+    .option(
+      '--dangerous-no-script-sandbox',
+      'run --script without the Node.js permission sandbox (use if Node < 20)'
+    )
     .action(
       async (options: {
         string?: string[];
@@ -294,6 +298,7 @@ const main = async () => {
         index?: number;
         path?: string;
         confirmPossibleDangerousPatch?: boolean;
+        dangerousNoScriptSandbox?: boolean;
       }) => {
         await handleAdhocPatch(options);
         process.exit(0);
