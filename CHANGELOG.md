@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-## [v4.0.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.0) - 2026-02-08
+## [v4.0.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.0) - 2026-02-09
 
 - Add a patch to filter out escape sequences that cause unwanted terminal scrolling (#496) - @brrock
 - Add comprehensive documentation for thinking verbs and thinking indicator customizations

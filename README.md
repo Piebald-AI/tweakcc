@@ -48,13 +48,13 @@ Download it and try it out for free! **https://piebald.ai/**
 >
 > **NEW in 4.0.0:** You can now create custom patches via sandboxed scripts! Works with native installations. No need to fork tweakcc just to make a quick patch! See [`tweakcc adhoc-patch`](#cli-commands).
 >
-> **NEW in 4.0.0:** You can also apply customizations from a remote URL to a config file.  See [Remote Config](#remote-config).
+> **NEW in 4.0.0:** You can also apply customizations from a remote URL to a config file. See [Remote Config](#remote-config).
 >
 > Also see `tweakcc --restore`, [`tweakcc unpack`](#cli-commands), and [`tweakcc repack`](#cli-commands).
 
-
 > [!NOTE]
 > **NEW:** tweakcc 4.0.0 also introduces several new patches:
+>
 > - [AGENTS.md support (demo video)](#feature-agentsmd-support)
 > - [:lock: unlock swarm mode](#feature-swarm-mode-native-multi-agent)
 > - [:lock: unlock session memory (blog post)](https://piebald.ai/blog/session-memory-is-coming-to-claude-code) (thank you [@odysseus0](https://github.com/odysseus0)!)
@@ -67,8 +67,6 @@ Download it and try it out for free! **https://piebald.ai/**
 > - [auto-accept plan mode](#feature-auto-accept-plan-mode) (thank you [@irdbl](https://github.com/irdbl)!)
 > - [dangerously bypassing permissions in sudo](#feature-bypass-permissions-check-in-sudo) (thank you [@brrock](https://github.com/brrock)!)
 > - [native installer warning suppression](#feature-suppress-native-installer-warning) (thank you [@brrock](https://github.com/brrock)!).
-
-
 
 With tweakcc, you can
 
