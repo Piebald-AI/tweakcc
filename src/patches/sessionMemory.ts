@@ -103,22 +103,22 @@ const patchUpdateThresholds = (file: string): string | null => {
   // Replace minimumMessageTokensToInit
   newFile = globalReplace(
     newFile,
-    /minimumMessageTokensToInit:1e4,/g,
-    'minimumMessageTokensToInit:Number(process.env.CC_SM_MINIMUM_MESSAGE_TOKENS_TO_INIT??1e4),'
+    /minimumMessageTokensToInit:1e4\b/g,
+    'minimumMessageTokensToInit:Number(process.env.CC_SM_MINIMUM_MESSAGE_TOKENS_TO_INIT??1e4)'
   );
 
   // Replace minimumTokensBetweenUpdate
   newFile = globalReplace(
     newFile,
-    /minimumTokensBetweenUpdate:5000,/g,
-    'minimumTokensBetweenUpdate:Number(process.env.CC_SM_MINIMUM_TOKENS_BETWEEN_UPDATE??5000),'
+    /minimumTokensBetweenUpdate:5000\b/g,
+    'minimumTokensBetweenUpdate:Number(process.env.CC_SM_MINIMUM_TOKENS_BETWEEN_UPDATE??5000)'
   );
 
   // Replace toolCallsBetweenUpdates
   newFile = globalReplace(
     newFile,
-    /toolCallsBetweenUpdates:3,/g,
-    'toolCallsBetweenUpdates:Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES??3),'
+    /toolCallsBetweenUpdates:3\b/g,
+    'toolCallsBetweenUpdates:Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES??3)'
   );
 
   // Check if any replacements were made
