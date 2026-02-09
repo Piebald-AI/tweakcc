@@ -158,7 +158,7 @@ describe('deepMergeWithDefaults', () => {
     it('should fill in missing inputPatternHighlighters', () => {
       const partial: Partial<Settings> = {
         themes: [],
-        thinkingVerbs: { format: '', verbs: [] },
+        thinkingVerbs: { enabled: true, format: '', verbs: [] },
         // Missing inputPatternHighlighters
       };
 
@@ -177,7 +177,7 @@ describe('deepMergeWithDefaults', () => {
     it('should fill in missing inputPatternHighlightersTestText', () => {
       const partial: Partial<Settings> = {
         themes: [],
-        thinkingVerbs: { format: '', verbs: [] },
+        thinkingVerbs: { enabled: true, format: '', verbs: [] },
         // Missing inputPatternHighlightersTestText
       };
 
@@ -206,7 +206,7 @@ describe('deepMergeWithDefaults', () => {
 
       const partial: Partial<Settings> = {
         themes: [],
-        thinkingVerbs: { format: '', verbs: [] },
+        thinkingVerbs: { enabled: true, format: '', verbs: [] },
         inputPatternHighlighters: userHighlighters,
       };
 

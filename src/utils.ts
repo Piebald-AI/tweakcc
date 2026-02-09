@@ -471,8 +471,30 @@ export function deepMergeWithDefaults(
       // Key exists in both, and default is a plain object - recurse
       result[key] = deepMergeWithDefaults(result[key], defaultValue);
     }
-    // Otherwise, keep the partial value as-is
+    // Otherwise, keep partial value as-is
   }
 
   return result;
+}
+
+/**
+ * Extracts version information from CLI or extension content.
+ * Handles both CLI (cli.js) and VS Code extension (extension.js, webview/index.js) formats.
+ */
+export function extractVersionFromContent(content: string): string | null {
+  const patterns = [
+    /VERSION\s*[=:]\s*["']([\d.]+)["']/i,
+    /version["']\s*:\s*["']([\d.]+)["']/i,
+    /const\s+VERSION\s*=\s*["']([\d.]+)["']/i,
+    /"version"\s*:\s*"([\d.]+)"/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = content.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
 }

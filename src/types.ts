@@ -1,3 +1,5 @@
+import { VSCodeFork } from './vscode/extensionTypes';
+
 export interface Theme {
   name: string;
   id: string;
@@ -67,6 +69,7 @@ export interface Theme {
 }
 
 export interface ThinkingVerbsConfig {
+  enabled: boolean;
   format: string;
   verbs: string[];
 }
@@ -75,6 +78,7 @@ export interface ThinkingStyleConfig {
   reverseMirror: boolean;
   updateInterval: number;
   phases: string[];
+  hideSpinner: boolean;
 }
 
 export interface UserMessageDisplayConfig {
@@ -127,9 +131,35 @@ export interface MiscConfig {
   enableRememberSkill: boolean;
   tokenCountRounding: number | null;
   autoAcceptPlanMode: boolean;
+  removeNewSessionShortcut: boolean;
   allowBypassPermissionsInSudo: boolean | null;
   suppressNativeInstallerWarning: boolean;
   filterScrollEscapeSequences: boolean;
+}
+
+export interface TableConfig {
+  width?: number;
+  color?: string;
+  columns?: Array<{ header: string; key: string; width?: number }>;
+  expandOn?: string;
+}
+
+export interface VSCodeExtensionsConfig {
+  enableConversationTitle: boolean;
+  hideStartupBanner: boolean;
+  hideCtrlGToEdit: boolean;
+  removeNewSessionShortcut: boolean;
+  tableFormat: TableFormat;
+  enableSwarmMode: boolean;
+  tokenCountRounding: number | null;
+}
+
+export interface UnifiedInstallationInfo {
+  type: 'cli' | 'vscode-extension';
+  path: string;
+  version: string;
+  fork?: VSCodeFork;
+  selected?: boolean;
 }
 
 export interface InputPatternHighlighter {
@@ -166,8 +196,10 @@ export interface Settings {
   planModeToolset: string | null;
   subagentModels: SubagentModelsConfig;
   inputPatternHighlighters: InputPatternHighlighter[];
-  inputPatternHighlightersTestText: string; // Global test text for previewing highlighters
+  inputPatternHighlightersTestText: string;
   claudeMdAltNames: string[] | null;
+  tableConfig?: TableConfig;
+  vscodeExtensions: VSCodeExtensionsConfig;
 }
 
 export interface RemoteConfig {
@@ -176,15 +208,23 @@ export interface RemoteConfig {
   settings: Partial<Settings>;
 }
 
+export interface InstallationPatchRecord {
+  version: string;
+  lastPatched: string; // ISO timestamp
+  patchesApplied: string[]; // List of patch IDs
+}
+
 export interface TweakccConfig {
   ccVersion: string;
-  ccInstallationDir?: string | null; // Deprecated: only used for migration from old configs
   ccInstallationPath?: string | null;
   lastModified: string;
   changesApplied: boolean;
   settings: Settings;
   hidePiebaldAnnouncement?: boolean;
   remoteConfig?: RemoteConfig; // Cached remote config from last --config-url usage
+  installations?: {
+    [path: string]: InstallationPatchRecord;
+  }; // Track patches per installation path
 }
 
 export type InstallationKind = 'npm-based' | 'native-binary';
@@ -226,6 +266,7 @@ export enum MainMenuItem {
   USER_MESSAGE_DISPLAY = 'User message display',
   INPUT_PATTERN_HIGHLIGHTERS = 'Input pattern highlighters',
   MISC = 'Misc',
+  VS_CODE_EXTENSION = 'VS Code Extension',
   TOOLSETS = 'Toolsets',
   SUBAGENT_MODELS = 'Subagent models',
   CLAUDE_MD_ALT_NAMES = 'CLAUDE.md alternative names',

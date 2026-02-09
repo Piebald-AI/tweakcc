@@ -29,6 +29,10 @@ const baseMenuItems: SelectItem[] = [
     desc: 'Miscellaneous settings (input box border, etc.)',
   },
   {
+    name: MainMenuItem.VS_CODE_EXTENSION,
+    desc: 'VS Code extension specific settings (conversation title, table format, etc.)',
+  },
+  {
     name: MainMenuItem.TOOLSETS,
     desc: 'Manage toolsets to control which tools are available',
   },

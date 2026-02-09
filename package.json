@@ -52,9 +52,11 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
+    "@types/archiver": "^7.0.0",
     "@types/node": "^20.19.10",
     "@types/react": "^18.3.23",
     "@types/which": "^3.0.4",
+    "@types/yauzl": "^2.10.3",
     "eslint": "^9.33.0",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^16.3.0",
@@ -72,6 +74,7 @@
     "*.{json,md}": "prettier --write"
   },
   "dependencies": {
+    "archiver": "^7.0.1",
     "chalk": "^5.5.0",
     "cli-spinners": "^3.4.0",
     "commander": "^14.0.0",
@@ -84,7 +87,8 @@
     "oxfmt": "^0.28.0",
     "react": "^19.1.1",
     "wasmagic": "^1.0.7",
-    "which": "^6.0.0"
+    "which": "^6.0.0",
+    "yauzl": "^3.2.0"
   },
   "engines": {
     "node": ">=20.0.0"
