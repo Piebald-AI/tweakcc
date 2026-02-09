@@ -63,8 +63,8 @@ def main():
     patches_path = root / "src" / "patches" / "index.ts"
     content = patches_path.read_text()
     content, count = re.subn(
-        rf"writePatchesAppliedIndication\(\s*content,\s*'{re.escape(current_version)}'",
-        f"writePatchesAppliedIndication(\n      content,\n      '{new_version}'",
+        rf"writePatchesAppliedIndication\(\s*\w+,\s*'{re.escape(current_version)}'",
+        f"writePatchesAppliedIndication(\n          c,\n          '{new_version}'",
         content,
     )
     if count != 1:

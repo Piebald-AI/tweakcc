@@ -43,6 +43,31 @@ Download it and try it out for free! **https://piebald.ai/**
 
 <img src="./assets/demo.gif" alt="Animated GIF demonstrating running `npx tweakcc`, creating a new theme, changing all of Claude Code's UI colors to purple, changing the thinking format from '<verb>ing...' to 'Claude is <verb>ing', changing the generating spinner style to a 50ms glow animation, applying the changes, running Claude, and using '/config' to switch to the new theme, and sending a message to see the new thinking verb format." width="800">
 
+> [!IMPORTANT]
+> **NEW in 4.0.0:** tweakcc now has an API; use `npm i tweakcc` to add to your project and see [API](#api)!
+>
+> **NEW in 4.0.0:** You can now create custom patches via sandboxed scripts! Works with native installations. No need to fork tweakcc just to make a quick patch! See [`tweakcc adhoc-patch`](#cli-commands).
+>
+> **NEW in 4.0.0:** You can also apply customizations from a remote URL to a config file. See [Remote Config](#remote-config).
+>
+> Also see `tweakcc --restore`, [`tweakcc unpack`](#cli-commands), and [`tweakcc repack`](#cli-commands).
+
+> [!NOTE]
+> **NEW:** tweakcc 4.0.0 also introduces several new patches:
+>
+> - [AGENTS.md support (demo video)](#feature-agentsmd-support)
+> - [:lock: unlock swarm mode](#feature-swarm-mode-native-multi-agent)
+> - [:lock: unlock session memory (blog post)](https://piebald.ai/blog/session-memory-is-coming-to-claude-code) (thank you [@odysseus0](https://github.com/odysseus0)!)
+> - [`/remember` skill](https://piebald.ai/blog/session-memory-is-coming-to-claude-code)
+> - [input pattern highlighters](#feature-input-pattern-highlighters)
+> - [Opus plan 1M](#feature-opus-plan-1m-mode)
+> - [MCP startup optimization](#feature-mcp-startup-optimization)
+> - [token count rounding](#feature-token-count-rounding)
+> - [statusline throttling/pacing](#feature-statusline-update-customization)
+> - [auto-accept plan mode](#feature-auto-accept-plan-mode) (thank you [@irdbl](https://github.com/irdbl)!)
+> - [dangerously bypassing permissions in sudo](#feature-bypass-permissions-check-in-sudo) (thank you [@brrock](https://github.com/brrock)!)
+> - [native installer warning suppression](#feature-suppress-native-installer-warning) (thank you [@brrock](https://github.com/brrock)!).
+
 With tweakcc, you can
 
 - Customize all of Claude Code's **system prompts** (**NEW:** also see all of [**Claude Code's system prompts**](https://github.com/Piebald-AI/claude-code-system-prompts))
@@ -87,7 +112,7 @@ $ pnpm dlx tweakcc
 - [How it works](#how-it-works)
 - [Remote config](#remote-config)
 - [CLI Commands (`unpack`, `repack`, `adhoc-patch`)](#cli-commands)
-- [API](#cli-commands)
+- [API](#api)
 - [System prompts](#system-prompts)
 - [Toolsets](#toolsets)
 - [**Features**](#features)
@@ -508,7 +533,7 @@ undefined
 <details>
 <summary><b>Utilities</b>&nbsp;&nbsp;&bull;&nbsp;&nbsp; General utilities to help with patching.</summary>
 
-```js
+````js
 // Utilities to find various commonly-used variables in CC's code.
 // See the docs for `tweakcc adhoc-patch --script` above for more details.
 findChalkVar(fileContents: string): string | undefined;
@@ -572,7 +597,7 @@ export const globalReplace = (
   pattern: RegExp,
   replacement: string | ((substring: string, ...args: unknown[]) => string)
 ): string;
-```
+````
 
 Demo of `showDiff`:
 
