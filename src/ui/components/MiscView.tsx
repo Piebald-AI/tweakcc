@@ -522,9 +522,9 @@ export function MiscView({ onSubmit }: MiscViewProps) {
       },
       {
         id: 'removeNewSessionShortcut',
-        title: 'Remove Ctrl-L (new session) shortcut',
+        title: 'Remove Ctrl-K (new session) shortcut',
         description:
-          'Removes the Ctrl-L global shortcut for starting a new session to prevent accidental triggers.',
+          'Removes the Ctrl-K global shortcut for starting a new session to prevent accidental triggers.',
         getValue: () => settings.misc?.removeNewSessionShortcut ?? false,
         toggle: () => {
           updateSettings(settings => {

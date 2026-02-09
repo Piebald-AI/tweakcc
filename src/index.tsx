@@ -12,6 +12,7 @@ import {
 } from './config';
 import { enableDebug, enableVerbose, enableShowUnchanged } from './utils';
 import { PatchGroup, getAllPatchDefinitions } from './patches/index';
+import { PatchResult } from './types';
 import {
   preloadStringsFile,
   getSystemPromptDefinitions,
@@ -86,14 +87,7 @@ function getInvocationCommand(): string {
  * @param results - The patch results to display
  * @param patchFilter - Optional list of explicitly requested patch IDs (always shown even if skipped)
  */
-function printUnifiedPatchResults(
-  results: {
-    path: string;
-    success: boolean;
-    error?: string;
-    patchesApplied?: string[];
-  }[]
-): void {
+function printUnifiedPatchResults(results: PatchResult[]): void {
   console.log('\nPatches applied:');
 
   for (const result of results) {
@@ -307,6 +301,7 @@ const main = async () => {
  * Handles the --apply flag for non-interactive mode.
  * All errors in detection will throw with detailed messages.
  * @param patchFilter - Optional list of patch IDs to apply (if null, apply all)
+ * @param installationFilter - Optional list of installation paths to apply patches to
  * @param configUrl - Optional URL to fetch configuration from
  */
 async function handleApplyMode(
@@ -351,9 +346,19 @@ async function handleApplyMode(
       process.exit(1);
     }
 
-    // Filter installations if filter provided
     const installationsToPatch = installationFilter
-      ? allInstallations.filter(inst => installationFilter.includes(inst.path))
+      ? (() => {
+          const isCaseInsensitive = process.platform !== 'linux';
+          const normalizedFilter = isCaseInsensitive
+            ? installationFilter.map(p => p.toLowerCase())
+            : installationFilter;
+
+          return allInstallations.filter(inst =>
+            isCaseInsensitive
+              ? normalizedFilter.includes(inst.path.toLowerCase())
+              : installationFilter.includes(inst.path)
+          );
+        })()
       : allInstallations;
 
     if (installationsToPatch.length === 0) {

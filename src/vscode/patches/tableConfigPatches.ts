@@ -13,7 +13,7 @@ export const patchTableWidth = (
   }
 
   const { width } = tableConfig;
-  const pattern = /width:\s*(\d+)/g;
+  const pattern = /width:\s*\d+/;
   const modified = content.replace(pattern, `width:${width}`);
 
   if (modified !== content) {
@@ -33,7 +33,7 @@ export const patchTableColor = (
   }
 
   const { color } = tableConfig;
-  const pattern = /color:\s*["'][\w]+["']/g;
+  const pattern = /color:\s*["'][\w]+["']/;
   const modified = content.replace(pattern, `color:"${color}"`);
 
   if (modified !== content) {
@@ -58,7 +58,7 @@ export const patchTableColumnConfig = (
 
   const { columns } = tableConfig;
   const columnsString = JSON.stringify(columns);
-  const pattern = /columns:\s*\[[^\]]*\]/g;
+  const pattern = /columns:\s*\[[^\]]*\]/;
   const modified = content.replace(pattern, `columns:${columnsString}`);
 
   if (modified !== content) {
@@ -78,7 +78,7 @@ export const patchTableExpandConfig = (
   }
 
   const { expandOn } = tableConfig;
-  const pattern = /expandOn:\s*["']\w+["']/g;
+  const pattern = /expandOn:\s*["']\w+["']/;
   const modified = content.replace(pattern, `expandOn:"${expandOn}"`);
 
   if (modified !== content) {

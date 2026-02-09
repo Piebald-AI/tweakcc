@@ -78,7 +78,7 @@ For VS Code extensions, tweakcc works similarly to CLI installations:
 
 - Detects installed Claude Code extensions across all supported forks
 - Reads and patches two bundled files: `extension.js` (extension host) and `webview/index.js` (UI)
-- Applies to same settings and patches used for CLI (thinking verbs, table format, swarm mode, etc.)
+- Applies the same settings and patches used for CLI (thinking verbs, table format, swarm mode, etc.)
 - Tracks versions per installation to warn if extension has been updated since last patch
 
 ### VSIX File Support

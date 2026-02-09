@@ -55,6 +55,7 @@ import { writeConversationTitle } from './conversationTitle';
 import { writeHideStartupBanner } from './hideStartupBanner';
 import { writeHideCtrlGToEdit } from './hideCtrlGToEdit';
 import { writeHideStartupClawd } from './hideStartupClawd';
+import { writeRemoveNewSessionShortcut } from './removeNewSessionShortcut';
 import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
 import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
@@ -431,11 +432,12 @@ const PATCH_DEFINITIONS = [
     appliesTo: 'cli',
   },
   {
-    id: 'increase-file-read-limit',
-    name: 'Increase file read limit',
+    id: 'filter-scroll-escape-sequences',
+    name: 'Filter scroll escape sequences',
     group: PatchGroup.MISC_CONFIGURABLE,
     description:
-      'Max tokens Claude can read from a file at once will be increased',
+      'Filter out terminal escape sequences that cause unwanted scrolling',
+    appliesTo: 'cli',
   },
   {
     id: 'suppress-line-numbers',
@@ -497,6 +499,7 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.MISC_CONFIGURABLE,
     description:
       'Filter out terminal escape sequences that cause unwanted scrolling',
+    appliesTo: 'cli',
   },
   // Features
   {
@@ -943,7 +946,7 @@ export const applyCustomization = async (
       condition: !!config.settings.misc?.tokenCountRounding,
     },
     'remove-new-session-shortcut': {
-      fn: c => writeHideCtrlGToEdit(c), // Reuse similar logic or implement specific one
+      fn: c => writeRemoveNewSessionShortcut(c),
       condition: !!config.settings.misc?.removeNewSessionShortcut,
     },
     'remember-skill': {

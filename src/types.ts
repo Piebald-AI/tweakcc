@@ -208,6 +208,13 @@ export interface RemoteConfig {
   settings: Partial<Settings>;
 }
 
+export interface PatchResult {
+  path: string;
+  success: boolean;
+  error?: string;
+  patchesApplied?: string[];
+}
+
 export interface InstallationPatchRecord {
   version: string;
   lastPatched: string; // ISO timestamp

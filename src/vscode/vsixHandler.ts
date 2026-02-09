@@ -36,12 +36,21 @@ export async function extractVSIX(
         }
 
         zipfile.on('entry', (entry: Entry) => {
-          if (entry.uncompressedSize === 0 || entry.fileName.endsWith('/')) {
+          if (entry.fileName.endsWith('/')) {
             zipfile.readEntry();
             return;
           }
 
           const outputPath = path.join(extractDir, entry.fileName);
+          const resolvedOutputPath = path.resolve(outputPath);
+          const resolvedExtractDir = path.resolve(extractDir);
+
+          if (!resolvedOutputPath.startsWith(resolvedExtractDir)) {
+            debug(`Skipping unsafe path: ${entry.fileName}`);
+            zipfile.readEntry();
+            return;
+          }
+
           const outputDir = path.dirname(outputPath);
 
           fsPromises
@@ -129,11 +138,12 @@ export async function installVSIX(
   const { getForkCommand } = await import('./extensionTypes');
   const command = getForkCommand(fork);
 
-  const { exec } = await import('child_process');
+  const { execFile } = await import('child_process');
 
   return new Promise((resolve, reject) => {
-    exec(
-      `"${command}" --install-extension "${vsixPath}"`,
+    execFile(
+      command,
+      ['--install-extension', vsixPath],
       (error: Error | null, stdout: string, stderr: string) => {
         if (error) {
           debug(`Error installing VSIX:`, error);

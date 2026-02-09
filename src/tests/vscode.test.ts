@@ -4,7 +4,7 @@ import {
   patchThinkingVerbs,
   patchConversationTitle,
   patchTableFormat,
-  EXTENSION_PATCHES,
+  EXTENSION_PATCH_DEFINITIONS,
 } from '@/vscode/patches';
 import { TweakccConfig } from '@/types';
 
@@ -59,7 +59,7 @@ describe('Extension Patches', () => {
   });
 
   it('should register patches', () => {
-    expect(EXTENSION_PATCHES.length).toBeGreaterThan(0);
+    expect(EXTENSION_PATCH_DEFINITIONS.length).toBeGreaterThan(0);
   });
 
   it('should patch thinking verbs in webview.js', () => {

@@ -122,9 +122,9 @@ export function VSCodeExtensionView({ onBack }: { onBack: () => void }) {
       },
       {
         id: 'removeNewSessionShortcut',
-        title: 'Remove Ctrl-L (new session) shortcut',
+        title: 'Remove Ctrl-K (new session) shortcut',
         description:
-          'Removes Ctrl-L global shortcut for starting a new session to prevent accidental triggers.',
+          'Removes Ctrl-K global shortcut for starting a new session to prevent accidental triggers.',
         getValue: () =>
           settings.vscodeExtensions?.removeNewSessionShortcut ?? false,
         toggle: () => {
