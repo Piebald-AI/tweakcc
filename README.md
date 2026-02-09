@@ -112,7 +112,7 @@ $ pnpm dlx tweakcc
 - [How it works](#how-it-works)
 - [Remote config](#remote-config)
 - [CLI Commands (`unpack`, `repack`, `adhoc-patch`)](#cli-commands)
-- [API](#cli-commands)
+- [API](#api)
 - [System prompts](#system-prompts)
 - [Toolsets](#toolsets)
 - [**Features**](#features)
