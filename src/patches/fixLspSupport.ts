@@ -4,7 +4,7 @@ import { escapeIdent, globalReplace, LocationResult, showDiff } from './index';
 
 const getOpenDocumentLocation = (oldFile: string): LocationResult | null => {
   // Step 1: Find `ensureServerStarted:[$\w]+`
-  const ensureServerStartedPattern = /ensureServerStarted:([$\w]+)\b/;
+  const ensureServerStartedPattern = /ensureServerStarted:([$\w]+)/;
   const ensureMatch = oldFile.match(ensureServerStartedPattern);
   if (!ensureMatch || ensureMatch.index === undefined) {
     console.error('patch: fixLspSupport: failed to find ensureServerStarted');
