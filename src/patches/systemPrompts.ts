@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { debug, stringifyRegex, verbose } from '../utils';
+import { debug, warn, stringifyRegex, verbose } from '../utils';
 import { showDiff, PatchResult, PatchGroup } from './index';
 import {
   loadSystemPromptsWithRegex,
@@ -127,10 +127,10 @@ export const applySystemPrompts = async (
             // number by accounting for any frontmatter/comment lines.
             const absoluteLineNum = lineNum + (prompt.contentLineOffset || 0);
             const lineText = contentLines[lineNum - 1] || '';
-            debug(
+            warn(
               formatBacktickError(filePath, absoluteLineNum, lineText, columns)
             );
-            debug('');
+            warn('');
           }
 
           continue; // Skip this prompt
