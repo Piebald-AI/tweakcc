@@ -133,6 +133,13 @@ export const applySystemPrompts = async (
             warn('');
           }
 
+          results.push({
+            id: promptId,
+            name: prompt.name,
+            group: PatchGroup.SYSTEM_PROMPTS,
+            applied: false,
+            details: 'unescaped backticks',
+          });
           continue; // Skip this prompt
         }
       }

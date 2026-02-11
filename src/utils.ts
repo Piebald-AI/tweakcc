@@ -11,6 +11,9 @@ let isDebugModeOn = false;
 let isVerboseModeOn = false;
 let isShowUnchangedOn = false;
 
+/**
+ * Returns true when debug mode is active via --debug flag or DEBUG env var.
+ */
 export const isDebug = (): boolean => {
   if (isDebugModeOn) return true;
   const debugEnv = process.env.DEBUG;
@@ -32,6 +35,9 @@ export const enableVerbose = (): void => {
 export const enableShowUnchanged = (): void => {
   isShowUnchangedOn = true;
 };
+/**
+ * Logs a message to stdout only when debug mode is enabled.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const debug = (message: any, ...optionalParams: any[]) => {
   if (isDebug()) {
@@ -44,6 +50,9 @@ export const verbose = (message: any, ...optionalParams: any[]) => {
     console.log(message, ...optionalParams);
   }
 };
+/**
+ * Logs a warning message unconditionally via console.warn.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const warn = (message: any, ...optionalParams: any[]) => {
   console.warn(message, ...optionalParams);
