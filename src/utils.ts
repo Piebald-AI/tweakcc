@@ -12,7 +12,9 @@ let isVerboseModeOn = false;
 let isShowUnchangedOn = false;
 
 export const isDebug = (): boolean => {
-  return isDebugModeOn;
+  if (isDebugModeOn) return true;
+  const debugEnv = process.env.DEBUG;
+  return debugEnv === 'tweakcc' || debugEnv === '*';
 };
 export const isVerbose = (): boolean => {
   return isVerboseModeOn;
@@ -41,6 +43,10 @@ export const verbose = (message: any, ...optionalParams: any[]) => {
   if (isVerbose()) {
     console.log(message, ...optionalParams);
   }
+};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const warn = (message: any, ...optionalParams: any[]) => {
+  console.warn(message, ...optionalParams);
 };
 
 export function getCurrentClaudeCodeTheme(): string {
