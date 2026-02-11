@@ -3,6 +3,7 @@
 
 import { showDiff, getReactVar, getRequireFuncName } from './index';
 import { writeSlashCommandDefinition as writeSlashCmd } from './slashCommands';
+import { debug } from '../utils';
 
 // ============================================================================
 // SUB PATCH 1: Add /title slash command
@@ -541,7 +542,7 @@ export const writeConversationTitle = (oldFile: string): string | null => {
   if (tmp) {
     result = tmp;
   } else {
-    console.log(
+    debug(
       'patch: conversationTitle: step 5 failed (enableRenameConversationCommand)'
     );
     // It's okay if it fails--we'll not abort the whole operation.

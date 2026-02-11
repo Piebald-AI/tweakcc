@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import { execSync } from 'node:child_process';
 import LIEF from 'node-lief';
-import { isDebug, debug } from './utils';
+import { isDebug, debug, warn } from './utils';
 
 /**
  * Constants for Bun trailer and serialized layout sizes.
@@ -950,7 +950,7 @@ function repackMachO(
       });
       debug('repackMachO: Code signing completed successfully');
     } catch (codesignError) {
-      console.warn(
+      warn(
         'Warning: Failed to re-sign binary. The binary may not run correctly on macOS:',
         codesignError
       );
