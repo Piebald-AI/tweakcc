@@ -14,11 +14,19 @@
 //  }
 // ```
 //
-// Past sessions pattern (CC 2.1.27):
+// Past sessions pattern (CC ≤2.1.37):
 // ```diff
 //  function AQ8() {
 // -  if (!$_("tengu_coral_fern", !1)) return null;
 //    return `# Accessing Past Sessions...
+//  }
+// ```
+//
+// Past sessions pattern (CC ≥2.1.38):
+// ```diff
+// -if(uL("tengu_coral_fern",!1)){
+// +if(true){
+//    let M=wX(YL());E.push("## Searching past context",...
 //  }
 // ```
 
@@ -48,21 +56,56 @@ const patchExtraction = (file: string): string | null => {
 
 /**
  * Patch 2: Bypass tengu_coral_fern flag check for past session search
+ *
+ * CC ≤2.1.37: negative guard with early return
+ *   if(!fn("tengu_coral_fern",!1))return null;
+ *
+ * CC ≥2.1.38: positive conditional block
+ *   if(fn("tengu_coral_fern",!1)){...}
  */
 const patchPastSessions = (file: string): string | null => {
-  const pattern = /if\(![$\w]+\("tengu_coral_fern",!1\)\)return null;/;
-  const match = file.match(pattern);
+  // Try new pattern first (CC ≥2.1.38): positive conditional block
+  const newPattern = /if\([$\w]+\("tengu_coral_fern",!1\)\)\{/;
+  const newMatch = file.match(newPattern);
 
-  if (!match || match.index === undefined) {
-    console.error('patch: sessionMemory: failed to find past sessions gate');
-    return null;
+  if (newMatch && newMatch.index !== undefined) {
+    const replacement = 'if(true){';
+    const newFile =
+      file.slice(0, newMatch.index) +
+      replacement +
+      file.slice(newMatch.index + newMatch[0].length);
+
+    showDiff(
+      file,
+      newFile,
+      replacement,
+      newMatch.index,
+      newMatch.index + newMatch[0].length
+    );
+    return newFile;
   }
 
-  const newFile =
-    file.slice(0, match.index) + file.slice(match.index + match[0].length);
+  // Fall back to old pattern (CC ≤2.1.37): negative guard with early return
+  const oldPattern = /if\(![$\w]+\("tengu_coral_fern",!1\)\)return null;/;
+  const oldMatch = file.match(oldPattern);
 
-  showDiff(file, newFile, '', match.index, match.index + match[0].length);
-  return newFile;
+  if (oldMatch && oldMatch.index !== undefined) {
+    const newFile =
+      file.slice(0, oldMatch.index) +
+      file.slice(oldMatch.index + oldMatch[0].length);
+
+    showDiff(
+      file,
+      newFile,
+      '',
+      oldMatch.index,
+      oldMatch.index + oldMatch[0].length
+    );
+    return newFile;
+  }
+
+  console.error('patch: sessionMemory: failed to find past sessions gate');
+  return null;
 };
 
 /**
