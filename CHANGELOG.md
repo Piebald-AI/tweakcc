@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v4.0.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.2) - 2026-02-11
+
+- Fix LSP patches (#511) - @TyceHerrman
+
 ## [v4.0.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.1) - 2026-02-10
 
 - Fix session memory past sessions gate for CC 2.1.38+ (#509) - @astrosteveo
