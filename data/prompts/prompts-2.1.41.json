@@ -1044,7 +1044,7 @@
         "3": "READ_TOOL_NAME",
         "4": "EDIT_TOOL_NAME",
         "5": "WRITE_TOOL_NAME",
-        "6": "EXPLORE_AGENT"
+        "6": "CONDITIONAL_DELEGATE_CODEBASE_EXPLORATION"
       },
       "version": "2.1.41"
     },
@@ -1580,9 +1580,9 @@
         "0": "SYSTEM_REMINDER",
         "1": "EDIT_TOOL",
         "2": "WRITE_TOOL",
-        "3": "EXPLORE_SUBAGENT",
-        "4": "PLAN_V2_EXPLORE_AGENT_COUNT",
-        "5": "PLAN_AGENT",
+        "3": "EXPLORE_AGENT_VARIANT",
+        "4": "EXPLORE_SUBAGENT",
+        "5": "PLAN_V2_EXPLORE_AGENT_COUNT",
         "6": "GLOB_TOOL_NAME",
         "7": "GREP_TOOL_NAME",
         "8": "READ_TOOL_NAME",
