@@ -1044,9 +1044,7 @@
         "3": "READ_TOOL_NAME",
         "4": "EDIT_TOOL_NAME",
         "5": "WRITE_TOOL_NAME",
-        "6": "EXPLORE_AGENT",
-        "7": "GLOB_TOOL_NAME",
-        "8": "GREP_TOOL_NAME"
+        "6": "EXPLORE_AGENT"
       },
       "version": "2.1.41"
     },
@@ -1585,9 +1583,13 @@
         "3": "EXPLORE_SUBAGENT",
         "4": "PLAN_V2_EXPLORE_AGENT_COUNT",
         "5": "PLAN_AGENT",
-        "6": "AGENT_COUNT_IS_GREATER_THAN_ZERO",
-        "7": "ASK_USER_QUESTION_TOOL_NAME",
-        "8": "EXIT_PLAN_MODE_TOOL"
+        "6": "GLOB_TOOL_NAME",
+        "7": "GREP_TOOL_NAME",
+        "8": "READ_TOOL_NAME",
+        "9": "PLAN_SUBAGENT",
+        "10": "PLAN_V2_PLAN_AGENT_COUNT",
+        "11": "ASK_USER_QUESTION_TOOL_NAME",
+        "12": "EXIT_PLAN_MODE_TOOL"
       },
       "version": "2.1.41"
     },
