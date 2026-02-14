@@ -2,6 +2,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'path';
 import type { StringsFile } from './systemPromptSync';
 import { PROMPT_CACHE_DIR } from './config';
+import { warn } from './utils';
 
 /**
  * Downloads the strings file for a given CC version from GitHub
@@ -59,9 +60,7 @@ export async function downloadStringsFile(
         'utf-8'
       );
     } catch (cacheError) {
-      console.warn(
-        `Failed to write to cache to ${cacheFilePath}: ${cacheError}`
-      );
+      warn(`Failed to write to cache to ${cacheFilePath}: ${cacheError}`);
     }
 
     return jsonData;

@@ -1,4 +1,5 @@
 import { escapeIdent } from '.';
+import { debug } from '../utils';
 
 export const findChalkVar = (fileContents: string): string | undefined => {
   // Find chalk variable using the counting method
@@ -48,7 +49,7 @@ export const getModuleLoaderFunction = (
     return match[1];
   }
 
-  console.log(
+  debug(
     'patch: getModuleLoaderFunction: failed to find module loader function'
   );
   return undefined;
@@ -65,9 +66,7 @@ export const getReactModuleNameNonBun = (
     /var ([$\w]+)=[$\w]+\(\([$\w]+\)=>\{var [$\w]+=Symbol\.for\("react\.(transitional\.)?element"\)/;
   const match = fileContents.match(pattern);
   if (!match) {
-    console.log(
-      'patch: getReactModuleNameNonBun: failed to find React module name'
-    );
+    debug('patch: getReactModuleNameNonBun: failed to find React module name');
     return undefined;
   }
   return match[1];
@@ -94,7 +93,7 @@ export const getReactModuleFunctionBun = (
 ): string | undefined => {
   const reactModuleNameNonBun = getReactModuleNameNonBun(fileContents);
   if (!reactModuleNameNonBun) {
-    console.log(
+    debug(
       '^ patch: getReactModuleFunctionBun: failed to find React module name (Bun)'
     );
     return undefined;
@@ -106,7 +105,7 @@ export const getReactModuleFunctionBun = (
   );
   const match = fileContents.match(pattern);
   if (!match) {
-    console.log(
+    debug(
       `patch: getReactModuleFunctionBun: failed to find React module function (Bun) (reactModuleNameNonBun=${reactModuleNameNonBun})`
     );
     return undefined;
@@ -131,7 +130,7 @@ export const getReactVar = (fileContents: string): string | undefined => {
 
   const moduleLoader = getModuleLoaderFunction(fileContents);
   if (!moduleLoader) {
-    console.log('^ patch: getReactVar: failed to find moduleLoader');
+    debug('^ patch: getReactVar: failed to find moduleLoader');
     reactVarCache = undefined;
     return undefined;
   }
@@ -139,7 +138,7 @@ export const getReactVar = (fileContents: string): string | undefined => {
   // Try non-bun first (reactModuleNameNonBun)
   const reactModuleVarNonBun = getReactModuleNameNonBun(fileContents);
   if (!reactModuleVarNonBun) {
-    console.log('^ patch: getReactVar: failed to find reactModuleVarNonBun');
+    debug('^ patch: getReactVar: failed to find reactModuleVarNonBun');
     reactVarCache = undefined;
     return undefined;
   }
@@ -159,7 +158,7 @@ export const getReactVar = (fileContents: string): string | undefined => {
   // If reactModuleNameNonBun fails, try reactModuleFunctionBun
   const reactModuleFunctionBun = getReactModuleFunctionBun(fileContents);
   if (!reactModuleFunctionBun) {
-    console.log('^ patch: getReactVar: failed to find reactModuleFunctionBun');
+    debug('^ patch: getReactVar: failed to find reactModuleFunctionBun');
     reactVarCache = undefined;
     return undefined;
   }
@@ -170,7 +169,7 @@ export const getReactVar = (fileContents: string): string | undefined => {
   );
   const bunMatch = fileContents.match(bunPattern);
   if (!bunMatch) {
-    console.log(
+    debug(
       `patch: getReactVar: failed to find bunPattern (moduleLoader=${moduleLoader}, reactModuleVarNonBun=${reactModuleVarNonBun}, reactModuleFunctionBun=${reactModuleFunctionBun})`
     );
     reactVarCache = undefined;
@@ -222,7 +221,7 @@ export const findRequireFunc = (fileContents: string): string | undefined => {
   );
   const requireFuncMatch = fileContents.match(requireFuncPattern);
   if (!requireFuncMatch) {
-    console.log(
+    debug(
       `patch: findRequireFunc: failed to find require function variable (createRequireVar=${createRequireVar})`
     );
     return undefined;
@@ -291,7 +290,7 @@ export const findTextComponent = (fileContents: string): string | undefined => {
     /\bfunction ([$\w]+).{0,20}color:[$\w]+,backgroundColor:[$\w]+,dimColor:[$\w]+(?:=![01])?,bold:[$\w]+(?:=![01])?/;
   const match = fileContents.match(textComponentPattern);
   if (!match) {
-    console.log('patch: findTextComponent: failed to find text component');
+    debug('patch: findTextComponent: failed to find text component');
     return undefined;
   }
   return match[1];

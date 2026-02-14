@@ -12,7 +12,7 @@ import {
   ThinkingVerbsConfig,
   TweakccConfig,
 } from './types';
-import { debug, expandTilde, deepMergeWithDefaults } from './utils';
+import { debug, warn, expandTilde, deepMergeWithDefaults } from './utils';
 import { hasUnappliedSystemPromptChanges } from './systemPromptHashIndex';
 import {
   migrateUserMessageDisplayToV320,
@@ -108,18 +108,16 @@ export const warnAboutMultipleConfigs = (): void => {
   });
 
   if (existingLocations.length > 0) {
-    console.warn(chalk.yellow('\nMultiple configuration locations detected:'));
-    console.warn(chalk.gray(`   Active: ${configDir}`));
-    console.warn(chalk.gray('   Other existing locations:'));
+    warn(chalk.yellow('\nMultiple configuration locations detected:'));
+    warn(chalk.gray(`   Active: ${configDir}`));
+    warn(chalk.gray('   Other existing locations:'));
     existingLocations.forEach(loc => {
-      console.warn(chalk.gray(`     - ${loc}`));
+      warn(chalk.gray(`     - ${loc}`));
     });
-    console.warn(
+    warn(
       chalk.gray('   Only the active location is used. To switch locations,')
     );
-    console.warn(
-      chalk.gray('   move your config.json to the desired directory.\n')
-    );
+    warn(chalk.gray('   move your config.json to the desired directory.\n'));
   }
 };
 

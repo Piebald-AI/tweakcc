@@ -1,4 +1,5 @@
 import { showDiff } from './index';
+import { warn } from '../utils';
 
 export const writeSuppressNativeInstallerWarning = (
   file: string
@@ -9,9 +10,7 @@ export const writeSuppressNativeInstallerWarning = (
   const match = file.match(pattern);
 
   if (!match || match.index === undefined) {
-    console.warn(
-      'patch: suppressNativeInstallerWarning: failed to find pattern'
-    );
+    warn('patch: suppressNativeInstallerWarning: failed to find pattern');
     return null;
   }
 
