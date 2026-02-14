@@ -67,8 +67,9 @@ const applyIndicatorViewPatch = (
   textComponent: string,
   chalkVar: string
 ): { content: string; closingParenIndex: number } | null => {
-  // 1. Find alignItems:"center",minHeight:9,
-  const alignItemsPattern = /alignItems:"center",minHeight:9,?/;
+  // 1. Find alignItems:"center",minHeight:<value>, where value can be a number or ternary
+  const alignItemsPattern =
+    /alignItems:"center",minHeight:([$\w]+\?\d+:\d+|\d+),?/;
   const alignItemsMatch = fileContents.match(alignItemsPattern);
   if (!alignItemsMatch || alignItemsMatch.index === undefined) {
     console.error(
@@ -77,10 +78,11 @@ const applyIndicatorViewPatch = (
     return null;
   }
 
-  // 2. Replace alignItems:"center",minHeight:9, with just minHeight:9,
+  // 2. Replace alignItems:"center",minHeight:<value>, with just minHeight:<value>,
+  const minHeightValue = alignItemsMatch[1];
   let content =
     fileContents.slice(0, alignItemsMatch.index) +
-    'minHeight:9,' +
+    `minHeight:${minHeightValue},` +
     fileContents.slice(alignItemsMatch.index + alignItemsMatch[0].length);
 
   // 3. Go back 200 chars from the alignItems location
@@ -449,8 +451,9 @@ export const writePatchesAppliedIndication = (
   if (showPatchesApplied) {
     // If patch 4 wasn't applied, we need to find the insertion point
     if (patch4ClosingParenIndex === -1) {
-      // Find alignItems:"center",minHeight:9, to use as reference point
-      const alignItemsPattern = /alignItems:"center",minHeight:9,?/;
+      // Find alignItems:"center",minHeight:<value>, to use as reference point
+      const alignItemsPattern =
+        /alignItems:"center",minHeight:([$\w]+\?\d+:\d+|\d+),?/;
       const alignItemsMatch = content.match(alignItemsPattern);
       if (!alignItemsMatch || alignItemsMatch.index === undefined) {
         console.error(
