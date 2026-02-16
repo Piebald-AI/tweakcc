@@ -66,6 +66,23 @@ import { showDiff } from './index';
  * +}, [O]),
  * +X = Pc.useCallback(() => {}, [])
  *  (Pc.useEffect(() => {
+ *
+ * CC 2.1.42
+ * ```diff
+ * -M = vf.useCallback(() => {
+ * -  if (j.current !== void 0) clearTimeout(j.current);
+ * -  j.current = setTimeout(() => {
+ * -    ((j.current = void 0), D());
+ * -  }, 300);
+ * -}, [D]);
+ * +unused1 = vf.useCallback(() => {
+ * +  let now = Date.now();
+ * +  if (now - lastCall.current >= 300) {
+ * +    lastCall.current = now;
+ * +    D();
+ * +  }
+ * +}, [D]),
+ * +M = vf.useCallback(() => {}, [])
  * ```
  */
 export const writeStatuslineUpdateThrottle = (
@@ -84,7 +101,7 @@ export const writeStatuslineUpdateThrottle = (
   //   Match[5]: The function call with parameter if newer format (e.g., "I(A)")
   //   Match[6]: The argument to the function if newer format (e.g., "A")
   const pattern =
-    /(,([$\w]+)=([$\w]+(?:\.default)?)\.useCallback.{0,1000}statusLineText.{0,200}?),([$\w]+)=([$\w]+\(\(\)=>(\2\(([$\w]+)\)),300\)|[$\w]+\(\2,300\))/;
+    /(,([$\w]+)=([$\w]+(?:\.default)?)\.useCallback.{0,1000}statusLineText.{0,200}?),([$\w]+)=([$\w.]+\(\(\)=>(\2\(([$\w]+)\)),300\)|[$\w]+\(\2,300\)|.{0,100}\{[$\w]+\.current=void 0,\2\(\)\},300\)\},\[\2\]\))/;
 
   const match = oldFile.match(pattern);
 
@@ -137,7 +154,7 @@ export const writeStatuslineUpdateThrottle = (
     } else {
       replacement =
         firstPart +
-        `,${reactVar}.useEffect(()=>{` +
+        `,unused1=${reactVar}.useEffect(()=>{` +
         `const id=setInterval(()=>${call},${intervalMs});` +
         `return()=>clearInterval(id);` +
         `},[${intervalDependencies}]),` +

@@ -756,7 +756,10 @@ export const applyCustomization = async (
     },
     'remember-skill': {
       fn: c => writeRememberSkill(c),
-      condition: !!config.settings.misc?.enableRememberSkill,
+      condition:
+        !!config.settings.misc?.enableRememberSkill &&
+        !!ccInstInfo.version &&
+        compareVersions(ccInstInfo.version, '2.1.42') < 0,
     },
     'agents-md': {
       fn: c => writeAgentsMd(c, config.settings.claudeMdAltNames!),

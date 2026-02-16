@@ -206,11 +206,12 @@ const patchLabelFunction = (oldFile: string): string | null => {
  */
 const patchModelSelectorOptions = (oldFile: string): string | null => {
   // Find where opusplan is added to the model list: [...A, Mm3()]
-  // Pattern: if (K === "opusplan") return [...A, Mm3()];
+  // Old pattern: if (K === "opusplan") return [...A, Mm3()];
+  // New pattern: if (K === "opusplan") return v1A([...A, Mm3()]);
   // We need to add a similar case for opusplan[1m]
   // Capture groups: 1=fullMatch, 2=conditionVar (K), 3=listVar (A), 4=funcName (Mm3)
   const pattern =
-    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*\[\s*\.\.\.([$\w]+)\s*,\s*([$\w]+)\(\)\s*\];)/;
+    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*(?:[$\w]+\()?\[\s*\.\.\.([$\w]+)\s*,\s*([$\w]+)\(\)\s*\]\)?;)/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
@@ -256,7 +257,7 @@ const patchAlwaysShowInModelSelector = (oldFile: string): string | null => {
   // Find the pattern: if(K===null||A.some((VAR)=>VAR.value===K))return A;
   // This is right before the opusplan conditional, and we want to inject pushes before this
   const pattern =
-    /(if\s*\(\s*[$\w]+\s*===\s*null\s*\|\|\s*([$\w]+)\.some\s*\(\s*\(\s*[$\w]+\s*\)\s*=>\s*[$\w]+\.value\s*===\s*[$\w]+\s*\)\s*\)\s*return\s*[$\w]+\s*;)/;
+    /(if\s*\(\s*[$\w]+\s*===\s*null\s*\|\|\s*([$\w]+)\.some\s*\(\s*\(\s*[$\w]+\s*\)\s*=>\s*[$\w]+\.value\s*===\s*[$\w]+\s*\)\s*\)\s*return\s*(?:[$\w]+\()?[$\w]+\)?\s*;)/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
