@@ -1,6 +1,6 @@
 {
   "name": "tweakcc",
-  "version": "4.0.2",
+  "version": "4.0.3",
   "type": "module",
   "description": "Command-line tool to customize your Claude Code theme colors, thinking verbs and more.",
   "main": "dist/lib/index.mjs",
