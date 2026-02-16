@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v4.0.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.3) - 2026-02-16
+
 - Fix patchesAppliedIndication for CC 2.1.42+ ternary minHeight (#518) - @zigazaga4
 - Fix opusplan1m, statuslineUpdateThrottle, and rememberSkill patches for CC 2.1.42 (#520) - @bl-ue
 
