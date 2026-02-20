@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { debug, stringifyRegex, verbose } from '../utils';
+import { debug, warn, stringifyRegex, verbose } from '../utils';
 import { showDiff, PatchResult, PatchGroup } from './index';
 import {
   loadSystemPromptsWithRegex,
@@ -127,12 +127,19 @@ export const applySystemPrompts = async (
             // number by accounting for any frontmatter/comment lines.
             const absoluteLineNum = lineNum + (prompt.contentLineOffset || 0);
             const lineText = contentLines[lineNum - 1] || '';
-            console.log(
+            warn(
               formatBacktickError(filePath, absoluteLineNum, lineText, columns)
             );
-            console.log();
+            warn('');
           }
 
+          results.push({
+            id: promptId,
+            name: prompt.name,
+            group: PatchGroup.SYSTEM_PROMPTS,
+            applied: false,
+            details: 'unescaped backticks',
+          });
           continue; // Skip this prompt
         }
       }
@@ -201,7 +208,7 @@ export const applySystemPrompts = async (
         details,
       });
     } else {
-      console.log(
+      debug(
         chalk.yellow(
           `Could not find system prompt "${prompt.name}" in cli.js (using regex ${stringifyRegex(pattern)})`
         )
