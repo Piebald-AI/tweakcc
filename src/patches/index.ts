@@ -70,6 +70,7 @@ import { writeAutoAcceptPlanMode } from './autoAcceptPlanMode';
 import { writeAllowBypassPermsInSudo } from './allowBypassPermsInSudo';
 import { writeSuppressNativeInstallerWarning } from './suppressNativeInstallerWarning';
 import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
+import { writeWorktreeMode } from './worktreeMode';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -361,6 +362,13 @@ const PATCH_DEFINITIONS = [
     name: 'Swarm mode',
     group: PatchGroup.FEATURES,
     description: 'Enable SWARM MODE in Claude Code',
+  },
+  {
+    id: 'worktree-mode',
+    name: 'Worktree mode',
+    group: PatchGroup.FEATURES,
+    description:
+      'Enable the EnterWorktree tool for isolated git worktree sessions',
   },
   {
     id: 'session-memory',
@@ -788,6 +796,10 @@ export const applyCustomization = async (
     'swarm-mode': {
       fn: c => writeSwarmMode(c),
       condition: !!config.settings.misc?.enableSwarmMode,
+    },
+    'worktree-mode': {
+      fn: c => writeWorktreeMode(c),
+      condition: !!config.settings.misc?.enableWorktreeMode,
     },
     'session-memory': {
       fn: c => writeSessionMemory(c),
