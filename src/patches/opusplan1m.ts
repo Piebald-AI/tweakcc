@@ -111,7 +111,7 @@ const patchModelAliasesList = (oldFile: string): string | null => {
 const patchDescriptionFunction = (oldFile: string): string | null => {
   // Pattern matches: if (VAR === "opusplan") return "Opus 4.5 in plan mode, else Sonnet 4.5";
   const pattern =
-    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*"Opus 4\.\d+ in plan mode, else Sonnet 4\.5";)/;
+    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*"Opus .{0,20} in plan mode, else Sonnet .{0,20}";)/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {

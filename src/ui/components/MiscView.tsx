@@ -374,19 +374,6 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         },
       },
       {
-        id: 'enableSwarmMode',
-        title: 'Enable swarm mode (native multi-agent)',
-        description:
-          'Force-enable native multi-agent features (TeammateTool, delegate mode, swarm spawning) by bypassing the tengu_brass_pebble statsig flag.',
-        getValue: () => settings.misc?.enableSwarmMode ?? true,
-        toggle: () => {
-          updateSettings(settings => {
-            ensureMisc();
-            settings.misc!.enableSwarmMode = !settings.misc!.enableSwarmMode;
-          });
-        },
-      },
-      {
         id: 'enableWorktreeMode',
         title: 'Enable worktree mode (EnterWorktree tool)',
         description:

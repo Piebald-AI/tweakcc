@@ -58,7 +58,6 @@ import { writeHideStartupClawd } from './hideStartupClawd';
 import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
 import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
-import { writeSwarmMode } from './swarmMode';
 import { writeSessionMemory } from './sessionMemory';
 import { writeRememberSkill } from './rememberSkill';
 import { writeThinkingBlockStyling } from './thinkingBlockStyling';
@@ -357,12 +356,6 @@ const PATCH_DEFINITIONS = [
       'Filter out terminal escape sequences that cause unwanted scrolling',
   },
   // Features
-  {
-    id: 'swarm-mode',
-    name: 'Swarm mode',
-    group: PatchGroup.FEATURES,
-    description: 'Enable SWARM MODE in Claude Code',
-  },
   {
     id: 'worktree-mode',
     name: 'Worktree mode',
@@ -793,10 +786,6 @@ export const applyCustomization = async (
       condition: !!config.settings.misc?.filterScrollEscapeSequences,
     },
     // Features
-    'swarm-mode': {
-      fn: c => writeSwarmMode(c),
-      condition: !!config.settings.misc?.enableSwarmMode,
-    },
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),
       condition: !!config.settings.misc?.enableWorktreeMode,

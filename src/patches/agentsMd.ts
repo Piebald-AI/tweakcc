@@ -102,7 +102,7 @@ export const writeAgentsMd = (
   // Step 1: Find the function that handles CLAUDE.md file reading
   // Pattern: function xyz(a, b) { ...... return { ... path: ..., content: ... } }
   const funcPattern =
-    /function ([$\w]+)\(([$\w]+),([$\w]+)\).{0,400}\{path:[$\w]+,.{1,20}?content:[$\w]+/;
+    /function ([$\w]+)\(([$\w]+),([$\w]+)\)(?:.|\n){0,500}Skipping non-text file in @include(?:.|\n){0,500}\{path:[$\w]+,.{0,20}?content:[$\w]+/;
 
   const funcMatch = file.match(funcPattern);
 
