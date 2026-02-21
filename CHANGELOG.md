@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v4.0.5](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.5) - 2026-02-21
+
 - Fix an unnecessary warning when certain LSP patches aren't patched (#535) - @bl-ue
 
 ## [v4.0.4](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.4) - 2026-02-21
