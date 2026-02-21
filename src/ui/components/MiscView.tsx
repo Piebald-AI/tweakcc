@@ -78,6 +78,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     allowBypassPermissionsInSudo: false,
     suppressNativeInstallerWarning: false,
     filterScrollEscapeSequences: false,
+    enableWorktreeMode: true,
   };
 
   const ensureMisc = () => {
@@ -382,6 +383,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
           updateSettings(settings => {
             ensureMisc();
             settings.misc!.enableSwarmMode = !settings.misc!.enableSwarmMode;
+          });
+        },
+      },
+      {
+        id: 'enableWorktreeMode',
+        title: 'Enable worktree mode (EnterWorktree tool)',
+        description:
+          'Force-enable the EnterWorktree tool for isolated git worktree sessions by bypassing the tengu_worktree_mode feature flag.',
+        getValue: () => settings.misc?.enableWorktreeMode ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableWorktreeMode =
+              !settings.misc!.enableWorktreeMode;
           });
         },
       },
