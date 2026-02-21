@@ -56,7 +56,6 @@ Download it and try it out for free! **https://piebald.ai/**
 > **NEW:** tweakcc 4.0.0 also introduces several new patches:
 >
 > - [AGENTS.md support (demo video)](#feature-agentsmd-support)
-> - [:lock: unlock swarm mode](#feature-swarm-mode-native-multi-agent)
 > - [:lock: unlock session memory (blog post)](https://piebald.ai/blog/session-memory-is-coming-to-claude-code) (thank you [@odysseus0](https://github.com/odysseus0)!)
 > - [`/remember` skill](https://piebald.ai/blog/session-memory-is-coming-to-claude-code)
 > - [input pattern highlighters](#feature-input-pattern-highlighters)
@@ -90,7 +89,6 @@ tweakcc also
 - Adds the **`opusplan[1m]`** model alias, combining Opus for planning with Sonnet's 1M context for execution—reducing "[context anxiety](#feature-opus-plan-1m-mode)" ([#108](https://github.com/Piebald-AI/tweakcc/issues/108))
 - Adds a message to Claude Code's startup banner indicating that you're running the patched version of CC (configurable)
 - Speeds up Claude Code startup by **~50%** with non-blocking MCP connections and configurable parallel connection batch size ([#406](https://github.com/Piebald-AI/tweakcc/issues/406))
-- Enables native multi-agent/swarm mode (TeammateTool, delegate mode, swarm spawning) by bypassing the `tengu_brass_pebble` Statsig flag.
 
 tweakcc supports Claude Code installed on **Windows, macOS, and Linux**, both **native/binary installations** and those installed via npm, yarn, pnpm, bun, Homebrew/Linuxbrew, nvm, fnm, n, volta, nvs, and nodenv, as well as custom locations.
 
@@ -144,7 +142,6 @@ $ pnpm dlx tweakcc
   - [Opus Plan 1M mode](#feature-opus-plan-1m-mode)
   - [MCP startup optimization](#feature-mcp-startup-optimization)
   - [Table format](#feature-table-format)
-  - [Swarm mode (native multi-agent)](#feature-swarm-mode-native-multi-agent)
   - [Token count rounding](#feature-token-count-rounding)
   - [Statusline update customization](#feature-statusline-update-customization)
   - [AGENTS.md support (with video)](#feature-agentsmd-support)
@@ -973,39 +970,6 @@ tweakcc provides three alternative formats:
 ```
 
 Valid values are `"default"`, `"ascii"`, `"clean"`, and `"clean-top-bottom"`.
-
-## Feature: Swarm mode (native multi-agent)
-
-Claude Code 2.1.16+ includes native multi-agent features that are gated behind the `tengu_brass_pebble` Statsig flag. tweakcc patches this gate to enable these features for everyone.
-
-![Screenshot showing swarm mode status](./assets/swarm_1_swarm_status.png)
-![Screenshot showing one of the workers requesting permission](./assets/swarm_2_worker_permission_request.png)
-
-**Features unlocked:**
-
-| Feature              | Description                                                |
-| -------------------- | ---------------------------------------------------------- |
-| **TeammateTool**     | Tool for spawning and coordinating teammate agents         |
-| **Delegate mode**    | Task tool mode option for delegating work                  |
-| **Swarm spawning**   | `launchSwarm` + `teammateCount` parameters in ExitPlanMode |
-| **Teammate mailbox** | Inter-agent messaging system                               |
-| **Task teammates**   | Task list teammate display and coordination                |
-
-**Enable/disable**
-
-**Via the UI:** Run `npx tweakcc`, go to **Misc**, and check/uncheck **Enable swarm mode (native multi-agent)**. Then **Apply customizations**.
-
-**Via `config.json`:**
-
-```json
-{
-  "settings": {
-    "misc": {
-      "enableSwarmMode": true
-    }
-  }
-}
-```
 
 ## Feature: Token count rounding
 

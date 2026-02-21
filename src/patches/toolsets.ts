@@ -25,25 +25,16 @@ export const findSelectComponentName = (
 ): string | null => {
   // Pattern matches the Select component's function signature
   const selectPattern =
-    /function ([$\w]+)(?:\([$\w]+\)\{let [$\w]+=[$\w]+\(\d+\),\{(?:(?:isDisabled|hideIndexes|visibleOptionCount|highlightText|options|defaultValue|onCancel|onChange|onFocus|defaultFocusValue|layout|disableSelection|inlineDescriptions|onUpFromFirstItem|onDownFromLastItem|onInputModeToggle|onOpenEditor):[$\w]+,?)+\}=|\(\{(?:(?:isDisabled|hideIndexes|visibleOptionCount|highlightText|options|defaultValue|onCancel|onChange|onFocus|defaultFocusValue|layout|disableSelection|inlineDescriptions|onUpFromFirstItem|onDownFromLastItem|onInputModeToggle|onOpenEditor):[$\w]+(?:=(?:[^,]+,|[^}]+\})|[,}]))+\))/g;
-
-  const matches = Array.from(fileContents.matchAll(selectPattern));
-  if (matches.length === 0) {
+    /\.createElement\(([$\w]+),.{0,100}"Yes, use recommended settings"/;
+  const match = fileContents.match(selectPattern);
+  if (!match) {
     console.error(
       'patch: findSelectComponentName: failed to find selectPattern'
     );
     return null;
   }
 
-  // Return the longest match (most complete signature)
-  let longestMatch = matches[0];
-  for (const match of matches) {
-    if (match[0].length > longestMatch[0].length) {
-      longestMatch = match;
-    }
-  }
-
-  return longestMatch[1];
+  return match[1];
 };
 
 /**
@@ -759,9 +750,9 @@ export const writeSlashCommandDefinition = (oldFile: string): string | null => {
   argumentHint: "[toolset-name]",
   isEnabled: () => true,
   isHidden: false,
-  async call(onExit, ctx, input) {
+  load: () => Promise.resolve().then(() => ({call: (onExit, ctx, input) => {
     return ${reactVar}.createElement(toolsetComp, { onExit, input });
-  },
+  }})),
   userFacingName() {
     return "toolset";
   }
@@ -839,7 +830,7 @@ export const findModeChange = (
   fileContents: string
 ): { index: number; modeVar: string; setStateVar: string } | null => {
   const pattern =
-    /if\([$\w]+==="acceptEdits"\)[$\w]+\("auto-accept-mode"\);.{0,100}\(([$\w]+)\(\([$\w]+\)=>\(\{\.\.\.[$\w]+,toolPermissionContext.{0,200}?mode:([$\w]+)/;
+    /if\(([$\w]+)\(\([$\w]+\)=>\(\{\.\.\.[$\w]+,toolPermissionContext.{0,200}?mode:([$\w]+)/;
   const match = fileContents.match(pattern);
 
   if (!match || match.index === undefined) {
@@ -847,18 +838,8 @@ export const findModeChange = (
     return null;
   }
 
-  // Find where the semicolon is (end of the if statement, before the .{0,200}?mode: part)
-  const semicolonPattern =
-    /if\([$\w]+==="acceptEdits"\)[$\w]+\("auto-accept-mode"\);/;
-  const semicolonMatch = fileContents.match(semicolonPattern);
-
-  if (!semicolonMatch || semicolonMatch.index === undefined) {
-    console.error('patch: findModeChange: failed to find semicolon position');
-    return null;
-  }
-
   return {
-    index: semicolonMatch.index + semicolonMatch[0].length,
+    index: match.index,
     modeVar: match[2],
     // We can't get a setState ourselves because it's a hook that gets it and this code is not in
     // the top-level component.But there's already an instantiation 600+ lines back (as of 2.1.31,

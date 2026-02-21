@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fix patching errors for CC 2.1.50+ and remove the swarm mode patch (#532) - @bl-ue
+
 ## [v4.0.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.3) - 2026-02-16
 
 - Fix patchesAppliedIndication for CC 2.1.42+ ternary minHeight (#518) - @zigazaga4
