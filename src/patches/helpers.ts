@@ -3,7 +3,7 @@ import { escapeIdent } from '.';
 export const findChalkVar = (fileContents: string): string | undefined => {
   // Find chalk variable using the counting method
   const chalkPattern =
-    /\b([$\w]+)(?:\.(?:cyan|gray|green|red|yellow|ansi256|bgAnsi256|bgHex|bgRgb|hex|rgb|bold|dim|inverse|italic|strikethrough|underline)\b)+\(/g;
+    /[^$\w]([$\w]+)(?:\.(?:cyan|gray|green|red|yellow|ansi256|bgAnsi256|bgHex|bgRgb|hex|rgb|bold|dim|inverse|italic|strikethrough|underline)\b)+\(/g;
   const chalkMatches = Array.from(fileContents.matchAll(chalkPattern));
 
   // Count occurrences of each variable
@@ -146,7 +146,7 @@ export const getReactVar = (fileContents: string): string | undefined => {
 
   // Pattern: X=moduleLoader(reactModule,1)
   const nonBunPattern = new RegExp(
-    `\\b([$\\w]+)=${escapeIdent(moduleLoader)}\\(${escapeIdent(reactModuleVarNonBun)}\\(\\),1\\)`
+    `[^$\\w]([$\\w]+)=${escapeIdent(moduleLoader)}\\(${escapeIdent(reactModuleVarNonBun)}\\(\\),1\\)`
   );
   const nonBunMatch = fileContents.match(nonBunPattern);
   if (nonBunMatch) {
@@ -163,10 +163,10 @@ export const getReactVar = (fileContents: string): string | undefined => {
     reactVarCache = undefined;
     return undefined;
   }
-  // \b([$\w]+)=T\(fH\(\),1\)
-  // Pattern: X=moduleLoader(reactModuleBun,1)
+  // ;([$\w]+)=T\(fH\(\),1\)
+  // Pattern: ;X=moduleLoader(reactModuleBun,1)
   const bunPattern = new RegExp(
-    `\\b([$\\w]+)=${escapeIdent(moduleLoader)}\\(${escapeIdent(reactModuleFunctionBun)}\\(\\),1\\)`
+    `[^$\\w]([$\\w]+)=${escapeIdent(moduleLoader)}\\(${escapeIdent(reactModuleFunctionBun)}\\(\\),1\\)`
   );
   const bunMatch = fileContents.match(bunPattern);
   if (!bunMatch) {
@@ -303,7 +303,7 @@ export const findTextComponent = (fileContents: string): string | undefined => {
 export const findBoxComponent = (fileContents: string): string | undefined => {
   // Method 1: Find Box by ink-box createElement with local variable (CC ~2.0.x)
   const inkBoxPattern =
-    /function ([$\w]+)\(.{0,2000}\b([$\w]+)=[$\w]+(?:\.default)?\.createElement\("ink-box".{0,200}?return \2/;
+    /function ([$\w]+)\(.{0,2000}[^$\w]([$\w]+)=[$\w]+(?:\.default)?\.createElement\("ink-box".{0,200}?return \2/;
   const inkBoxMatch = fileContents.match(inkBoxPattern);
   if (inkBoxMatch) {
     return inkBoxMatch[1];
@@ -319,7 +319,7 @@ export const findBoxComponent = (fileContents: string): string | undefined => {
   }
 
   // Method 3: Search for Box displayName (older CC versions, 0.2.9 - 2.0.77 at least)
-  const boxDisplayNamePattern = /\b([$\w]+)\.displayName="Box"/;
+  const boxDisplayNamePattern = /[^$\w]([$\w]+)\.displayName="Box"/;
   const boxDisplayNameMatch = fileContents.match(boxDisplayNamePattern);
   if (boxDisplayNameMatch) {
     return boxDisplayNameMatch[1];

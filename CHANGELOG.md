@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fix boundary detection to not use `\b` in several regexes and fix tool call patching typo (#538) - @bl-ue
+
 ## [v4.0.5](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.5) - 2026-02-21
 
 - Fix an unnecessary warning when certain LSP patches aren't patched (#535) - @bl-ue

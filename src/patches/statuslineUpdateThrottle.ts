@@ -91,12 +91,12 @@ export const writeStatuslineUpdateThrottle = (
   useFixedInterval: boolean = false
 ): string | null => {
   // Pattern breakdown:
-  // - (\b([$\w]+)=([$\w]+(?:\.default)?)\.useCallback.{0,1000}statusLineText.{0,200}?)
+  // - (([$\w]+)=([$\w]+(?:\.default)?)\.useCallback.{0,1000}statusLineText.{0,200}?)
   //   Match[1]: Everything up to and including the statusLineText context (firstPart)
   //   Match[2]: The status line update function name (statuslineUpdateFn)
   //   Match[3]: The React variable, possibly with .default (reactVar)
   //
-  // - (\b[$\w]+\(\(\)=>(\2\(([$\w]+)\)),300\)|\b[$\w]+\(\2,300\))
+  // - ([$\w]+\(\(\)=>(\2\(([$\w]+)\)),300\)|[$\w]+\(\2,300\))
   //   Match[4]: The old debounced invocation (to be replaced)
   //   Match[5]: The function call with parameter if newer format (e.g., "I(A)")
   //   Match[6]: The argument to the function if newer format (e.g., "A")
