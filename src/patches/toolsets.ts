@@ -76,7 +76,7 @@ export const getMainAppComponentBodyStart = (
   // Pattern matches the main app component function signature with all its props
   // Updated for 2.1.20: added initialAgentName, initialAgentColor, taskListId, remoteSessionConfig, autoTickIntervalMs
   const appComponentPattern =
-    /function ([$\w]+)\(\{(?:(?:commands|debug|initialPrompt|initialTools|initialMessages|initialCheckpoints|initialFileHistorySnapshots|initialAgentName|initialAgentColor|mcpClients|dynamicMcpConfig|mcpCliEndpoint|autoConnectIdeFlag|strictMcpConfig|systemPrompt|appendSystemPrompt|onBeforeQuery|onTurnComplete|disabled|mainThreadAgentDefinition|disableSlashCommands|taskListId|remoteSessionConfig|autoTickIntervalMs):[$\w]+(?:=(?:[^,]+,|[^}]+\})|[,}]))+\)/g;
+    /function ([$\w]+)\(\{(?:\w+:[$\w]+(?:=(?:[^,]+,|[^}]+\})|[,}]))+initialFileHistorySnapshots:[$\w]+,(?:\w+:[$\w]+(?:=(?:[^,]+,|[^}]+\})|[,}]))+\)/g;
 
   const allMatches = Array.from(fileContents.matchAll(appComponentPattern));
   // Filter to only matches that contain 'commands:' - unique to main app component
@@ -107,38 +107,6 @@ export const getMainAppComponentBodyStart = (
 };
 
 /**
- * Get app state variable and getter function names
- */
-export const getAppStateVarAndGetterFunction = (
-  fileContents: string
-): { appStateVar: string; appStateGetterFunction: string } | null => {
-  const bodyStart = getMainAppComponentBodyStart(fileContents);
-  if (bodyStart === null) {
-    console.error(
-      'patch: getAppStateVarAndGetterFunction: failed to find bodyStart'
-    );
-    return null;
-  }
-
-  // Look at the next 500 chars for the useState pattern (increased from 20 for 2.1.x)
-  const chunk = fileContents.slice(bodyStart, bodyStart + 500);
-  const statePattern = /let\[([$\w]+),[$\w]+\]=([$\w]+)\(\)/;
-  const match = chunk.match(statePattern);
-
-  if (!match) {
-    console.error(
-      'patch: getAppStateVarAndGetterFunction: failed to find statePattern'
-    );
-    return null;
-  }
-
-  return {
-    appStateVar: match[1],
-    appStateGetterFunction: match[2],
-  };
-};
-
-/**
  * Get app state selector and useState function names
  */
 export const getAppStateSelectorAndUseState = (
@@ -158,63 +126,6 @@ export const getAppStateSelectorAndUseState = (
   return {
     appStateUseSelectorFn: match[1],
     appStateSetState: match[2],
-  };
-};
-
-/**
- * Get the location and identifiers for the tool fetching useMemo
- */
-export const getToolFetchingUseMemoLocation = (
-  fileContents: string
-): {
-  startIndex: number;
-  endIndex: number;
-  outputVarName: string;
-  reactVarName: string;
-  toolFilterFunction: string;
-  toolPermissionContextVar: string;
-  needsSemicolonPrefix: boolean;
-} | null => {
-  const bodyStart = getMainAppComponentBodyStart(fileContents);
-  if (bodyStart === null) {
-    console.error(
-      'patch: getToolFetchingUseMemoLocation: failed to find bodyStart'
-    );
-    return null;
-  }
-
-  // Look at the next 2000 chars
-  const chunk = fileContents.slice(bodyStart, bodyStart + 2000);
-
-  // Pattern to match: outputVar=reactVar.useMemo(()=>filterFunc(contextVar),[contextVar])
-  // Or (CC 2.1.9+): outputVar=reactVar.useMemo(()=>filterFunc(contextVar),[contextVar,extraDep])
-  // Note: may be comma-separated (,v=...) or let-prefixed (let v=...)
-  const useMemoPattern =
-    /(?:let |,)([$\w]+)=([$\w]+)\.useMemo\(\(\)=>([$\w]+)\(([$\w]+)\),\[\4(?:,[$\w]+)?\]\)/;
-  const match = chunk.match(useMemoPattern);
-
-  if (!match || match.index === undefined) {
-    console.error(
-      'patch: getToolFetchingUseMemoLocation: failed to find useMemoPattern'
-    );
-    return null;
-  }
-
-  const absoluteStart = bodyStart + match.index;
-  const absoluteEnd = absoluteStart + match[0].length;
-
-  // Check if match started with comma (needs semicolon prefix in replacement)
-  const matchedText = match[0];
-  const needsSemicolonPrefix = matchedText.startsWith(',');
-
-  return {
-    startIndex: absoluteStart,
-    endIndex: absoluteEnd,
-    outputVarName: match[1],
-    reactVarName: match[2],
-    toolFilterFunction: match[3],
-    toolPermissionContextVar: match[4],
-    needsSemicolonPrefix,
   };
 };
 

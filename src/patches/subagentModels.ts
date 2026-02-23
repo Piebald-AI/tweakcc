@@ -99,7 +99,7 @@ const patchGeneralPurposeAgent = (
   model: string
 ): string | null => {
   const pattern =
-    /(\b[$\w]+\s*=\s*\{agentType\s*:\s*"general-purpose"[\s\S]{0,2500}?)(\})/;
+    /([^$\w][$\w]+\s*=\s*\{agentType\s*:\s*"general-purpose"[\s\S]{0,2500}?)(\})/;
 
   const match = file.match(pattern);
 
