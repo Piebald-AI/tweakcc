@@ -621,7 +621,7 @@ export const appendToolsetToShortcutsDisplay = (
 
   // Replace with the new pattern that includes toolset
   const oldText = match[0];
-  const newText = `"? for shortcuts [",state.toolset||"undefined","]"`;
+  const newText = `"? for shortcuts [",currentToolset||"undefined","]"`;
 
   const newFile = oldFile.replace(oldText, newText);
   if (newFile === oldFile) {
