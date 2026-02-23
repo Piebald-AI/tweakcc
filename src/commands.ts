@@ -447,13 +447,6 @@ export async function handleRepack(
   );
 
   const newJs = await fs.readFile(inputJsPath, 'utf8');
-  const currentJs = await readContent(installation);
-
-  const approved = await promptUserForDiffApproval(currentJs, newJs);
-  if (!approved) {
-    console.log(chalk.yellow('Aborted.'));
-    return;
-  }
 
   await writeContent(installation, newJs);
 
