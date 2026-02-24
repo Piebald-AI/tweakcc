@@ -90,7 +90,7 @@ tweakcc also
 - Adds a message to Claude Code's startup banner indicating that you're running the patched version of CC (configurable)
 - Speeds up Claude Code startup by **~50%** with non-blocking MCP connections and configurable parallel connection batch size ([#406](https://github.com/Piebald-AI/tweakcc/issues/406))
 
-tweakcc supports Claude Code installed on **Windows, macOS, and Linux**, both **native/binary installations** and those installed via npm, yarn, pnpm, bun, Homebrew/Linuxbrew, nvm, fnm, n, volta, nvs, and nodenv, as well as custom locations.
+tweakcc supports Claude Code installed on **Windows, macOS, and Linux**, both **native/binary installations** and those installed via npm, yarn, pnpm, bun, Homebrew/Linuxbrew, nvm, fnm, n, volta, nvs, nodenv, and **Nix** (including [NixOS](https://nixos.org/) and [nix-darwin](https://github.com/LnL7/nix-darwin)), as well as custom locations.
 
 tweakcc supports Claude Code's **native installation**, which is a large platform-specific native executable containing the same minified/compiled JavaScript code from npm, just packaged up in a [Bun](https://github.com/oven-sh/bun) binary. We support patching the native binary on macOS, Windows, and Linux, including ad-hoc signing on Apple Silicon, via [**node-lief**](https://github.com/Piebald-AI/node-lief), our Node.js bindings for [LIEF (Library to Instrument Executables)](https://github.com/lief-project/LIEF).
 
@@ -1228,6 +1228,30 @@ Yes! You can use the [`FORCE_COLOR`](https://force-color.org/) environment varia
 <summary>Why isn't my new theme being applied?</summary>
 
 Could you have forgotten to actually set Claude Code's theme to your new theme? Run `claude` and then use `/theme` to switch to your new theme if so.
+
+</details>
+
+#### Nix / NixOS
+
+<details>
+<summary>Does tweakcc work with Claude Code installed via Nix?</summary>
+
+**Yes.** tweakcc automatically detects and resolves Nix [`makeBinaryWrapper`](https://nixos.org/manual/nixpkgs/stable/#fun-makeBinaryWrapper) wrappers. When your `claude` binary is a Nix wrapper (a tiny compiled C shim that sets environment variables and calls `execv`), tweakcc sees through it to find the real Bun-compiled binary (typically named `.claude-unwrapped`) and operates on that instead.
+
+However, because the Nix store (`/nix/store/...`) is read-only, writing the patched binary back requires `sudo`:
+
+```bash
+sudo npx tweakcc --apply
+```
+
+To undo your changes and restore the original binary:
+
+```bash
+sudo nix store repair /nix/store/<hash>-claude-code-<version>
+```
+
+> [!WARNING]
+> **Modifying the Nix store directly is fragile.** Your changes will be lost if you run `nix-collect-garbage`, `nix store repair`, or rebuild the package (e.g., via `nixos-rebuild switch` or `home-manager switch`). After any of those operations, simply re-run `sudo npx tweakcc --apply` to re-patch. Your customizations are always preserved in `~/.tweakcc/config.json`.
 
 </details>
 

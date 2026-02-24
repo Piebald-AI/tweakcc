@@ -9,6 +9,7 @@
 import type {
   extractClaudeJsFromNativeInstallation as ExtractFn,
   repackNativeInstallation as RepackFn,
+  resolveNixBinaryWrapper as ResolveNixFn,
 } from './nativeInstallation';
 
 import { debug } from './utils';
@@ -16,6 +17,7 @@ import { debug } from './utils';
 interface NativeInstallationModule {
   extractClaudeJsFromNativeInstallation: typeof ExtractFn;
   repackNativeInstallation: typeof RepackFn;
+  resolveNixBinaryWrapper: typeof ResolveNixFn;
 }
 
 let cachedModule: NativeInstallationModule | null = null;
@@ -80,4 +82,19 @@ export async function repackNativeInstallation(
     );
   }
   mod.repackNativeInstallation(binPath, modifiedClaudeJs, outputPath);
+}
+
+/**
+ * Detects whether a binary is a Nix `makeBinaryWrapper` wrapper and returns
+ * the path to the real wrapped executable, or null if not a wrapper.
+ * Returns null if node-lief is not available.
+ */
+export async function resolveNixBinaryWrapper(
+  binaryPath: string
+): Promise<string | null> {
+  const mod = await tryLoadNativeInstallationModule();
+  if (!mod) {
+    return null;
+  }
+  return mod.resolveNixBinaryWrapper(binaryPath);
 }
