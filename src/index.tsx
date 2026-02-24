@@ -158,7 +158,7 @@ const main = async () => {
     .description(
       'Command-line tool to customize your Claude Code theme colors, thinking verbs and more.'
     )
-    .version('4.0.7')
+    .version('4.0.8')
     .option('-d, --debug', 'enable debug mode')
     .option('-v, --verbose', 'enable verbose debug mode (includes diffs)')
     .option('--show-unchanged', 'show unchanged diffs (requires --verbose)')
