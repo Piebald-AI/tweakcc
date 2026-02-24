@@ -518,8 +518,8 @@
       ],
       "identifierMap": {
         "0": "WEB_CONTENT",
-        "1": "ADDITIONAL_INSTRUCTIONS",
-        "2": "HAS_ADDITIONAL_INSTRUCTIONS_FLAG"
+        "1": "USER_PROMPT",
+        "2": "IS_TRUSTED_DOMAIN"
       },
       "version": "2.1.30"
     },
@@ -1053,7 +1053,7 @@
         0
       ],
       "identifierMap": {
-        "0": "CUSTOM_INSTRUCTIONS_LIST"
+        "0": "TOOL_USAGE_HINTS_ARRAY"
       },
       "version": "2.1.30"
     },
@@ -1639,7 +1639,7 @@
         "0": "ZOD_PARSE_RESULT",
         "1": "ZOD_ISSUE_ITEM",
         "2": "JSON_STRINGIFY_FN",
-        "3": "JSON_STRINGIFY_FN"
+        "3": "PARSED_HOOK_OUTPUT"
       },
       "version": "2.1.51"
     },
@@ -1943,9 +1943,9 @@
         "0": "PLAN_STATE",
         "1": "EDIT_TOOL",
         "2": "WRITE_TOOL",
-        "3": "IS_SUBAGENT_ENABLED_FN",
-        "4": "PLAN_SUBAGENT",
-        "5": "PLAN_V2_PLAN_AGENT_COUNT",
+        "3": "EXPLORE_AGENT_VARIANT",
+        "4": "EXPLORE_SUBAGENT",
+        "5": "PLAN_V2_EXPLORE_AGENT_COUNT",
         "6": "GLOB_TOOL_NAME",
         "7": "GREP_TOOL_NAME",
         "8": "READ_TOOL_NAME",
@@ -2608,10 +2608,10 @@
         "1": "TASK_TOOL",
         "2": "READ_TOOL",
         "3": "GLOB_TOOL",
-        "4": "GET_PERMISSION_MODE_FN",
-        "5": "IS_BACKGROUND_TASKS_DISABLED_FN",
-        "6": "PROCESS_ENV",
-        "7": "IS_HEADLESS_FN",
+        "4": "GET_SUBSCRIPTION_TYPE_FN",
+        "5": "IS_TRUTHY_FN",
+        "6": "PROCESS_OBJECT",
+        "7": "IS_IN_TEAMMATE_CONTEXT_FN",
         "8": "TASK_TOOL_OBJECT",
         "9": "WRITE_TOOL"
       },
