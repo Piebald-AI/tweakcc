@@ -579,7 +579,7 @@ export const appendToolsetToModeDisplay = (oldFile: string): string | null => {
   // Replace with the new pattern that includes toolset
   const oldText = match[0];
   // insertShiftTabAppStateVar provides the definition for currentToolset.
-  const newText = `${tlFunction}(${modeVar}).toLowerCase()," on [",currentToolset||"undefined","]"`;
+  const newText = `${tlFunction}(${modeVar}).toLowerCase(),currentToolset?\` on [\${currentToolset}]\`:""`;
 
   const newFile = oldFile.replace(oldText, newText);
 
@@ -621,7 +621,7 @@ export const appendToolsetToShortcutsDisplay = (
 
   // Replace with the new pattern that includes toolset
   const oldText = match[0];
-  const newText = `"? for shortcuts [",currentToolset||"undefined","]"`;
+  const newText = `currentToolset?\`? for shortcuts [\${currentToolset}]\`:"? for shortcuts"`;
 
   const newFile = oldFile.replace(oldText, newText);
   if (newFile === oldFile) {
