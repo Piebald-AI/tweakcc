@@ -7,6 +7,136 @@ import { execSync } from 'node:child_process';
 import LIEF from 'node-lief';
 import { isDebug, debug } from './utils';
 
+// ============================================================================
+// Nix binary wrapper detection
+// ============================================================================
+
+/**
+ * Maximum file size for a Nix binary wrapper. These are tiny compiled C
+ * programs (~5-20KB). Anything larger is definitely not a wrapper.
+ */
+const NIX_WRAPPER_MAX_SIZE = 200_000;
+
+/**
+ * Detects whether a binary is a Nix `makeBinaryWrapper` output and, if so,
+ * extracts the path to the real wrapped executable.
+ *
+ * Nix's `makeBinaryWrapper` generates a small C program that:
+ *   1. Manipulates the environment (setenv/unsetenv/putenv)
+ *   2. Calls `execv("/nix/store/.../real-binary", argv)`
+ *
+ * The wrapper always embeds a DOCSTRING in `.rodata` (ELF) or `__cstring`
+ * (Mach-O) containing the literal `makeCWrapper` invocation, whose first
+ * argument is the real executable path. This is a contractual part of the
+ * wrapper format (used by `makeBinaryWrapper.extractCmd`).
+ *
+ * Detection strategy:
+ *   1. Size gate: wrappers are tiny (<200KB), real Bun binaries are multi-MB
+ *   2. Symbol gate: wrappers import `execv`, real Bun apps do not
+ *   3. Parse the DOCSTRING: `makeCWrapper '/nix/store/.../real-binary' ...`
+ *   4. Fallback: find `/nix/store/` paths with `/bin/` in `.rodata`
+ *
+ * @returns The path to the real wrapped executable, or null if not a wrapper.
+ */
+export function resolveNixBinaryWrapper(binaryPath: string): string | null {
+  try {
+    // Gate 1: file size — wrappers are tiny
+    const stat = fs.statSync(binaryPath);
+    if (stat.size > NIX_WRAPPER_MAX_SIZE) {
+      return null;
+    }
+
+    LIEF.logging.disable();
+    const binary = LIEF.parse(binaryPath);
+
+    // Gate 2: must import execv — the hallmark of a makeBinaryWrapper
+    const symbols = binary.symbols();
+    const hasExecv = symbols.some(sym => {
+      const name = sym.name;
+      return name === 'execv' || name === '_execv';
+    });
+
+    if (!hasExecv) {
+      debug(
+        'resolveNixBinaryWrapper: no execv import found, not a Nix wrapper'
+      );
+      return null;
+    }
+
+    debug(
+      'resolveNixBinaryWrapper: execv import found, checking for Nix wrapper DOCSTRING'
+    );
+
+    // Extract string data from .rodata (ELF) or __TEXT,__cstring (Mach-O)
+    let rawBytes: Buffer | null = null;
+
+    if (binary.format === 'ELF') {
+      const rodata = binary.sections().find(s => s.name === '.rodata');
+      if (rodata) {
+        rawBytes = rodata.content;
+      }
+    } else if (binary.format === 'MachO') {
+      const machoBinary = binary as LIEF.MachO.Binary;
+      const textSeg = machoBinary.getSegment('__TEXT');
+      if (textSeg) {
+        const cstring = textSeg.getSection('__cstring');
+        if (cstring) {
+          rawBytes = cstring.content;
+        }
+      }
+    }
+
+    if (!rawBytes || rawBytes.length === 0) {
+      debug('resolveNixBinaryWrapper: could not read string section');
+      return null;
+    }
+
+    const text = rawBytes.toString('utf-8');
+
+    // Strategy 1: parse the DOCSTRING
+    // makeBinaryWrapper always embeds: makeCWrapper '/nix/store/.../real' ...
+    const docstringMatch = text.match(/makeCWrapper\s+'(\/nix\/store\/[^']+)'/);
+    if (docstringMatch) {
+      const resolvedPath = docstringMatch[1];
+      debug(
+        `resolveNixBinaryWrapper: found wrapped executable via DOCSTRING: ${resolvedPath}`
+      );
+      return resolvedPath;
+    }
+
+    // Also handle unquoted (shouldn't happen but defensive)
+    const unquotedMatch = text.match(/makeCWrapper\s+(\/nix\/store\/\S+)/);
+    if (unquotedMatch) {
+      const resolvedPath = unquotedMatch[1];
+      debug(
+        `resolveNixBinaryWrapper: found wrapped executable via unquoted DOCSTRING: ${resolvedPath}`
+      );
+      return resolvedPath;
+    }
+
+    // Strategy 2: find /nix/store/ paths in the string table
+    // The execv target is the one that points to an executable (contains /bin/)
+    // as opposed to env var values (--prefix PATH) which point to directories.
+    const nixPaths = text.match(/\/nix\/store\/[^\0\n\r]+/g);
+    if (nixPaths) {
+      for (const p of nixPaths) {
+        if (p.includes('/bin/')) {
+          debug(
+            `resolveNixBinaryWrapper: found wrapped executable via /bin/ heuristic: ${p}`
+          );
+          return p;
+        }
+      }
+    }
+
+    debug('resolveNixBinaryWrapper: has execv but no Nix store paths found');
+    return null;
+  } catch (error) {
+    debug('resolveNixBinaryWrapper: error during detection:', error);
+    return null;
+  }
+}
+
 /**
  * Constants for Bun trailer and serialized layout sizes.
  *
@@ -505,6 +635,11 @@ function getBunData(binary: LIEF.Abstract.Binary): BunData {
 /**
  * Extracts claude.js from a native installation binary.
  * Returns the contents as a Buffer, or null if not found.
+ *
+ * Note: If the binary might be a Nix `makeBinaryWrapper` wrapper, callers
+ * should resolve it first using `resolveNixBinaryWrapper()` and pass the
+ * real binary path here. This is handled at detection time in
+ * `installationDetection.ts`.
  */
 export function extractClaudeJsFromNativeInstallation(
   nativeInstallationPath: string
@@ -1035,6 +1170,13 @@ function repackELF(
 
 /**
  * Repacks a modified claude.js back into the native installation binary.
+ *
+ * Note: If the binary might be a Nix `makeBinaryWrapper` wrapper, callers
+ * should resolve it first using `resolveNixBinaryWrapper()` and pass the
+ * real binary path here. This is handled at detection time in
+ * `installationDetection.ts`, so `nativeInstallationPath` should already
+ * point to the real binary.
+ *
  * @param binPath - Path to the original native installation binary
  * @param modifiedClaudeJs - Modified claude.js contents as a Buffer
  * @param outputPath - Where to write the repacked binary

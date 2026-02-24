@@ -10,7 +10,10 @@ import {
   doesFileExist,
   compareSemverVersions,
 } from './utils';
-import { extractClaudeJsFromNativeInstallation } from './nativeInstallationLoader';
+import {
+  extractClaudeJsFromNativeInstallation,
+  resolveNixBinaryWrapper,
+} from './nativeInstallationLoader';
 import { CLIJS_SEARCH_PATHS, NATIVE_SEARCH_PATHS } from './installationPaths';
 import { CONFIG_FILE, updateConfigFile } from './config';
 import {
@@ -212,6 +215,26 @@ async function readFilePrefix(
 }
 
 /**
+ * If the binary at `binaryPath` is a Nix `makeBinaryWrapper` wrapper,
+ * resolves through to the real wrapped executable. Otherwise returns
+ * the original path unchanged.
+ *
+ * This ensures that `nativeInstallationPath` always points to the actual
+ * Bun-compiled binary (not the tiny C wrapper), so all downstream
+ * operations (backup, extract, repack) operate on the right file.
+ */
+async function maybeResolveNixWrapper(binaryPath: string): Promise<string> {
+  const resolved = await resolveNixBinaryWrapper(binaryPath);
+  if (resolved) {
+    debug(
+      `maybeResolveNixWrapper: resolved Nix wrapper ${binaryPath} -> ${resolved}`
+    );
+    return resolved;
+  }
+  return binaryPath;
+}
+
+/**
  * Resolves a path to its installation type.
  * Handles symlinks by resolving to target.
  * Returns the kind and resolved path, or null if unrecognized.
@@ -247,7 +270,9 @@ export async function resolvePathToInstallationType(
         }
 
         if (!lower.startsWith('text/')) {
-          return { kind: 'native-binary', resolvedPath };
+          // It's a binary — check if it's a Nix wrapper and resolve through
+          const nixResolved = await maybeResolveNixWrapper(resolvedPath);
+          return { kind: 'native-binary', resolvedPath: nixResolved };
         }
 
         debug('resolvePathToInstallationType: Unrecognized file type');
@@ -265,7 +290,9 @@ export async function resolvePathToInstallationType(
     }
 
     if (fallbackType === 'binary') {
-      return { kind: 'native-binary', resolvedPath };
+      // It's a binary — check if it's a Nix wrapper and resolve through
+      const nixResolved = await maybeResolveNixWrapper(resolvedPath);
+      return { kind: 'native-binary', resolvedPath: nixResolved };
     }
 
     debug(
@@ -446,10 +473,17 @@ export async function collectCandidates(): Promise<InstallationCandidate[]> {
     }
     try {
       if (await doesFileExist(nativePath)) {
-        debug(`collectCandidates: Found native binary at ${nativePath}`);
-        const version = await extractVersion(nativePath, 'native-binary');
+        // Resolve through Nix wrapper if applicable
+        const resolvedNativePath = await maybeResolveNixWrapper(nativePath);
+        debug(
+          `collectCandidates: Found native binary at ${nativePath}${resolvedNativePath !== nativePath ? ` (resolved -> ${resolvedNativePath})` : ''}`
+        );
+        const version = await extractVersion(
+          resolvedNativePath,
+          'native-binary'
+        );
         candidates.push({
-          path: nativePath,
+          path: resolvedNativePath,
           kind: 'native-binary',
           version,
         });

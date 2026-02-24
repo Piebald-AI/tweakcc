@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Add Nix support (#548) - @signadou
+
 ## [v4.0.8](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.8) - 2026-02-24
 
 - Fix `? for shortcuts [undefined]` when no toolset is active (#544) - @bl-ue
