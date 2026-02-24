@@ -105,7 +105,20 @@
         "5": "GLOB_TOOL_NAME",
         "6": "GREP_TOOL_NAME"
       },
-      "version": "2.0.73"
+      "version": "2.0.73",
+      "agentMetadata": {
+        "model": "haiku",
+        "permissionMode": "dontAsk",
+        "whenToUse": "Use this agent when the user asks questions (\"Can Claude...\", \"Does Claude...\", \"How do I...\") about: (1) Claude Code (the CLI tool) - features, hooks, slash commands, MCP servers, settings, IDE integrations, keyboard shortcuts; (2) Claude Agent SDK - building custom agents; (3) Claude API (formerly Anthropic API) - API usage, tool use, Anthropic SDK usage. **IMPORTANT:** Before spawning a new agent, check if there is already a running or recently completed claude-code-guide agent that you can resume using the \"resume\" parameter.",
+        "tools": [
+          "Glob",
+          "Grep",
+          "Read",
+          "WebFetch",
+          "WebSearch"
+        ],
+        "agentType": "claude-code-guide"
+      }
     },
     {
       "name": "Agent Prompt: CLAUDE.md creation",
@@ -127,7 +140,15 @@
       ],
       "identifiers": [],
       "identifierMap": {},
-      "version": "2.0.77"
+      "version": "2.0.77",
+      "agentMetadata": {
+        "model": "inherit",
+        "whenToUse": "Command execution specialist for running bash commands. Use this for git operations, command execution, and other terminal tasks.",
+        "tools": [
+          "Bash"
+        ],
+        "agentType": "Bash"
+      }
     },
     {
       "name": "Agent Prompt: Conversation summarization",
@@ -165,7 +186,21 @@
         "2": "READ_TOOL_NAME",
         "3": "BASH_TOOL_NAME"
       },
-      "version": "2.0.56"
+      "version": "2.0.56",
+      "agentMetadata": {
+        "model": "haiku",
+        "whenToUse": "Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. \"src/components/**/*.tsx\"), search code for keywords (eg. \"API endpoints\"), or answer questions about the codebase (eg. \"how do API endpoints work?\"). When calling this agent, specify the desired thoroughness level: \"quick\" for basic searches, \"medium\" for moderate exploration, or \"very thorough\" for comprehensive analysis across multiple locations and naming conventions.",
+        "whenToUseDynamic": true,
+        "disallowedTools": [
+          "Task",
+          "ExitPlanMode",
+          "Edit",
+          "Write",
+          "NotebookEdit"
+        ],
+        "criticalSystemReminder": "CRITICAL: This is a READ-ONLY task. You CANNOT edit, write, or create files.",
+        "agentType": "Explore"
+      }
     },
     {
       "name": "Agent Prompt: Hook condition evaluator",
@@ -203,7 +238,20 @@
         "2": "READ_TOOL_NAME",
         "3": "BASH_TOOL_NAME"
       },
-      "version": "2.0.56"
+      "version": "2.0.56",
+      "agentMetadata": {
+        "model": "inherit",
+        "whenToUse": "Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs.",
+        "disallowedTools": [
+          "Task",
+          "ExitPlanMode",
+          "Edit",
+          "Write",
+          "NotebookEdit"
+        ],
+        "criticalSystemReminder": "CRITICAL: This is a READ-ONLY task. You CANNOT edit, write, or create files.",
+        "agentType": "Plan"
+      }
     },
     {
       "name": "Agent Prompt: /pr-comments slash command",
@@ -330,7 +378,17 @@
       ],
       "identifiers": [],
       "identifierMap": {},
-      "version": "2.1.47"
+      "version": "2.1.47",
+      "agentMetadata": {
+        "model": "sonnet",
+        "color": "orange",
+        "whenToUse": "Use this agent to configure the user's Claude Code status line setting.",
+        "tools": [
+          "Read",
+          "Edit"
+        ],
+        "agentType": "statusline-setup"
+      }
     },
     {
       "name": "Agent Prompt: Task tool",
@@ -341,7 +399,14 @@
       ],
       "identifiers": [],
       "identifierMap": {},
-      "version": "2.0.14"
+      "version": "2.0.14",
+      "agentMetadata": {
+        "whenToUse": "General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you.",
+        "tools": [
+          "*"
+        ],
+        "agentType": "general-purpose"
+      }
     },
     {
       "name": "Agent Prompt: Task tool (extra notes)",
@@ -363,7 +428,15 @@
       ],
       "identifiers": [],
       "identifierMap": {},
-      "version": "2.0.30"
+      "version": "2.0.30",
+      "agentMetadata": {
+        "model": "sonnet",
+        "whenToUse": "Update Magic Docs",
+        "tools": [
+          "Edit"
+        ],
+        "agentType": "magic-docs"
+      }
     },
     {
       "name": "Agent Prompt: User sentiment analysis",
