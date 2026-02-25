@@ -259,7 +259,7 @@
         0
       ],
       "identifierMap": {
-        "0": "USER_INPUT"
+        "0": "ADDITIONAL_USER_INPUT"
       },
       "version": "2.1.30"
     },
@@ -510,8 +510,8 @@
       ],
       "identifierMap": {
         "0": "WEB_CONTENT",
-        "1": "ADDITIONAL_INSTRUCTIONS",
-        "2": "HAS_ADDITIONAL_INSTRUCTIONS_FLAG"
+        "1": "USER_PROMPT",
+        "2": "IS_TRUSTED_DOMAIN"
       },
       "version": "2.1.30"
     },
@@ -878,7 +878,7 @@
       "identifierMap": {
         "0": "DEBUG_LOG_PATH",
         "1": "DEBUG_LOG_SUMMARY",
-        "2": "USER_ISSUE_DESCRIPTION",
+        "2": "ISSUE_DESCRIPTION",
         "3": "SETTINGS_FILE_PATH",
         "4": "LOG_LINE_COUNT",
         "5": "CLAUDE_CODE_GUIDE_SUBAGENT_NAME"
@@ -940,7 +940,7 @@
         0
       ],
       "identifierMap": {
-        "0": "PREVIOUS_SUMMARY"
+        "0": "PREVIOUS_AGENT_SUMMARY"
       },
       "version": "2.1.32"
     },
@@ -1167,7 +1167,7 @@
       "identifierMap": {
         "0": "CURRENT_BRANCH",
         "1": "MAIN_BRANCH",
-        "2": "GIT_STATUS_OUTPUT",
+        "2": "GIT_STATUS",
         "3": "RECENT_COMMITS"
       },
       "version": "2.1.30"
@@ -1423,7 +1423,7 @@
       ],
       "identifierMap": {
         "0": "AVAILABLE_TOOLS_SET",
-        "1": "ASK_USER_QUESTION_TOOL_NAME"
+        "1": "ASK_USER_QUESTION_TOOL"
       },
       "version": "2.1.31"
     },
@@ -1855,7 +1855,7 @@
         "0": "ZOD_PARSE_RESULT",
         "1": "ZOD_ISSUE_ITEM",
         "2": "JSON_STRINGIFY_FN",
-        "3": "JSON_STRINGIFY_FN"
+        "3": "PARSED_HOOK_OUTPUT"
       },
       "version": "2.1.51"
     },
@@ -2156,12 +2156,12 @@
         11
       ],
       "identifierMap": {
-        "0": "PLAN_STATE",
+        "0": "SYSTEM_REMINDER",
         "1": "EDIT_TOOL",
         "2": "WRITE_TOOL",
-        "3": "IS_SUBAGENT_ENABLED_FN",
-        "4": "PLAN_SUBAGENT",
-        "5": "PLAN_V2_PLAN_AGENT_COUNT",
+        "3": "EXPLORE_AGENT_VARIANT",
+        "4": "EXPLORE_SUBAGENT",
+        "5": "PLAN_V2_EXPLORE_AGENT_COUNT",
         "6": "GLOB_TOOL_NAME",
         "7": "GREP_TOOL_NAME",
         "8": "READ_TOOL_NAME",
@@ -2232,7 +2232,7 @@
         3
       ],
       "identifierMap": {
-        "0": "PLAN_STATE",
+        "0": "SYSTEM_REMINDER",
         "1": "EDIT_TOOL",
         "2": "WRITE_TOOL",
         "3": "ASK_USER_QUESTION_TOOL_NAME"
@@ -2632,10 +2632,10 @@
       "identifierMap": {
         "0": "GIT_COMMAND_PARALLEL_NOTE",
         "1": "BASH_TOOL_NAME",
-        "2": "ATTRIBUTION_TEXT",
+        "2": "COMMIT_CO_AUTHORED_BY_CLAUDE_CODE",
         "3": "TODO_TOOL_OBJECT",
         "4": "TASK_TOOL_NAME",
-        "5": "PR_ATTRIBUTION_TEXT"
+        "5": "PR_GENERATED_WITH_CLAUDE_CODE"
       },
       "version": "2.1.38"
     },
@@ -3214,7 +3214,7 @@
         "0": "DEFAULT_READ_LINES",
         "1": "MAX_LINE_LENGTH",
         "2": "CONDITIONAL_READ_LINES",
-        "3": "IS_PDF_SUPPORTED_FN",
+        "3": "CAN_READ_PDF_FILES",
         "4": "BASH_TOOL_NAME"
       },
       "version": "2.1.50"
@@ -3312,10 +3312,10 @@
         "1": "TASK_TOOL",
         "2": "READ_TOOL",
         "3": "GLOB_TOOL",
-        "4": "GET_PERMISSION_MODE_FN",
-        "5": "IS_BACKGROUND_TASKS_DISABLED_FN",
-        "6": "PROCESS_ENV",
-        "7": "IS_HEADLESS_FN",
+        "4": "GET_SUBSCRIPTION_TYPE_FN",
+        "5": "IS_TRUTHY_FN",
+        "6": "PROCESS_OBJECT",
+        "7": "IS_IN_TEAMMATE_CONTEXT_FN",
         "8": "TASK_TOOL_OBJECT",
         "9": "WRITE_TOOL"
       },
@@ -3455,7 +3455,7 @@
         0
       ],
       "identifierMap": {
-        "0": "WRITE_TOOL_EXTRA_NOTES_FN"
+        "0": "MUST_READ_FIRST_FN"
       },
       "version": "2.1.53"
     },
