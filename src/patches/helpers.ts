@@ -42,7 +42,7 @@ export const getModuleLoaderFunction = (
 
   // NPM bundles: var T=(H,$,A)=>{ at the start
   const firstChunk = fileContents.slice(0, 1000);
-  const pattern = /var ([$\w]+)=\([$\w]+,[$\w]+,[$\w]+\)=>\{/;
+  const pattern = /(?:var |,)([$\w]+)=\([$\w]+,[$\w]+,[$\w]+\)=>\{/;
   const match = firstChunk.match(pattern);
   if (match) {
     return match[1];
