@@ -788,7 +788,10 @@ export const applyCustomization = async (
     // Features
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),
-      condition: !!config.settings.misc?.enableWorktreeMode,
+      condition:
+        !!config.settings.misc?.enableWorktreeMode &&
+        !!ccInstInfo.version &&
+        compareVersions(ccInstInfo.version, '2.1.51') < 0,
     },
     'session-memory': {
       fn: c => writeSessionMemory(c),

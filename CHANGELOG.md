@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 - Add Nix support (#548) - @signadou
+- Fix patching for CC 2.1.51+ (#551) - @bl-ue
 
 ## [v4.0.8](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.8) - 2026-02-24
 
