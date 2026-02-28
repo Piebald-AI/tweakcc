@@ -41,11 +41,19 @@ export const getModuleLoaderFunction = (
   }
 
   // NPM bundles: var T=(H,$,A)=>{ at the start
-  const firstChunk = fileContents.slice(0, 1000);
-  const pattern = /(?:var |,)([$\w]+)=\([$\w]+,[$\w]+,[$\w]+\)=>\{/;
-  const match = firstChunk.match(pattern);
-  if (match) {
-    return match[1];
+  // In newer versions there are more than one, and the one with the shortest name
+  // is the most common one and therefore the correct one.
+  const firstChunk = fileContents.slice(0, 10000);
+  const pattern = /(?:var |,)([$\w]+)=\([$\w]+,[$\w]+,[$\w]+\)=>\{/g;
+  const matches = Array.from(firstChunk.matchAll(pattern));
+  if (matches.length > 0) {
+    let shortest = matches[0][1];
+    for (const m of matches) {
+      if (m[1].length < shortest.length) {
+        shortest = m[1];
+      }
+    }
+    return shortest;
   }
 
   console.log(
