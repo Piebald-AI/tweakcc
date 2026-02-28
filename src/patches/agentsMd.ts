@@ -94,6 +94,40 @@ import { showDiff } from './index';
  *    return null;
  *  }
  * ```
+ *
+ * CC 2.1.62 (reads file first, catches ENOENT):
+ * ```
+ *  function kPA(H, $) {
+ *    try {
+ *      let L = mH().readFileSync(H, { encoding: "utf-8" }),
+ *        I = fM.extname(H).toLowerCase();
+ *      if (I && !sC1.has(I))
+ *        return T(`Skipping non-text file in @include: ${H}`), null;
+ *      let { content: D, paths: B } = eC1(L), f = D;
+ *      if ($ === "AutoMem" || $ === "TeamMem") { ... }
+ *      return { path: H, type: $, content: f, globs: B };
+ *    } catch (A) {
+ *      let L = A.code;
+ * -    if (L === "ENOENT" || L === "EISDIR") return null;
+ * +    if (L === "ENOENT" || L === "EISDIR") {
+ * +      if (H.endsWith("/CLAUDE.md") || H.endsWith("\\CLAUDE.md")) {
+ * +        for (let alt of ["AGENTS.md", "GEMINI.md", "QWEN.md"]) {
+ * +          let altPath = H.slice(0, -9) + alt;
+ * +          if (mH().existsSync(altPath) && mH().statSync(altPath).isFile())
+ * +            return kPA(altPath, $);
+ * +        }
+ * +      }
+ * +      return null;
+ * +    }
+ *      if (L === "EACCES")
+ *        c("tengu_claude_md_permission_error", {
+ *          is_access_error: 1,
+ *          has_home_dir: H.includes(UL()) ? 1 : 0,
+ *        });
+ *    }
+ *    return null;
+ *  }
+ * ```
  */
 export const writeAgentsMd = (
   file: string,
@@ -156,7 +190,31 @@ export const writeAgentsMd = (
     return newFile;
   }
 
-  // Step 4: Try the fallback pattern (uses }catch or }}catch)
+  // Step 4: Try the catch-based pattern (CC 2.1.62+)
+  // In v2.1.62+, the function reads the file directly inside try{} and catches
+  // ENOENT when the file doesn't exist. We inject into the ENOENT handler:
+  //   if(errVar==="ENOENT"||errVar==="EISDIR")return null;
+  //   → if(errVar==="ENOENT"||errVar==="EISDIR"){ <alt-name check> return null; }
+  const catchPattern =
+    /(if\([$\w]+==="ENOENT"\|\|[$\w]+==="EISDIR"\))return null;/;
+  const catchMatch = file.slice(funcStart).match(catchPattern);
+
+  if (catchMatch && catchMatch.index !== undefined) {
+    const injection = buildInjection();
+    const replacement = catchMatch[1] + '{' + injection + '}';
+
+    const startIndex = funcStart + catchMatch.index;
+    const endIndex = startIndex + catchMatch[0].length;
+
+    const newFile =
+      file.slice(0, startIndex) + replacement + file.slice(endIndex);
+
+    showDiff(file, newFile, replacement, startIndex, endIndex);
+
+    return newFile;
+  }
+
+  // Step 5: Try the fallback pattern (uses }catch or }}catch, CC <2.1.29)
   // Pattern: }catch or }}catch
   const fallbackPattern = /(\})(}catch)/;
   const fallbackMatch = file.slice(funcStart).match(fallbackPattern);
