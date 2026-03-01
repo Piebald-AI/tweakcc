@@ -102,16 +102,16 @@ const patchModelAliasesList = (oldFile: string): string | null => {
  * Patch 3: Fix the description function (Zm3) to handle opusplan[1m]
  *
  * Original:
- *   if (A === "opusplan") return "Opus 4.5 in plan mode, else Sonnet 4.5";
- *
+ *   if (A === "opusplan") return "Opus 4.6 in plan mode, else Sonnet 4.6";
  * Patched:
- *   if (A === "opusplan") return "Opus 4.5 in plan mode, else Sonnet 4.5";
- *   if (A === "opusplan[1m]") return "Opus 4.5 in plan mode, else Sonnet 4.5 (1M context)";
+ *   if (A === "opusplan") return "Opus 4.6 in plan mode, else Sonnet 4.6";
+ *   if (A === "opusplan[1m]") return "Opus 4.6 in plan mode, else Sonnet 4.6 (1M context)";
  */
 const patchDescriptionFunction = (oldFile: string): string | null => {
-  // Pattern matches: if (VAR === "opusplan") return "Opus 4.5 in plan mode, else Sonnet 4.5";
+  // Pattern matches: if (VAR === "opusplan") return "<some text>";
+  // Keep this strict enough to avoid consuming adjacent tokens.
   const pattern =
-    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*"Opus .{0,20} in plan mode, else Sonnet .{0,20}";)/;
+    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*"[^"]*";)/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
@@ -123,10 +123,9 @@ const patchDescriptionFunction = (oldFile: string): string | null => {
 
   const [fullMatch, , varName] = match;
 
-  // Add the opusplan[1m] case right after the opusplan case
   const replacement =
-    fullMatch +
-    `if(${varName}==="opusplan[1m]")return"Opus 4.5 in plan mode, else Sonnet 4.5 (1M context)";`;
+    `if(${varName}==="opusplan")return"Opus 4.6 in plan mode, else Sonnet 4.6";` +
+    `if(${varName}==="opusplan[1m]")return"Opus 4.6 in plan mode, else Sonnet 4.6 (1M context)";`;
 
   const newFile =
     oldFile.slice(0, match.index) +
@@ -209,9 +208,10 @@ const patchModelSelectorOptions = (oldFile: string): string | null => {
   // Old pattern: if (K === "opusplan") return [...A, Mm3()];
   // New pattern: if (K === "opusplan") return v1A([...A, Mm3()]);
   // We need to add a similar case for opusplan[1m]
-  // Capture groups: 1=fullMatch, 2=conditionVar (K), 3=listVar (A), 4=funcName (Mm3)
+  // Capture groups:
+  // 1=fullMatch, 2=conditionVar (K), 3=optional wrapper fn (v1A), 4=listVar (A), 5=funcName (Mm3)
   const pattern =
-    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*(?:[$\w]+\()?\[\s*\.\.\.([$\w]+)\s*,\s*([$\w]+)\(\)\s*\]\)?;)/;
+    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*(?:([$\w]+)\()?\[\s*\.\.\.([$\w]+)\s*,\s*([$\w]+)\(\)\s*\]\)?;)/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
@@ -221,13 +221,12 @@ const patchModelSelectorOptions = (oldFile: string): string | null => {
     return null;
   }
 
-  const [fullMatch, , varName, listVar] = match;
-
-  // Add the opusplan[1m] case right after. We create an inline object instead of a function
-  // since we don't want to modify the function definitions area
+  const [fullMatch, , varName, wrapFn, listVar] = match;
+  const returnExpr = wrapFn
+    ? `${wrapFn}([...${listVar},{value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus 4.6 in plan mode, Sonnet 4.6 (1M context) otherwise"}])`
+    : `[...${listVar},{value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus 4.6 in plan mode, Sonnet 4.6 (1M context) otherwise"}]`;
   const replacement =
-    fullMatch +
-    `if(${varName}==="opusplan[1m]")return[...${listVar},{value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus 4.5 in plan mode, Sonnet 4.5 (1M context) otherwise"}];`;
+    fullMatch + `if(${varName}==="opusplan[1m]")return ${returnExpr};`;
 
   const newFile =
     oldFile.slice(0, match.index) +
@@ -272,8 +271,8 @@ const patchAlwaysShowInModelSelector = (oldFile: string): string | null => {
   // Inject pushes BEFORE the conditional return
   // This ensures opusplan and opusplan[1m] are always in the list
   const inject =
-    `${listVar}.push({value:"opusplan",label:"Opus Plan Mode",description:"Use Opus 4.5 in plan mode, Sonnet 4.5 otherwise"});` +
-    `${listVar}.push({value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus 4.5 in plan mode, Sonnet 4.5 (1M context) otherwise"});`;
+    `${listVar}.push({value:"opusplan",label:"Opus Plan Mode",description:"Use Opus 4.6 in plan mode, Sonnet 4.6 otherwise"});` +
+    `${listVar}.push({value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus 4.6 in plan mode, Sonnet 4.6 (1M context) otherwise"});`;
 
   const newFile =
     oldFile.slice(0, match.index) + inject + oldFile.slice(match.index);
