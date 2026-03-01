@@ -154,23 +154,11 @@ const PATCH_DEFINITIONS = [
       'Set the CLAUDE_CODE_CONTEXT_LIMIT env var to change 200k max for custom models',
   },
   {
-    id: 'model-customizations',
-    name: 'Model customizations',
-    group: PatchGroup.ALWAYS_APPLIED,
-    description: 'Access all Claude models with /model, not just latest 3',
-  },
-  {
     id: 'opusplan1m',
     name: 'Opusplan[1m] support',
     group: PatchGroup.ALWAYS_APPLIED,
     description:
       'Use the "Opus Plan 1M" model: Opus for planning, Sonnet 1M context for building',
-  },
-  {
-    id: 'show-more-items-in-select-menus',
-    name: 'Show more items in select menus',
-    group: PatchGroup.ALWAYS_APPLIED,
-    description: 'Show 25 items in select menus instead of default 5',
   },
   {
     id: 'thinking-block-styling',
@@ -191,6 +179,18 @@ const PATCH_DEFINITIONS = [
     description: `Statusline updates will be properly throttled instead of queued (or debounced)`,
   },
   // Misc Configurable
+  {
+    id: 'model-customizations',
+    name: 'Model customizations',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Access all Claude models with /model, not just latest 3',
+  },
+  {
+    id: 'show-more-items-in-select-menus',
+    name: 'Show more items in select menus',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Show 25 items in select menus instead of default 5',
+  },
   {
     id: 'patches-applied-indication',
     name: 'Patches applied indication',
@@ -605,6 +605,10 @@ export const applyCustomization = async (
   // ==========================================================================
   // Define patch implementations (keyed by PatchId)
   // ==========================================================================
+  // Keep model list customization and select-menu size behavior in sync.
+  // Disabling model customizations should restore both selectors to vanilla CC behavior.
+  const modelCustomizationsEnabled =
+    config.settings.misc?.enableModelCustomizations ?? true;
   const patchImplementations: Record<PatchId, PatchImplementation> = {
     // Always Applied
     'verbose-property': {
@@ -613,14 +617,8 @@ export const applyCustomization = async (
     'context-limit': {
       fn: c => writeContextLimit(c),
     },
-    'model-customizations': {
-      fn: c => writeModelCustomizations(c),
-    },
     opusplan1m: {
       fn: c => writeOpusplan1m(c),
-    },
-    'show-more-items-in-select-menus': {
-      fn: c => writeShowMoreItemsInSelectMenus(c, 25),
     },
     'thinking-block-styling': {
       fn: c => writeThinkingBlockStyling(c),
@@ -650,6 +648,14 @@ export const applyCustomization = async (
           showTweakccVersion,
           showPatchesApplied
         ),
+    },
+    'model-customizations': {
+      fn: c => writeModelCustomizations(c),
+      condition: modelCustomizationsEnabled,
+    },
+    'show-more-items-in-select-menus': {
+      fn: c => writeShowMoreItemsInSelectMenus(c, 25),
+      condition: modelCustomizationsEnabled,
     },
     'table-format': {
       fn: c => writeTableFormat(c, tableFormat),

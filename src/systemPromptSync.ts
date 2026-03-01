@@ -1345,8 +1345,9 @@ const applyIdentifierMapping = (
     const humanName = identifierMap[labelIndex];
 
     if (humanName) {
-      // Skip empty mappings
       reverseMap[humanName] = capturedVar;
+    } else {
+      reverseMap[`UNKNOWN_${labelIndex}`] = capturedVar;
     }
   }
 
