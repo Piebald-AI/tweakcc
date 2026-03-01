@@ -33,4 +33,10 @@ describe('writeOpusplan1m', () => {
     expect(output).toContain('if(K==="opusplan[1m]")return [...A,');
     expect(() => new Function(output!)).not.toThrow();
   });
+
+  it('returns null for unmatched input', () => {
+    const output = writeOpusplan1m('function z(){return 1;}');
+
+    expect(output).toBeNull();
+  });
 });

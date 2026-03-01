@@ -108,10 +108,7 @@ const patchModelAliasesList = (oldFile: string): string | null => {
  *   if (A === "opusplan[1m]") return "Opus 4.6 in plan mode, else Sonnet 4.6 (1M context)";
  */
 const patchDescriptionFunction = (oldFile: string): string | null => {
-  // Pattern matches: if (VAR === "opusplan") return "<some text>";
-  // Keep this strict enough to avoid consuming adjacent tokens.
-  const pattern =
-    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*"[^"]*";)/;
+  const pattern = /(if\(([$A-Za-z_][\w$]*)==="opusplan"\)return"[^"]*";)/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
@@ -123,7 +120,6 @@ const patchDescriptionFunction = (oldFile: string): string | null => {
 
   const [fullMatch, , varName] = match;
 
-  // Replace the full branch instead of appending to preserve statement boundaries.
   const replacement =
     `if(${varName}==="opusplan")return"Opus 4.6 in plan mode, else Sonnet 4.6";` +
     `if(${varName}==="opusplan[1m]")return"Opus 4.6 in plan mode, else Sonnet 4.6 (1M context)";`;
@@ -212,7 +208,7 @@ const patchModelSelectorOptions = (oldFile: string): string | null => {
   // Capture groups:
   // 1=fullMatch, 2=conditionVar (K), 3=optional wrapper fn (v1A), 4=listVar (A), 5=funcName (Mm3)
   const pattern =
-    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*(?:([$\w]+)\()?\[\s*\.\.\.([$\w]+)\s*,\s*([$\w]+)\(\)\s*\]\)?;)/;
+    /(if\(([$A-Za-z_][\w$]*)==="opusplan"\)return (?:([$A-Za-z_][\w$]*)\()?\[\.\.\.([$A-Za-z_][\w$]*),([$A-Za-z_][\w$]*)\(\)\]\)?;)/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
@@ -223,8 +219,6 @@ const patchModelSelectorOptions = (oldFile: string): string | null => {
   }
 
   const [fullMatch, , varName, wrapFn, listVar] = match;
-  // Preserve the optional wrapper call (e.g. v1A(...)) so generated code remains valid
-  // for both wrapped and bare-array return forms.
   const returnExpr = wrapFn
     ? `${wrapFn}([...${listVar},{value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus 4.6 in plan mode, Sonnet 4.6 (1M context) otherwise"}])`
     : `[...${listVar},{value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus 4.6 in plan mode, Sonnet 4.6 (1M context) otherwise"}]`;
