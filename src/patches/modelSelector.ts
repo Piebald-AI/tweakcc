@@ -38,9 +38,12 @@ const findCustomModelListInsertionPoint = (
   // 2. Extract the model list variable name
   const modelListVar = pushMatch[1];
 
+  // The declaration/function head can move farther from the push site across CC builds
+  // and when other patches expand this block, so keep a wider lookback window.
   const searchStart = Math.max(0, pushMatch.index - 1500);
   const chunk = fileContents.slice(searchStart, pushMatch.index);
 
+  // Declaration can be emitted as let/var/const depending on minifier output.
   const declPattern = `(?:let|var|const) ${escapeIdent(modelListVar)}=.+?;`;
   const funcPattern = new RegExp(
     `function [$\\w]+\\([^)]*\\)\\{${declPattern}`,

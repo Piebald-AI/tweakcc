@@ -123,6 +123,7 @@ const patchDescriptionFunction = (oldFile: string): string | null => {
 
   const [fullMatch, , varName] = match;
 
+  // Replace the full branch instead of appending to preserve statement boundaries.
   const replacement =
     `if(${varName}==="opusplan")return"Opus 4.6 in plan mode, else Sonnet 4.6";` +
     `if(${varName}==="opusplan[1m]")return"Opus 4.6 in plan mode, else Sonnet 4.6 (1M context)";`;
@@ -222,6 +223,8 @@ const patchModelSelectorOptions = (oldFile: string): string | null => {
   }
 
   const [fullMatch, , varName, wrapFn, listVar] = match;
+  // Preserve the optional wrapper call (e.g. v1A(...)) so generated code remains valid
+  // for both wrapped and bare-array return forms.
   const returnExpr = wrapFn
     ? `${wrapFn}([...${listVar},{value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus 4.6 in plan mode, Sonnet 4.6 (1M context) otherwise"}])`
     : `[...${listVar},{value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus 4.6 in plan mode, Sonnet 4.6 (1M context) otherwise"}]`;

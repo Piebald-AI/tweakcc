@@ -605,6 +605,8 @@ export const applyCustomization = async (
   // ==========================================================================
   // Define patch implementations (keyed by PatchId)
   // ==========================================================================
+  // Keep model list customization and select-menu size behavior in sync.
+  // Disabling model customizations should restore both selectors to vanilla CC behavior.
   const modelCustomizationsEnabled =
     config.settings.misc?.enableModelCustomizations !== false;
   const patchImplementations: Record<PatchId, PatchImplementation> = {
