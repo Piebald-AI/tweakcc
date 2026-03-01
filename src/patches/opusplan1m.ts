@@ -10,7 +10,7 @@
 //
 // See: https://github.com/Piebald-AI/tweakcc/issues/108
 
-import { showDiff } from './index';
+import { escapeIdent, showDiff } from './index';
 
 /**
  * Patch 1: Fix the mode-switching function (bF) to recognize opusplan[1m]
@@ -223,11 +223,18 @@ const patchModelSelectorOptions = (oldFile: string): string | null => {
 
   const [fullMatch, , varName, listVar] = match;
 
-  // Add the opusplan[1m] case right after. We create an inline object instead of a function
-  // since we don't want to modify the function definitions area
+  const wrapperMatch = fullMatch.match(
+    new RegExp(`return\\s*([$\\w]+)\\(\\s*\\[\\.\\.\\.${escapeIdent(listVar)}`)
+  );
+  const wrapFn = wrapperMatch ? wrapperMatch[1] : null;
+
+  const newEntry = `{value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus 4.6 in plan mode, Sonnet 4.6 (1M context) otherwise"}`;
+  const returnExpr = wrapFn
+    ? `${wrapFn}([...${listVar},${newEntry}])`
+    : `[...${listVar},${newEntry}]`;
+
   const replacement =
-    fullMatch +
-    `if(${varName}==="opusplan[1m]")return[...${listVar},{value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus 4.6 in plan mode, Sonnet 4.6 (1M context) otherwise"}];`;
+    fullMatch + `if(${varName}==="opusplan[1m]")return ${returnExpr};`;
 
   const newFile =
     oldFile.slice(0, match.index) +

@@ -186,6 +186,27 @@ describe('config.ts', () => {
 
       expect(result.settings.misc.enableModelCustomizations).toBe(true);
     });
+
+    it('should preserve explicit false for enableModelCustomizations', async () => {
+      const mockConfig = {
+        ccVersion: '1.0.0',
+        ccInstallationPath: null,
+        lastModified: '2024-01-01',
+        changesApplied: true,
+        settings: {
+          ...DEFAULT_SETTINGS,
+          misc: {
+            ...DEFAULT_SETTINGS.misc,
+            enableModelCustomizations: false,
+          },
+        },
+      };
+
+      vi.spyOn(fs, 'readFile').mockResolvedValue(JSON.stringify(mockConfig));
+      const result = await readConfigFile();
+
+      expect(result.settings.misc.enableModelCustomizations).toBe(false);
+    });
   });
 
   describe('updateConfigFile', () => {
