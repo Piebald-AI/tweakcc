@@ -230,8 +230,7 @@ describe('systemPrompts.ts', () => {
       expect(result.newContent).toBe(
         'desc:`Choose the \\`subagent_type\\` based on needs`'
       );
-      expect(result.results[0].applied).toBeDefined();
-      expect(result.results[0].applied).not.toBeUndefined();
+      expect(result.results[0].applied).toBe(false);
     });
 
     it('should auto-escape multiple backticks in template literal context', async () => {
@@ -294,6 +293,130 @@ describe('systemPrompts.ts', () => {
       const result = await applySystemPrompts(cliContent, '1.0.0', false);
 
       expect(result.newContent).toBe('desc:`Use \\`foo\\` for config`');
+    });
+
+    it('should auto-escape backticks adjacent to template expressions', async () => {
+      const mockPromptData = {
+        promptId: 'test-prompt',
+        prompt: {
+          name: 'Test Prompt',
+          description: 'Test',
+          ccVersion: '1.0.0',
+          variables: [],
+          content: 'Value: `${x}`',
+          contentLineOffset: 0,
+        },
+        regex: 'Value: `\\$\\{x\\}`',
+        getInterpolatedContent: () => 'Value: `${x}`',
+        pieces: ['Value: `${x}`'],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      vi.mocked(promptSync.loadSystemPromptsWithRegex).mockResolvedValue([
+        mockPromptData,
+      ]);
+      vi.mocked(systemPromptHashIndex.setAppliedHash).mockResolvedValue();
+
+      const cliContent = 'desc:`Value: `${x}``';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe('desc:`Value: \\`${x}\\``');
+    });
+
+    it('should auto-escape only unescaped backticks when mixed with escaped ones', async () => {
+      const mockPromptData = {
+        promptId: 'test-prompt',
+        prompt: {
+          name: 'Test Prompt',
+          description: 'Test',
+          ccVersion: '1.0.0',
+          variables: [],
+          content: 'Use \\`foo\\` and `bar` for config',
+          contentLineOffset: 0,
+        },
+        regex: 'Use \\\\`foo\\\\` and `bar` for config',
+        getInterpolatedContent: () => 'Use \\`foo\\` and `bar` for config',
+        pieces: ['Use \\`foo\\` and `bar` for config'],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      vi.mocked(promptSync.loadSystemPromptsWithRegex).mockResolvedValue([
+        mockPromptData,
+      ]);
+      vi.mocked(systemPromptHashIndex.setAppliedHash).mockResolvedValue();
+
+      const cliContent = 'desc:`Use \\`foo\\` and `bar` for config`';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe(
+        'desc:`Use \\`foo\\` and \\`bar\\` for config`'
+      );
+    });
+
+    it('should auto-escape backticks at start and end of content', async () => {
+      const mockPromptData = {
+        promptId: 'test-prompt',
+        prompt: {
+          name: 'Test Prompt',
+          description: 'Test',
+          ccVersion: '1.0.0',
+          variables: [],
+          content: '`code`',
+          contentLineOffset: 0,
+        },
+        regex: '`code`',
+        getInterpolatedContent: () => '`code`',
+        pieces: ['`code`'],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      vi.mocked(promptSync.loadSystemPromptsWithRegex).mockResolvedValue([
+        mockPromptData,
+      ]);
+      vi.mocked(systemPromptHashIndex.setAppliedHash).mockResolvedValue();
+
+      const cliContent = 'desc:``code``';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe('desc:`\\`code\\``');
+    });
+
+    it('should auto-escape consecutive backticks individually', async () => {
+      const mockPromptData = {
+        promptId: 'test-prompt',
+        prompt: {
+          name: 'Test Prompt',
+          description: 'Test',
+          ccVersion: '1.0.0',
+          variables: [],
+          content: 'Use ```code``` blocks',
+          contentLineOffset: 0,
+        },
+        regex: 'Use ```code``` blocks',
+        getInterpolatedContent: () => 'Use ```code``` blocks',
+        pieces: ['Use ```code``` blocks'],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      vi.mocked(promptSync.loadSystemPromptsWithRegex).mockResolvedValue([
+        mockPromptData,
+      ]);
+      vi.mocked(systemPromptHashIndex.setAppliedHash).mockResolvedValue();
+
+      const cliContent = 'desc:`Use ```code``` blocks`';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe(
+        'desc:`Use \\`\\`\\`code\\`\\`\\` blocks`'
+      );
     });
 
     it('should escape single quotes in single-quoted string literals', async () => {

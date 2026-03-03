@@ -119,6 +119,11 @@ export const applySystemPrompts = async (
         const unescapedBackticks = findUnescapedBackticks(interpolatedContent);
         if (unescapedBackticks.size > 0) {
           hasUnescapedBackticks = true;
+          console.log(
+            chalk.yellow(
+              `Auto-escaped ${unescapedBackticks.size} line(s) with unescaped backticks in "${prompt.name}"`
+            )
+          );
           debug(
             `Auto-escaped ${unescapedBackticks.size} line(s) with unescaped backticks in "${prompt.name}"`
           );
@@ -159,7 +164,11 @@ export const applySystemPrompts = async (
 
       // Store the hash of the applied prompt content
       const appliedHash = computeMD5Hash(prompt.content);
-      await setAppliedHash(promptId, appliedHash);
+      try {
+        await setAppliedHash(promptId, appliedHash);
+      } catch (error) {
+        debug(`Failed to store hash for "${prompt.name}": ${error}`);
+      }
 
       // Show diff in debug mode
       showDiff(
