@@ -79,6 +79,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     suppressNativeInstallerWarning: false,
     filterScrollEscapeSequences: false,
     enableWorktreeMode: true,
+    enableContextLimitOverride: false,
   };
 
   const ensureMisc = () => {
@@ -384,6 +385,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.enableWorktreeMode =
               !settings.misc!.enableWorktreeMode;
+          });
+        },
+      },
+      {
+        id: 'enableContextLimitOverride',
+        title: 'Override context limit (advanced)',
+        description:
+          'Replaces the hardcoded 200K context limit with CLAUDE_CODE_CONTEXT_LIMIT env var. You must export this env var before launching CC, otherwise auto-compact will break.',
+        getValue: () => settings.misc?.enableContextLimitOverride ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableContextLimitOverride =
+              !settings.misc!.enableContextLimitOverride;
           });
         },
       },

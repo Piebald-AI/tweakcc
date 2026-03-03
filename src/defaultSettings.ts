@@ -713,6 +713,7 @@ export const DEFAULT_SETTINGS: Settings = {
     suppressNativeInstallerWarning: false,
     filterScrollEscapeSequences: false,
     enableWorktreeMode: true,
+    enableContextLimitOverride: false,
   },
   toolsets: [],
   defaultToolset: null,

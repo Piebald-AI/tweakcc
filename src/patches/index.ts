@@ -147,13 +147,6 @@ const PATCH_DEFINITIONS = [
     description: 'Token counter will show (2s · ↓ 169 tokens · thinking)',
   },
   {
-    id: 'context-limit',
-    name: 'Context limit',
-    group: PatchGroup.ALWAYS_APPLIED,
-    description:
-      'Set the CLAUDE_CODE_CONTEXT_LIMIT env var to change 200k max for custom models',
-  },
-  {
     id: 'model-customizations',
     name: 'Model customizations',
     group: PatchGroup.ALWAYS_APPLIED,
@@ -191,6 +184,13 @@ const PATCH_DEFINITIONS = [
     description: `Statusline updates will be properly throttled instead of queued (or debounced)`,
   },
   // Misc Configurable
+  {
+    id: 'context-limit',
+    name: 'Context limit',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Override the 200K context limit via CLAUDE_CODE_CONTEXT_LIMIT env var (set before launching CC)',
+  },
   {
     id: 'patches-applied-indication',
     name: 'Patches applied indication',
@@ -612,6 +612,7 @@ export const applyCustomization = async (
     },
     'context-limit': {
       fn: c => writeContextLimit(c),
+      condition: !!config.settings.misc?.enableContextLimitOverride,
     },
     'model-customizations': {
       fn: c => writeModelCustomizations(c),
