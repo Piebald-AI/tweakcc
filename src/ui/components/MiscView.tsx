@@ -78,6 +78,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     allowBypassPermissionsInSudo: false,
     suppressNativeInstallerWarning: false,
     filterScrollEscapeSequences: false,
+    enableWorktreeMode: true,
   };
 
   const ensureMisc = () => {
@@ -373,15 +374,16 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         },
       },
       {
-        id: 'enableSwarmMode',
-        title: 'Enable swarm mode (native multi-agent)',
+        id: 'enableWorktreeMode',
+        title: 'Enable worktree mode (EnterWorktree tool)',
         description:
-          'Force-enable native multi-agent features (TeammateTool, delegate mode, swarm spawning) by bypassing the tengu_brass_pebble statsig flag.',
-        getValue: () => settings.misc?.enableSwarmMode ?? true,
+          'Force-enable the EnterWorktree tool for isolated git worktree sessions by bypassing the tengu_worktree_mode feature flag.',
+        getValue: () => settings.misc?.enableWorktreeMode ?? true,
         toggle: () => {
           updateSettings(settings => {
             ensureMisc();
-            settings.misc!.enableSwarmMode = !settings.misc!.enableSwarmMode;
+            settings.misc!.enableWorktreeMode =
+              !settings.misc!.enableWorktreeMode;
           });
         },
       },

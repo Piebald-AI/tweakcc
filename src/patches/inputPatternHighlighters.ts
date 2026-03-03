@@ -96,7 +96,7 @@ const writeCustomHighlighterCreation = (
 
   const rangesVar = match[3];
 
-  const reactMemoPattern = /\b([$\w]+(?:\.default)?)\.useMemo\(/;
+  const reactMemoPattern = /[^$\w]([$\w]+(?:\.default)?)\.useMemo\(/;
   const reactMemoMatch = match[1].match(reactMemoPattern);
   if (!reactMemoMatch) {
     console.error(

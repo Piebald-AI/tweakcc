@@ -130,6 +130,7 @@ export interface MiscConfig {
   allowBypassPermissionsInSudo: boolean | null;
   suppressNativeInstallerWarning: boolean;
   filterScrollEscapeSequences: boolean;
+  enableWorktreeMode: boolean;
 }
 
 export interface InputPatternHighlighter {

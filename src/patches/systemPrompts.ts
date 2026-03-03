@@ -201,11 +201,17 @@ export const applySystemPrompts = async (
         details,
       });
     } else {
-      console.log(
-        chalk.yellow(
-          `Could not find system prompt "${prompt.name}" in cli.js (using regex ${stringifyRegex(pattern)})`
-        )
-      );
+      // Temporarily skip patching these prompts because they're markdown in the npm install but HTML in the native.
+      if (
+        !prompt.name.startsWith('Data:') &&
+        prompt.name !== 'Skill: Build with Claude API'
+      ) {
+        console.log(
+          chalk.yellow(
+            `Could not find system prompt "${prompt.name}" in cli.js (using regex ${stringifyRegex(pattern)})`
+          )
+        );
+      }
 
       verbose(`\n  Debug info for ${prompt.name}:`);
       verbose(

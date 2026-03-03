@@ -106,25 +106,13 @@ export const writeFixLspSupport = (oldFile: string): string | null => {
   let content = oldFile;
 
   // Replace first validation
-  const beforeReplace1 = content;
   content = globalReplace(content, validationPattern1, '');
-  if (content === beforeReplace1) {
-    console.warn('patch: fixLspSupport: restartOnCrash validation not found');
-  }
 
   // Replace second validation
-  const beforeReplace2 = content;
   content = globalReplace(content, validationPattern2, '');
-  if (content === beforeReplace2) {
-    console.warn('patch: fixLspSupport: startupTimeout validation not found');
-  }
 
   // Replace third validation
-  const beforeReplace3 = content;
   content = globalReplace(content, validationPattern3, '');
-  if (content === beforeReplace3) {
-    console.warn('patch: fixLspSupport: shutdownTimeout validation not found');
-  }
 
   // Patch 2: Add the openDocument patch
   const location = getOpenDocumentLocation(content);

@@ -712,6 +712,7 @@ export const DEFAULT_SETTINGS: Settings = {
     allowBypassPermissionsInSudo: false,
     suppressNativeInstallerWarning: false,
     filterScrollEscapeSequences: false,
+    enableWorktreeMode: true,
   },
   toolsets: [],
   defaultToolset: null,

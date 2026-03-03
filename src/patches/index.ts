@@ -58,7 +58,6 @@ import { writeHideStartupClawd } from './hideStartupClawd';
 import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
 import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
-import { writeSwarmMode } from './swarmMode';
 import { writeSessionMemory } from './sessionMemory';
 import { writeRememberSkill } from './rememberSkill';
 import { writeThinkingBlockStyling } from './thinkingBlockStyling';
@@ -70,6 +69,7 @@ import { writeAutoAcceptPlanMode } from './autoAcceptPlanMode';
 import { writeAllowBypassPermsInSudo } from './allowBypassPermsInSudo';
 import { writeSuppressNativeInstallerWarning } from './suppressNativeInstallerWarning';
 import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
+import { writeWorktreeMode } from './worktreeMode';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -357,10 +357,11 @@ const PATCH_DEFINITIONS = [
   },
   // Features
   {
-    id: 'swarm-mode',
-    name: 'Swarm mode',
+    id: 'worktree-mode',
+    name: 'Worktree mode',
     group: PatchGroup.FEATURES,
-    description: 'Enable SWARM MODE in Claude Code',
+    description:
+      'Enable the EnterWorktree tool for isolated git worktree sessions',
   },
   {
     id: 'session-memory',
@@ -644,7 +645,7 @@ export const applyCustomization = async (
       fn: c =>
         writePatchesAppliedIndication(
           c,
-          '4.0.1',
+          '4.0.10',
           legacyItems,
           showTweakccVersion,
           showPatchesApplied
@@ -756,7 +757,10 @@ export const applyCustomization = async (
     },
     'remember-skill': {
       fn: c => writeRememberSkill(c),
-      condition: !!config.settings.misc?.enableRememberSkill,
+      condition:
+        !!config.settings.misc?.enableRememberSkill &&
+        !!ccInstInfo.version &&
+        compareVersions(ccInstInfo.version, '2.1.42') < 0,
     },
     'agents-md': {
       fn: c => writeAgentsMd(c, config.settings.claudeMdAltNames!),
@@ -782,9 +786,12 @@ export const applyCustomization = async (
       condition: !!config.settings.misc?.filterScrollEscapeSequences,
     },
     // Features
-    'swarm-mode': {
-      fn: c => writeSwarmMode(c),
-      condition: !!config.settings.misc?.enableSwarmMode,
+    'worktree-mode': {
+      fn: c => writeWorktreeMode(c),
+      condition:
+        !!config.settings.misc?.enableWorktreeMode &&
+        !!ccInstInfo.version &&
+        compareVersions(ccInstInfo.version, '2.1.51') < 0,
     },
     'session-memory': {
       fn: c => writeSessionMemory(c),
