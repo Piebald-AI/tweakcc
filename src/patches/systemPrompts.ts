@@ -5,8 +5,6 @@ import {
   loadSystemPromptsWithRegex,
   reconstructContentFromPieces,
   findUnescapedBackticks,
-  formatBacktickError,
-  getPromptFilePath,
 } from '../systemPromptSync';
 import { setAppliedHash, computeMD5Hash } from '../systemPromptHashIndex';
 
@@ -116,24 +114,14 @@ export const applySystemPrompts = async (
 
       // Only check for unescaped backticks if the original uses template literals
       // String literals (single/double quotes) don't need backticks escaped
+      let hasUnescapedBackticks = false;
       if (delimiter === '`') {
         const unescapedBackticks = findUnescapedBackticks(interpolatedContent);
         if (unescapedBackticks.size > 0) {
-          const filePath = getPromptFilePath(promptId);
-          const contentLines = prompt.content.split('\n');
-
-          for (const [lineNum, columns] of unescapedBackticks) {
-            // lineNum is relative to prompt.content; adjust to absolute file line
-            // number by accounting for any frontmatter/comment lines.
-            const absoluteLineNum = lineNum + (prompt.contentLineOffset || 0);
-            const lineText = contentLines[lineNum - 1] || '';
-            console.log(
-              formatBacktickError(filePath, absoluteLineNum, lineText, columns)
-            );
-            console.log();
-          }
-
-          continue; // Skip this prompt
+          hasUnescapedBackticks = true;
+          debug(
+            `Auto-escaped ${unescapedBackticks.size} line(s) with unescaped backticks in "${prompt.name}"`
+          );
         }
       }
 
@@ -161,6 +149,8 @@ export const applySystemPrompts = async (
       } else if (delimiter === "'") {
         replacementContent = replacementContent.replace(/\n/g, '\\n');
         replacementContent = replacementContent.replace(/'/g, "\\'");
+      } else if (delimiter === '`' && hasUnescapedBackticks) {
+        replacementContent = replacementContent.replace(/(?<!\\)`/g, '\\`');
       }
 
       // Replace the matched content with the interpolated content from the markdown file

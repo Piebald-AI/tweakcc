@@ -199,6 +199,103 @@ describe('systemPrompts.ts', () => {
       expect(result.newContent).toBe('msg:"Say \\"Hello\\""');
     });
 
+    it('should auto-escape backticks in template literal context', async () => {
+      const mockPromptData = {
+        promptId: 'test-prompt',
+        prompt: {
+          name: 'Test Prompt',
+          description: 'Test',
+          ccVersion: '1.0.0',
+          variables: [],
+          content: 'Choose the `subagent_type` based on needs',
+          contentLineOffset: 0,
+        },
+        regex: 'Choose the `subagent_type` based on needs',
+        getInterpolatedContent: () =>
+          'Choose the `subagent_type` based on needs',
+        pieces: ['Choose the `subagent_type` based on needs'],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      vi.mocked(promptSync.loadSystemPromptsWithRegex).mockResolvedValue([
+        mockPromptData,
+      ]);
+      vi.mocked(systemPromptHashIndex.setAppliedHash).mockResolvedValue();
+
+      const cliContent = 'desc:`Choose the `subagent_type` based on needs`';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe(
+        'desc:`Choose the \\`subagent_type\\` based on needs`'
+      );
+      expect(result.results[0].applied).toBeDefined();
+      expect(result.results[0].applied).not.toBeUndefined();
+    });
+
+    it('should auto-escape multiple backticks in template literal context', async () => {
+      const mockPromptData = {
+        promptId: 'test-prompt',
+        prompt: {
+          name: 'Test Prompt',
+          description: 'Test',
+          ccVersion: '1.0.0',
+          variables: [],
+          content: 'Use `foo` and `bar` for config',
+          contentLineOffset: 0,
+        },
+        regex: 'Use `foo` and `bar` for config',
+        getInterpolatedContent: () => 'Use `foo` and `bar` for config',
+        pieces: ['Use `foo` and `bar` for config'],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      vi.mocked(promptSync.loadSystemPromptsWithRegex).mockResolvedValue([
+        mockPromptData,
+      ]);
+      vi.mocked(systemPromptHashIndex.setAppliedHash).mockResolvedValue();
+
+      const cliContent = 'desc:`Use `foo` and `bar` for config`';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe(
+        'desc:`Use \\`foo\\` and \\`bar\\` for config`'
+      );
+    });
+
+    it('should not double-escape already-escaped backticks', async () => {
+      const mockPromptData = {
+        promptId: 'test-prompt',
+        prompt: {
+          name: 'Test Prompt',
+          description: 'Test',
+          ccVersion: '1.0.0',
+          variables: [],
+          content: 'Use \\`foo\\` for config',
+          contentLineOffset: 0,
+        },
+        regex: 'Use \\\\`foo\\\\` for config',
+        getInterpolatedContent: () => 'Use \\`foo\\` for config',
+        pieces: ['Use \\`foo\\` for config'],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      vi.mocked(promptSync.loadSystemPromptsWithRegex).mockResolvedValue([
+        mockPromptData,
+      ]);
+      vi.mocked(systemPromptHashIndex.setAppliedHash).mockResolvedValue();
+
+      const cliContent = 'desc:`Use \\`foo\\` for config`';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe('desc:`Use \\`foo\\` for config`');
+    });
+
     it('should escape single quotes in single-quoted string literals', async () => {
       const mockPromptData = {
         promptId: 'test-prompt',
