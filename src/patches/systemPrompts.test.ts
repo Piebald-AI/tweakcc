@@ -552,6 +552,70 @@ describe('systemPrompts.ts', () => {
       expect(result.newContent).toBe("msg:'It\\'s working'");
     });
 
+    it('should set applied:true when auto-escape changes content even if char delta is 0', async () => {
+      const mockPromptData = {
+        promptId: 'test-prompt',
+        prompt: {
+          name: 'Test Prompt',
+          description: 'Test',
+          ccVersion: '1.0.0',
+          variables: [],
+          content: 'Use `x` here',
+          contentLineOffset: 0,
+        },
+        regex: 'Use `x` here',
+        getInterpolatedContent: () => 'Use `x` here',
+        pieces: ['Use `x` here'],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      vi.mocked(promptSync.loadSystemPromptsWithRegex).mockResolvedValue([
+        mockPromptData,
+      ]);
+      vi.mocked(systemPromptHashIndex.setAppliedHash).mockResolvedValue();
+
+      const cliContent = 'desc:`Use `x` here`';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe('desc:`Use \\`x\\` here`');
+      expect(result.results[0].applied).toBe(true);
+    });
+
+    it('should surface hash persistence failure in result details', async () => {
+      const mockPromptData = {
+        promptId: 'test-prompt',
+        prompt: {
+          name: 'Test Prompt',
+          description: 'Test',
+          ccVersion: '1.0.0',
+          variables: [],
+          content: 'New longer content here',
+          contentLineOffset: 0,
+        },
+        regex: 'Original text',
+        getInterpolatedContent: () => 'New longer content here',
+        pieces: ['Original text'],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      vi.mocked(promptSync.loadSystemPromptsWithRegex).mockResolvedValue([
+        mockPromptData,
+      ]);
+      vi.mocked(systemPromptHashIndex.setAppliedHash).mockRejectedValue(
+        new Error('Storage failure')
+      );
+
+      const cliContent = 'desc:"Original text"';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toContain('New longer content here');
+      expect(result.results[0].details).toContain('hash');
+    });
+
     it('should skip prompts not in patchFilter', async () => {
       const mockPromptData = {
         promptId: 'test-prompt',

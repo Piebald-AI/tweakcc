@@ -1141,6 +1141,27 @@ World`;
       expect(result.incomplete).toBe(false);
     });
 
+    it('should not treat escaped \\${ as interpolation start at depth 0 (INTERP-001)', () => {
+      const input = 'text \\${ `code`';
+      const result = promptSync.escapeDepthZeroBackticks(input);
+      expect(result.content).toBe('text \\${ \\`code\\`');
+      expect(result.incomplete).toBe(false);
+    });
+
+    it('should not treat escaped \\${ inside interpolation as nested (INTERP-002)', () => {
+      const input = '${a \\${b} `code`';
+      const result = promptSync.escapeDepthZeroBackticks(input);
+      expect(result.content).toBe('${a \\${b} \\`code\\`');
+      expect(result.incomplete).toBe(false);
+    });
+
+    it('should not treat escaped \\${ inside template in interpolation (INTERP-003)', () => {
+      const input = '${a?`text \\${ more`:`other`} `code`';
+      const result = promptSync.escapeDepthZeroBackticks(input);
+      expect(result.content).toBe('${a?`text \\${ more`:`other`} \\`code\\`');
+      expect(result.incomplete).toBe(false);
+    });
+
     it('should handle deeply nested template literals in interpolations', () => {
       const input = '${a?`${b?`deep`:`also`}`:`flat`}';
       const result = promptSync.escapeDepthZeroBackticks(input);

@@ -1141,7 +1141,7 @@ export const escapeDepthZeroBackticks = (
         if (ch === '`' && unescaped) {
           templateStack.pop();
         } else if (ch === '$' && next === '{') {
-          depth++;
+          if (unescaped) depth++;
           out += '${';
           i++;
           continue;
@@ -1151,7 +1151,7 @@ export const escapeDepthZeroBackticks = (
       }
       if (!inString) {
         if (ch === '$' && next === '{') {
-          depth++;
+          if (unescaped) depth++;
           out += '${';
           i++;
           continue;
@@ -1172,7 +1172,7 @@ export const escapeDepthZeroBackticks = (
     }
 
     if (ch === '$' && next === '{' && !inString) {
-      depth++;
+      if (unescaped) depth++;
       out += '${';
       i++;
       continue;

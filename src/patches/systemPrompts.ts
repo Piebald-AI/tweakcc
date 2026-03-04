@@ -165,10 +165,12 @@ export const applySystemPrompts = async (
 
       // Store the hash of the applied prompt content
       const appliedHash = computeMD5Hash(prompt.content);
+      let hashFailed = false;
       try {
         await setAppliedHash(promptId, appliedHash);
       } catch (error) {
         debug(`Failed to store hash for "${prompt.name}": ${error}`);
+        hashFailed = true;
       }
 
       // Show diff in debug mode
@@ -182,7 +184,7 @@ export const applySystemPrompts = async (
 
       // Track this prompt's result
       const charDiff = originalLength - newLength;
-      const applied = charDiff !== 0;
+      const applied = oldContent !== content;
 
       let details: string;
       if (charDiff > 0) {
@@ -191,6 +193,10 @@ export const applySystemPrompts = async (
         details = chalk.red(`${Math.abs(charDiff)} more chars`);
       } else {
         details = 'unchanged';
+      }
+
+      if (hashFailed) {
+        details += ' (hash storage failed)';
       }
 
       results.push({
