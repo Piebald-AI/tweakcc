@@ -4,7 +4,7 @@ import { showDiff, PatchResult, PatchGroup } from './index';
 import {
   loadSystemPromptsWithRegex,
   reconstructContentFromPieces,
-  findUnescapedBackticks,
+  escapeDepthZeroBackticks,
 } from '../systemPromptSync';
 import { setAppliedHash, computeMD5Hash } from '../systemPromptHashIndex';
 
@@ -112,24 +112,6 @@ export const applySystemPrompts = async (
       const matchIndex = match.index;
       const delimiter = matchIndex > 0 ? content[matchIndex - 1] : '';
 
-      // Only check for unescaped backticks if the original uses template literals
-      // String literals (single/double quotes) don't need backticks escaped
-      let hasUnescapedBackticks = false;
-      if (delimiter === '`') {
-        const unescapedBackticks = findUnescapedBackticks(interpolatedContent);
-        if (unescapedBackticks.size > 0) {
-          hasUnescapedBackticks = true;
-          console.log(
-            chalk.yellow(
-              `Auto-escaped ${unescapedBackticks.size} line(s) with unescaped backticks in "${prompt.name}"`
-            )
-          );
-          debug(
-            `Auto-escaped ${unescapedBackticks.size} line(s) with unescaped backticks in "${prompt.name}"`
-          );
-        }
-      }
-
       // Calculate character counts for this prompt (both with human-readable placeholders)
       // Note: trim() to match how markdown files are parsed and how whitespace is applied
       const originalBaselineContent = reconstructContentFromPieces(
@@ -143,19 +125,38 @@ export const applySystemPrompts = async (
       const oldContent = content;
       const matchLength = match[0].length;
 
-      // delimiter was already determined above for backtick check
       let replacementContent = interpolatedContent;
 
-      // If it's a string literal (double or single quote), convert actual newlines to \n
-      // and escape the delimiter character. Template literals can have actual newlines.
       if (delimiter === '"') {
         replacementContent = replacementContent.replace(/\n/g, '\\n');
         replacementContent = replacementContent.replace(/"/g, '\\"');
       } else if (delimiter === "'") {
         replacementContent = replacementContent.replace(/\n/g, '\\n');
         replacementContent = replacementContent.replace(/'/g, "\\'");
-      } else if (delimiter === '`' && hasUnescapedBackticks) {
-        replacementContent = replacementContent.replace(/(?<!\\)`/g, '\\`');
+      } else if (delimiter === '`') {
+        const { content: escaped, incomplete } =
+          escapeDepthZeroBackticks(interpolatedContent);
+        if (incomplete) {
+          console.log(
+            chalk.red(
+              `Incomplete backtick escaping for "${prompt.name}" (unclosed interpolation) - skipping`
+            )
+          );
+          results.push({
+            id: promptId,
+            name: prompt.name,
+            group: PatchGroup.SYSTEM_PROMPTS,
+            applied: false,
+            details: 'incomplete escaping: unclosed interpolation detected',
+          });
+          continue;
+        }
+        if (escaped !== interpolatedContent) {
+          console.log(
+            chalk.yellow(`Auto-escaped unescaped backticks in "${prompt.name}"`)
+          );
+        }
+        replacementContent = escaped;
       }
 
       // Replace the matched content with the interpolated content from the markdown file

@@ -1053,4 +1053,99 @@ World`;
       expect(stringLiteralContent.match(regex)).not.toBeNull();
     });
   });
+
+  describe('escapeDepthZeroBackticks', () => {
+    it('should escape depth-0 backticks', () => {
+      const input = 'Use `code` here';
+      const expected = 'Use \\`code\\` here';
+      expect(promptSync.escapeDepthZeroBackticks(input).content).toBe(expected);
+    });
+
+    it('should not double-escape already-escaped backticks', () => {
+      const input = 'Use \\`code\\` here';
+      expect(promptSync.escapeDepthZeroBackticks(input).content).toBe(input);
+    });
+
+    it('should preserve backticks inside ${...} interpolations', () => {
+      const input = '${cond?`a`:`b`}';
+      expect(promptSync.escapeDepthZeroBackticks(input).content).toBe(input);
+    });
+
+    it('should escape depth-0 backticks but preserve interpolation backticks', () => {
+      const input = 'Use `x` and ${c?`a`:`b`}';
+      const expected = 'Use \\`x\\` and ${c?`a`:`b`}';
+      expect(promptSync.escapeDepthZeroBackticks(input).content).toBe(expected);
+    });
+
+    it('should preserve backticks inside nested braces in interpolation', () => {
+      const input = '${fn({k:`v`})}';
+      expect(promptSync.escapeDepthZeroBackticks(input).content).toBe(input);
+    });
+
+    it('should escape consecutive backticks', () => {
+      const input = '```code```';
+      const expected = '\\`\\`\\`code\\`\\`\\`';
+      expect(promptSync.escapeDepthZeroBackticks(input).content).toBe(expected);
+    });
+
+    it('should return empty string for empty input', () => {
+      expect(promptSync.escapeDepthZeroBackticks('').content).toBe('');
+    });
+
+    it('should return input unchanged when no backticks present', () => {
+      const input = 'plain text with no backticks';
+      expect(promptSync.escapeDepthZeroBackticks(input).content).toBe(input);
+    });
+
+    it('should escape backtick after escaped backslash (REGEX-001 fixed)', () => {
+      const input = 'text\\\\`more';
+      // \\\\` in source = two actual backslashes + backtick at runtime.
+      // Even backslash count means the backtick is unescaped.
+      expect(promptSync.escapeDepthZeroBackticks(input).content).toBe(
+        'text\\\\\\`more'
+      );
+    });
+
+    it('should not escape backtick after odd number of backslashes', () => {
+      const input = 'text\\\\\\`more';
+      // Three backslashes + backtick: odd count means backtick is already escaped
+      expect(promptSync.escapeDepthZeroBackticks(input).content).toBe(input);
+    });
+
+    it('should handle unclosed interpolation gracefully (SFH-002)', () => {
+      const input = '`pre` ${unclosed `backtick`';
+      const result = promptSync.escapeDepthZeroBackticks(input);
+      expect(result.content).toBe('\\`pre\\` ${unclosed `backtick`');
+      expect(result.incomplete).toBe(true);
+    });
+
+    it('should escape backtick immediately after interpolation close', () => {
+      expect(promptSync.escapeDepthZeroBackticks('${x}`y`').content).toBe(
+        '${x}\\`y\\`'
+      );
+    });
+
+    it('should escape depth-0 backticks across multiple lines', () => {
+      const input = 'line1 `a`\nline2 `b`\nline3 ${x?`c`:`d`}';
+      const result = promptSync.escapeDepthZeroBackticks(input);
+      expect(result.content).toBe(
+        'line1 \\`a\\`\nline2 \\`b\\`\nline3 ${x?`c`:`d`}'
+      );
+      expect(result.incomplete).toBe(false);
+    });
+
+    it('should not let } inside nested template literal close the interpolation (SFHPFV-003)', () => {
+      const input = 'Use `x` and ${cond?`}`:`other`}';
+      const result = promptSync.escapeDepthZeroBackticks(input);
+      expect(result.content).toBe('Use \\`x\\` and ${cond?`}`:`other`}');
+      expect(result.incomplete).toBe(false);
+    });
+
+    it('should handle deeply nested template literals in interpolations', () => {
+      const input = '${a?`${b?`deep`:`also`}`:`flat`}';
+      const result = promptSync.escapeDepthZeroBackticks(input);
+      expect(result.content).toBe(input);
+      expect(result.incomplete).toBe(false);
+    });
+  });
 });

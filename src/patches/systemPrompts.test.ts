@@ -230,7 +230,46 @@ describe('systemPrompts.ts', () => {
       expect(result.newContent).toBe(
         'desc:`Choose the \\`subagent_type\\` based on needs`'
       );
+    });
+
+    it('should skip prompt with applied:false when escapeDepthZeroBackticks returns incomplete', async () => {
+      const mockPromptData = {
+        promptId: 'test-prompt',
+        prompt: {
+          name: 'Test Prompt',
+          description: 'Test',
+          ccVersion: '1.0.0',
+          variables: [],
+          content: 'text ${unclosed backtick',
+          contentLineOffset: 0,
+        },
+        regex: 'text \\$\\{unclosed backtick',
+        getInterpolatedContent: () => 'text ${unclosed backtick',
+        pieces: ['text ${unclosed backtick'],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      vi.mocked(promptSync.loadSystemPromptsWithRegex).mockResolvedValue([
+        mockPromptData,
+      ]);
+      vi.mocked(systemPromptHashIndex.setAppliedHash).mockResolvedValue();
+      const spy = vi
+        .spyOn(promptSync, 'escapeDepthZeroBackticks')
+        .mockReturnValue({
+          content: 'partially escaped',
+          incomplete: true,
+        });
+
+      const cliContent = 'desc:`text ${unclosed backtick`';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe(cliContent);
+      expect(result.results).toHaveLength(1);
       expect(result.results[0].applied).toBe(false);
+      expect(result.results[0].details).toContain('incomplete');
+      spy.mockRestore();
     });
 
     it('should auto-escape multiple backticks in template literal context', async () => {
@@ -419,6 +458,68 @@ describe('systemPrompts.ts', () => {
       );
     });
 
+    it('should preserve backticks inside interpolation expressions', async () => {
+      const mockPromptData = {
+        promptId: 'test-prompt',
+        prompt: {
+          name: 'Test Prompt',
+          description: 'Test',
+          ccVersion: '1.0.0',
+          variables: [],
+          content: 'Run `cmd` then ${cond?`a`:`b`}',
+          contentLineOffset: 0,
+        },
+        regex: 'Run `cmd` then \\$\\{cond\\?`a`:`b`\\}',
+        getInterpolatedContent: () => 'Run `cmd` then ${cond?`a`:`b`}',
+        pieces: ['Run `cmd` then ${cond?`a`:`b`}'],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      vi.mocked(promptSync.loadSystemPromptsWithRegex).mockResolvedValue([
+        mockPromptData,
+      ]);
+      vi.mocked(systemPromptHashIndex.setAppliedHash).mockResolvedValue();
+
+      const cliContent = 'desc:`Run `cmd` then ${cond?`a`:`b`}`';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe(
+        'desc:`Run \\`cmd\\` then ${cond?`a`:`b`}`'
+      );
+    });
+
+    it('should escape depth-0 backticks but preserve interpolation backticks', async () => {
+      const mockPromptData = {
+        promptId: 'test-prompt',
+        prompt: {
+          name: 'Test Prompt',
+          description: 'Test',
+          ccVersion: '1.0.0',
+          variables: [],
+          content: 'Use `x` and ${c?`a`:`b`}',
+          contentLineOffset: 0,
+        },
+        regex: 'Use `x` and \\$\\{c\\?`a`:`b`\\}',
+        getInterpolatedContent: () => 'Use `x` and ${c?`a`:`b`}',
+        pieces: ['Use `x` and ${c?`a`:`b`}'],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      vi.mocked(promptSync.loadSystemPromptsWithRegex).mockResolvedValue([
+        mockPromptData,
+      ]);
+      vi.mocked(systemPromptHashIndex.setAppliedHash).mockResolvedValue();
+
+      const cliContent = 'desc:`Use `x` and ${c?`a`:`b`}`';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe('desc:`Use \\`x\\` and ${c?`a`:`b`}`');
+    });
+
     it('should escape single quotes in single-quoted string literals', async () => {
       const mockPromptData = {
         promptId: 'test-prompt',
@@ -449,6 +550,40 @@ describe('systemPrompts.ts', () => {
 
       // Should escape single quotes
       expect(result.newContent).toBe("msg:'It\\'s working'");
+    });
+
+    it('should skip prompts not in patchFilter', async () => {
+      const mockPromptData = {
+        promptId: 'test-prompt',
+        prompt: {
+          name: 'Test Prompt',
+          description: 'Test',
+          ccVersion: '1.0.0',
+          variables: [],
+          content: 'Hello World',
+          contentLineOffset: 0,
+        },
+        regex: 'Hello World',
+        getInterpolatedContent: () => 'Hello World',
+        pieces: ['Hello World'],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      vi.mocked(promptSync.loadSystemPromptsWithRegex).mockResolvedValue([
+        mockPromptData,
+      ]);
+      vi.mocked(systemPromptHashIndex.setAppliedHash).mockResolvedValue();
+
+      const cliContent = 'desc:"Hello World"';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false, [
+        'other-id',
+      ]);
+
+      expect(result.newContent).toBe(cliContent);
+      expect(result.results[0].skipped).toBe(true);
+      expect(result.results[0].applied).toBe(false);
     });
   });
 });
