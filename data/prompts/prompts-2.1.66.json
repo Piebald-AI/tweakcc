@@ -200,9 +200,10 @@
       "version": "2.0.56",
       "agentMetadata": {
         "model": "haiku",
-        "whenToUse": null,
+        "whenToUse": "Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. \"src/components/**/*.tsx\"), search code for keywords (eg. \"API endpoints\"), or answer questions about the codebase (eg. \"how do API endpoints work?\"). When calling this agent, specify the desired thoroughness level: \"quick\" for basic searches, \"medium\" for moderate exploration, or \"very thorough\" for comprehensive analysis across multiple locations and naming conventions.",
+        "whenToUseDynamic": true,
         "disallowedTools": [
-          "tq",
+          "Agent",
           "ExitPlanMode",
           "Edit",
           "Write",
@@ -264,7 +265,7 @@
         "model": "inherit",
         "whenToUse": "Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs.",
         "disallowedTools": [
-          "tq",
+          "Agent",
           "ExitPlanMode",
           "Edit",
           "Write",
@@ -881,7 +882,7 @@
         "0": "DEBUG_LOG_PATH",
         "1": "DEBUG_LOG_SUMMARY",
         "2": "ISSUE_DESCRIPTION",
-        "3": "SETTINGS_FILE_PATH",
+        "3": "GET_SETTINGS_FILE_PATH_FN",
         "4": "LOG_LINE_COUNT",
         "5": "CLAUDE_CODE_GUIDE_SUBAGENT_NAME"
       },
@@ -1444,7 +1445,7 @@
       ],
       "identifierMap": {
         "0": "AVAILABLE_TOOLS_SET",
-        "1": "ASK_USER_QUESTION_TOOL"
+        "1": "ASK_USER_QUESTION_TOOL_NAME"
       },
       "version": "2.1.31"
     },
@@ -2149,9 +2150,11 @@
         7
       ],
       "identifierMap": {
-        "0": "SYSTEM_REMINDER",
+        "0": "PLAN_FILE_INFO_BLOCK",
         "1": "EDIT_TOOL",
         "2": "WRITE_TOOL",
+        "3": "EXPLORE_SUBAGENT",
+        "4": "PLAN_V2_EXPLORE_AGENT_COUNT",
         "5": "PLAN_SUBAGENT",
         "6": "PLAN_V2_PLAN_AGENT_COUNT",
         "7": "ASK_USER_QUESTION_TOOL_NAME",
@@ -2196,12 +2199,12 @@
       ],
       "identifierMap": {
         "0": "PLAN_FILE_INFO_BLOCK",
-        "1": "EDIT_TOOL_NAME",
-        "2": "EXPLORE_SUBAGENT_NOTE",
+        "1": "EDIT_TOOL",
+        "2": "WRITE_TOOL",
         "3": "GET_READ_ONLY_TOOLS_FN",
-        "4": "WRITE_TOOL_NAME",
+        "4": "EXPLORE_SUBAGENT",
         "5": "ASK_USER_QUESTION_TOOL_NAME",
-        "6": "WRITE_TOOL_NAME"
+        "6": "EXIT_PLAN_MODE_TOOL"
       },
       "version": "2.1.63"
     },
