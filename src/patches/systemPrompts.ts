@@ -204,6 +204,7 @@ export const applySystemPrompts = async (
         name: prompt.name,
         group: PatchGroup.SYSTEM_PROMPTS,
         applied,
+        ...(hashFailed && { failed: true }),
         details,
       });
     } else {

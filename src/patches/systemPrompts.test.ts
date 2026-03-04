@@ -613,7 +613,8 @@ describe('systemPrompts.ts', () => {
       const result = await applySystemPrompts(cliContent, '1.0.0', false);
 
       expect(result.newContent).toContain('New longer content here');
-      expect(result.results[0].details).toContain('hash');
+      expect(result.results[0].failed).toBe(true);
+      expect(result.results[0].details).toContain('hash storage failed');
     });
 
     it('should skip prompts not in patchFilter', async () => {
