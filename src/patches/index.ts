@@ -147,13 +147,6 @@ const PATCH_DEFINITIONS = [
     description: 'Token counter will show (2s · ↓ 169 tokens · thinking)',
   },
   {
-    id: 'context-limit',
-    name: 'Context limit',
-    group: PatchGroup.ALWAYS_APPLIED,
-    description:
-      'Set the CLAUDE_CODE_CONTEXT_LIMIT env var to change 200k max for custom models',
-  },
-  {
     id: 'opusplan1m',
     name: 'Opusplan[1m] support',
     group: PatchGroup.ALWAYS_APPLIED,
@@ -190,6 +183,13 @@ const PATCH_DEFINITIONS = [
     name: 'Show more items in select menus',
     group: PatchGroup.MISC_CONFIGURABLE,
     description: 'Show 25 items in select menus instead of default 5',
+  },
+  {
+    id: 'context-limit',
+    name: 'Context limit',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Override the 200K context limit via CLAUDE_CODE_CONTEXT_LIMIT env var (set before launching CC)',
   },
   {
     id: 'patches-applied-indication',
@@ -616,6 +616,7 @@ export const applyCustomization = async (
     },
     'context-limit': {
       fn: c => writeContextLimit(c),
+      condition: !!config.settings.misc?.enableContextLimitOverride,
     },
     opusplan1m: {
       fn: c => writeOpusplan1m(c),

@@ -6,6 +6,6 @@ export const writeContextLimit = (oldFile: string): string | null => {
   return globalReplace(
     oldFile,
     /\b200000\b/,
-    'process.env.CLAUDE_CODE_CONTEXT_LIMIT'
+    '(+process.env.CLAUDE_CODE_CONTEXT_LIMIT||200000)'
   );
 };
