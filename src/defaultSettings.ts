@@ -714,6 +714,7 @@ export const DEFAULT_SETTINGS: Settings = {
     filterScrollEscapeSequences: false,
     enableWorktreeMode: true,
     enableContextLimitOverride: false,
+    enableModelCustomizations: true,
   },
   toolsets: [],
   defaultToolset: null,

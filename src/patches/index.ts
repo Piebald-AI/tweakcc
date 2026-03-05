@@ -147,23 +147,11 @@ const PATCH_DEFINITIONS = [
     description: 'Token counter will show (2s · ↓ 169 tokens · thinking)',
   },
   {
-    id: 'model-customizations',
-    name: 'Model customizations',
-    group: PatchGroup.ALWAYS_APPLIED,
-    description: 'Access all Claude models with /model, not just latest 3',
-  },
-  {
     id: 'opusplan1m',
     name: 'Opusplan[1m] support',
     group: PatchGroup.ALWAYS_APPLIED,
     description:
       'Use the "Opus Plan 1M" model: Opus for planning, Sonnet 1M context for building',
-  },
-  {
-    id: 'show-more-items-in-select-menus',
-    name: 'Show more items in select menus',
-    group: PatchGroup.ALWAYS_APPLIED,
-    description: 'Show 25 items in select menus instead of default 5',
   },
   {
     id: 'thinking-block-styling',
@@ -184,6 +172,18 @@ const PATCH_DEFINITIONS = [
     description: `Statusline updates will be properly throttled instead of queued (or debounced)`,
   },
   // Misc Configurable
+  {
+    id: 'model-customizations',
+    name: 'Model customizations',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Access all Claude models with /model, not just latest 3',
+  },
+  {
+    id: 'show-more-items-in-select-menus',
+    name: 'Show more items in select menus',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Show 25 items in select menus instead of default 5',
+  },
   {
     id: 'context-limit',
     name: 'Context limit',
@@ -605,6 +605,10 @@ export const applyCustomization = async (
   // ==========================================================================
   // Define patch implementations (keyed by PatchId)
   // ==========================================================================
+  // Keep model list customization and select-menu size behavior in sync.
+  // Disabling model customizations should restore both selectors to vanilla CC behavior.
+  const modelCustomizationsEnabled =
+    config.settings.misc?.enableModelCustomizations ?? true;
   const patchImplementations: Record<PatchId, PatchImplementation> = {
     // Always Applied
     'verbose-property': {
@@ -614,14 +618,8 @@ export const applyCustomization = async (
       fn: c => writeContextLimit(c),
       condition: !!config.settings.misc?.enableContextLimitOverride,
     },
-    'model-customizations': {
-      fn: c => writeModelCustomizations(c),
-    },
     opusplan1m: {
       fn: c => writeOpusplan1m(c),
-    },
-    'show-more-items-in-select-menus': {
-      fn: c => writeShowMoreItemsInSelectMenus(c, 25),
     },
     'thinking-block-styling': {
       fn: c => writeThinkingBlockStyling(c),
@@ -651,6 +649,14 @@ export const applyCustomization = async (
           showTweakccVersion,
           showPatchesApplied
         ),
+    },
+    'model-customizations': {
+      fn: c => writeModelCustomizations(c),
+      condition: modelCustomizationsEnabled,
+    },
+    'show-more-items-in-select-menus': {
+      fn: c => writeShowMoreItemsInSelectMenus(c, 25),
+      condition: modelCustomizationsEnabled,
     },
     'table-format': {
       fn: c => writeTableFormat(c, tableFormat),

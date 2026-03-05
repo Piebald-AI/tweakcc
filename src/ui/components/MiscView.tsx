@@ -80,6 +80,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     filterScrollEscapeSequences: false,
     enableWorktreeMode: true,
     enableContextLimitOverride: false,
+    enableModelCustomizations: true,
   };
 
   const ensureMisc = () => {
@@ -221,6 +222,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.enableConversationTitle =
               !settings.misc!.enableConversationTitle;
+          });
+        },
+      },
+      {
+        id: 'enableModelCustomizations',
+        title: 'Enable model customizations (/model shows all models)',
+        description:
+          'Show all Claude models in /model menu, not just the latest 3. Disable to use Claude Code default model list.',
+        getValue: () => settings.misc?.enableModelCustomizations ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableModelCustomizations =
+              !settings.misc!.enableModelCustomizations;
           });
         },
       },

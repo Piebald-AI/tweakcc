@@ -132,6 +132,7 @@ export interface MiscConfig {
   filterScrollEscapeSequences: boolean;
   enableWorktreeMode: boolean;
   enableContextLimitOverride: boolean;
+  enableModelCustomizations: boolean;
 }
 
 export interface InputPatternHighlighter {
