@@ -81,6 +81,8 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableWorktreeMode: true,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
+    enableVoiceMode: false,
+    enableVoiceSottoVoce: true,
   };
 
   const ensureMisc = () => {
