@@ -225,7 +225,9 @@ function isClaudeModule(moduleName: string): boolean {
     moduleName.endsWith('/claude') ||
     moduleName === 'claude' ||
     moduleName.endsWith('/claude.exe') ||
-    moduleName === 'claude.exe'
+    moduleName === 'claude.exe' ||
+    moduleName.endsWith('/src/entrypoints/cli.js') ||
+    moduleName === 'src/entrypoints/cli.js'
   );
 }
 
