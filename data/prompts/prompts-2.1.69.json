@@ -183,7 +183,14 @@
         "1": "IS_SUBAGENT",
         "2": "ADDITIONAL_INSTRUCTIONS"
       },
-      "version": "2.1.69"
+      "version": "2.1.69",
+      "agentMetadata": {
+        "whenToUse": "General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks. When you are searching for a keyword or file and are not confident that you will find the right match in the first few tries use this agent to perform the search for you.",
+        "tools": [
+          "*"
+        ],
+        "agentType": "general-purpose"
+      }
     },
     {
       "name": "Agent Prompt: Conversation summarization",
@@ -229,10 +236,9 @@
       "version": "2.0.56",
       "agentMetadata": {
         "model": "haiku",
-        "whenToUse": "Fast agent specialized for exploring codebases. Use this when you need to quickly find files by patterns (eg. \"src/components/**/*.tsx\"), search code for keywords (eg. \"API endpoints\"), or answer questions about the codebase (eg. \"how do API endpoints work?\"). When calling this agent, specify the desired thoroughness level: \"quick\" for basic searches, \"medium\" for moderate exploration, or \"very thorough\" for comprehensive analysis across multiple locations and naming conventions.",
-        "whenToUseDynamic": true,
+        "whenToUse": null,
         "disallowedTools": [
-          "Agent",
+          "pq",
           "ExitPlanMode",
           "Edit",
           "Write",
@@ -331,7 +337,7 @@
       "identifierMap": {
         "0": "ADDITIONAL_USER_INPUT"
       },
-      "version": "2.1.30"
+      "version": "2.1.69"
     },
     {
       "name": "Agent Prompt: Prompt Suggestion Generator v2",
