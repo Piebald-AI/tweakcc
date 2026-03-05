@@ -406,6 +406,33 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         },
       },
       {
+        id: 'enableVoiceMode',
+        title: 'Enable voice mode (/voice command)',
+        description:
+          'Force-enable the /voice command by bypassing the tengu_amber_quartz feature gate.',
+        getValue: () => settings.misc?.enableVoiceMode ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableVoiceMode = !settings.misc!.enableVoiceMode;
+          });
+        },
+      },
+      {
+        id: 'enableVoiceSottoVoce',
+        title: 'Enable sotto voce for voice mode',
+        description:
+          'Enable the concise-output prompt used for voice interactions. Only applies when voice mode is enabled.',
+        getValue: () => settings.misc?.enableVoiceSottoVoce ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableVoiceSottoVoce =
+              !settings.misc!.enableVoiceSottoVoce;
+          });
+        },
+      },
+      {
         id: 'enableContextLimitOverride',
         title: 'Override context limit',
         description:
