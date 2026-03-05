@@ -29,8 +29,13 @@ describe('voiceMode', () => {
   it('returns null when the amber quartz gate is absent', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    expect(writeVoiceMode('const x=1;', false)).toBeNull();
-
-    consoleError.mockRestore();
+    try {
+      expect(writeVoiceMode('const x=1;', false)).toBeNull();
+      expect(consoleError).toHaveBeenCalledWith(
+        'patch: voiceMode: failed to find tengu_amber_quartz gate'
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 });
