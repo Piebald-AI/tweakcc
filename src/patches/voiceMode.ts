@@ -13,7 +13,7 @@
 // Patch 1 - Voice feature gate (tengu_amber_quartz):
 // ```diff
 //  function qX_() {
-// +  return true;
+// +  return !0;
 //    return A9("tengu_amber_quartz", !1);
 //  }
 // ```
@@ -21,7 +21,7 @@
 // Patch 2 - Voice output efficiency (tengu_sotto_voce):
 // ```diff
 // -if(A9("tengu_sotto_voce",!1))
-// +if(true)
+// +if(!0)
 //    return`# Output efficiency...`
 // ```
 
@@ -57,7 +57,7 @@ const patchSottoVoce = (file: string): string | null => {
     return null;
   }
 
-  const replacement = 'if(true)';
+  const replacement = 'if(!0)';
   const newFile =
     file.slice(0, match.index) +
     replacement +
