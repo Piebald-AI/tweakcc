@@ -31,6 +31,7 @@ vi.mock('node:child_process', () => ({
 }));
 vi.mock('../nativeInstallationLoader', () => ({
   extractClaudeJsFromNativeInstallation: vi.fn(),
+  getNativeModuleLoadError: vi.fn().mockReturnValue(null),
   repackNativeInstallation: vi.fn(),
   resolveNixBinaryWrapper: vi.fn().mockResolvedValue(null),
 }));
