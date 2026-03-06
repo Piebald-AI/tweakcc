@@ -319,7 +319,9 @@ export const writePatchesAppliedIndication = (
   showTweakccVersion: boolean = true,
   showPatchesApplied: boolean = true
 ): string | null => {
-  // PATCH 1: Version output modification
+  // PATCH 1: Version output modification — replace ALL occurrences so that both
+  // the commander .version() registration and the direct early-return output path
+  // show the tweakcc version.
   const versionOutputLocation = findVersionOutputLocation(fileContents);
   if (!versionOutputLocation) {
     console.error(
@@ -328,11 +330,10 @@ export const writePatchesAppliedIndication = (
     return null;
   }
 
+  const versionPattern = '}.VERSION} (Claude Code)';
   const newText = `\\n${tweakccVersion} (tweakcc)`;
-  let content =
-    fileContents.slice(0, versionOutputLocation.endIndex) +
-    newText +
-    fileContents.slice(versionOutputLocation.endIndex);
+  const replacement = versionPattern + newText;
+  let content = fileContents.replaceAll(versionPattern, replacement);
 
   showDiff(
     fileContents,
