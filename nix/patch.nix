@@ -11,7 +11,7 @@ in
     nativeBuildInputs = [tweakccPkg pkgs.makeBinaryWrapper pkgs.binutils];
     inherit settingsJson;
   } ''
-    set -e
+    set -euo pipefail
     cp -r ${pkgs.claude-code}/. $out
     chmod -R u+w $out
 
@@ -20,7 +20,13 @@ in
 
     if [ -f "$out/bin/.claude-unwrapped" ]; then
       export TWEAKCC_CC_INSTALLATION_PATH=$out/bin/.claude-unwrapped
+      BEFORE=$(sha256sum $out/bin/.claude-unwrapped | awk '{print $1}')
       tweakcc --apply
+      AFTER=$(sha256sum $out/bin/.claude-unwrapped | awk '{print $1}')
+      if [ "$BEFORE" = "$AFTER" ]; then
+        echo "ERROR: tweakcc --apply made no changes to .claude-unwrapped"
+        exit 1
+      fi
 
       # The original wrapper hardcodes the original store path in a compiled C binary.
       # Recreate the wrapper pointing to the patched .claude-unwrapped.
@@ -30,6 +36,12 @@ in
         --prefix PATH : "$pathPrefix"
     else
       export TWEAKCC_CC_INSTALLATION_PATH=$out/bin/claude
+      BEFORE=$(sha256sum $out/bin/claude | awk '{print $1}')
       tweakcc --apply
+      AFTER=$(sha256sum $out/bin/claude | awk '{print $1}')
+      if [ "$BEFORE" = "$AFTER" ]; then
+        echo "ERROR: tweakcc --apply made no changes to claude"
+        exit 1
+      fi
     fi
   ''
