@@ -17,7 +17,8 @@ describe('voiceMode', () => {
   });
 
   it('matches the amber quartz gate in assignment context', () => {
-    const file = 'const gate=function qX_(){return A9("tengu_amber_quartz",!1)}';
+    const file =
+      'const gate=function qX_(){return A9("tengu_amber_quartz",!1)}';
 
     const result = writeVoiceMode(file, false);
 
@@ -27,7 +28,9 @@ describe('voiceMode', () => {
   });
 
   it('returns null when the amber quartz gate is absent', () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
 
     try {
       expect(writeVoiceMode('const x=1;', false)).toBeNull();
