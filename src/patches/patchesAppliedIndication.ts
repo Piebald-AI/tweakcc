@@ -439,6 +439,7 @@ export const writePatchesAppliedIndication = (
   }
 
   // PATCH 4: Add tweakcc version to indicator view (if enabled)
+  // Non-fatal: indicator view patches are best-effort; patches 1-3 still apply if these fail.
   let patch4ClosingParenIndex = -1;
   if (showTweakccVersion) {
     const patch4Result = applyIndicatorViewPatch(
@@ -450,15 +451,17 @@ export const writePatchesAppliedIndication = (
       chalkVar
     );
     if (!patch4Result) {
-      console.error('patch: patchesAppliedIndication: patch 4 failed');
-      return null;
+      console.error(
+        'patch: patchesAppliedIndication: patch 4 failed (non-fatal)'
+      );
+    } else {
+      content = patch4Result.content;
+      patch4ClosingParenIndex = patch4Result.closingParenIndex;
     }
-
-    content = patch4Result.content;
-    patch4ClosingParenIndex = patch4Result.closingParenIndex;
   }
 
   // PATCH 5: Add patches applied list to indicator view (if enabled)
+  // Non-fatal: indicator view patches are best-effort; patches 1-3 still apply if these fail.
   if (showPatchesApplied) {
     // If patch 4 wasn't applied, we need to find the insertion point
     if (patch4ClosingParenIndex === -1) {
@@ -468,28 +471,32 @@ export const writePatchesAppliedIndication = (
       const alignItemsMatch = content.match(alignItemsPattern);
       if (!alignItemsMatch || alignItemsMatch.index === undefined) {
         console.error(
-          'patch: patchesAppliedIndication: failed to find reference point for PATCH 5'
+          'patch: patchesAppliedIndication: failed to find reference point for PATCH 5 (non-fatal)'
         );
-        return null;
+      } else {
+        patch4ClosingParenIndex =
+          alignItemsMatch.index + alignItemsMatch[0].length;
       }
-      patch4ClosingParenIndex =
-        alignItemsMatch.index + alignItemsMatch[0].length;
     }
 
-    const finalContent = applyIndicatorPatchesListPatch(
-      content,
-      patch4ClosingParenIndex,
-      reactVar,
-      boxComponent,
-      textComponent,
-      chalkVar,
-      patchesApplies
-    );
-    if (!finalContent) {
-      console.error('patch: patchesAppliedIndication: patch 5 failed');
-      return null;
+    if (patch4ClosingParenIndex !== -1) {
+      const finalContent = applyIndicatorPatchesListPatch(
+        content,
+        patch4ClosingParenIndex,
+        reactVar,
+        boxComponent,
+        textComponent,
+        chalkVar,
+        patchesApplies
+      );
+      if (!finalContent) {
+        console.error(
+          'patch: patchesAppliedIndication: patch 5 failed (non-fatal)'
+        );
+      } else {
+        content = finalContent;
+      }
     }
-    content = finalContent;
   }
 
   return content;
