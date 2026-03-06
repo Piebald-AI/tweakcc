@@ -36,10 +36,18 @@ export const findVersionOutputLocation = (
 const findTweakccVersionLocation = (
   fileContents: string
 ): LocationResult | null => {
-  // Find Claude Code version display
-  const pattern =
+  // Old inline format (pre-2.1.69):
+  // createElement(Y,{bold:!0},"Claude Code")," ",createElement(Y,{dimColor:!0},"v",VERSION)
+  const oldPattern =
     /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)/;
-  const match = fileContents.match(pattern);
+
+  // New memoized format (2.1.69+): "Claude Code" element cached, then referenced in outer element:
+  // createElement(Y,null,cachedClaudeCode," ",createElement(Y,{dimColor:!0},"v",VERSION))
+  const newPattern =
+    /[^$\w]([$\w]+)\.createElement\(([$\w]+),null,[$\w]+," ",\1\.createElement\(\2,\{dimColor:!0\},"v",[$\w]+\)/;
+
+  const match =
+    fileContents.match(oldPattern) ?? fileContents.match(newPattern);
   if (!match || match.index === undefined) {
     console.error(
       'patch: patchesAppliedIndication: failed to find Claude Code version pattern'
@@ -246,10 +254,13 @@ const applyIndicatorPatchesListPatch = (
 const findPatchesListLocation = (
   fileContents: string
 ): LocationResult | null => {
-  // 1. Find the same regex as patch 2
-  const pattern =
+  // 1. Find the same regex as patch 2 (both old and new formats)
+  const oldPattern =
     /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)/;
-  const match = fileContents.match(pattern);
+  const newPattern =
+    /[^$\w]([$\w]+)\.createElement\(([$\w]+),null,[$\w]+," ",\1\.createElement\(\2,\{dimColor:!0\},"v",[$\w]+\)/;
+  const match =
+    fileContents.match(oldPattern) ?? fileContents.match(newPattern);
   if (!match || match.index === undefined) {
     console.error(
       'patch: patchesAppliedIndication: failed to find Claude Code version pattern for patch 3'
