@@ -46,7 +46,7 @@ export const findDividerComponentName = (
   // Pattern matches the Divider component's function signature
   // TODO: this could be refactored to a single function that takes a list of params, and maybe even finds and returns the longest match.
   const dividerPattern =
-    /function ([$\w]+)(?:\([$\w]+\)\{let [$\w]+=[$\w]+\(\d+\),\{(?:(?:orientation|title|width|padding|titlePadding|titleColor|titleDimColor|dividerChar|dividerColor|dividerDimColor|boxProps):[$\w]+,?)+\}=|\(\{(?:(?:orientation|title|width|padding|titlePadding|titleColor|titleDimColor|dividerChar|dividerColor|dividerDimColor|boxProps):[$\w]+(?:=(?:[^,]+,|[^}]+\})|[,}]))+\))/g;
+    /function ([$\w]+)(?:\([$\w]+\)\{let [$\w]+=(?:[$\w]+\.)?[$\w]+\(\d+\),\{(?:(?:orientation|title|width|padding|titlePadding|titleColor|titleDimColor|dividerChar|dividerColor|dividerDimColor|boxProps):[$\w]+,?)+\}=|\(\{(?:(?:orientation|title|width|padding|titlePadding|titleColor|titleDimColor|dividerChar|dividerColor|dividerDimColor|boxProps):[$\w]+(?:=(?:[^,]+,|[^}]+\})|[,}]))+\))/g;
 
   const matches = Array.from(fileContents.matchAll(dividerPattern));
   if (matches.length === 0) {
