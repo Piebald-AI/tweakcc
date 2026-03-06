@@ -37,6 +37,7 @@ async function tryLoadNativeInstallationModule(): Promise<NativeInstallationModu
     await import('node-lief');
     // If it is, dynamically import the module that uses it
     cachedModule = await import('./nativeInstallation');
+    loadError = null;
     return cachedModule;
   } catch (err) {
     loadError = err instanceof Error ? err.message : String(err);

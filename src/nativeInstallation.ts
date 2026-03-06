@@ -492,25 +492,25 @@ function extractBunDataFromSection(sectionData: Buffer): BunData {
 
 const ELF_MAGIC = Buffer.from([0x7f, 0x45, 0x4c, 0x46]);
 
+/** Returns true if the file at filePath begins with the ELF magic bytes. */
 function isELFFile(filePath: string): boolean {
+  let fd: number | null = null;
   try {
-    const fd = fs.openSync(filePath, 'r');
+    fd = fs.openSync(filePath, 'r');
     const buf = Buffer.allocUnsafe(4);
-    fs.readSync(fd, buf, 0, 4, 0);
-    fs.closeSync(fd);
-    return buf.equals(ELF_MAGIC);
+    const bytesRead = fs.readSync(fd, buf, 0, 4, 0);
+    return bytesRead === 4 && buf.equals(ELF_MAGIC);
   } catch {
     return false;
+  } finally {
+    if (fd !== null) fs.closeSync(fd);
   }
 }
 
 /**
- * ELF layout:
- * [original ELF ...][Bun data...][Bun offsets][Bun trailer][u64 totalByteCount]
- *
- * Reads directly from the file without LIEF to avoid crashes on large binaries.
- * The u64 totalByteCount at the end of the file gives the overlay size
- * (data + OFFSETS + TRAILER, not including the 8-byte field itself).
+ * Extracts Bun data from an ELF binary by reading the file tail directly,
+ * without using LIEF. Uses BunOffsets.byteCount (from the offsets struct) as
+ * the authoritative data region size. The trailing u64 footer is not used.
  */
 function extractBunDataFromELFRaw(filePath: string): BunData {
   const fd = fs.openSync(filePath, 'r');
@@ -1259,6 +1259,7 @@ function repackELF(
   }
 }
 
+/** Repacks a modified Bun buffer into an ELF binary by rewriting the file overlay. */
 function repackELFRaw(
   binPath: string,
   newBunBuffer: Buffer,
@@ -1266,15 +1267,30 @@ function repackELFRaw(
 ): void {
   const originalData = fs.readFileSync(binPath);
   const fileSize = originalData.length;
-  const totalByteCount = Number(originalData.readBigUInt64LE(fileSize - 8));
-  const elfSize = fileSize - totalByteCount - 8;
+
+  const tailSize = SIZEOF_OFFSETS + BUN_TRAILER.length + 8;
+  if (fileSize < tailSize) {
+    throw new Error('repackELFRaw: file too small to contain Bun data');
+  }
+  const offsetsBytes = originalData.subarray(
+    fileSize - tailSize,
+    fileSize - tailSize + SIZEOF_OFFSETS
+  );
+  const existingOffsets = parseOffsets(offsetsBytes);
+  const byteCount =
+    typeof existingOffsets.byteCount === 'bigint'
+      ? Number(existingOffsets.byteCount)
+      : existingOffsets.byteCount;
+
+  const overlaySize = byteCount + SIZEOF_OFFSETS + BUN_TRAILER.length + 8;
+  const elfSize = fileSize - overlaySize;
 
   if (elfSize <= 0 || elfSize >= fileSize) {
     throw new Error(`repackELFRaw: computed ELF size out of range: ${elfSize}`);
   }
 
   debug(
-    `repackELFRaw: elfSize=${elfSize}, totalByteCount=${totalByteCount}, newBunBuffer=${newBunBuffer.length}`
+    `repackELFRaw: elfSize=${elfSize}, byteCount=${byteCount}, newBunBuffer=${newBunBuffer.length}`
   );
 
   const newOverlay = Buffer.allocUnsafe(newBunBuffer.length + 8);
