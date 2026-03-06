@@ -331,7 +331,8 @@ if (toolsets.hasOwnProperty(currentToolset)) {
  */
 export const writeToolsetComponentDefinition = (
   oldFile: string,
-  toolsets: Toolset[]
+  toolsets: Toolset[],
+  defaultToolset: string | null
 ): string | null => {
   const insertionPoint = findTopLevelPositionBeforeSlashCommand(oldFile);
   if (insertionPoint === null) {
@@ -402,9 +403,13 @@ export const writeToolsetComponentDefinition = (
     }))
   );
 
+  const fallback = defaultToolset
+    ? JSON.stringify(defaultToolset)
+    : 'undefined';
+
   // Generate the component code
   const componentCode = `const toolsetComp = ({ onExit, input }) => {
-  const currentToolset = ${appStateUseSelectorFn}(state => state.toolset);
+  const currentToolset = ${appStateUseSelectorFn}(state => state.toolset) ?? ${fallback};
 
   const setState = ${appStateSetState}();
 
@@ -533,7 +538,10 @@ export const findShiftTabAppStateVarInsertionPoint = (
  * Insert the state getter variable at the start of the statusline component
  * This is for appendToolsetToModeDisplay which injects `currentTool` but can't define it itself.
  */
-export const insertShiftTabAppStateVar = (oldFile: string): string | null => {
+export const insertShiftTabAppStateVar = (
+  oldFile: string,
+  defaultToolset: string | null
+): string | null => {
   const insertionPoint = findShiftTabAppStateVarInsertionPoint(oldFile);
   if (insertionPoint === null) {
     console.error(
@@ -551,7 +559,10 @@ export const insertShiftTabAppStateVar = (oldFile: string): string | null => {
   }
 
   const { appStateUseSelectorFn } = stateInfo;
-  const codeToInsert = `let currentToolset=${appStateUseSelectorFn}(state => state.toolset);`;
+  const fallback = defaultToolset
+    ? JSON.stringify(defaultToolset)
+    : 'undefined';
+  const codeToInsert = `let currentToolset=${appStateUseSelectorFn}(state => state.toolset) ?? ${fallback};`;
 
   const newFile =
     oldFile.slice(0, insertionPoint) +
@@ -712,7 +723,8 @@ export const findToolChangeComponentScope = (
  * So that writeModeChangeUpdateToolset can use them.
  */
 export const addCurrentToolsetAtToolChangeComponentScope = (
-  oldFile: string
+  oldFile: string,
+  defaultToolset: string | null
 ): string | null => {
   const scopeIndex = findToolChangeComponentScope(oldFile);
   if (scopeIndex === null) {
@@ -728,9 +740,12 @@ export const addCurrentToolsetAtToolChangeComponentScope = (
   }
 
   const { appStateUseSelectorFn } = stateInfo;
+  const fallback = defaultToolset
+    ? JSON.stringify(defaultToolset)
+    : 'undefined';
 
   // Inject the currentToolset access right at the start of the component scope
-  const injectionCode = `const currentToolset = ${appStateUseSelectorFn}(state => state.toolset);`;
+  const injectionCode = `const currentToolset = ${appStateUseSelectorFn}(state => state.toolset) ?? ${fallback};`;
 
   const newFile =
     oldFile.slice(0, scopeIndex) + injectionCode + oldFile.slice(scopeIndex);
@@ -838,7 +853,7 @@ export const writeToolsets = (
   }
 
   // Step 3: Add toolset component definition
-  result = writeToolsetComponentDefinition(result, toolsets);
+  result = writeToolsetComponentDefinition(result, toolsets, defaultToolset);
   if (!result) {
     console.error(
       'patch: toolsets: step 3 failed (writeToolsetComponentDefinition)'
@@ -856,7 +871,7 @@ export const writeToolsets = (
   }
 
   // Step 5: Insert state getter in statusline component
-  result = insertShiftTabAppStateVar(result);
+  result = insertShiftTabAppStateVar(result, defaultToolset);
   if (!result) {
     console.error('patch: toolsets: step 5 failed (insertShiftTabAppStateVar)');
     return null;
@@ -883,7 +898,10 @@ export const writeToolsets = (
   // Step 8: Mode-change toolset switching (optional)
   if (planModeToolset && defaultToolset) {
     // First, add setState access at the tool change component scope
-    result = addCurrentToolsetAtToolChangeComponentScope(result);
+    result = addCurrentToolsetAtToolChangeComponentScope(
+      result,
+      defaultToolset
+    );
     if (!result) {
       console.error(
         'patch: toolsets: step 8a failed (addCurrentToolsetAtToolChangeComponentScope)'
