@@ -1524,6 +1524,123 @@ describe('config.ts', () => {
         findClaudeCodeInstallation(mockConfig, { interactive: true })
       ).rejects.toThrow('Could not extract JS from native binary');
     });
+
+    it('should include node-lief load reason in error when getNativeModuleLoadError returns a message', async () => {
+      const mockConfig = {
+        ccInstallationPath: null,
+        changesApplied: false,
+        ccVersion: '',
+        lastModified: '',
+        settings: DEFAULT_SETTINGS,
+      };
+
+      const nativeBinaryPath = '/usr/local/bin/claude';
+
+      vi.spyOn(fs, 'stat').mockImplementation(async filePath => {
+        if (filePath === nativeBinaryPath) {
+          return {} as Stats;
+        }
+        throw createEnoent();
+      });
+
+      vi.mocked(whichMock).mockResolvedValue(nativeBinaryPath);
+      lstatSpy.mockImplementation(async filePath => {
+        if (filePath === nativeBinaryPath) {
+          return createRegularStats();
+        }
+        throw createEnoent();
+      });
+      vi.spyOn(fs, 'realpath').mockResolvedValue(nativeBinaryPath);
+
+      vi.spyOn(fs, 'open').mockResolvedValue({
+        read: async ({ buffer }: { buffer: Buffer }) => {
+          const contentBuffer = Buffer.from('fake binary content');
+          contentBuffer.copy(buffer);
+          return { bytesRead: contentBuffer.length, buffer };
+        },
+        close: async () => {},
+      } as unknown as fs.FileHandle);
+
+      mockMagicInstance.detect.mockReturnValue('application/octet-stream');
+
+      vi.mocked(
+        nativeInstallation.extractClaudeJsFromNativeInstallation
+      ).mockResolvedValue(null);
+
+      vi.mocked(nativeInstallation.getNativeModuleLoadError).mockReturnValue(
+        'Cannot find module node-lief'
+      );
+
+      await expect(
+        findClaudeCodeInstallation(mockConfig, { interactive: true })
+      ).rejects.toThrow('node-lief failed to load');
+
+      vi.mocked(nativeInstallation.getNativeModuleLoadError).mockReturnValue(
+        null
+      );
+    });
+
+    it('should include NixOS/Bun hint in error when shared library failure detected on linux', async () => {
+      const mockConfig = {
+        ccInstallationPath: null,
+        changesApplied: false,
+        ccVersion: '',
+        lastModified: '',
+        settings: DEFAULT_SETTINGS,
+      };
+
+      const nativeBinaryPath = '/usr/local/bin/claude';
+
+      vi.spyOn(fs, 'stat').mockImplementation(async filePath => {
+        if (filePath === nativeBinaryPath) {
+          return {} as Stats;
+        }
+        throw createEnoent();
+      });
+
+      vi.mocked(whichMock).mockResolvedValue(nativeBinaryPath);
+      lstatSpy.mockImplementation(async filePath => {
+        if (filePath === nativeBinaryPath) {
+          return createRegularStats();
+        }
+        throw createEnoent();
+      });
+      vi.spyOn(fs, 'realpath').mockResolvedValue(nativeBinaryPath);
+
+      vi.spyOn(fs, 'open').mockResolvedValue({
+        read: async ({ buffer }: { buffer: Buffer }) => {
+          const contentBuffer = Buffer.from('fake binary content');
+          contentBuffer.copy(buffer);
+          return { bytesRead: contentBuffer.length, buffer };
+        },
+        close: async () => {},
+      } as unknown as fs.FileHandle);
+
+      mockMagicInstance.detect.mockReturnValue('application/octet-stream');
+
+      vi.mocked(
+        nativeInstallation.extractClaudeJsFromNativeInstallation
+      ).mockResolvedValue(null);
+
+      vi.mocked(nativeInstallation.getNativeModuleLoadError).mockReturnValue(
+        'cannot open shared object file: libz.so.1: No such file or directory'
+      );
+
+      const platformSpy = vi
+        .spyOn(process, 'platform', 'get')
+        .mockReturnValue('linux');
+
+      try {
+        await expect(
+          findClaudeCodeInstallation(mockConfig, { interactive: true })
+        ).rejects.toThrow('nix shell nixpkgs#nodejs');
+      } finally {
+        platformSpy.mockRestore();
+        vi.mocked(nativeInstallation.getNativeModuleLoadError).mockReturnValue(
+          null
+        );
+      }
+    });
   });
 
   describe('startupCheck', () => {
