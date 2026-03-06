@@ -258,7 +258,8 @@ export const writeToolsetFieldToAppState = (
  */
 export const writeToolFetchingUseMemo = (
   oldFile: string,
-  toolsets: Toolset[]
+  toolsets: Toolset[],
+  defaultToolset: string | null
 ): string | null => {
   const stateInfo = getAppStateSelectorAndUseState(oldFile);
   if (!stateInfo) {
@@ -292,8 +293,15 @@ export const writeToolFetchingUseMemo = (
     )
   );
 
+  // When persisted app state is loaded it may not have a toolset field (saved before
+  // the toolset patch existed), causing currentToolset to be undefined. Fall back to
+  // defaultToolset so the restriction is active from the very first render.
+  const fallback = defaultToolset
+    ? JSON.stringify(defaultToolset)
+    : 'undefined';
+
   // Generate the replacement code
-  const replacement = `let currentToolset = ${appStateUseSelectorFn}(state => state.toolset);
+  const replacement = `let currentToolset = ${appStateUseSelectorFn}(state => state.toolset) ?? ${fallback};
 let ${toolAggregationVar} = undefined;
 const toolsets = ${toolsetsJSON};
 if (toolsets.hasOwnProperty(currentToolset)) {
@@ -823,7 +831,7 @@ export const writeToolsets = (
   }
 
   // Step 2: Modify tool fetching useMemo
-  result = writeToolFetchingUseMemo(result, toolsets);
+  result = writeToolFetchingUseMemo(result, toolsets, defaultToolset);
   if (!result) {
     console.error('patch: toolsets: step 2 failed (writeToolFetchingUseMemo)');
     return null;
