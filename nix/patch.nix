@@ -11,7 +11,7 @@ in
     nativeBuildInputs = [tweakccPkg pkgs.makeBinaryWrapper pkgs.binutils];
     inherit settingsJson;
   } ''
-    set -euo pipefail
+    set -eo pipefail
     cp -r ${pkgs.claude-code}/. $out
     chmod -R u+w $out
 
