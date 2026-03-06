@@ -386,11 +386,13 @@ async function extractVersionFromNativeBinary(
 
   if (!claudeJsBuffer) {
     const loadErr = getNativeModuleLoadError();
-    const nixNote = loadErr?.includes('cannot open shared object')
-      ? '\n\nOn NixOS with Bun, native module loading often fails due to missing system libraries.\n' +
-        'Try running tweakcc with Node.js instead:\n' +
-        '  nix shell nixpkgs#nodejs -c npx tweakcc'
-      : '';
+    const nixNote =
+      loadErr?.includes('cannot open shared object') ||
+      loadErr?.includes('No such file')
+        ? '\n\nOn NixOS with Bun, native module loading often fails due to missing system libraries.\n' +
+          'Try running tweakcc with Node.js instead:\n' +
+          '  nix shell nixpkgs#nodejs -c npx tweakcc'
+        : '';
     throw new Error(
       `Could not extract JS from native binary: ${binaryPath}` +
         (loadErr ? `\nReason: node-lief failed to load: ${loadErr}` : '') +

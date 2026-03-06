@@ -12,6 +12,11 @@ import type {
   resolveNixBinaryWrapper as ResolveNixFn,
 } from './nativeInstallation';
 
+import {
+  isELFFile,
+  extractClaudeJsFromELFBinary,
+  repackELFBinary,
+} from './elfInstallation';
 import { debug } from './utils';
 
 interface NativeInstallationModule {
@@ -37,7 +42,6 @@ async function tryLoadNativeInstallationModule(): Promise<NativeInstallationModu
     await import('node-lief');
     // If it is, dynamically import the module that uses it
     cachedModule = await import('./nativeInstallation');
-    loadError = null;
     return cachedModule;
   } catch (err) {
     loadError = err instanceof Error ? err.message : String(err);
@@ -57,11 +61,15 @@ export function getNativeModuleLoadError(): string | null {
 
 /**
  * Extracts claude.js from a native installation binary.
- * Returns null if node-lief is not available or extraction fails.
+ * For ELF files (Linux/NixOS), bypasses node-lief entirely.
+ * Returns null if extraction fails or node-lief is not available for non-ELF binaries.
  */
 export async function extractClaudeJsFromNativeInstallation(
   nativeInstallationPath: string
 ): Promise<Buffer | null> {
+  if (isELFFile(nativeInstallationPath)) {
+    return extractClaudeJsFromELFBinary(nativeInstallationPath);
+  }
   const mod = await tryLoadNativeInstallationModule();
   if (!mod) {
     return null;
@@ -71,21 +79,20 @@ export async function extractClaudeJsFromNativeInstallation(
 
 /**
  * Repacks a modified claude.js back into the native installation binary.
- * This should only be called after a successful extractClaudeJsFromNativeInstallation(),
- * which ensures the module is already loaded and cached.
+ * For ELF files (Linux/NixOS), bypasses node-lief entirely.
  */
 export async function repackNativeInstallation(
   binPath: string,
   modifiedClaudeJs: Buffer,
   outputPath: string
 ): Promise<void> {
-  // The module should already be cached from a prior extractClaudeJsFromNativeInstallation() call
+  if (isELFFile(binPath)) {
+    repackELFBinary(binPath, modifiedClaudeJs, outputPath);
+    return;
+  }
   const mod = await tryLoadNativeInstallationModule();
   if (!mod) {
-    throw new Error(
-      '`repackNativeInstallation()` called but `node-lief` is not available. ' +
-        'This is unexpected - `extractClaudeJsFromNativeInstallation()` should have been called first.'
-    );
+    throw new Error('node-lief not available for non-ELF binary');
   }
   mod.repackNativeInstallation(binPath, modifiedClaudeJs, outputPath);
 }
