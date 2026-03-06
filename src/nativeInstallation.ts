@@ -4,8 +4,15 @@
 
 import fs from 'node:fs';
 import { execSync } from 'node:child_process';
-import LIEF from 'node-lief';
+import type LIEF from 'node-lief';
+
 import { isDebug, debug } from './utils';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getLIEF(): any {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require('node-lief');
+}
 
 // ============================================================================
 // Nix binary wrapper detection
@@ -46,8 +53,8 @@ export function resolveNixBinaryWrapper(binaryPath: string): string | null {
       return null;
     }
 
-    LIEF.logging.disable();
-    const binary = LIEF.parse(binaryPath);
+    getLIEF().logging.disable();
+    const binary = getLIEF().parse(binaryPath) as LIEF.Abstract.Binary;
 
     // Gate 2: must import execv — the hallmark of a makeBinaryWrapper
     const symbols = binary.symbols();
@@ -735,8 +742,10 @@ export function extractClaudeJsFromNativeInstallation(
         nativeInstallationPath
       ));
     } else {
-      LIEF.logging.disable();
-      const binary = LIEF.parse(nativeInstallationPath);
+      getLIEF().logging.disable();
+      const binary = getLIEF().parse(
+        nativeInstallationPath
+      ) as LIEF.Abstract.Binary;
       ({ bunOffsets, bunData, moduleStructSize } = getBunData(binary));
     }
 
@@ -1132,7 +1141,7 @@ function repackMachO(
       // - x86_64: 4KB (4096 bytes)
       // - ARM64 (Apple Silicon): 16KB (16384 bytes)
       const isARM64 =
-        machoBinary.header.cpuType === LIEF.MachO.Header.CPU_TYPE.ARM64;
+        machoBinary.header.cpuType === getLIEF().MachO.Header.CPU_TYPE.ARM64;
       const PAGE_SIZE = isARM64 ? 16384 : 4096;
       const alignedSizeDiff = Math.ceil(sizeDiff / PAGE_SIZE) * PAGE_SIZE;
 
@@ -1362,8 +1371,8 @@ export function repackNativeInstallation(
     return;
   }
 
-  LIEF.logging.disable();
-  const binary = LIEF.parse(binPath);
+  getLIEF().logging.disable();
+  const binary = getLIEF().parse(binPath) as LIEF.Abstract.Binary;
 
   const { bunOffsets, bunData, sectionHeaderSize, moduleStructSize } =
     getBunData(binary);
