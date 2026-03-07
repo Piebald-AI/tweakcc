@@ -131,6 +131,7 @@ export interface MiscConfig {
   suppressNativeInstallerWarning: boolean;
   filterScrollEscapeSequences: boolean;
   enableWorktreeMode: boolean;
+  allowCustomAgentModels: boolean;
   enableContextLimitOverride: boolean;
   enableModelCustomizations: boolean;
 }
