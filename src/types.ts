@@ -133,6 +133,8 @@ export interface MiscConfig {
   enableWorktreeMode: boolean;
   enableContextLimitOverride: boolean;
   enableModelCustomizations: boolean;
+  enableVoiceMode: boolean;
+  enableVoiceConciseOutput: boolean;
 }
 
 export interface InputPatternHighlighter {

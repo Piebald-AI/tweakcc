@@ -81,6 +81,8 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableWorktreeMode: true,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
+    enableVoiceMode: false,
+    enableVoiceConciseOutput: true,
   };
 
   const ensureMisc = () => {
@@ -400,6 +402,33 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.enableWorktreeMode =
               !settings.misc!.enableWorktreeMode;
+          });
+        },
+      },
+      {
+        id: 'enableVoiceMode',
+        title: 'Enable voice mode (/voice command)',
+        description:
+          'Force-enable the /voice command by bypassing the tengu_amber_quartz feature gate.',
+        getValue: () => settings.misc?.enableVoiceMode ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableVoiceMode = !settings.misc!.enableVoiceMode;
+          });
+        },
+      },
+      {
+        id: 'enableVoiceConciseOutput',
+        title: 'Enable concise output for voice mode',
+        description:
+          'Enable the concise-output prompt used for voice interactions. Only applies when voice mode is enabled.',
+        getValue: () => settings.misc?.enableVoiceConciseOutput ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableVoiceConciseOutput =
+              !settings.misc!.enableVoiceConciseOutput;
           });
         },
       },

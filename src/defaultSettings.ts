@@ -715,6 +715,8 @@ export const DEFAULT_SETTINGS: Settings = {
     enableWorktreeMode: true,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
+    enableVoiceMode: false,
+    enableVoiceConciseOutput: true,
   },
   toolsets: [],
   defaultToolset: null,
