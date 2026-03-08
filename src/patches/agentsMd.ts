@@ -82,9 +82,16 @@ export const writeAgentsMd = (
   showDiff(file, newFile, ',didReroute', sigIndex, sigIndex);
 
   // Step 2: Inject fallback at the early return null (when file doesn't exist)
-  const earlyReturnPattern = /\.isFile\(\)\)return null/;
   const funcBody = newFile.slice(funcStart);
-  const earlyReturnMatch = funcBody.match(earlyReturnPattern);
+
+  // CC ≤2.1.62: existsSync/isFile check before reading
+  const oldEarlyReturnPattern = /\.isFile\(\)\)return null/;
+  // CC ≥2.1.69: try/catch with ENOENT/EISDIR error codes
+  const newEarlyReturnPattern = /==="EISDIR"\)return null/;
+
+  const earlyReturnMatch =
+    funcBody.match(oldEarlyReturnPattern) ??
+    funcBody.match(newEarlyReturnPattern);
 
   if (!earlyReturnMatch || earlyReturnMatch.index === undefined) {
     console.error(
@@ -93,11 +100,15 @@ export const writeAgentsMd = (
     return null;
   }
 
+  const isNewPattern = !funcBody.match(oldEarlyReturnPattern);
+
   const fallback = `if(!didReroute&&(${firstParam}.endsWith("/CLAUDE.md")||${firstParam}.endsWith("\\\\CLAUDE.md"))){for(let alt of ${altNamesJson}){let altPath=${firstParam}.slice(0,-9)+alt;if(${fsExpr}.existsSync(altPath)&&${fsExpr}.statSync(altPath).isFile())return ${functionName}(altPath,${restParams},true);}}`;
 
   const earlyReturnStart = funcStart + earlyReturnMatch.index;
   const oldStr = earlyReturnMatch[0];
-  const newStr = `.isFile()){${fallback}return null;}`;
+  const newStr = isNewPattern
+    ? `==="EISDIR"){${fallback}return null;}`
+    : `.isFile()){${fallback}return null;}`;
 
   newFile =
     newFile.slice(0, earlyReturnStart) +
