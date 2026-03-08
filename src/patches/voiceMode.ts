@@ -48,7 +48,7 @@ const patchAmberQuartz = (file: string): string | null => {
   return newFile;
 };
 
-const patchSottoVoce = (file: string): string | null => {
+const patchConciseOutput = (file: string): string | null => {
   const pattern = /if\([$\w]+\("tengu_sotto_voce",!1\)\)/;
   const match = file.match(pattern);
 
@@ -76,13 +76,13 @@ const patchSottoVoce = (file: string): string | null => {
 
 export const writeVoiceMode = (
   file: string,
-  enableSottoVoce: boolean
+  enableConciseOutput: boolean
 ): string | null => {
   let newFile = patchAmberQuartz(file);
   if (!newFile) return null;
 
-  if (enableSottoVoce) {
-    newFile = patchSottoVoce(newFile);
+  if (enableConciseOutput) {
+    newFile = patchConciseOutput(newFile);
     if (!newFile) return null;
   }
 

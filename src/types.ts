@@ -134,7 +134,7 @@ export interface MiscConfig {
   enableContextLimitOverride: boolean;
   enableModelCustomizations: boolean;
   enableVoiceMode: boolean;
-  enableVoiceSottoVoce: boolean;
+  enableVoiceConciseOutput: boolean;
 }
 
 export interface InputPatternHighlighter {

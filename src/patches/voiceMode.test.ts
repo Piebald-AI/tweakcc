@@ -16,7 +16,7 @@ describe('voiceMode', () => {
     expect(result).toContain('if(!0)return`# Output efficiency...`');
   });
 
-  it('patches only amber quartz when enableSottoVoce is false', () => {
+  it('patches only amber quartz when enableConciseOutput is false', () => {
     const file =
       'const x=1;' +
       'function qX_(){return A9("tengu_amber_quartz",!1)}' +

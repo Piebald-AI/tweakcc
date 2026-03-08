@@ -858,7 +858,10 @@ export const applyCustomization = async (
     },
     'voice-mode': {
       fn: c =>
-        writeVoiceMode(c, config.settings.misc?.enableVoiceSottoVoce ?? true),
+        writeVoiceMode(
+          c,
+          config.settings.misc?.enableVoiceConciseOutput ?? true
+        ),
       condition: !!config.settings.misc?.enableVoiceMode,
     },
   };

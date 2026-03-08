@@ -82,7 +82,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,
-    enableVoiceSottoVoce: true,
+    enableVoiceConciseOutput: true,
   };
 
   const ensureMisc = () => {
@@ -419,16 +419,16 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         },
       },
       {
-        id: 'enableVoiceSottoVoce',
-        title: 'Enable sotto voce for voice mode',
+        id: 'enableVoiceConciseOutput',
+        title: 'Enable concise output for voice mode',
         description:
           'Enable the concise-output prompt used for voice interactions. Only applies when voice mode is enabled.',
-        getValue: () => settings.misc?.enableVoiceSottoVoce ?? true,
+        getValue: () => settings.misc?.enableVoiceConciseOutput ?? true,
         toggle: () => {
           updateSettings(settings => {
             ensureMisc();
-            settings.misc!.enableVoiceSottoVoce =
-              !settings.misc!.enableVoiceSottoVoce;
+            settings.misc!.enableVoiceConciseOutput =
+              !settings.misc!.enableVoiceConciseOutput;
           });
         },
       },

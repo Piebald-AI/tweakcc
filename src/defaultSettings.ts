@@ -716,7 +716,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,
-    enableVoiceSottoVoce: true,
+    enableVoiceConciseOutput: true,
   },
   toolsets: [],
   defaultToolset: null,
