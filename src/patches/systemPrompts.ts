@@ -4,9 +4,7 @@ import { showDiff, PatchResult, PatchGroup } from './index';
 import {
   loadSystemPromptsWithRegex,
   reconstructContentFromPieces,
-  findUnescapedBackticks,
-  formatBacktickError,
-  getPromptFilePath,
+  escapeDepthZeroBackticks,
 } from '../systemPromptSync';
 import { setAppliedHash, computeMD5Hash } from '../systemPromptHashIndex';
 
@@ -114,29 +112,6 @@ export const applySystemPrompts = async (
       const matchIndex = match.index;
       const delimiter = matchIndex > 0 ? content[matchIndex - 1] : '';
 
-      // Only check for unescaped backticks if the original uses template literals
-      // String literals (single/double quotes) don't need backticks escaped
-      if (delimiter === '`') {
-        const unescapedBackticks = findUnescapedBackticks(interpolatedContent);
-        if (unescapedBackticks.size > 0) {
-          const filePath = getPromptFilePath(promptId);
-          const contentLines = prompt.content.split('\n');
-
-          for (const [lineNum, columns] of unescapedBackticks) {
-            // lineNum is relative to prompt.content; adjust to absolute file line
-            // number by accounting for any frontmatter/comment lines.
-            const absoluteLineNum = lineNum + (prompt.contentLineOffset || 0);
-            const lineText = contentLines[lineNum - 1] || '';
-            console.log(
-              formatBacktickError(filePath, absoluteLineNum, lineText, columns)
-            );
-            console.log();
-          }
-
-          continue; // Skip this prompt
-        }
-      }
-
       // Calculate character counts for this prompt (both with human-readable placeholders)
       // Note: trim() to match how markdown files are parsed and how whitespace is applied
       const originalBaselineContent = reconstructContentFromPieces(
@@ -150,17 +125,38 @@ export const applySystemPrompts = async (
       const oldContent = content;
       const matchLength = match[0].length;
 
-      // delimiter was already determined above for backtick check
       let replacementContent = interpolatedContent;
 
-      // If it's a string literal (double or single quote), convert actual newlines to \n
-      // and escape the delimiter character. Template literals can have actual newlines.
       if (delimiter === '"') {
         replacementContent = replacementContent.replace(/\n/g, '\\n');
         replacementContent = replacementContent.replace(/"/g, '\\"');
       } else if (delimiter === "'") {
         replacementContent = replacementContent.replace(/\n/g, '\\n');
         replacementContent = replacementContent.replace(/'/g, "\\'");
+      } else if (delimiter === '`') {
+        const { content: escaped, incomplete } =
+          escapeDepthZeroBackticks(interpolatedContent);
+        if (incomplete) {
+          console.log(
+            chalk.red(
+              `Incomplete backtick escaping for "${prompt.name}" (unclosed interpolation) - skipping`
+            )
+          );
+          results.push({
+            id: promptId,
+            name: prompt.name,
+            group: PatchGroup.SYSTEM_PROMPTS,
+            applied: false,
+            details: 'incomplete escaping: unclosed interpolation detected',
+          });
+          continue;
+        }
+        if (escaped !== interpolatedContent) {
+          console.log(
+            chalk.yellow(`Auto-escaped unescaped backticks in "${prompt.name}"`)
+          );
+        }
+        replacementContent = escaped;
       }
 
       // Replace the matched content with the interpolated content from the markdown file
@@ -169,7 +165,13 @@ export const applySystemPrompts = async (
 
       // Store the hash of the applied prompt content
       const appliedHash = computeMD5Hash(prompt.content);
-      await setAppliedHash(promptId, appliedHash);
+      let hashFailed = false;
+      try {
+        await setAppliedHash(promptId, appliedHash);
+      } catch (error) {
+        debug(`Failed to store hash for "${prompt.name}": ${error}`);
+        hashFailed = true;
+      }
 
       // Show diff in debug mode
       showDiff(
@@ -182,7 +184,7 @@ export const applySystemPrompts = async (
 
       // Track this prompt's result
       const charDiff = originalLength - newLength;
-      const applied = charDiff !== 0;
+      const applied = oldContent !== content;
 
       let details: string;
       if (charDiff > 0) {
@@ -193,11 +195,16 @@ export const applySystemPrompts = async (
         details = 'unchanged';
       }
 
+      if (hashFailed) {
+        details += ' (hash storage failed)';
+      }
+
       results.push({
         id: promptId,
         name: prompt.name,
         group: PatchGroup.SYSTEM_PROMPTS,
         applied,
+        ...(hashFailed && { failed: true }),
         details,
       });
     } else {
