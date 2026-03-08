@@ -70,6 +70,7 @@ import { writeAllowBypassPermsInSudo } from './allowBypassPermsInSudo';
 import { writeSuppressNativeInstallerWarning } from './suppressNativeInstallerWarning';
 import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeWorktreeMode } from './worktreeMode';
+import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import {
   restoreNativeBinaryFromBackup,
@@ -357,6 +358,13 @@ const PATCH_DEFINITIONS = [
       'Filter out terminal escape sequences that cause unwanted scrolling',
   },
   // Features
+  {
+    id: 'allow-custom-agent-models',
+    name: 'Allow custom agent models',
+    group: PatchGroup.FEATURES,
+    description:
+      'Allow arbitrary model names in custom agent frontmatter (e.g. gemini-2.5-flash)',
+  },
   {
     id: 'worktree-mode',
     name: 'Worktree mode',
@@ -801,6 +809,10 @@ export const applyCustomization = async (
       condition: !!config.settings.misc?.filterScrollEscapeSequences,
     },
     // Features
+    'allow-custom-agent-models': {
+      fn: c => writeAllowCustomAgentModels(c),
+      condition: !!config.settings.misc?.allowCustomAgentModels,
+    },
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),
       condition:

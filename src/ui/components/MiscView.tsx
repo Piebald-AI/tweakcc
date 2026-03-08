@@ -79,6 +79,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     suppressNativeInstallerWarning: false,
     filterScrollEscapeSequences: false,
     enableWorktreeMode: true,
+    allowCustomAgentModels: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,
@@ -624,6 +625,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.filterScrollEscapeSequences =
               !settings.misc!.filterScrollEscapeSequences;
+          });
+        },
+      },
+      {
+        id: 'allowCustomAgentModels',
+        title: 'Allow custom agent models',
+        description:
+          'Allow arbitrary model names in custom agent frontmatter (e.g. gemini-2.5-flash). Useful with a local proxy for non-Claude models.',
+        getValue: () => settings.misc?.allowCustomAgentModels ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.allowCustomAgentModels =
+              !settings.misc!.allowCustomAgentModels;
           });
         },
       },
