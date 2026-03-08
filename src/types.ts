@@ -134,6 +134,8 @@ export interface MiscConfig {
   allowCustomAgentModels: boolean;
   enableContextLimitOverride: boolean;
   enableModelCustomizations: boolean;
+  enableVoiceMode: boolean;
+  enableVoiceConciseOutput: boolean;
 }
 
 export interface InputPatternHighlighter {

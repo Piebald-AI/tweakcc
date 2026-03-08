@@ -71,6 +71,7 @@ import { writeSuppressNativeInstallerWarning } from './suppressNativeInstallerWa
 import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
+import { writeVoiceMode } from './voiceMode';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -413,6 +414,13 @@ const PATCH_DEFINITIONS = [
     name: 'Conversation title',
     group: PatchGroup.FEATURES,
     description: '/title command will be created & enabled',
+  },
+  {
+    id: 'voice-mode',
+    name: 'Voice mode',
+    group: PatchGroup.FEATURES,
+    description:
+      'Enable /voice command for speech-to-text input (hold Space to record)',
   },
 ] as const;
 
@@ -859,6 +867,14 @@ export const applyCustomization = async (
           ccInstInfo.version &&
           compareVersions(ccInstInfo.version, '2.0.64') < 0
         ),
+    },
+    'voice-mode': {
+      fn: c =>
+        writeVoiceMode(
+          c,
+          config.settings.misc?.enableVoiceConciseOutput ?? true
+        ),
+      condition: !!config.settings.misc?.enableVoiceMode,
     },
   };
 

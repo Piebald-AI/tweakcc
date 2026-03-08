@@ -716,6 +716,8 @@ export const DEFAULT_SETTINGS: Settings = {
     allowCustomAgentModels: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
+    enableVoiceMode: false,
+    enableVoiceConciseOutput: true,
   },
   toolsets: [],
   defaultToolset: null,
