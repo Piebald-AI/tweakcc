@@ -7,7 +7,10 @@ import { DEFAULT_SETTINGS } from '@/defaultSettings';
 import { SettingsContext } from '../App';
 import { ThemeEditView } from './ThemeEditView';
 import { ThemePreview } from './ThemePreview';
+import { CommunityThemesView } from './CommunityThemesView';
 import Header from './Header';
+
+const BROWSE_COMMUNITY_LABEL = 'Browse community themes…';
 
 function generateThemeItems(themes: Theme[]): string[] {
   return themes.map(theme => `${theme.name} (${theme.id})`);
@@ -26,6 +29,9 @@ export function ThemesView({ onBack }: ThemesViewProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [editingThemeId, setEditingThemeId] = useState<string | null>(null);
   const [inputActive, setInputActive] = useState(true);
+  const [browsingCommunity, setBrowsingCommunity] = useState(false);
+
+  const totalItems = themes.length + 1;
 
   const handleCreateTheme = () => {
     const baseTheme = themes[0] || DEFAULT_SETTINGS.themes[0];
@@ -62,6 +68,8 @@ export function ThemesView({ onBack }: ThemesViewProps) {
     setSelectedIndex(0);
   };
 
+  const isCommunitySelected = selectedIndex === themes.length;
+
   useInput(
     (input, key) => {
       if (key.escape) {
@@ -69,19 +77,26 @@ export function ThemesView({ onBack }: ThemesViewProps) {
       } else if (key.upArrow) {
         setSelectedIndex(prev => Math.max(0, prev - 1));
       } else if (key.downArrow) {
-        setSelectedIndex(prev => Math.min(themes.length - 1, prev + 1));
+        setSelectedIndex(prev => Math.min(totalItems - 1, prev + 1));
       } else if (key.return) {
-        const selectedTheme = themes[selectedIndex];
-        if (selectedTheme) {
-          setEditingThemeId(selectedTheme.id);
+        if (isCommunitySelected) {
+          setBrowsingCommunity(true);
           setInputActive(false);
+        } else {
+          const selectedTheme = themes[selectedIndex];
+          if (selectedTheme) {
+            setEditingThemeId(selectedTheme.id);
+            setInputActive(false);
+          }
         }
       } else if (input === 'n') {
         handleCreateTheme();
       } else if (input === 'd') {
-        const selectedTheme = themes[selectedIndex];
-        if (selectedTheme) {
-          handleDeleteTheme(selectedTheme.id);
+        if (!isCommunitySelected) {
+          const selectedTheme = themes[selectedIndex];
+          if (selectedTheme) {
+            handleDeleteTheme(selectedTheme.id);
+          }
         }
       } else if (key.ctrl && input === 'r') {
         handleResetThemes();
@@ -90,7 +105,17 @@ export function ThemesView({ onBack }: ThemesViewProps) {
     { isActive: inputActive }
   );
 
-  // Handle editing theme view after all hooks are called
+  if (browsingCommunity) {
+    return (
+      <CommunityThemesView
+        onBack={() => {
+          setBrowsingCommunity(false);
+          setInputActive(true);
+        }}
+      />
+    );
+  }
+
   if (editingThemeId) {
     return (
       <ThemeEditView
@@ -146,11 +171,29 @@ export function ThemesView({ onBack }: ThemesViewProps) {
               {item}
             </Text>
           ))}
+          <Text
+            color={isCommunitySelected ? 'blue' : undefined}
+            bold={isCommunitySelected}
+          >
+            {isCommunitySelected ? '❯ ' : '  '}
+            {BROWSE_COMMUNITY_LABEL}
+          </Text>
         </Box>
       </Box>
 
       <Box width="50%">
-        <ThemePreview theme={selectedTheme} />
+        {isCommunitySelected ? (
+          <Box
+            flexDirection="column"
+            justifyContent="center"
+            alignItems="center"
+            height={10}
+          >
+            <Text dimColor>Press enter to browse community themes.</Text>
+          </Box>
+        ) : (
+          <ThemePreview theme={selectedTheme} />
+        )}
       </Box>
     </Box>
   );
