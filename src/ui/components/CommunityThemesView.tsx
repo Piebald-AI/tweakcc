@@ -56,7 +56,10 @@ export function CommunityThemesView({ onBack }: CommunityThemesViewProps) {
     setStatusMessage(null);
     try {
       const theme = await fetchCommunityTheme(id);
-      const merged = deepMergeWithDefaults(theme, DEFAULT_THEME) as CommunityTheme;
+      const merged = deepMergeWithDefaults(
+        theme,
+        DEFAULT_THEME
+      ) as CommunityTheme;
       setPreviewTheme(merged);
     } catch {
       setPreviewTheme(null);
@@ -71,7 +74,10 @@ export function CommunityThemesView({ onBack }: CommunityThemesViewProps) {
       setStatusMessage('Downloading theme…');
       try {
         const theme = await fetchCommunityTheme(entry.id);
-        const merged = deepMergeWithDefaults(theme, DEFAULT_THEME) as CommunityTheme;
+        const merged = deepMergeWithDefaults(
+          theme,
+          DEFAULT_THEME
+        ) as CommunityTheme;
 
         const alreadyExists = settings.themes.some(t => t.id === merged.id);
         if (alreadyExists) {
