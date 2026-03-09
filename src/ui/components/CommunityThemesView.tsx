@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useCallback } from 'react';
+import { useState, useEffect, useContext, useCallback, useRef } from 'react';
 import { Box, Text, useInput } from 'ink';
 
 import { Theme } from '@/types';
@@ -36,6 +36,7 @@ export function CommunityThemesView({ onBack }: CommunityThemesViewProps) {
   const [previewTheme, setPreviewTheme] = useState<Theme | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const previewRequestId = useRef(0);
 
   useEffect(() => {
     fetchCommunityThemeIndex()
@@ -52,20 +53,25 @@ export function CommunityThemesView({ onBack }: CommunityThemesViewProps) {
   // ======================================================================
 
   const loadPreview = useCallback(async (id: string) => {
+    const requestId = ++previewRequestId.current;
     setPreviewLoading(true);
     setStatusMessage(null);
     try {
       const theme = await fetchCommunityTheme(id);
+      if (requestId !== previewRequestId.current) return;
       const merged = deepMergeWithDefaults(
         theme,
         DEFAULT_THEME
       ) as CommunityTheme;
       setPreviewTheme(merged);
     } catch {
+      if (requestId !== previewRequestId.current) return;
       setPreviewTheme(null);
       setStatusMessage('Failed to load preview.');
     } finally {
-      setPreviewLoading(false);
+      if (requestId === previewRequestId.current) {
+        setPreviewLoading(false);
+      }
     }
   }, []);
 
