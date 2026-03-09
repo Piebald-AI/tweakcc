@@ -27,7 +27,7 @@ type LoadState =
   | { status: 'loaded'; entries: CommunityThemeIndexEntry[] };
 
 export function CommunityThemesView({ onBack }: CommunityThemesViewProps) {
-  const { settings, updateSettings } = useContext(SettingsContext);
+  const { updateSettings } = useContext(SettingsContext);
 
   const [loadState, setLoadState] = useState<LoadState>({
     status: 'loading',
@@ -79,23 +79,24 @@ export function CommunityThemesView({ onBack }: CommunityThemesViewProps) {
           DEFAULT_THEME
         ) as CommunityTheme;
 
-        const alreadyExists = settings.themes.some(t => t.id === merged.id);
-        if (alreadyExists) {
+        let added = false;
+        updateSettings(s => {
+          if (s.themes.some(t => t.id === merged.id)) return;
+          s.themes.push(merged);
+          added = true;
+        });
+        if (added) {
+          setStatusMessage(`Added "${merged.name}" to your themes!`);
+        } else {
           setStatusMessage(
             `Theme "${merged.name}" (${merged.id}) is already in your config.`
           );
-          return;
         }
-
-        updateSettings(s => {
-          s.themes.push(merged);
-        });
-        setStatusMessage(`Added "${merged.name}" to your themes!`);
       } catch {
         setStatusMessage('Failed to download theme.');
       }
     },
-    [settings.themes, updateSettings]
+    [updateSettings]
   );
 
   // ======================================================================
@@ -155,7 +156,7 @@ export function CommunityThemesView({ onBack }: CommunityThemesViewProps) {
   return (
     <Box>
       <Box flexDirection="column" width="50%">
-        <Header>Themes</Header>
+        <Header>Community Themes</Header>
         <Box marginBottom={1} flexDirection="column">
           <Text dimColor>space to preview theme</Text>
           <Text dimColor>enter to download theme</Text>
