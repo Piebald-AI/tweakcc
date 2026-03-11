@@ -1,7 +1,6 @@
 import path from 'path';
 import fs from 'node:fs/promises';
 import which from 'which';
-import { WASMagic } from 'wasmagic';
 
 import {
   debug,
@@ -46,31 +45,7 @@ export class InstallationDetectionError extends Error {
 }
 
 // ============================================================================
-// WASMagic singleton (with graceful fallback for SIMD-unsupported systems)
-// ============================================================================
-
-let magicInstancePromise: Promise<WASMagic | null> | null = null;
-
-/**
- * Gets the WASMagic instance, or null if it fails to initialize.
- * This can happen on older CPUs that don't support WebAssembly SIMD (requires SSE 4.1+).
- */
-async function getMagicInstance(): Promise<WASMagic | null> {
-  if (!magicInstancePromise) {
-    magicInstancePromise = WASMagic.create().catch(error => {
-      debug(
-        'WASMagic initialization failed (likely SIMD unsupported on this CPU):',
-        error
-      );
-      debug('Using fallback file type detection');
-      return null;
-    });
-  }
-  return magicInstancePromise;
-}
-
-// ============================================================================
-// Fallback file type detection (pure JavaScript, no WASM)
+// File type detection
 // ============================================================================
 
 // Binary file magic numbers
@@ -83,12 +58,10 @@ const MACHO_FAT = Buffer.from([0xca, 0xfe, 0xba, 0xbe]); // Mach-O Fat/Universal
 const PE_MAGIC = Buffer.from([0x4d, 0x5a]); // MZ (DOS/PE/Windows executable)
 
 /**
- * Fallback file type detection using magic numbers and heuristics.
- * Used when WASMagic is unavailable (e.g., on CPUs without SIMD support).
- *
+ * File type detection using magic numbers and heuristics.
  * Returns 'javascript' for JS files, 'binary' for executables, or null if unknown.
  */
-function detectFileTypeFallback(
+function detectFileTypeHeuristic(
   prefix: Buffer
 ): 'javascript' | 'binary' | null {
   if (prefix.length === 0) {
@@ -101,7 +74,7 @@ function detectFileTypeFallback(
     const shebangLine = prefix.subarray(0, Math.min(256, prefix.length));
     const shebangStr = shebangLine.toString('utf8').split('\n')[0];
     if (shebangStr.includes('node')) {
-      debug('detectFileTypeFallback: Detected JavaScript via shebang');
+      debug('detectFileTypeHeuristic: Detected JavaScript via shebang');
       return 'javascript';
     }
   }
@@ -112,7 +85,7 @@ function detectFileTypeFallback(
 
     // ELF binary
     if (first4.equals(ELF_MAGIC)) {
-      debug('detectFileTypeFallback: Detected ELF binary');
+      debug('detectFileTypeHeuristic: Detected ELF binary');
       return 'binary';
     }
 
@@ -124,14 +97,14 @@ function detectFileTypeFallback(
       first4.equals(MACHO_MAGIC_64_LE) ||
       first4.equals(MACHO_FAT)
     ) {
-      debug('detectFileTypeFallback: Detected Mach-O binary');
+      debug('detectFileTypeHeuristic: Detected Mach-O binary');
       return 'binary';
     }
   }
 
   // PE/Windows executable
   if (prefix.length >= 2 && prefix.subarray(0, 2).equals(PE_MAGIC)) {
-    debug('detectFileTypeFallback: Detected PE binary');
+    debug('detectFileTypeHeuristic: Detected PE binary');
     return 'binary';
   }
 
@@ -161,22 +134,38 @@ function detectFileTypeFallback(
   // If file has null bytes, it's likely binary
   if (nullCount > 0) {
     debug(
-      `detectFileTypeFallback: Detected binary (${nullCount} null bytes in first ${sampleSize} bytes)`
+      `detectFileTypeHeuristic: Detected binary (${nullCount} null bytes in first ${sampleSize} bytes)`
     );
     return 'binary';
+  }
+
+  const textSample = prefix
+    .subarray(0, sampleSize)
+    .toString('utf8')
+    .trimStart();
+  const lowerTextSample = textSample.toLowerCase();
+  if (
+    lowerTextSample.startsWith('@echo') ||
+    lowerTextSample.startsWith('echo ') ||
+    lowerTextSample.startsWith('cmd ') ||
+    lowerTextSample.startsWith('cmd.exe ') ||
+    lowerTextSample.startsWith('rem ')
+  ) {
+    debug('detectFileTypeHeuristic: Ignoring command script wrapper');
+    return null;
   }
 
   // If >90% printable, assume it's text (likely JavaScript)
   const printableRatio = printableCount / sampleSize;
   if (printableRatio > 0.9) {
     debug(
-      `detectFileTypeFallback: Detected JavaScript via text heuristic (${Math.round(printableRatio * 100)}% printable)`
+      `detectFileTypeHeuristic: Detected JavaScript via text heuristic (${Math.round(printableRatio * 100)}% printable)`
     );
     return 'javascript';
   }
 
   debug(
-    `detectFileTypeFallback: Unknown file type (${Math.round(printableRatio * 100)}% printable)`
+    `detectFileTypeHeuristic: Unknown file type (${Math.round(printableRatio * 100)}% printable)`
   );
   return null;
 }
@@ -260,49 +249,21 @@ export async function resolvePathToInstallationType(
       return null;
     }
 
-    // Try WASMagic first (may be null on systems without SIMD support)
-    const magic = await getMagicInstance();
+    debug('resolvePathToInstallationType: Using heuristic file type detection');
+    const fileType = detectFileTypeHeuristic(prefix);
 
-    if (magic && typeof magic.detect === 'function') {
-      // Use WASMagic for accurate MIME type detection
-      const mime = magic.detect(prefix) || null;
-
-      if (mime) {
-        const lower = mime.toLowerCase();
-        debug(`resolvePathToInstallationType: Detected mime type: ${lower}`);
-
-        if (lower.includes('javascript')) {
-          return { kind: 'npm-based', resolvedPath };
-        }
-
-        if (!lower.startsWith('text/')) {
-          // It's a binary — check if it's a Nix wrapper and resolve through
-          const nixResolved = await maybeResolveNixWrapper(resolvedPath);
-          return { kind: 'native-binary', resolvedPath: nixResolved };
-        }
-
-        debug('resolvePathToInstallationType: Unrecognized file type');
-        return null;
-      }
-    }
-
-    // Fallback: WASMagic unavailable or returned no result
-    // Use pure JavaScript detection (works on all systems)
-    debug('resolvePathToInstallationType: Using fallback file type detection');
-    const fallbackType = detectFileTypeFallback(prefix);
-
-    if (fallbackType === 'javascript') {
+    if (fileType === 'javascript') {
       return { kind: 'npm-based', resolvedPath };
     }
 
-    if (fallbackType === 'binary') {
+    if (fileType === 'binary') {
       // It's a binary — check if it's a Nix wrapper and resolve through
       const nixResolved = await maybeResolveNixWrapper(resolvedPath);
       return { kind: 'native-binary', resolvedPath: nixResolved };
     }
 
     debug(
-      'resolvePathToInstallationType: Fallback could not determine file type'
+      'resolvePathToInstallationType: Heuristic could not determine file type'
     );
     return null;
   } catch (error) {
