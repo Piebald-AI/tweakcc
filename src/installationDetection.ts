@@ -1,7 +1,6 @@
 import path from 'path';
 import fs from 'node:fs/promises';
 import which from 'which';
-import { WASMagic } from 'wasmagic';
 
 import {
   debug,
@@ -49,22 +48,37 @@ export class InstallationDetectionError extends Error {
 // WASMagic singleton (with graceful fallback for SIMD-unsupported systems)
 // ============================================================================
 
-let magicInstancePromise: Promise<WASMagic | null> | null = null;
+// WASMagic detection interface — matches the subset of the WASMagic API we use.
+interface MagicDetector {
+  detect(buf: Buffer): string | null;
+}
+
+let magicInstancePromise: Promise<MagicDetector | null> | null = null;
 
 /**
  * Gets the WASMagic instance, or null if it fails to initialize.
  * This can happen on older CPUs that don't support WebAssembly SIMD (requires SSE 4.1+).
+ *
+ * Uses dynamic import() so that the WASM module is never loaded at the top level.
+ * The wasmagic abort() function throws synchronously during WASM compilation,
+ * which would crash the process if loaded via a static import. Dynamic import
+ * ensures the crash is contained within the promise chain.
  */
-async function getMagicInstance(): Promise<WASMagic | null> {
+async function getMagicInstance(): Promise<MagicDetector | null> {
   if (!magicInstancePromise) {
-    magicInstancePromise = WASMagic.create().catch(error => {
-      debug(
-        'WASMagic initialization failed (likely SIMD unsupported on this CPU):',
-        error
-      );
-      debug('Using fallback file type detection');
-      return null;
-    });
+    magicInstancePromise = (async () => {
+      try {
+        const { WASMagic } = await import('wasmagic');
+        return await WASMagic.create();
+      } catch (error) {
+        debug(
+          'WASMagic initialization failed (likely SIMD unsupported on this CPU):',
+          error
+        );
+        debug('Using fallback file type detection');
+        return null;
+      }
+    })();
   }
   return magicInstancePromise;
 }
