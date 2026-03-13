@@ -1,0 +1,44 @@
+name: Update Nix Hash
+
+on:
+  push:
+    branches: [feat/nix-module]
+    paths:
+      - pnpm-lock.yaml
+
+jobs:
+  update-hash:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Get correct hash
+        id: hash
+        run: |
+          # Set hash to empty to trigger hash mismatch and capture the correct hash
+          sed -i 's/hash = "sha256-[^"]*"/hash = ""/' nix/package.nix
+          HASH=$(nix build .#tweakcc 2>&1 | grep 'got:' | awk '{print $2}' | tail -1)
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+
+      - name: Update hash in package.nix
+        run: |
+          sed -i 's|hash = "";|hash = "${{ steps.hash.outputs.hash }}";|' nix/package.nix
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add nix/package.nix
+          git diff --staged --quiet || git commit -m "chore: update pnpmDeps hash"
+          git push

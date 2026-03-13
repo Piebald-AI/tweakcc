@@ -363,7 +363,7 @@ async function handleApplyMode(
     config = await readConfigFile();
   }
 
-  if (!config.settings || Object.keys(config.settings).length === 0) {
+  if (!config.settings) {
     const source = configUrl ? configUrl : CONFIG_FILE;
     console.error('No saved customizations found in ' + source);
     process.exit(1);

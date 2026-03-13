@@ -36,10 +36,18 @@ export const findVersionOutputLocation = (
 const findTweakccVersionLocation = (
   fileContents: string
 ): LocationResult | null => {
-  // Find Claude Code version display
-  const pattern =
+  // Old inline format (pre-2.1.69):
+  // createElement(Y,{bold:!0},"Claude Code")," ",createElement(Y,{dimColor:!0},"v",VERSION)
+  const oldPattern =
     /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)/;
-  const match = fileContents.match(pattern);
+
+  // New memoized format (2.1.69+): "Claude Code" element cached, then referenced in outer element:
+  // createElement(Y,null,cachedClaudeCode," ",createElement(Y,{dimColor:!0},"v",VERSION))
+  const newPattern =
+    /[^$\w]([$\w]+)\.createElement\(([$\w]+),null,[$\w]+," ",\1\.createElement\(\2,\{dimColor:!0\},"v",[$\w]+\)/;
+
+  const match =
+    fileContents.match(oldPattern) ?? fileContents.match(newPattern);
   if (!match || match.index === undefined) {
     console.error(
       'patch: patchesAppliedIndication: failed to find Claude Code version pattern'
@@ -246,10 +254,13 @@ const applyIndicatorPatchesListPatch = (
 const findPatchesListLocation = (
   fileContents: string
 ): LocationResult | null => {
-  // 1. Find the same regex as patch 2
-  const pattern =
+  // 1. Find the same regex as patch 2 (both old and new formats)
+  const oldPattern =
     /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)/;
-  const match = fileContents.match(pattern);
+  const newPattern =
+    /[^$\w]([$\w]+)\.createElement\(([$\w]+),null,[$\w]+," ",\1\.createElement\(\2,\{dimColor:!0\},"v",[$\w]+\)/;
+  const match =
+    fileContents.match(oldPattern) ?? fileContents.match(newPattern);
   if (!match || match.index === undefined) {
     console.error(
       'patch: patchesAppliedIndication: failed to find Claude Code version pattern for patch 3'
@@ -308,7 +319,9 @@ export const writePatchesAppliedIndication = (
   showTweakccVersion: boolean = true,
   showPatchesApplied: boolean = true
 ): string | null => {
-  // PATCH 1: Version output modification
+  // PATCH 1: Version output modification — replace ALL occurrences so that both
+  // the commander .version() registration and the direct early-return output path
+  // show the tweakcc version.
   const versionOutputLocation = findVersionOutputLocation(fileContents);
   if (!versionOutputLocation) {
     console.error(
@@ -317,11 +330,10 @@ export const writePatchesAppliedIndication = (
     return null;
   }
 
+  const versionPattern = '}.VERSION} (Claude Code)';
   const newText = `\\n${tweakccVersion} (tweakcc)`;
-  let content =
-    fileContents.slice(0, versionOutputLocation.endIndex) +
-    newText +
-    fileContents.slice(versionOutputLocation.endIndex);
+  const replacement = versionPattern + newText;
+  let content = fileContents.replaceAll(versionPattern, replacement);
 
   showDiff(
     fileContents,
@@ -428,6 +440,7 @@ export const writePatchesAppliedIndication = (
   }
 
   // PATCH 4: Add tweakcc version to indicator view (if enabled)
+  // Non-fatal: indicator view patches are best-effort; patches 1-3 still apply if these fail.
   let patch4ClosingParenIndex = -1;
   if (showTweakccVersion) {
     const patch4Result = applyIndicatorViewPatch(
@@ -439,15 +452,17 @@ export const writePatchesAppliedIndication = (
       chalkVar
     );
     if (!patch4Result) {
-      console.error('patch: patchesAppliedIndication: patch 4 failed');
-      return null;
+      console.error(
+        'patch: patchesAppliedIndication: patch 4 failed (non-fatal)'
+      );
+    } else {
+      content = patch4Result.content;
+      patch4ClosingParenIndex = patch4Result.closingParenIndex;
     }
-
-    content = patch4Result.content;
-    patch4ClosingParenIndex = patch4Result.closingParenIndex;
   }
 
   // PATCH 5: Add patches applied list to indicator view (if enabled)
+  // Non-fatal: indicator view patches are best-effort; patches 1-3 still apply if these fail.
   if (showPatchesApplied) {
     // If patch 4 wasn't applied, we need to find the insertion point
     if (patch4ClosingParenIndex === -1) {
@@ -457,28 +472,32 @@ export const writePatchesAppliedIndication = (
       const alignItemsMatch = content.match(alignItemsPattern);
       if (!alignItemsMatch || alignItemsMatch.index === undefined) {
         console.error(
-          'patch: patchesAppliedIndication: failed to find reference point for PATCH 5'
+          'patch: patchesAppliedIndication: failed to find reference point for PATCH 5 (non-fatal)'
         );
-        return null;
+      } else {
+        patch4ClosingParenIndex =
+          alignItemsMatch.index + alignItemsMatch[0].length;
       }
-      patch4ClosingParenIndex =
-        alignItemsMatch.index + alignItemsMatch[0].length;
     }
 
-    const finalContent = applyIndicatorPatchesListPatch(
-      content,
-      patch4ClosingParenIndex,
-      reactVar,
-      boxComponent,
-      textComponent,
-      chalkVar,
-      patchesApplies
-    );
-    if (!finalContent) {
-      console.error('patch: patchesAppliedIndication: patch 5 failed');
-      return null;
+    if (patch4ClosingParenIndex !== -1) {
+      const finalContent = applyIndicatorPatchesListPatch(
+        content,
+        patch4ClosingParenIndex,
+        reactVar,
+        boxComponent,
+        textComponent,
+        chalkVar,
+        patchesApplies
+      );
+      if (!finalContent) {
+        console.error(
+          'patch: patchesAppliedIndication: patch 5 failed (non-fatal)'
+        );
+      } else {
+        content = finalContent;
+      }
     }
-    content = finalContent;
   }
 
   return content;

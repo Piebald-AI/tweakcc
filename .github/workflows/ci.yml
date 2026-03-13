@@ -40,3 +40,17 @@ jobs:
 
       - name: Check formatting
         run: pnpm prettier --check src
+
+  nix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Build tweakcc package
+        run: nix build .#tweakcc
