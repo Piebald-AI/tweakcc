@@ -12,6 +12,7 @@ import {
 } from './utils';
 import {
   extractClaudeJsFromNativeInstallation,
+  getNativeModuleLoadError,
   resolveNixBinaryWrapper,
 } from './nativeInstallationLoader';
 import { CLIJS_SEARCH_PATHS, NATIVE_SEARCH_PATHS } from './installationPaths';
@@ -384,7 +385,17 @@ async function extractVersionFromNativeBinary(
     await extractClaudeJsFromNativeInstallation(binaryPath);
 
   if (!claudeJsBuffer) {
-    throw new Error(`Could not extract JS from native binary: ${binaryPath}`);
+    const loadErr = getNativeModuleLoadError();
+    const nixNote = loadErr?.includes('cannot open shared object')
+      ? '\n\nOn NixOS with Bun, native module loading often fails due to missing system libraries.\n' +
+        'Try running tweakcc with Node.js instead:\n' +
+        '  nix shell nixpkgs#nodejs -c npx tweakcc'
+      : '';
+    throw new Error(
+      `Could not extract JS from native binary: ${binaryPath}` +
+        (loadErr ? `\nReason: node-lief failed to load: ${loadErr}` : '') +
+        nixNote
+    );
   }
 
   const content = claudeJsBuffer.toString('utf8');
