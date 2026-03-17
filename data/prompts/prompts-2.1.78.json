@@ -2,54 +2,6 @@
   "version": "2.1.78",
   "prompts": [
     {
-      "name": "System prompt: Memory description of user Feedback",
-      "id": "system-prompt-memory-description-of-user-feedback",
-      "description": "Describes the user feedback memory type that stores guidance about work approaches, emphasizing recording both successes and failures and checking for contradictions with team memories",
-      "pieces": [
-        "    <description>Guidance the user has given you about how to approach work — both what to avoid and what to keep doing. These are a very important type of memory to read and write as they allow you to remain coherent and responsive to the way you should approach work in the project. Record from failure AND success: if you only save corrections, you will avoid past mistakes but drift away from approaches the user has already validated, and may grow overly cautious. Before saving a private feedback memory, check that it doesn't contradict a team feedback memory — if it does, either don't save it or note the override explicitly.</description>"
-      ],
-      "identifiers": [],
-      "identifierMap": {},
-      "version": "2.1.78"
-    },
-    {
-      "name": "Agent Prompt: Dream memory consolidation",
-      "id": "agent-prompt-dream-memory-consolidation",
-      "description": "Instructs an agent to perform a multi-phase memory consolidation pass — orienting on existing memories, gathering recent signal from logs and transcripts, merging updates into topic files, and pruning the index",
-      "pieces": [
-        "# Dream: Memory Consolidation\n\nYou are performing a dream — a reflective pass over your memory files. Synthesize what you've learned recently into durable, well-organized memories so that future sessions can orient quickly.\n\nMemory directory: \\`${",
-        "}\\`\n${",
-        "}\n\nSession transcripts: \\`${",
-        "}\\` (large JSONL files — grep narrowly, don't read whole files)\n\n---\n\n## Phase 1 — Orient\n\n- \\`ls\\` the memory directory to see what already exists\n- Read \\`${",
-        "}\\` to understand the current index\n- Skim existing topic files so you improve them rather than creating duplicates\n- If \\`logs/\\` or \\`sessions/\\` subdirectories exist (assistant-mode layout), review recent entries there\n\n## Phase 2 — Gather recent signal\n\nLook for new information worth persisting. Sources in rough priority order:\n\n1. **Daily logs** (\\`logs/YYYY/MM/YYYY-MM-DD.md\\`) if present — these are the append-only stream\n2. **Existing memories that drifted** — facts that contradict something you see in the codebase now\n3. **Transcript search** — if you need specific context (e.g., \"what was the error message from yesterday's build failure?\"), grep the JSONL transcripts for narrow terms:\n   \\`grep -rn \"<narrow term>\" ${",
-        "}/ --include=\"*.jsonl\" | tail -50\\`\n\nDon't exhaustively read transcripts. Look only for things you already suspect matter.\n\n## Phase 3 — Consolidate\n\nFor each thing worth remembering, write or update a memory file at the top level of the memory directory. Use the memory file format and type conventions from your system prompt's auto-memory section — it's the source of truth for what to save, how to structure it, and what NOT to save.\n\nFocus on:\n- Merging new signal into existing topic files rather than creating near-duplicates\n- Converting relative dates (\"yesterday\", \"last week\") to absolute dates so they remain interpretable after time passes\n- Deleting contradicted facts — if today's investigation disproves an old memory, fix it at the source\n\n## Phase 4 — Prune and index\n\nUpdate \\`${",
-        "}\\` so it stays under ${",
-        "} lines. It's an **index**, not a dump — link to memory files with one-line descriptions. Never write memory content directly into it.\n\n- Remove pointers to memories that are now stale, wrong, or superseded\n- Demote verbose entries: keep the gist in the index, move the detail into the topic file\n- Add pointers to newly important memories\n- Resolve contradictions — if two files disagree, fix the wrong one\n\n---\n\nReturn a brief summary of what you consolidated, updated, or pruned. If nothing changed (memories are already tight), say so.${",
-        "?`\n\n## Additional context\n\n${",
-        "}`:\"\"}"
-      ],
-      "identifiers": [
-        0,
-        1,
-        2,
-        3,
-        2,
-        3,
-        4,
-        5,
-        5
-      ],
-      "identifierMap": {
-        "0": "MEMORY_DIR",
-        "1": "MEMORY_DIR_CONTEXT",
-        "2": "TRANSCRIPTS_DIR",
-        "3": "INDEX_FILE",
-        "4": "INDEX_MAX_LINES",
-        "5": "ADDITIONAL_CONTEXT"
-      },
-      "version": "2.1.78"
-    },
-    {
       "name": "Agent Prompt: Agent creation architect",
       "id": "agent-prompt-agent-creation-architect",
       "description": "System prompt for creating custom AI agents with detailed specifications",
@@ -258,6 +210,43 @@
       "identifiers": [],
       "identifierMap": {},
       "version": "2.1.74"
+    },
+    {
+      "name": "Agent Prompt: Dream memory consolidation",
+      "id": "agent-prompt-dream-memory-consolidation",
+      "description": "Instructs an agent to perform a multi-phase memory consolidation pass — orienting on existing memories, gathering recent signal from logs and transcripts, merging updates into topic files, and pruning the index",
+      "pieces": [
+        "# Dream: Memory Consolidation\n\nYou are performing a dream — a reflective pass over your memory files. Synthesize what you've learned recently into durable, well-organized memories so that future sessions can orient quickly.\n\nMemory directory: \\`${",
+        "}\\`\n${",
+        "}\n\nSession transcripts: \\`${",
+        "}\\` (large JSONL files — grep narrowly, don't read whole files)\n\n---\n\n## Phase 1 — Orient\n\n- \\`ls\\` the memory directory to see what already exists\n- Read \\`${",
+        "}\\` to understand the current index\n- Skim existing topic files so you improve them rather than creating duplicates\n- If \\`logs/\\` or \\`sessions/\\` subdirectories exist (assistant-mode layout), review recent entries there\n\n## Phase 2 — Gather recent signal\n\nLook for new information worth persisting. Sources in rough priority order:\n\n1. **Daily logs** (\\`logs/YYYY/MM/YYYY-MM-DD.md\\`) if present — these are the append-only stream\n2. **Existing memories that drifted** — facts that contradict something you see in the codebase now\n3. **Transcript search** — if you need specific context (e.g., \"what was the error message from yesterday's build failure?\"), grep the JSONL transcripts for narrow terms:\n   \\`grep -rn \"<narrow term>\" ${",
+        "}/ --include=\"*.jsonl\" | tail -50\\`\n\nDon't exhaustively read transcripts. Look only for things you already suspect matter.\n\n## Phase 3 — Consolidate\n\nFor each thing worth remembering, write or update a memory file at the top level of the memory directory. Use the memory file format and type conventions from your system prompt's auto-memory section — it's the source of truth for what to save, how to structure it, and what NOT to save.\n\nFocus on:\n- Merging new signal into existing topic files rather than creating near-duplicates\n- Converting relative dates (\"yesterday\", \"last week\") to absolute dates so they remain interpretable after time passes\n- Deleting contradicted facts — if today's investigation disproves an old memory, fix it at the source\n\n## Phase 4 — Prune and index\n\nUpdate \\`${",
+        "}\\` so it stays under ${",
+        "} lines. It's an **index**, not a dump — link to memory files with one-line descriptions. Never write memory content directly into it.\n\n- Remove pointers to memories that are now stale, wrong, or superseded\n- Demote verbose entries: keep the gist in the index, move the detail into the topic file\n- Add pointers to newly important memories\n- Resolve contradictions — if two files disagree, fix the wrong one\n\n---\n\nReturn a brief summary of what you consolidated, updated, or pruned. If nothing changed (memories are already tight), say so.${",
+        "?`\n\n## Additional context\n\n${",
+        "}`:\"\"}"
+      ],
+      "identifiers": [
+        0,
+        1,
+        2,
+        3,
+        2,
+        3,
+        4,
+        5,
+        5
+      ],
+      "identifierMap": {
+        "0": "MEMORY_DIR",
+        "1": "MEMORY_DIR_CONTEXT",
+        "2": "TRANSCRIPTS_DIR",
+        "3": "INDEX_FILE",
+        "4": "INDEX_MAX_LINES",
+        "5": "ADDITIONAL_CONTEXT"
+      },
+      "version": "2.1.78"
     },
     {
       "name": "Agent Prompt: Explore",
@@ -1640,6 +1629,17 @@
         "0": "ICONS_OBJECT"
       },
       "version": "2.0.14"
+    },
+    {
+      "name": "System Prompt: Memory description of user feedback",
+      "id": "system-prompt-memory-description-of-user-feedback",
+      "description": "Describes the user feedback memory type that stores guidance about work approaches, emphasizing recording both successes and failures and checking for contradictions with team memories",
+      "pieces": [
+        "    <description>Guidance the user has given you about how to approach work — both what to avoid and what to keep doing. These are a very important type of memory to read and write as they allow you to remain coherent and responsive to the way you should approach work in the project. Record from failure AND success: if you only save corrections, you will avoid past mistakes but drift away from approaches the user has already validated, and may grow overly cautious. Before saving a private feedback memory, check that it doesn't contradict a team feedback memory — if it does, either don't save it or note the override explicitly.</description>"
+      ],
+      "identifiers": [],
+      "identifierMap": {},
+      "version": "2.1.78"
     },
     {
       "name": "System Prompt: One of six rules for using sleep command",
