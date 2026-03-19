@@ -303,7 +303,7 @@
         "agentType": "Explore"
       }
     },
-        {
+    {
       "name": "Agent Prompt: Hook condition evaluator",
       "id": "agent-prompt-hook-condition-evaluator",
       "description": "System prompt for evaluating hook conditions in Claude Code",
