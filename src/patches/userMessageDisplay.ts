@@ -147,7 +147,13 @@ export const writeUserMessageDisplay = (
   const pattern =
     /(No content found in user prompt message.{0,150}?\b)([$\w]+(?:\.default)?\.createElement.{0,30}\b[$\w]+(?:\.default)?\.createElement.{0,40}">.+?)?(([$\w]+(?:\.default)?\.createElement).{0,100})(\([$\w]+,(?:\{[^{}]+wrap:"wrap"\},([$\w]+)(?:\.trim\(\))?\)\)|\{text:([$\w]+)(?:,thinkingMetadata:[$\w]+)?\}\)\)?))/;
 
-  const match = oldFile.match(pattern);
+  // CC ≥2.1.79: Rendering delegates to a subcomponent with {text:VAR,...}
+  // Pattern: No content found...createElement(BOX,{flexDirection:...},createElement(SUB,{text:VAR,...}))
+  const newPattern =
+    /(No content found in user prompt message.{0,50}?\b)(([$\w]+(?:\.default)?)\.createElement\([$\w]+,\{flexDirection:"column"[^}]*\},([$\w]+(?:\.default)?\.createElement)\([$\w]+,\{text:([$\w]+)[^}]*\}\)\))/;
+
+  const oldMatch = oldFile.match(pattern);
+  const match = oldMatch ?? oldFile.match(newPattern);
 
   if (!match || match.index === undefined) {
     console.error(
@@ -156,9 +162,18 @@ export const writeUserMessageDisplay = (
     return null;
   }
 
-  const createElementFn = match[4];
-  // Either match[6] or match[7] will be present (never both)
-  const messageVar = match[6] ?? match[7];
+  let createElementFn: string;
+  let messageVar: string;
+
+  if (oldMatch) {
+    // Old pattern matches
+    createElementFn = match[4];
+    messageVar = match[6] ?? match[7];
+  } else {
+    // New pattern (CC ≥2.1.79)
+    createElementFn = match[4];
+    messageVar = match[5];
+  }
 
   // Build box attributes (border and padding)
   const boxAttrs: string[] = [];
