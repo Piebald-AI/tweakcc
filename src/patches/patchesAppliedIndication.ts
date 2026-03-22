@@ -37,9 +37,15 @@ const findTweakccVersionLocation = (
   fileContents: string
 ): LocationResult | null => {
   // Find Claude Code version display
+  // Pre-React-compiler: X.createElement(Y,{bold:!0},"Claude Code")," ",Z.createElement(W,{dimColor:!0},"v",VAR)
+  // Post-React-compiler (CC ≥2.1.79): X.createElement(Y,null,MEMO_VAR," ",X.createElement(Y,{dimColor:!0},"v",VAR))
   const pattern =
     /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)/;
-  const match = fileContents.match(pattern);
+  const newPattern =
+    /[^$\w]([$\w]+)\.createElement\(([$\w]+),null,[$\w]+," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)\)/;
+  const oldMatch = fileContents.match(pattern);
+  const isNewPattern = !oldMatch;
+  const match = oldMatch ?? fileContents.match(newPattern);
   if (!match || match.index === undefined) {
     console.error(
       'patch: patchesAppliedIndication: failed to find Claude Code version pattern'
@@ -47,8 +53,11 @@ const findTweakccVersionLocation = (
     return null;
   }
 
-  // Insert right after this match
-  const insertIndex = match.index + match[0].length;
+  // Old pattern: insert after the match (children are comma-separated at top level)
+  // New pattern: insert BEFORE the last ) to add children inside the outer createElement
+  const insertIndex = isNewPattern
+    ? match.index + match[0].length - 1
+    : match.index + match[0].length;
   return {
     startIndex: insertIndex,
     endIndex: insertIndex,
@@ -178,24 +187,57 @@ const applyIndicatorPatchesListPatch = (
   chalkVar: string,
   patchesApplies: string[]
 ): string | null => {
-  // Start stack machine at level = 5
-  let level = 4; // This right at the very end of the header component, right after the debug banner.
-  let currentIndex = startIndex;
+  // Find the insertion point: the closing paren of the Fragment createElement that
+  // wraps the entire header component output.
+  //
+  // Strategy 1 (CC ≥2.1.79): Find createElement(REACT.Fragment,null,...) near the
+  // alignItems location and use its closing paren.
+  // Strategy 2 (older CC): Use stack machine from startIndex at level 4.
   let insertionIndex = -1;
 
-  while (currentIndex < fileContents.length) {
-    const ch = fileContents[currentIndex];
-    if (ch === '(') {
-      level++;
-    } else if (ch === ')') {
-      if (level === 1) {
-        // Found the location - this is where we add the patches list
-        insertionIndex = currentIndex;
-        break;
+  // Strategy 1: Look for Fragment createElement after startIndex
+  const fragmentPattern = /createElement\([$\w]+\.Fragment,null,/;
+  const searchRegion = fileContents.slice(startIndex, startIndex + 5000);
+  const fragmentMatch = searchRegion.match(fragmentPattern);
+
+  if (fragmentMatch && fragmentMatch.index !== undefined) {
+    // Walk to find the closing paren of this createElement call
+    const fragStart = startIndex + fragmentMatch.index;
+    let level = 1; // we're right after "createElement("
+    const scanFrom = fragStart + fragmentMatch[0].length;
+    for (let i = scanFrom; i < fileContents.length; i++) {
+      const ch = fileContents[i];
+      if (ch === '(') level++;
+      else if (ch === ')') {
+        level--;
+        if (level === 0) {
+          insertionIndex = i;
+          break;
+        }
       }
-      level--;
     }
-    currentIndex++;
+  }
+
+  // Strategy 2: Stack machine (older CC)
+  if (insertionIndex === -1) {
+    let level = 4;
+    let currentIndex = startIndex;
+    while (
+      currentIndex < fileContents.length &&
+      currentIndex < startIndex + 10000
+    ) {
+      const ch = fileContents[currentIndex];
+      if (ch === '(') {
+        level++;
+      } else if (ch === ')') {
+        if (level === 1) {
+          insertionIndex = currentIndex;
+          break;
+        }
+        level--;
+      }
+      currentIndex++;
+    }
   }
 
   if (insertionIndex === -1) {
@@ -246,20 +288,25 @@ const applyIndicatorPatchesListPatch = (
 const findPatchesListLocation = (
   fileContents: string
 ): LocationResult | null => {
-  // 1. Find the same regex as patch 2
-  const pattern =
-    /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)/;
-  const match = fileContents.match(pattern);
-  if (!match || match.index === undefined) {
+  // 1. Find the version display area (may already be modified by PATCH 2)
+  // Find the "Claude Code" that's near dimColor:!0},"v" (the header version display)
+  const versionDisplayPattern =
+    /"Claude Code".{0,200}\{dimColor:!0\},"v",[$\w]+\)/;
+  const versionDisplayMatch = fileContents.match(versionDisplayPattern);
+  if (!versionDisplayMatch || versionDisplayMatch.index === undefined) {
     console.error(
-      'patch: patchesAppliedIndication: failed to find Claude Code version pattern for patch 3'
+      'patch: patchesAppliedIndication: failed to find version display for patch 3'
     );
     return null;
   }
+  const matchResult = { index: versionDisplayMatch.index };
 
   // 2. Go back 1500 chars from the match start
-  const lookbackStart = Math.max(0, match.index - 1500);
-  const lookbackSubstring = fileContents.slice(lookbackStart, match.index);
+  const lookbackStart = Math.max(0, matchResult.index - 1500);
+  const lookbackSubstring = fileContents.slice(
+    lookbackStart,
+    matchResult.index
+  );
 
   // 3. Take the last `}function ([$\w]+)\(`
   const functionPattern = /\}function ([$\w]+)\(/g;
@@ -287,7 +334,57 @@ const findPatchesListLocation = (
     return null;
   }
 
-  // 5. Insert after this line
+  // 5. In CC ≥2.1.79 (React compiler), the header createElement is inside a
+  // memo cache conditional (g=J&&createElement(header,null),A[13]=J,...).
+  // Inserting after it would break the conditional. Instead, find where the
+  // header variable is used as a child in a parent createElement and insert
+  // after it there.
+  //
+  // Find: createElement(header,null) assigns to some variable (e.g. 'g')
+  // Then find where that variable appears as a child: ...R,h,I,g))
+  // Insert after the variable reference in the children list.
+
+  // First check if we're inside a memo conditional
+  const afterMatch = fileContents.slice(
+    createHeaderMatch.index + createHeaderMatch[0].length,
+    createHeaderMatch.index + createHeaderMatch[0].length + 50
+  );
+
+  if (/^[$\w]+\[\d+\]=/.test(afterMatch)) {
+    // React compiler memo pattern — find where the variable is used as a child
+    // The variable is assigned like: g=J&&createElement(header,null),A[13]=J,A[14]=g
+    // Look backwards from createElement to find the variable name
+    const beforeCreate = fileContents.slice(
+      Math.max(0, createHeaderMatch.index - 20),
+      createHeaderMatch.index + 1
+    );
+    const varMatch = beforeCreate.match(/([$\w]+)=[$\w]+&&[^$\w]?$/);
+    if (varMatch) {
+      const headerVar = varMatch[1];
+      // Find where this variable is used as a child: ,headerVar) or ,headerVar,
+      // in a createElement call after the assignment
+      const searchAfter = fileContents.slice(
+        createHeaderMatch.index,
+        createHeaderMatch.index + 2000
+      );
+      const childUsePattern = new RegExp(`,${escapeIdent(headerVar)}\\)`);
+      const childUseMatch = searchAfter.match(childUsePattern);
+      if (childUseMatch && childUseMatch.index !== undefined) {
+        // Insert right before the ) — after the header variable as a sibling
+        const insertIndex =
+          createHeaderMatch.index +
+          childUseMatch.index +
+          childUseMatch[0].length -
+          1; // before the )
+        return {
+          startIndex: insertIndex,
+          endIndex: insertIndex,
+        };
+      }
+    }
+  }
+
+  // Fallback for older CC: insert after the createElement call
   const insertIndex = createHeaderMatch.index + createHeaderMatch[0].length;
   return {
     startIndex: insertIndex,
@@ -318,10 +415,12 @@ export const writePatchesAppliedIndication = (
   }
 
   const newText = `\\n${tweakccVersion} (tweakcc)`;
-  let content =
-    fileContents.slice(0, versionOutputLocation.endIndex) +
-    newText +
-    fileContents.slice(versionOutputLocation.endIndex);
+  // Patch ALL occurrences of the version pattern (commander help text + console.log early exit)
+  const versionPattern = '}.VERSION} (Claude Code)';
+  let content = fileContents.replaceAll(
+    versionPattern,
+    versionPattern + newText
+  );
 
   showDiff(
     fileContents,
@@ -398,7 +497,7 @@ export const writePatchesAppliedIndication = (
     }
     const lines = [];
     lines.push(
-      `${reactVar}.createElement(${boxComponent}, { flexDirection: "column" },`
+      `,${reactVar}.createElement(${boxComponent}, { flexDirection: "column" },`
     );
     lines.push(
       `${reactVar}.createElement(${boxComponent}, null, ${reactVar}.createElement(${textComponent}, {color: "success", bold: true}, "┃ "), ${reactVar}.createElement(${textComponent}, {color: "success", bold: true}, "✓ tweakcc patches are applied")),`
