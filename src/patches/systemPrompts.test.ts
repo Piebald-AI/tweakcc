@@ -197,6 +197,23 @@ describe('systemPrompts.ts', () => {
       expect(result.newContent).toBe('msg:"Say \\"Hello\\""');
     });
 
+    it('should not double-escape already-escaped double quotes', async () => {
+      const mockPromptData = buildMockPromptData({
+        content: 'Say \\"Hello\\"',
+        regex: 'Say \\\\"Hello\\\\"',
+        getInterpolatedContent: () => 'Say \\"Hello\\"',
+        pieces: ['Say \\"Hello\\"'],
+      });
+
+      setupMocks(mockPromptData);
+
+      const cliContent = 'msg:"Say \\"Hello\\""';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe('msg:"Say \\"Hello\\""');
+    });
+
     it('should auto-escape backticks in template literal context', async () => {
       const mockPromptData = buildMockPromptData({
         content: 'Choose the `subagent_type` based on needs',
@@ -383,6 +400,23 @@ describe('systemPrompts.ts', () => {
       setupMocks(mockPromptData);
 
       const cliContent = "msg:'It's working'";
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe("msg:'It\\'s working'");
+    });
+
+    it('should not double-escape already-escaped single quotes', async () => {
+      const mockPromptData = buildMockPromptData({
+        content: "It\\'s working",
+        regex: "It\\\\'s working",
+        getInterpolatedContent: () => "It\\'s working",
+        pieces: ["It\\'s working"],
+      });
+
+      setupMocks(mockPromptData);
+
+      const cliContent = "msg:'It\\'s working'";
 
       const result = await applySystemPrompts(cliContent, '1.0.0', false);
 
