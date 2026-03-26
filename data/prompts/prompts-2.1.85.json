@@ -2,28 +2,6 @@
   "version": "2.1.85",
   "prompts": [
     {
-      "name": "",
-      "id": "",
-      "description": "",
-      "pieces": [
-        "Stop hook blocking error from command \"${",
-        "}\": ${",
-        "||",
-        "}"
-      ],
-      "identifiers": [
-        0,
-        1,
-        2
-      ],
-      "identifierMap": {
-        "0": "",
-        "1": "",
-        "2": ""
-      },
-      "version": "2.1.85"
-    },
-    {
       "name": "Agent Prompt: Auto mode rule reviewer",
       "id": "agent-auto-mode-rule-reviewer",
       "description": "Reviews and critiques user-defined auto mode classifier rules for clarity, completeness, conflicts, and actionability",
@@ -353,7 +331,7 @@
         "model": "inherit",
         "whenToUse": "Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs.",
         "disallowedTools": [
-          "jq",
+          "Agent",
           "ExitPlanMode",
           "Edit",
           "Write",
@@ -1827,7 +1805,7 @@
         0
       ],
       "identifierMap": {
-        "0": ""
+        "0": "AGENT_TOOL_NAME"
       },
       "version": "2.1.85"
     },
