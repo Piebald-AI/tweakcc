@@ -33,6 +33,7 @@ import { writeShowMoreItemsInSelectMenus } from './showMoreItemsInSelectMenus';
 import { writeThemes } from './themes';
 import { writeContextLimit } from './contextLimit';
 import { writeInputBoxBorder } from './inputBorderBox';
+import { writeInputChevronColor } from './inputChevronColor';
 import { writeThinkerFormat } from './thinkerFormat';
 import { writeThinkerSymbolMirrorOption } from './thinkerMirrorOption';
 import { writeThinkerSymbolChars } from './thinkerSymbolChars';
@@ -271,6 +272,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.MISC_CONFIGURABLE,
     description:
       "Your custom styles to the main input box's border will be applied",
+  },
+  {
+    id: 'input-chevron-color',
+    name: 'Input chevron color',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'The input chevron changes color based on loading state (e.g. green when idle)',
   },
   {
     id: 'subagent-models',
@@ -776,6 +784,11 @@ export const applyCustomization = async (
         config.settings.inputBox.removeBorder !==
           DEFAULT_SETTINGS.inputBox.removeBorder
       ),
+    },
+    'input-chevron-color': {
+      fn: c =>
+        writeInputChevronColor(c, config.settings.inputBox!.chevronIdleColor!),
+      condition: !!config.settings.inputBox?.chevronIdleColor,
     },
     'subagent-models': {
       fn: c => writeSubagentModels(c, config.settings.subagentModels!),
