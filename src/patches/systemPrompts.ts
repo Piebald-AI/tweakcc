@@ -46,6 +46,28 @@ const extractBuildTime = (content: string): string | undefined => {
  * @param patchFilter - Optional list of patch/prompt IDs to apply (if provided, only matching prompts are applied)
  * @returns SystemPromptsResult with modified content and per-prompt results
  */
+const escapeUnescapedChar = (str: string, char: string): string => {
+  let result = '';
+  for (let i = 0; i < str.length; i++) {
+    if (str[i] === char) {
+      let bs = 0;
+      let j = i - 1;
+      while (j >= 0 && str[j] === '\\') {
+        bs++;
+        j--;
+      }
+      if (bs % 2 === 0) {
+        result += '\\' + char;
+      } else {
+        result += char;
+      }
+    } else {
+      result += str[i];
+    }
+  }
+  return result;
+};
+
 export const applySystemPrompts = async (
   content: string,
   version: string,
@@ -129,10 +151,10 @@ export const applySystemPrompts = async (
 
       if (delimiter === '"') {
         replacementContent = replacementContent.replace(/\n/g, '\\n');
-        replacementContent = replacementContent.replace(/"/g, '\\"');
+        replacementContent = escapeUnescapedChar(replacementContent, '"');
       } else if (delimiter === "'") {
         replacementContent = replacementContent.replace(/\n/g, '\\n');
-        replacementContent = replacementContent.replace(/'/g, "\\'");
+        replacementContent = escapeUnescapedChar(replacementContent, "'");
       } else if (delimiter === '`') {
         const { content: escaped, incomplete } =
           escapeDepthZeroBackticks(interpolatedContent);
