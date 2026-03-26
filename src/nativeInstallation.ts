@@ -627,8 +627,20 @@ function getBunData(binary: LIEF.Abstract.Binary): BunData {
       return extractBunDataFromMachO(binary as LIEF.MachO.Binary);
     case 'PE':
       return extractBunDataFromPE(binary as LIEF.PE.Binary);
-    case 'ELF':
-      return extractBunDataFromELFOverlay(binary as LIEF.ELF.Binary);
+    case 'ELF': {
+      const elfBinary = binary as LIEF.ELF.Binary;
+      if (elfBinary.hasOverlay) {
+        return extractBunDataFromELFOverlay(elfBinary);
+      }
+      const bunSection = elfBinary.sections().find(s => s.name === '.bun');
+      if (bunSection) {
+        debug(
+          'getBunData: ELF has no overlay but has .bun section, using section format'
+        );
+        return extractBunDataFromSection(bunSection.content);
+      }
+      throw new Error('ELF binary has no overlay data and no .bun section');
+    }
     default:
       throw new Error(`Unsupported binary format: ${binary.format}`);
   }
@@ -1145,25 +1157,45 @@ function repackELF(
   elfBinary: LIEF.ELF.Binary,
   binPath: string,
   newBunBuffer: Buffer,
-  outputPath: string
+  outputPath: string,
+  sectionHeaderSize?: number
 ): void {
   try {
-    // Build new overlay: [bunData][totalByteCount (8 bytes)]
-    // Note: newBunBuffer already includes offsets and trailer
-    const newOverlay = Buffer.allocUnsafe(newBunBuffer.length + 8);
-    newBunBuffer.copy(newOverlay, 0);
-    newOverlay.writeBigUInt64LE(
-      BigInt(newBunBuffer.length),
-      newBunBuffer.length
-    );
+    if (sectionHeaderSize) {
+      const bunSection = elfBinary.sections().find(s => s.name === '.bun');
+      if (!bunSection) {
+        throw new Error('.bun section not found for ELF section-based repack');
+      }
 
-    debug(`repackELF: Setting overlay data (${newOverlay.length} bytes)`);
+      const newSectionData = buildSectionData(newBunBuffer, sectionHeaderSize);
 
-    elfBinary.overlay = newOverlay;
-    debug(`repackELF: Writing modified binary to ${outputPath}...`);
+      debug(
+        `repackELF: Original .bun section size: ${bunSection.size}, new data size: ${newSectionData.length}`
+      );
+      debug(`repackELF: Using header size: ${sectionHeaderSize}`);
 
-    atomicWriteBinary(elfBinary, outputPath, binPath);
-    debug('repackELF: Write completed successfully');
+      bunSection.content = newSectionData;
+      bunSection.size = BigInt(newSectionData.length);
+
+      debug(`repackELF: Writing modified binary to ${outputPath}...`);
+      atomicWriteBinary(elfBinary, outputPath, binPath);
+      debug('repackELF: Write completed successfully');
+    } else {
+      const newOverlay = Buffer.allocUnsafe(newBunBuffer.length + 8);
+      newBunBuffer.copy(newOverlay, 0);
+      newOverlay.writeBigUInt64LE(
+        BigInt(newBunBuffer.length),
+        newBunBuffer.length
+      );
+
+      debug(`repackELF: Setting overlay data (${newOverlay.length} bytes)`);
+
+      elfBinary.overlay = newOverlay;
+      debug(`repackELF: Writing modified binary to ${outputPath}...`);
+
+      atomicWriteBinary(elfBinary, outputPath, binPath);
+      debug('repackELF: Write completed successfully');
+    }
   } catch (error) {
     console.error('repackELF failed:', error);
     throw error;
@@ -1227,7 +1259,13 @@ export function repackNativeInstallation(
       );
       break;
     case 'ELF':
-      repackELF(binary as LIEF.ELF.Binary, binPath, newBuffer, outputPath);
+      repackELF(
+        binary as LIEF.ELF.Binary,
+        binPath,
+        newBuffer,
+        outputPath,
+        sectionHeaderSize
+      );
       break;
     default:
       throw new Error(`Unsupported binary format: ${binary.format}`);
