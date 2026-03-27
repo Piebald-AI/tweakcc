@@ -490,6 +490,85 @@ function extractBunDataFromSection(sectionData: Buffer): BunData {
   };
 }
 
+const ELF_MAGIC = Buffer.from([0x7f, 0x45, 0x4c, 0x46]);
+
+/** Returns true if the file at filePath begins with the ELF magic bytes. */
+function isELFFile(filePath: string): boolean {
+  let fd: number | null = null;
+  try {
+    fd = fs.openSync(filePath, 'r');
+    const buf = Buffer.allocUnsafe(4);
+    const bytesRead = fs.readSync(fd, buf, 0, 4, 0);
+    return bytesRead === 4 && buf.equals(ELF_MAGIC);
+  } catch {
+    return false;
+  } finally {
+    if (fd !== null) fs.closeSync(fd);
+  }
+}
+
+/**
+ * Extracts Bun data from an ELF binary by reading the file tail directly,
+ * without using LIEF. Uses BunOffsets.byteCount (from the offsets struct) as
+ * the authoritative data region size. The trailing u64 footer is not used.
+ */
+function extractBunDataFromELFRaw(filePath: string): BunData {
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    const { size: fileSize } = fs.fstatSync(fd);
+    const tailSize = SIZEOF_OFFSETS + BUN_TRAILER.length + 8;
+
+    if (fileSize < tailSize) {
+      throw new Error('File too small to contain Bun data');
+    }
+
+    const tailBuffer = Buffer.allocUnsafe(tailSize);
+    fs.readSync(fd, tailBuffer, 0, tailSize, fileSize - tailSize);
+
+    const trailerStart = tailSize - 8 - BUN_TRAILER.length;
+    const trailerBytes = tailBuffer.subarray(
+      trailerStart,
+      trailerStart + BUN_TRAILER.length
+    );
+    if (!trailerBytes.equals(BUN_TRAILER)) {
+      throw new Error('BUN trailer not found in ELF file');
+    }
+
+    const offsetsBytes = tailBuffer.subarray(0, SIZEOF_OFFSETS);
+    const bunOffsets = parseOffsets(offsetsBytes);
+    const byteCount =
+      typeof bunOffsets.byteCount === 'bigint'
+        ? Number(bunOffsets.byteCount)
+        : bunOffsets.byteCount;
+
+    if (byteCount <= 0 || byteCount >= fileSize) {
+      throw new Error(`ELF byteCount out of range: ${byteCount}`);
+    }
+
+    const dataStart =
+      fileSize - 8 - BUN_TRAILER.length - SIZEOF_OFFSETS - byteCount;
+    if (dataStart < 0) {
+      throw new Error('ELF data region extends before start of file');
+    }
+
+    const dataBuffer = Buffer.allocUnsafe(byteCount);
+    fs.readSync(fd, dataBuffer, 0, byteCount, dataStart);
+
+    const bunDataBlob = Buffer.concat([dataBuffer, offsetsBytes, trailerBytes]);
+    const moduleStructSize = detectModuleStructSize(
+      bunOffsets.modulesPtr.length
+    );
+
+    debug(
+      `extractBunDataFromELFRaw: byteCount=${byteCount}, moduleStructSize=${moduleStructSize}`
+    );
+
+    return { bunOffsets, bunData: bunDataBlob, moduleStructSize };
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 /**
  * ELF layout:
  * [original ELF ...][Bun data...][Bun offsets][Bun trailer][u64 totalByteCount]
@@ -647,9 +726,19 @@ export function extractClaudeJsFromNativeInstallation(
   nativeInstallationPath: string
 ): Buffer | null {
   try {
-    LIEF.logging.disable();
-    const binary = LIEF.parse(nativeInstallationPath);
-    const { bunOffsets, bunData, moduleStructSize } = getBunData(binary);
+    let bunOffsets: BunOffsets;
+    let bunData: Buffer;
+    let moduleStructSize: number;
+
+    if (isELFFile(nativeInstallationPath)) {
+      ({ bunOffsets, bunData, moduleStructSize } = extractBunDataFromELFRaw(
+        nativeInstallationPath
+      ));
+    } else {
+      LIEF.logging.disable();
+      const binary = LIEF.parse(nativeInstallationPath);
+      ({ bunOffsets, bunData, moduleStructSize } = getBunData(binary));
+    }
 
     debug(
       `extractClaudeJsFromNativeInstallation: Got bunData, size=${bunData.length} bytes, moduleStructSize=${moduleStructSize}`
@@ -1170,6 +1259,78 @@ function repackELF(
   }
 }
 
+/** Repacks a modified Bun buffer into an ELF binary by rewriting the file overlay. */
+function repackELFRaw(
+  binPath: string,
+  newBunBuffer: Buffer,
+  outputPath: string
+): void {
+  const originalData = fs.readFileSync(binPath);
+  const fileSize = originalData.length;
+
+  const tailSize = SIZEOF_OFFSETS + BUN_TRAILER.length + 8;
+  if (fileSize < tailSize) {
+    throw new Error('repackELFRaw: file too small to contain Bun data');
+  }
+  const offsetsBytes = originalData.subarray(
+    fileSize - tailSize,
+    fileSize - tailSize + SIZEOF_OFFSETS
+  );
+  const existingOffsets = parseOffsets(offsetsBytes);
+  const byteCount =
+    typeof existingOffsets.byteCount === 'bigint'
+      ? Number(existingOffsets.byteCount)
+      : existingOffsets.byteCount;
+
+  const overlaySize = byteCount + SIZEOF_OFFSETS + BUN_TRAILER.length + 8;
+  const elfSize = fileSize - overlaySize;
+
+  if (elfSize <= 0 || elfSize >= fileSize) {
+    throw new Error(`repackELFRaw: computed ELF size out of range: ${elfSize}`);
+  }
+
+  debug(
+    `repackELFRaw: elfSize=${elfSize}, byteCount=${byteCount}, newBunBuffer=${newBunBuffer.length}`
+  );
+
+  const newOverlay = Buffer.allocUnsafe(newBunBuffer.length + 8);
+  newBunBuffer.copy(newOverlay, 0);
+  newOverlay.writeBigUInt64LE(BigInt(newBunBuffer.length), newBunBuffer.length);
+
+  const newBinary = Buffer.concat([
+    originalData.subarray(0, elfSize),
+    newOverlay,
+  ]);
+
+  const tempPath = outputPath + '.tmp';
+  fs.writeFileSync(tempPath, newBinary);
+  const origStat = fs.statSync(binPath);
+  fs.chmodSync(tempPath, origStat.mode);
+  try {
+    fs.renameSync(tempPath, outputPath);
+  } catch (error) {
+    try {
+      fs.unlinkSync(tempPath);
+    } catch {
+      // ignore cleanup errors
+    }
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      (error.code === 'ETXTBSY' ||
+        error.code === 'EBUSY' ||
+        error.code === 'EPERM')
+    ) {
+      throw new Error(
+        'Cannot update the Claude executable while it is running.\n' +
+          'Please close all Claude instances and try again.'
+      );
+    }
+    throw error;
+  }
+  debug('repackELFRaw: Write completed successfully');
+}
+
 /**
  * Repacks a modified claude.js back into the native installation binary.
  *
@@ -1188,10 +1349,22 @@ export function repackNativeInstallation(
   modifiedClaudeJs: Buffer,
   outputPath: string
 ): void {
+  if (isELFFile(binPath)) {
+    const { bunOffsets, bunData, moduleStructSize } =
+      extractBunDataFromELFRaw(binPath);
+    const newBuffer = rebuildBunData(
+      bunData,
+      bunOffsets,
+      modifiedClaudeJs,
+      moduleStructSize
+    );
+    repackELFRaw(binPath, newBuffer, outputPath);
+    return;
+  }
+
   LIEF.logging.disable();
   const binary = LIEF.parse(binPath);
 
-  // Extract Bun data and rebuild with modified claude.js
   const { bunOffsets, bunData, sectionHeaderSize, moduleStructSize } =
     getBunData(binary);
   const newBuffer = rebuildBunData(
