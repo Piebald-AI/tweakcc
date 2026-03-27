@@ -1184,10 +1184,11 @@ function repackELF(
       bunSection.content = newSectionData;
       bunSection.size = BigInt(newSectionData.length);
 
-      debug(`repackELF: Writing modified binary to ${outputPath}...`);
-      atomicWriteBinary(elfBinary, outputPath, binPath);
+      const tempPath = outputPath + '.tmp';
+      debug(`repackELF: Writing modified binary to ${tempPath}...`);
+      elfBinary.write(tempPath);
 
-      const verifyBinary = LIEF.parse(outputPath) as LIEF.ELF.Binary;
+      const verifyBinary = LIEF.parse(tempPath) as LIEF.ELF.Binary;
       const verifySection = verifyBinary
         .sections()
         .find(s => s.name === '.bun');
@@ -1195,11 +1196,20 @@ function repackELF(
         !verifySection ||
         verifySection.content.length !== newSectionData.length
       ) {
+        try {
+          fs.unlinkSync(tempPath);
+        } catch {
+          // ignore cleanup error
+        }
         throw new Error(
           `repackELF: .bun section size mismatch after write: expected ${newSectionData.length}, got ${verifySection?.content.length ?? 'section missing'}`
         );
       }
-      debug('repackELF: Write verified successfully');
+      debug('repackELF: Write verified, renaming to final path...');
+
+      const origStat = fs.statSync(binPath);
+      fs.chmodSync(tempPath, origStat.mode);
+      fs.renameSync(tempPath, outputPath);
     } else {
       const newOverlay = Buffer.allocUnsafe(newBunBuffer.length + 8);
       newBunBuffer.copy(newOverlay, 0);
