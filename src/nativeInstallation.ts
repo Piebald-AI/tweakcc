@@ -1168,18 +1168,38 @@ function repackELF(
       }
 
       const newSectionData = buildSectionData(newBunBuffer, sectionHeaderSize);
+      const originalSize = Number(bunSection.size);
 
       debug(
-        `repackELF: Original .bun section size: ${bunSection.size}, new data size: ${newSectionData.length}`
+        `repackELF: Original .bun section size: ${originalSize}, new data size: ${newSectionData.length}`
       );
       debug(`repackELF: Using header size: ${sectionHeaderSize}`);
+
+      if (newSectionData.length > originalSize) {
+        debug(
+          `repackELF: WARNING: new data (${newSectionData.length}) exceeds original section size (${originalSize}). LIEF will attempt to relocate the section during write.`
+        );
+      }
 
       bunSection.content = newSectionData;
       bunSection.size = BigInt(newSectionData.length);
 
       debug(`repackELF: Writing modified binary to ${outputPath}...`);
       atomicWriteBinary(elfBinary, outputPath, binPath);
-      debug('repackELF: Write completed successfully');
+
+      const verifyBinary = LIEF.parse(outputPath) as LIEF.ELF.Binary;
+      const verifySection = verifyBinary
+        .sections()
+        .find(s => s.name === '.bun');
+      if (
+        !verifySection ||
+        verifySection.content.length !== newSectionData.length
+      ) {
+        throw new Error(
+          `repackELF: .bun section size mismatch after write: expected ${newSectionData.length}, got ${verifySection?.content.length ?? 'section missing'}`
+        );
+      }
+      debug('repackELF: Write verified successfully');
     } else {
       const newOverlay = Buffer.allocUnsafe(newBunBuffer.length + 8);
       newBunBuffer.copy(newOverlay, 0);
