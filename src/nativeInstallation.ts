@@ -222,7 +222,12 @@ function parseStringPointer(buffer: Buffer, offset: number): StringPointer {
 /**
  * True if the module represents the native claude entrypoint.
  */
-function isClaudeModule(moduleName: string): boolean {
+function isClaudeModule(
+  moduleName: string,
+  index: number,
+  entryPointId: number
+): boolean {
+  if (index === entryPointId) return true;
   return (
     moduleName.endsWith('/claude') ||
     moduleName === 'claude' ||
@@ -716,7 +721,8 @@ export function extractClaudeJsFromNativeInstallation(
         // Module name is typically:
         // - Unix/macOS: /$bunfs/root/claude
         // - Windows:    B:/~BUN/root/claude.exe
-        if (!isClaudeModule(moduleName)) return undefined;
+        if (!isClaudeModule(moduleName, index, bunOffsets.entryPointId))
+          return undefined;
 
         const moduleContents = getStringPointerContent(
           bunData,
@@ -772,69 +778,86 @@ function rebuildBunData(
   }> = [];
 
   // Use mapModules to iterate and collect module data
-  mapModules(bunData, bunOffsets, moduleStructSize, (module, moduleName) => {
-    const nameBytes = getStringPointerContent(bunData, module.name);
-    const isClaude = isClaudeModule(moduleName);
-
-    // Check if this is claude.js and we have modified contents
-    let contentsBytes: Buffer;
-    if (modifiedClaudeJs && isClaude) {
-      contentsBytes = modifiedClaudeJs;
-    } else {
-      contentsBytes = getStringPointerContent(bunData, module.contents);
-    }
-
-    const sourcemapBytes = getStringPointerContent(bunData, module.sourcemap);
-
-    let bytecodeBytes = getStringPointerContent(bunData, module.bytecode);
-    const bytecodeOriginPathBytes = getStringPointerContent(
-      bunData,
-      module.bytecodeOriginPath
-    );
-
-    // When source is modified but bytecode exists, we must invalidate the
-    // bytecode so Bun/JSC falls back to parsing the modified source text.
-    // We corrupt the bytecode version header (first 8 bytes) so JSC rejects
-    // it during validation. This keeps the data the same size (no blob
-    // resize needed) while forcing source text execution.
-    if (modifiedClaudeJs && isClaude && module.bytecode.length > 0) {
-      debug(
-        `rebuildBunData: Invalidating bytecode header for claude module (${module.bytecode.length} bytes)`
+  mapModules(
+    bunData,
+    bunOffsets,
+    moduleStructSize,
+    (module, moduleName, index) => {
+      const nameBytes = getStringPointerContent(bunData, module.name);
+      const isClaude = isClaudeModule(
+        moduleName,
+        index,
+        bunOffsets.entryPointId
       );
-      bytecodeBytes = Buffer.from(bytecodeBytes);
-      // Zero out the JSC version/signature header to force validation failure
-      bytecodeBytes.fill(0, 0, Math.min(8, bytecodeBytes.length));
-    }
 
-    const moduleInfoBytes = getStringPointerContent(bunData, module.moduleInfo);
+      // Check if this is claude.js and we have modified contents
+      let contentsBytes: Buffer;
+      if (modifiedClaudeJs && isClaude) {
+        contentsBytes = modifiedClaudeJs;
+      } else {
+        contentsBytes = getStringPointerContent(bunData, module.contents);
+      }
 
-    modulesMetadata.push({
-      name: nameBytes,
-      contents: contentsBytes,
-      sourcemap: sourcemapBytes,
-      bytecode: bytecodeBytes,
-      moduleInfo: moduleInfoBytes,
-      bytecodeOriginPath: bytecodeOriginPathBytes,
-      encoding: module.encoding,
-      loader: module.loader,
-      moduleFormat: module.moduleFormat,
-      side: module.side,
-    });
+      const sourcemapBytes = getStringPointerContent(bunData, module.sourcemap);
 
-    if (moduleStructSize === SIZEOF_MODULE_NEW) {
-      stringsData.push(
-        nameBytes,
-        contentsBytes,
-        sourcemapBytes,
-        bytecodeBytes,
-        moduleInfoBytes,
-        bytecodeOriginPathBytes
+      let bytecodeBytes = getStringPointerContent(bunData, module.bytecode);
+      const bytecodeOriginPathBytes = getStringPointerContent(
+        bunData,
+        module.bytecodeOriginPath
       );
-    } else {
-      stringsData.push(nameBytes, contentsBytes, sourcemapBytes, bytecodeBytes);
+
+      // When source is modified but bytecode exists, we must invalidate the
+      // bytecode so Bun/JSC falls back to parsing the modified source text.
+      // We corrupt the bytecode version header (first 8 bytes) so JSC rejects
+      // it during validation. This keeps the data the same size (no blob
+      // resize needed) while forcing source text execution.
+      if (modifiedClaudeJs && isClaude && module.bytecode.length > 0) {
+        debug(
+          `rebuildBunData: Invalidating bytecode header for claude module (${module.bytecode.length} bytes)`
+        );
+        bytecodeBytes = Buffer.from(bytecodeBytes);
+        // Zero out the JSC version/signature header to force validation failure
+        bytecodeBytes.fill(0, 0, Math.min(8, bytecodeBytes.length));
+      }
+
+      const moduleInfoBytes = getStringPointerContent(
+        bunData,
+        module.moduleInfo
+      );
+
+      modulesMetadata.push({
+        name: nameBytes,
+        contents: contentsBytes,
+        sourcemap: sourcemapBytes,
+        bytecode: bytecodeBytes,
+        moduleInfo: moduleInfoBytes,
+        bytecodeOriginPath: bytecodeOriginPathBytes,
+        encoding: module.encoding,
+        loader: module.loader,
+        moduleFormat: module.moduleFormat,
+        side: module.side,
+      });
+
+      if (moduleStructSize === SIZEOF_MODULE_NEW) {
+        stringsData.push(
+          nameBytes,
+          contentsBytes,
+          sourcemapBytes,
+          bytecodeBytes,
+          moduleInfoBytes,
+          bytecodeOriginPathBytes
+        );
+      } else {
+        stringsData.push(
+          nameBytes,
+          contentsBytes,
+          sourcemapBytes,
+          bytecodeBytes
+        );
+      }
+      return undefined;
     }
-    return undefined;
-  });
+  );
 
   const stringsPerModule = moduleStructSize === SIZEOF_MODULE_NEW ? 6 : 4;
 
@@ -1341,12 +1364,20 @@ function hasBytecodeModule(
   moduleStructSize: number
 ): boolean {
   return (
-    mapModules(bunData, bunOffsets, moduleStructSize, (module, moduleName) => {
-      if (isClaudeModule(moduleName) && module.bytecode.length > 0) {
-        return true;
+    mapModules(
+      bunData,
+      bunOffsets,
+      moduleStructSize,
+      (module, moduleName, index) => {
+        if (
+          isClaudeModule(moduleName, index, bunOffsets.entryPointId) &&
+          module.bytecode.length > 0
+        ) {
+          return true;
+        }
+        return undefined;
       }
-      return undefined;
-    }) === true
+    ) === true
   );
 }
 
