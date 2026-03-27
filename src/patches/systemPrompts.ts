@@ -129,10 +129,11 @@ export const applySystemPrompts = async (
 
       if (delimiter === '"') {
         replacementContent = replacementContent.replace(/\n/g, '\\n');
-        replacementContent = replacementContent.replace(/"/g, '\\"');
+        // Only escape unescaped quotes (not already preceded by a backslash)
+        replacementContent = replacementContent.replace(/(?<!\\)"/g, '\\"');
       } else if (delimiter === "'") {
         replacementContent = replacementContent.replace(/\n/g, '\\n');
-        replacementContent = replacementContent.replace(/'/g, "\\'");
+        replacementContent = replacementContent.replace(/(?<!\\)'/g, "\\'");
       } else if (delimiter === '`') {
         const { content: escaped, incomplete } =
           escapeDepthZeroBackticks(interpolatedContent);

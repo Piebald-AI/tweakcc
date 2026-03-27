@@ -3,6 +3,8 @@
  */
 
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { execSync } from 'node:child_process';
 import LIEF from 'node-lief';
 import { isDebug, debug } from './utils';
@@ -439,23 +441,40 @@ function extractBunDataFromSection(sectionData: Buffer): BunData {
   let headerSize: number;
   let bunDataSize: number;
 
-  // Check which format matches the section length (allowing for padding up to 4KB)
+  // Detect header format by checking which size interpretation yields a valid
+  // Bun trailer at the expected position. We validate via trailer rather than
+  // requiring the data to fill the entire section, because repacked binaries
+  // may have significant zero-padding after the Bun blob (e.g., when bytecode
+  // is stripped, the blob shrinks but the ELF section size stays the same).
+  const hasValidTrailer = (hSize: number, dataSize: number): boolean => {
+    const blobEnd = hSize + dataSize;
+    if (blobEnd > sectionData.length || dataSize < BUN_TRAILER.length) {
+      return false;
+    }
+    const trailerPos = blobEnd - BUN_TRAILER.length;
+    return sectionData
+      .subarray(trailerPos, trailerPos + BUN_TRAILER.length)
+      .equals(BUN_TRAILER);
+  };
+
   if (
     sectionData.length >= 8 &&
+    bunDataSizeU64 > 0 &&
     expectedLengthU64 <= sectionData.length &&
-    expectedLengthU64 >= sectionData.length - 4096
+    hasValidTrailer(8, bunDataSizeU64)
   ) {
-    // u64 format matches
+    // u64 format with valid trailer
     headerSize = 8;
     bunDataSize = bunDataSizeU64;
     debug(
       `extractBunDataFromSection: detected u64 header format (Bun >= 1.3.4)`
     );
   } else if (
+    bunDataSizeU32 > 0 &&
     expectedLengthU32 <= sectionData.length &&
-    expectedLengthU32 >= sectionData.length - 4096
+    hasValidTrailer(4, bunDataSizeU32)
   ) {
-    // u32 format matches
+    // u32 format with valid trailer
     headerSize = 4;
     bunDataSize = bunDataSizeU32;
     debug(
@@ -619,6 +638,27 @@ function extractBunDataFromPE(peBinary: LIEF.PE.Binary): BunData {
   return extractBunDataFromSection(bunSection.content);
 }
 
+/**
+ * ELF .bun section layout (Bun >= ~1.3.x, Claude Code >= 2.1.80):
+ * The .bun section contains [u32/u64 size][Bun data blob], same format
+ * as Mach-O __bun and PE .bun sections.
+ */
+function extractBunDataFromELFSection(
+  elfBinary: LIEF.ELF.Binary
+): BunData | null {
+  const bunSection = elfBinary.sections().find(s => s.name === '.bun');
+  if (!bunSection) {
+    return null;
+  }
+
+  const sectionContent = bunSection.content;
+  debug(
+    `extractBunDataFromELFSection: Found .bun section, size=${sectionContent.length}`
+  );
+
+  return extractBunDataFromSection(sectionContent);
+}
+
 function getBunData(binary: LIEF.Abstract.Binary): BunData {
   debug(`getBunData: Binary format detected as ${binary.format}`);
 
@@ -627,8 +667,15 @@ function getBunData(binary: LIEF.Abstract.Binary): BunData {
       return extractBunDataFromMachO(binary as LIEF.MachO.Binary);
     case 'PE':
       return extractBunDataFromPE(binary as LIEF.PE.Binary);
-    case 'ELF':
-      return extractBunDataFromELFOverlay(binary as LIEF.ELF.Binary);
+    case 'ELF': {
+      const elfBinary = binary as LIEF.ELF.Binary;
+      // Try .bun section first (Bun >= ~1.3.x), fall back to overlay
+      const sectionResult = extractBunDataFromELFSection(elfBinary);
+      if (sectionResult) {
+        return sectionResult;
+      }
+      return extractBunDataFromELFOverlay(elfBinary);
+    }
     default:
       throw new Error(`Unsupported binary format: ${binary.format}`);
   }
@@ -725,22 +772,39 @@ function rebuildBunData(
   // Use mapModules to iterate and collect module data
   mapModules(bunData, bunOffsets, moduleStructSize, (module, moduleName) => {
     const nameBytes = getStringPointerContent(bunData, module.name);
+    const isClaude = isClaudeModule(moduleName);
 
     // Check if this is claude.js and we have modified contents
     let contentsBytes: Buffer;
-    if (modifiedClaudeJs && isClaudeModule(moduleName)) {
+    if (modifiedClaudeJs && isClaude) {
       contentsBytes = modifiedClaudeJs;
     } else {
       contentsBytes = getStringPointerContent(bunData, module.contents);
     }
 
     const sourcemapBytes = getStringPointerContent(bunData, module.sourcemap);
-    const bytecodeBytes = getStringPointerContent(bunData, module.bytecode);
-    const moduleInfoBytes = getStringPointerContent(bunData, module.moduleInfo);
+
+    let bytecodeBytes = getStringPointerContent(bunData, module.bytecode);
     const bytecodeOriginPathBytes = getStringPointerContent(
       bunData,
       module.bytecodeOriginPath
     );
+
+    // When source is modified but bytecode exists, we must invalidate the
+    // bytecode so Bun/JSC falls back to parsing the modified source text.
+    // We corrupt the bytecode version header (first 8 bytes) so JSC rejects
+    // it during validation. This keeps the data the same size (no blob
+    // resize needed) while forcing source text execution.
+    if (modifiedClaudeJs && isClaude && module.bytecode.length > 0) {
+      debug(
+        `rebuildBunData: Invalidating bytecode header for claude module (${module.bytecode.length} bytes)`
+      );
+      bytecodeBytes = Buffer.from(bytecodeBytes);
+      // Zero out the JSC version/signature header to force validation failure
+      bytecodeBytes.fill(0, 0, Math.min(8, bytecodeBytes.length));
+    }
+
+    const moduleInfoBytes = getStringPointerContent(bunData, module.moduleInfo);
 
     modulesMetadata.push({
       name: nameBytes,
@@ -1171,7 +1235,225 @@ function repackELF(
 }
 
 /**
+ * Repacks an ELF binary by writing directly to the .bun section using raw I/O.
+ * This avoids LIEF's write() which can corrupt ELF binaries.
+ *
+ * Reads the original file, locates the .bun section via LIEF (read-only),
+ * replaces the section content in memory, and writes the result.
+ */
+function repackELFSection(
+  elfBinary: LIEF.ELF.Binary,
+  binPath: string,
+  newBunBuffer: Buffer,
+  outputPath: string,
+  sectionHeaderSize: number
+): void {
+  try {
+    const bunSection = elfBinary.sections().find(s => s.name === '.bun');
+    if (!bunSection) {
+      throw new Error('.bun section not found for ELF repack');
+    }
+
+    // Get section file offset and size from LIEF
+    const sectionOffset = Number(bunSection.offset);
+    const originalSectionSize = Number(bunSection.size);
+
+    debug(
+      `repackELFSection: .bun section at offset=${sectionOffset}, size=${originalSectionSize}`
+    );
+
+    // Build new section data with size header
+    const newSectionData = buildSectionData(newBunBuffer, sectionHeaderSize);
+
+    if (newSectionData.length > originalSectionSize) {
+      throw new Error(
+        `New .bun section data (${newSectionData.length}) exceeds original section size (${originalSectionSize}). ` +
+          'In-place repack requires new data to fit within the original section.'
+      );
+    }
+
+    debug(
+      `repackELFSection: New section data=${newSectionData.length} bytes (original=${originalSectionSize})`
+    );
+
+    // Read the entire original binary
+    const originalData = fs.readFileSync(binPath);
+
+    // Replace section content, pad remaining space with zeros
+    newSectionData.copy(originalData, sectionOffset);
+    if (newSectionData.length < originalSectionSize) {
+      originalData.fill(
+        0,
+        sectionOffset + newSectionData.length,
+        sectionOffset + originalSectionSize
+      );
+    }
+
+    // Atomic write
+    const tempPath = outputPath + '.tmp';
+    fs.writeFileSync(tempPath, originalData);
+
+    const origStat = fs.statSync(binPath);
+    fs.chmodSync(tempPath, origStat.mode);
+
+    try {
+      fs.renameSync(tempPath, outputPath);
+    } catch (error) {
+      try {
+        if (fs.existsSync(tempPath)) {
+          fs.unlinkSync(tempPath);
+        }
+      } catch {
+        // Ignore cleanup errors
+      }
+
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error.code === 'ETXTBSY' ||
+          error.code === 'EBUSY' ||
+          error.code === 'EPERM')
+      ) {
+        throw new Error(
+          'Cannot update the Claude executable while it is running.\n' +
+            'Please close all Claude instances and try again.'
+        );
+      }
+
+      throw error;
+    }
+
+    debug('repackELFSection: Write completed successfully');
+  } catch (error) {
+    console.error('repackELFSection failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Checks if the binary's claude module has precompiled bytecode.
+ */
+function hasBytecodeModule(
+  bunData: Buffer,
+  bunOffsets: BunOffsets,
+  moduleStructSize: number
+): boolean {
+  return (
+    mapModules(bunData, bunOffsets, moduleStructSize, (module, moduleName) => {
+      if (isClaudeModule(moduleName) && module.bytecode.length > 0) {
+        return true;
+      }
+      return undefined;
+    }) === true
+  );
+}
+
+/**
+ * Recompiles modified source into a fresh standalone binary using
+ * `bun build --compile --bytecode`. This is required when the original
+ * binary has precompiled JSC bytecode, because Bun does not fall back
+ * to source text when bytecode is present — it must be recompiled.
+ */
+function recompileWithBun(
+  modifiedClaudeJs: Buffer,
+  outputPath: string,
+  originalPath: string
+): void {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tweakcc-recompile-'));
+
+  try {
+    const sourceText = modifiedClaudeJs.toString('utf8');
+
+    // The source text has a CJS wrapper: (function(exports, require, ...) { ... })
+    // We need to add invocation to prevent tree-shaking during recompilation.
+    // Strip the pragma line, add function call arguments at the end.
+    const pragmaEnd = sourceText.indexOf('\n') + 1;
+    const pragma = sourceText.substring(0, pragmaEnd);
+    const rest = sourceText.substring(pragmaEnd);
+
+    // Remove trailing ')' and add invocation with CJS arguments
+    const callable =
+      pragma +
+      rest.replace(
+        /\)\s*$/,
+        ')(exports, require, module, __filename, __dirname)\n'
+      );
+
+    const sourcePath = path.join(tmpDir, 'claude-source.js');
+    const compiledPath = path.join(tmpDir, 'claude-compiled');
+
+    fs.writeFileSync(sourcePath, callable);
+
+    debug(
+      `recompileWithBun: Compiling ${callable.length} bytes of source to bytecode...`
+    );
+
+    execSync(
+      `bun build --compile --bytecode "${sourcePath}" --outfile "${compiledPath}"`,
+      {
+        stdio: isDebug() ? 'inherit' : 'ignore',
+        timeout: 120000,
+      }
+    );
+
+    if (!fs.existsSync(compiledPath)) {
+      throw new Error('Bun compilation produced no output');
+    }
+
+    debug(
+      `recompileWithBun: Compiled successfully (${fs.statSync(compiledPath).size} bytes)`
+    );
+
+    // Atomic move to output path
+    const origStat = fs.statSync(originalPath);
+    fs.chmodSync(compiledPath, origStat.mode);
+
+    const tempOutput = outputPath + '.tmp';
+    fs.copyFileSync(compiledPath, tempOutput);
+
+    try {
+      fs.renameSync(tempOutput, outputPath);
+    } catch (error) {
+      try {
+        fs.unlinkSync(tempOutput);
+      } catch {
+        // Ignore cleanup errors
+      }
+
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error.code === 'ETXTBSY' ||
+          error.code === 'EBUSY' ||
+          error.code === 'EPERM')
+      ) {
+        throw new Error(
+          'Cannot update the Claude executable while it is running.\n' +
+            'Please close all Claude instances and try again.'
+        );
+      }
+      throw error;
+    }
+
+    debug('recompileWithBun: Binary installed successfully');
+  } finally {
+    // Clean up temp directory
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors
+    }
+  }
+}
+
+/**
  * Repacks a modified claude.js back into the native installation binary.
+ *
+ * For binaries with precompiled bytecode, this uses `bun build --compile
+ * --bytecode` to recompile the modified source into a fresh binary with
+ * matching bytecode. For binaries without bytecode, it uses the
+ * traditional approach of rebuilding the Bun data blob and writing it
+ * back into the binary.
  *
  * Note: If the binary might be a Nix `makeBinaryWrapper` wrapper, callers
  * should resolve it first using `resolveNixBinaryWrapper()` and pass the
@@ -1191,9 +1473,20 @@ export function repackNativeInstallation(
   LIEF.logging.disable();
   const binary = LIEF.parse(binPath);
 
-  // Extract Bun data and rebuild with modified claude.js
+  // Extract Bun data to check for bytecode
   const { bunOffsets, bunData, sectionHeaderSize, moduleStructSize } =
     getBunData(binary);
+
+  // If the binary has precompiled bytecode, recompile with Bun
+  if (hasBytecodeModule(bunData, bunOffsets, moduleStructSize)) {
+    debug(
+      'repackNativeInstallation: Binary has bytecode — recompiling with Bun'
+    );
+    recompileWithBun(modifiedClaudeJs, outputPath, binPath);
+    return;
+  }
+
+  // No bytecode — use traditional blob rebuild approach
   const newBuffer = rebuildBunData(
     bunData,
     bunOffsets,
@@ -1226,9 +1519,23 @@ export function repackNativeInstallation(
         sectionHeaderSize
       );
       break;
-    case 'ELF':
-      repackELF(binary as LIEF.ELF.Binary, binPath, newBuffer, outputPath);
+    case 'ELF': {
+      const elfBinary = binary as LIEF.ELF.Binary;
+      // Use raw I/O section repack if .bun section exists (avoids LIEF write corruption)
+      const hasBunSection = elfBinary.sections().some(s => s.name === '.bun');
+      if (hasBunSection && sectionHeaderSize) {
+        repackELFSection(
+          elfBinary,
+          binPath,
+          newBuffer,
+          outputPath,
+          sectionHeaderSize
+        );
+      } else {
+        repackELF(elfBinary, binPath, newBuffer, outputPath);
+      }
       break;
+    }
     default:
       throw new Error(`Unsupported binary format: ${binary.format}`);
   }
