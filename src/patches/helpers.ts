@@ -293,16 +293,25 @@ export const clearCaches = (): void => {
  */
 export const findTextComponent = (fileContents: string): string | undefined => {
   // Find the Text component function definition from Ink
-  // The minified Text component has this signature:
-  // function X({color:A,backgroundColor:B,dimColor:C=!1,bold:D=!1,...})
-  const textComponentPattern =
+  // Old format (parameter destructuring):
+  //   function X({color:A,backgroundColor:B,dimColor:C=!1,bold:D=!1,...})
+  // New format (body destructuring, CC 2.1.85+):
+  //   function T(H) { let $ = ..., { color: q, backgroundColor: K2, dimColor: _4, bold: f, ... } = H
+
+  // Try old format first (parameter destructuring)
+  const oldPattern =
     /\bfunction ([$\w]+).{0,20}color:[$\w]+,backgroundColor:[$\w]+,dimColor:[$\w]+(?:=![01])?,bold:[$\w]+(?:=![01])?/;
-  const match = fileContents.match(textComponentPattern);
-  if (!match) {
-    console.log('patch: findTextComponent: failed to find text component');
-    return undefined;
-  }
-  return match[1];
+  const oldMatch = fileContents.match(oldPattern);
+  if (oldMatch) return oldMatch[1];
+
+  // Try new format (body destructuring)
+  const newPattern =
+    /\bfunction ([$\w]+)\([$\w]+\)\s*\{.{0,80}color:\s*[$\w]+,\s*backgroundColor:\s*[$\w]+,\s*dimColor:\s*[$\w]+,\s*bold:\s*[$\w]+/;
+  const newMatch = fileContents.match(newPattern);
+  if (newMatch) return newMatch[1];
+
+  console.log('patch: findTextComponent: failed to find text component');
+  return undefined;
 };
 
 /**
@@ -324,6 +333,15 @@ export const findBoxComponent = (fileContents: string): string | undefined => {
   const directReturnMatch = fileContents.match(directReturnPattern);
   if (directReturnMatch) {
     return directReturnMatch[1];
+  }
+
+  // Method 2b: Body destructuring with children/flexWrap (CC 2.1.85+)
+  // Pattern: function NAME(H) { let $ = ..., { children: R, flexWrap: S, ... } = H ... createElement("ink-box"
+  const bodyDestructPattern =
+    /function ([$\w]+)\([$\w]+\)\s*\{.{0,200}children:\s*[$\w]+,\s*flexWrap:\s*[$\w]+.{0,3000}?\.createElement\("ink-box"/;
+  const bodyDestructMatch = fileContents.match(bodyDestructPattern);
+  if (bodyDestructMatch) {
+    return bodyDestructMatch[1];
   }
 
   // Method 3: Search for Box displayName (older CC versions, 0.2.9 - 2.0.77 at least)
