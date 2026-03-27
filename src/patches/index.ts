@@ -758,9 +758,15 @@ export const applyCustomization = async (
       ),
     },
     'input-chevron-color': {
-      fn: c =>
-        writeInputChevronColor(c, config.settings.inputBox!.chevronIdleColor!),
-      condition: !!config.settings.inputBox?.chevronIdleColor,
+      fn: c => {
+        const themeColorKey = config.settings.inputBox!.chevronIdleThemeColor!;
+        const theme = config.settings.themes?.[0];
+        const resolved =
+          (theme?.colors as Record<string, string>)?.[themeColorKey] ??
+          themeColorKey;
+        return writeInputChevronColor(c, resolved);
+      },
+      condition: !!config.settings.inputBox?.chevronIdleThemeColor,
     },
     'subagent-models': {
       fn: c => writeSubagentModels(c, config.settings.subagentModels!),
