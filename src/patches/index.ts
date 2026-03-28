@@ -72,6 +72,7 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
+import { writeKeybindingImmediateCommands } from './keybindingImmediateCommands';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -421,6 +422,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Enable /voice command for speech-to-text input (hold Space to record)',
+  },
+  {
+    id: 'fix-keybinding-immediate-commands',
+    name: 'Fix keybinding immediate commands',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description:
+      'Keybinding-triggered local slash commands (command:copy etc.) execute instantly instead of going through the model',
   },
 ] as const;
 
@@ -875,6 +883,9 @@ export const applyCustomization = async (
           config.settings.misc?.enableVoiceConciseOutput ?? true
         ),
       condition: !!config.settings.misc?.enableVoiceMode,
+    },
+    'fix-keybinding-immediate-commands': {
+      fn: c => writeKeybindingImmediateCommands(c),
     },
   };
 
