@@ -3,6 +3,7 @@ import { useContext, useState, useMemo } from 'react';
 import { SettingsContext } from '../App';
 import Header from './Header';
 import { TableFormat } from '../../types';
+import { DEFAULT_SETTINGS } from '../../defaultSettings';
 
 interface MiscViewProps {
   onSubmit: () => void;
@@ -166,7 +167,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         toggle: () => {
           updateSettings(settings => {
             if (!settings.inputBox) {
-              settings.inputBox = { removeBorder: false };
+              settings.inputBox = { ...DEFAULT_SETTINGS.inputBox };
             }
             settings.inputBox.removeBorder = !settings.inputBox.removeBorder;
           });
