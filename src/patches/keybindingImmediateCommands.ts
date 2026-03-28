@@ -20,7 +20,7 @@ export const writeKeybindingImmediateCommands = (
   oldFile: string
 ): string | null => {
   const pattern =
-    /([$\w]+)=([$\w]+)\.isActive&&\(([$\w]+)\?\.immediate\|\|([$\w]+)\?\.fromKeybinding\)/;
+    /([,;{}])([$\w]+)=([$\w]+)\.isActive&&\(([$\w]+)\?\.immediate\|\|([$\w]+)\?\.fromKeybinding\)/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
@@ -30,16 +30,16 @@ export const writeKeybindingImmediateCommands = (
     return null;
   }
 
-  const [fullMatch, resultVar, , commandVar, optionsVar] = match;
+  const [fullMatch, delimiter, resultVar, , commandVar, optionsVar] = match;
 
   const patchedPattern =
-    /[$\w]+=[$\w]+\?\.immediate\|\|[$\w]+\?\.fromKeybinding/;
+    /[,;{}][$\w]+=[$\w]+\?\.immediate\|\|[$\w]+\?\.fromKeybinding/;
   const alreadyPatched = oldFile.match(patchedPattern);
   if (alreadyPatched && !alreadyPatched[0].includes('.isActive')) {
     return oldFile;
   }
 
-  const replacement = `${resultVar}=${commandVar}?.immediate||${optionsVar}?.fromKeybinding`;
+  const replacement = `${delimiter}${resultVar}=${commandVar}?.immediate||${optionsVar}?.fromKeybinding`;
 
   const startIndex = match.index;
   const endIndex = startIndex + fullMatch.length;
