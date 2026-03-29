@@ -875,7 +875,7 @@ Here's what the searchable `/model` picker looks like:
 
 ![Searchable /model picker with bordered search box](./assets/modelSel.png)
 
-#### Configuration
+### Configuration
 
 **Via the UI:** Run `npx tweakcc`, go to **Misc**. These options are on by default:
 
