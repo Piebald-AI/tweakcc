@@ -126,6 +126,7 @@ $ pnpm dlx tweakcc
   - Increase the max size in tokens for files read via `Read`
   - Remove the border from the message input box
   - Add all models to `/model`
+  - [Searchable `/model` picker](#feature-searchable-model-picker)
   - tweakcc patches applied indicator
   - Show more items in select menus
   - Subagent models
@@ -861,6 +862,38 @@ claude --model opusplan[1m]
 | --------------------------- | ---------- | -------------- |
 | Plan mode (Shift+Tab twice) | Opus 4.5   | 200k           |
 | Execution mode (default)    | Sonnet 4.5 | **1M**         |
+
+## Feature: Searchable `/model` picker
+
+Claude Code's `/model` menu is much easier to use once tweakcc patches it to show the full model list and adds a searchable picker at the bottom of the screen.
+
+The search box uses the same rounded bordered styling as older Claude Code versions, stays visually wide even when empty, and lets you quickly filter large model lists without relying on numeric shortcuts or scrolling through everything manually.
+
+Here's what the searchable `/model` picker looks like:
+
+![Searchable /model picker with bordered search box](./assets/modelSel.png)
+
+#### Configuration
+
+**Via the UI:** Run `npx tweakcc`, go to **Misc**, and enable:
+
+- **Enable model customizations (/model shows all models)**
+- **Enable searchable /model picker**
+
+The searchable picker depends on model customizations being enabled, since the main benefit is searching the expanded `/model` list instead of Claude Code's default short list.
+
+**Via `config.json`:**
+
+```json
+{
+  "settings": {
+    "misc": {
+      "enableModelCustomizations": true,
+      "enableModelSelectorSearch": true
+    }
+  }
+}
+```
 
 ## Feature: MCP startup optimization
 
