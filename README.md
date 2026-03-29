@@ -867,6 +867,8 @@ claude --model opusplan[1m]
 
 Claude Code's `/model` menu is much easier to use once tweakcc patches it to show the full model list and adds a searchable picker at the bottom of the screen.
 
+This patch is **enabled by default** in tweakcc, but it currently only applies to the Claude Code **2.1.86** `/model` bundle shape. On other Claude Code versions, tweakcc will leave this specific patch unapplied rather than trying to force a partial match.
+
 The search box uses the same rounded bordered styling as older Claude Code versions, stays visually wide even when empty, and lets you quickly filter large model lists without relying on numeric shortcuts or scrolling through everything manually.
 
 Here's what the searchable `/model` picker looks like:
@@ -875,12 +877,14 @@ Here's what the searchable `/model` picker looks like:
 
 #### Configuration
 
-**Via the UI:** Run `npx tweakcc`, go to **Misc**, and enable:
+**Via the UI:** Run `npx tweakcc`, go to **Misc**. These options are on by default:
 
 - **Enable model customizations (/model shows all models)**
 - **Enable searchable /model picker**
 
 The searchable picker depends on model customizations being enabled, since the main benefit is searching the expanded `/model` list instead of Claude Code's default short list.
+
+If you're not on Claude Code `2.1.86`, you can still leave the setting enabled in tweakcc, but the searchable picker patch itself will be skipped until its bundle shape is explicitly supported.
 
 **Via `config.json`:**
 
