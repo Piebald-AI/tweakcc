@@ -82,6 +82,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     allowCustomAgentModels: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
+    enableModelSelectorSearch: true,
     enableVoiceMode: false,
     enableVoiceConciseOutput: true,
   };
@@ -239,6 +240,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.enableModelCustomizations =
               !settings.misc!.enableModelCustomizations;
+          });
+        },
+      },
+      {
+        id: 'enableModelSelectorSearch',
+        title: 'Enable searchable /model picker',
+        description:
+          'Adds the searchable model picker patch to /model. Requires model customizations to be enabled.',
+        getValue: () => settings.misc?.enableModelSelectorSearch ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableModelSelectorSearch =
+              !settings.misc!.enableModelSelectorSearch;
           });
         },
       },

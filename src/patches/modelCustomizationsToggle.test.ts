@@ -8,6 +8,7 @@ import { updateConfigFile } from '../config';
 import { replaceFileBreakingHardLinks } from '../utils';
 import { restoreClijsFromBackup } from '../installationBackup';
 import { writeModelCustomizations } from './modelSelector';
+import { writeModelSelectorSearch } from './modelSelectorSearch';
 import { writeShowMoreItemsInSelectMenus } from './showMoreItemsInSelectMenus';
 import { applySystemPrompts } from './systemPrompts';
 import { applyCustomization } from './index';
@@ -53,6 +54,10 @@ vi.mock('./showMoreItemsInSelectMenus', () => ({
   ),
 }));
 
+vi.mock('./modelSelectorSearch', () => ({
+  writeModelSelectorSearch: vi.fn((content: string) => `${content}|search`),
+}));
+
 vi.mock('./systemPrompts', () => ({
   applySystemPrompts: vi.fn(async (content: string) => ({
     newContent: content,
@@ -63,6 +68,7 @@ vi.mock('./systemPrompts', () => ({
 const PATCH_IDS = [
   'model-customizations',
   'show-more-items-in-select-menus',
+  'search-model-selector',
 ] as const;
 
 const baseConfig = (): TweakccConfig => ({
@@ -102,11 +108,14 @@ describe('model customization toggle patch conditions', () => {
     const showMoreResult = results.find(
       r => r.id === 'show-more-items-in-select-menus'
     );
+    const searchResult = results.find(r => r.id === 'search-model-selector');
 
     expect(modelResult).toMatchObject({ applied: false, skipped: true });
     expect(showMoreResult).toMatchObject({ applied: false, skipped: true });
+    expect(searchResult).toMatchObject({ applied: false, skipped: true });
     expect(vi.mocked(writeModelCustomizations)).not.toHaveBeenCalled();
     expect(vi.mocked(writeShowMoreItemsInSelectMenus)).not.toHaveBeenCalled();
+    expect(vi.mocked(writeModelSelectorSearch)).not.toHaveBeenCalled();
     expect(vi.mocked(replaceFileBreakingHardLinks)).toHaveBeenCalledWith(
       '/tmp/claude-cli.js',
       'base-content',
@@ -126,11 +135,14 @@ describe('model customization toggle patch conditions', () => {
     const showMoreResult = results.find(
       r => r.id === 'show-more-items-in-select-menus'
     );
+    const searchResult = results.find(r => r.id === 'search-model-selector');
 
     expect(modelResult).toMatchObject({ applied: true, failed: false });
     expect(showMoreResult).toMatchObject({ applied: true, failed: false });
+    expect(searchResult).toMatchObject({ applied: true, failed: false });
     expect(vi.mocked(writeModelCustomizations)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(writeShowMoreItemsInSelectMenus)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(writeModelSelectorSearch)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(replaceFileBreakingHardLinks)).toHaveBeenCalledWith(
       '/tmp/claude-cli.js',
       expect.stringContaining('base-content'),
@@ -138,12 +150,10 @@ describe('model customization toggle patch conditions', () => {
     );
   });
 
-  it('marks patches as failed when patch functions return null', async () => {
+  it('skips only the searchable model picker patch when its toggle is disabled', async () => {
     const config = baseConfig();
     config.settings.misc.enableModelCustomizations = true;
-
-    vi.mocked(writeModelCustomizations).mockReturnValue(null);
-    vi.mocked(writeShowMoreItemsInSelectMenus).mockReturnValue(null);
+    config.settings.misc.enableModelSelectorSearch = false;
 
     const { results } = await applyCustomization(config, ccInstInfo, [
       ...PATCH_IDS,
@@ -153,9 +163,37 @@ describe('model customization toggle patch conditions', () => {
     const showMoreResult = results.find(
       r => r.id === 'show-more-items-in-select-menus'
     );
+    const searchResult = results.find(r => r.id === 'search-model-selector');
+
+    expect(modelResult).toMatchObject({ applied: true, failed: false });
+    expect(showMoreResult).toMatchObject({ applied: true, failed: false });
+    expect(searchResult).toMatchObject({ applied: false, skipped: true });
+    expect(vi.mocked(writeModelCustomizations)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(writeShowMoreItemsInSelectMenus)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(writeModelSelectorSearch)).not.toHaveBeenCalled();
+  });
+
+  it('marks patches as failed when patch functions return null', async () => {
+    const config = baseConfig();
+    config.settings.misc.enableModelCustomizations = true;
+
+    vi.mocked(writeModelCustomizations).mockReturnValue(null);
+    vi.mocked(writeShowMoreItemsInSelectMenus).mockReturnValue(null);
+    vi.mocked(writeModelSelectorSearch).mockReturnValue(null);
+
+    const { results } = await applyCustomization(config, ccInstInfo, [
+      ...PATCH_IDS,
+    ]);
+
+    const modelResult = results.find(r => r.id === 'model-customizations');
+    const showMoreResult = results.find(
+      r => r.id === 'show-more-items-in-select-menus'
+    );
+    const searchResult = results.find(r => r.id === 'search-model-selector');
 
     expect(modelResult).toMatchObject({ applied: false, failed: true });
     expect(showMoreResult).toMatchObject({ applied: false, failed: true });
+    expect(searchResult).toMatchObject({ applied: false, failed: true });
     expect(vi.mocked(replaceFileBreakingHardLinks)).toHaveBeenCalledWith(
       '/tmp/claude-cli.js',
       'base-content',

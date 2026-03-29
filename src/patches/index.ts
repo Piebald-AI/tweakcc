@@ -43,6 +43,7 @@ import { writeUserMessageDisplay } from './userMessageDisplay';
 import { writeInputPatternHighlighters } from './inputPatternHighlighters';
 import { writeVerboseProperty } from './verboseProperty';
 import { writeModelCustomizations } from './modelSelector';
+import { writeModelSelectorSearch } from './modelSelectorSearch';
 import { writeOpusplan1m } from './opusplan1m';
 import { writeThinkingVisibility } from './thinkingVisibility';
 import { writeSubagentModels } from './subagentModels';
@@ -185,6 +186,12 @@ const PATCH_DEFINITIONS = [
     name: 'Show more items in select menus',
     group: PatchGroup.MISC_CONFIGURABLE,
     description: 'Show 25 items in select menus instead of default 5',
+  },
+  {
+    id: 'search-model-selector',
+    name: 'Searchable model selector',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Typing in /model will jump to matching models',
   },
   {
     id: 'context-limit',
@@ -625,6 +632,8 @@ export const applyCustomization = async (
   // Disabling model customizations should restore both selectors to vanilla CC behavior.
   const modelCustomizationsEnabled =
     config.settings.misc?.enableModelCustomizations ?? true;
+  const modelSelectorSearchEnabled =
+    config.settings.misc?.enableModelSelectorSearch ?? true;
   const patchImplementations: Record<PatchId, PatchImplementation> = {
     // Always Applied
     'verbose-property': {
@@ -673,6 +682,10 @@ export const applyCustomization = async (
     'show-more-items-in-select-menus': {
       fn: c => writeShowMoreItemsInSelectMenus(c, 25),
       condition: modelCustomizationsEnabled,
+    },
+    'search-model-selector': {
+      fn: c => writeModelSelectorSearch(c),
+      condition: modelCustomizationsEnabled && modelSelectorSearchEnabled,
     },
     'table-format': {
       fn: c => writeTableFormat(c, tableFormat),

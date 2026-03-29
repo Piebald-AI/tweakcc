@@ -207,6 +207,48 @@ describe('config.ts', () => {
 
       expect(result.settings.misc.enableModelCustomizations).toBe(false);
     });
+
+    it('should backfill enableModelSelectorSearch when missing in misc', async () => {
+      const misc = { ...DEFAULT_SETTINGS.misc } as Record<string, unknown>;
+      delete misc.enableModelSelectorSearch;
+
+      const mockConfig = {
+        ccVersion: '1.0.0',
+        ccInstallationPath: null,
+        lastModified: '2024-01-01',
+        changesApplied: true,
+        settings: {
+          ...DEFAULT_SETTINGS,
+          misc,
+        },
+      };
+
+      vi.spyOn(fs, 'readFile').mockResolvedValue(JSON.stringify(mockConfig));
+      const result = await readConfigFile();
+
+      expect(result.settings.misc.enableModelSelectorSearch).toBe(true);
+    });
+
+    it('should preserve explicit false for enableModelSelectorSearch', async () => {
+      const mockConfig = {
+        ccVersion: '1.0.0',
+        ccInstallationPath: null,
+        lastModified: '2024-01-01',
+        changesApplied: true,
+        settings: {
+          ...DEFAULT_SETTINGS,
+          misc: {
+            ...DEFAULT_SETTINGS.misc,
+            enableModelSelectorSearch: false,
+          },
+        },
+      };
+
+      vi.spyOn(fs, 'readFile').mockResolvedValue(JSON.stringify(mockConfig));
+      const result = await readConfigFile();
+
+      expect(result.settings.misc.enableModelSelectorSearch).toBe(false);
+    });
   });
 
   describe('updateConfigFile', () => {
