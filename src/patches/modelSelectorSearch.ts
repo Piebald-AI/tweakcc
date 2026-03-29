@@ -15,6 +15,11 @@ const replaceLiteralOnce = (
     return null;
   }
 
+  if (file.indexOf(oldSnippet, startIndex + oldSnippet.length) !== -1) {
+    console.error(`${errorMessage} (matched multiple times)`);
+    return null;
+  }
+
   const endIndex = startIndex + oldSnippet.length;
   const newFile = file.slice(0, startIndex) + newSnippet + file.slice(endIndex);
 
