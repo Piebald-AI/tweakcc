@@ -2,6 +2,11 @@
 
 import { showDiff } from './index';
 
+interface LiteralVariant {
+  oldSnippet: string;
+  newSnippet: string;
+}
+
 const replaceLiteralOnce = (
   file: string,
   oldSnippet: string,
@@ -28,25 +33,83 @@ const replaceLiteralOnce = (
   return newFile;
 };
 
+const replaceAnyLiteralOnce = (
+  file: string,
+  variants: LiteralVariant[],
+  errorMessage: string
+): string | null => {
+  for (const variant of variants) {
+    const startIndex = file.indexOf(variant.oldSnippet);
+
+    if (startIndex === -1) {
+      continue;
+    }
+
+    if (
+      file.indexOf(
+        variant.oldSnippet,
+        startIndex + variant.oldSnippet.length
+      ) !== -1
+    ) {
+      console.error(`${errorMessage} (matched multiple times)`);
+      return null;
+    }
+
+    const endIndex = startIndex + variant.oldSnippet.length;
+    const newFile =
+      file.slice(0, startIndex) + variant.newSnippet + file.slice(endIndex);
+
+    showDiff(file, newFile, variant.newSnippet, startIndex, endIndex);
+
+    return newFile;
+  }
+
+  console.error(errorMessage);
+  return null;
+};
+
 const MODEL_PICKER_2186_CALLSITE =
   'let E6=A??SYz,T6;if(K[49]!==J6||K[50]!==a||K[51]!==C||K[52]!==X||K[53]!==p||K[54]!==E6||K[55]!==F)T6=zK.createElement(m,{flexDirection:"column"},zK.createElement(J1,{defaultValue:X,defaultFocusValue:C,options:p,onChange:a,onFocus:J6,onCancel:E6,visibleOptionCount:F})),K[49]=J6,K[50]=a,K[51]=C,K[52]=X,K[53]=p,K[54]=E6,K[55]=F,K[56]=T6;else T6=K[56];let R6;if(K[57]!==g)R6=g>0&&zK.createElement(m,{paddingLeft:3},zK.createElement(v,{dimColor:!0},"and ",g," more…")),K[57]=g,K[58]=R6;else R6=K[58];let y6;if(K[59]!==T6||K[60]!==R6)y6=zK.createElement(m,{flexDirection:"column",marginBottom:1},T6,R6),K[59]=T6,K[60]=R6,K[61]=y6;else y6=K[61];';
+const MODEL_PICKER_2187_CALLSITE =
+  'let E6=A??hYz,T6;if(K[49]!==J6||K[50]!==a||K[51]!==C||K[52]!==X||K[53]!==p||K[54]!==E6||K[55]!==F)T6=zK.createElement(m,{flexDirection:"column"},zK.createElement(J1,{defaultValue:X,defaultFocusValue:C,options:p,onChange:a,onFocus:J6,onCancel:E6,visibleOptionCount:F})),K[49]=J6,K[50]=a,K[51]=C,K[52]=X,K[53]=p,K[54]=E6,K[55]=F,K[56]=T6;else T6=K[56];let R6;if(K[57]!==g)R6=g>0&&zK.createElement(m,{paddingLeft:3},zK.createElement(v,{dimColor:!0},"and ",g," more…")),K[57]=g,K[58]=R6;else R6=K[58];let y6;if(K[59]!==T6||K[60]!==R6)y6=zK.createElement(m,{flexDirection:"column",marginBottom:1},T6,R6),K[59]=T6,K[60]=R6,K[61]=y6;else y6=K[61];';
 
-const isModelPicker2186 = (file: string): boolean =>
-  file.includes(MODEL_PICKER_2186_CALLSITE);
+const isSupportedModelPickerVersion = (file: string): boolean =>
+  file.includes(MODEL_PICKER_2186_CALLSITE) ||
+  file.includes(MODEL_PICKER_2187_CALLSITE);
 
 const addSearchStateToModelPicker = (file: string): string | null =>
-  replaceLiteralOnce(
+  replaceAnyLiteralOnce(
     file,
-    '[W,Z]=SB8.useState(!1),f=M8(bYz),G;if(',
-    '[W,Z]=SB8.useState(!1),[L7,b7]=SB8.useState(""),f=M8(bYz),G;if(',
+    [
+      {
+        oldSnippet: '[W,Z]=SB8.useState(!1),f=M8(bYz),G;if(',
+        newSnippet:
+          '[W,Z]=SB8.useState(!1),[L7,b7]=SB8.useState(""),f=M8(bYz),G;if(',
+      },
+      {
+        oldSnippet: '[W,Z]=SB8.useState(!1),f=M8(CYz),G;if(',
+        newSnippet:
+          '[W,Z]=SB8.useState(!1),[L7,b7]=SB8.useState(""),f=M8(CYz),G;if(',
+      },
+    ],
     'patch: modelSelectorSearch: failed to add model picker search state'
   );
 
 const addSearchUiToModelPicker = (file: string): string | null => {
-  let nextFile = replaceLiteralOnce(
+  let nextFile = replaceAnyLiteralOnce(
     file,
-    MODEL_PICKER_2186_CALLSITE,
-    'let E6=A??SYz,T6=zK.createElement(m,{flexDirection:"column"},p.length===0?zK.createElement(v,{dimColor:!0,italic:!0},"No models match \u201c",L7,"\u201d"):zK.createElement(J1,{defaultValue:X,defaultFocusValue:C,options:p,onChange:a,onFocus:J6,onCancel:E6,visibleOptionCount:F,highlightText:L7}));let R6=g>0&&zK.createElement(m,{paddingLeft:3},zK.createElement(v,{dimColor:!0},"and ",g," more…"));let y6=zK.createElement(m,{flexDirection:"column",marginBottom:1},T6,R6);let n6=zK.createElement(m,{marginTop:1,width:"100%",minWidth:48,flexGrow:1,borderStyle:"round",borderColor:"suggestion",paddingX:1,flexDirection:"row"},zK.createElement(v,{dimColor:!0},"\u2315 "),zK.createElement(m,{flexGrow:1},zK.createElement(x3,{value:L7,onChange:b7,onSubmit:()=>{if(C!==void 0)a(C)},onExit:E6,placeholder:"Search models..."+" ".repeat(48),focus:!0,showCursor:!0,multiline:!1,cursorOffset:L7.length,onChangeCursorOffset:()=>{},columns:Math.max(42,(process.stdout.columns||80)-10)})));',
+    [
+      {
+        oldSnippet: MODEL_PICKER_2186_CALLSITE,
+        newSnippet:
+          'let E6=A??SYz,T6=zK.createElement(m,{flexDirection:"column"},p.length===0?zK.createElement(v,{dimColor:!0,italic:!0},"No models match \u201c",L7,"\u201d"):zK.createElement(J1,{defaultValue:X,defaultFocusValue:C,options:p,onChange:a,onFocus:J6,onCancel:E6,visibleOptionCount:F,highlightText:L7}));let R6=g>0&&zK.createElement(m,{paddingLeft:3},zK.createElement(v,{dimColor:!0},"and ",g," more…"));let y6=zK.createElement(m,{flexDirection:"column",marginBottom:1},T6,R6);let n6=zK.createElement(m,{marginTop:1,width:"100%",minWidth:48,flexGrow:1,borderStyle:"round",borderColor:"suggestion",paddingX:1,flexDirection:"row"},zK.createElement(v,{dimColor:!0},"\u2315 "),zK.createElement(m,{flexGrow:1},zK.createElement(x3,{value:L7,onChange:b7,onSubmit:()=>{if(C!==void 0)a(C)},onExit:E6,placeholder:"Search models..."+" ".repeat(48),focus:!0,showCursor:!0,multiline:!1,cursorOffset:L7.length,onChangeCursorOffset:()=>{},columns:Math.max(42,(process.stdout.columns||80)-10)})));',
+      },
+      {
+        oldSnippet: MODEL_PICKER_2187_CALLSITE,
+        newSnippet:
+          'let E6=A??hYz,T6=zK.createElement(m,{flexDirection:"column"},p.length===0?zK.createElement(v,{dimColor:!0,italic:!0},"No models match \u201c",L7,"\u201d"):zK.createElement(J1,{defaultValue:X,defaultFocusValue:C,options:p,onChange:a,onFocus:J6,onCancel:E6,visibleOptionCount:F,highlightText:L7}));let R6=g>0&&zK.createElement(m,{paddingLeft:3},zK.createElement(v,{dimColor:!0},"and ",g," more…"));let y6=zK.createElement(m,{flexDirection:"column",marginBottom:1},T6,R6);let n6=zK.createElement(m,{marginTop:1,width:"100%",minWidth:48,flexGrow:1,borderStyle:"round",borderColor:"suggestion",paddingX:1,flexDirection:"row"},zK.createElement(v,{dimColor:!0},"\u2315 "),zK.createElement(m,{flexGrow:1},zK.createElement(x3,{value:L7,onChange:b7,onSubmit:()=>{if(C!==void 0)a(C)},onExit:E6,placeholder:"Search models..."+" ".repeat(48),focus:!0,showCursor:!0,multiline:!1,cursorOffset:L7.length,onChangeCursorOffset:()=>{},columns:Math.max(42,(process.stdout.columns||80)-10)})));',
+      },
+    ],
     'patch: modelSelectorSearch: failed to update model picker J1 callsite'
   );
 
@@ -87,9 +150,9 @@ const addFuzzyFilteringToModelPicker = (file: string): string | null => {
 };
 
 export const writeModelSelectorSearch = (oldFile: string): string | null => {
-  if (!isModelPicker2186(oldFile)) {
+  if (!isSupportedModelPickerVersion(oldFile)) {
     console.error(
-      'patch: modelSelectorSearch: only supported on Claude Code 2.1.86'
+      'patch: modelSelectorSearch: only supported on Claude Code 2.1.86 or 2.1.87'
     );
     return null;
   }
