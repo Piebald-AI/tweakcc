@@ -247,7 +247,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         id: 'enableModelSelectorSearch',
         title: 'Enable searchable /model picker',
         description:
-          'Adds the searchable model picker patch to /model. Requires model customizations to be enabled.',
+          'Makes the /model picker searchable. Disable to use the old scrollable list.',
         getValue: () => settings.misc?.enableModelSelectorSearch ?? true,
         toggle: () => {
           updateSettings(settings => {

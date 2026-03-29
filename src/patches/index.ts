@@ -191,7 +191,7 @@ const PATCH_DEFINITIONS = [
     id: 'search-model-selector',
     name: 'Searchable model selector',
     group: PatchGroup.MISC_CONFIGURABLE,
-    description: 'Typing in /model will jump to matching models',
+    description: 'Makes model selector searchable, with fuzzy matching',
   },
   {
     id: 'context-limit',
