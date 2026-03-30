@@ -480,23 +480,22 @@ function extractBunDataFromSection(sectionData: Buffer): BunData {
   let headerSize: number;
   let bunDataSize: number;
 
-  // Check which format matches the section length (allowing for padding up to 4KB)
-  if (
-    sectionData.length >= 8 &&
-    expectedLengthU64 <= sectionData.length &&
-    expectedLengthU64 >= sectionData.length - 4096
-  ) {
-    // u64 format matches
+  const isValidPayload = (hdrSize: number, dataSize: number): boolean => {
+    if (dataSize <= 0 || hdrSize + dataSize > sectionData.length) return false;
+    if (dataSize < BUN_TRAILER.length) return false;
+    const trailerOffset = hdrSize + dataSize - BUN_TRAILER.length;
+    return sectionData
+      .subarray(trailerOffset, trailerOffset + BUN_TRAILER.length)
+      .equals(BUN_TRAILER);
+  };
+
+  if (sectionData.length >= 8 && isValidPayload(8, bunDataSizeU64)) {
     headerSize = 8;
     bunDataSize = bunDataSizeU64;
     debug(
       `extractBunDataFromSection: detected u64 header format (Bun >= 1.3.4)`
     );
-  } else if (
-    expectedLengthU32 <= sectionData.length &&
-    expectedLengthU32 >= sectionData.length - 4096
-  ) {
-    // u32 format matches
+  } else if (isValidPayload(4, bunDataSizeU32)) {
     headerSize = 4;
     bunDataSize = bunDataSizeU32;
     debug(
@@ -865,9 +864,8 @@ function rebuildBunData(
         bunData,
         module.contents
       );
-      const originalHadWrapper = originalContents
-        .toString('utf-8', 0, BUN_CJS_PREFIX.length)
-        .startsWith(BUN_CJS_PREFIX);
+      const originalHadWrapper =
+        stripBunCjsWrapper(originalContents).hadWrapper;
       contentsBytes = originalHadWrapper
         ? addBunCjsWrapper(modifiedClaudeJs)
         : modifiedClaudeJs;
@@ -1408,51 +1406,45 @@ function repackELFSection(
     // This bypasses LIEF's ELF builder which fails with std::bad_alloc on large
     // binaries. We use atomic copy-then-write to avoid corrupting the binary.
     const tempPath = outputPath + '.tmp';
+    let tempCreated = false;
 
-    debug(
-      `repackELFSection: Copying ${binPath} to ${tempPath} for atomic write...`
-    );
-    fs.copyFileSync(binPath, tempPath);
-
-    const fd = fs.openSync(tempPath, 'r+');
     try {
-      const bytesWritten = fs.writeSync(
-        fd,
-        sectionBuffer,
-        0,
-        sectionBuffer.length,
-        sectionFileOffset
-      );
       debug(
-        `repackELFSection: Wrote ${bytesWritten} bytes at offset 0x${sectionFileOffset.toString(16)}`
+        `repackELFSection: Copying ${binPath} to ${tempPath} for atomic write...`
       );
+      fs.copyFileSync(binPath, tempPath);
+      tempCreated = true;
 
-      if (bytesWritten !== sectionBuffer.length) {
-        throw new Error(
-          `Short write: expected ${sectionBuffer.length} bytes, wrote ${bytesWritten}`
-        );
-      }
-    } finally {
-      fs.closeSync(fd);
-    }
-
-    // Copy permissions from the original binary
-    const origStat = fs.statSync(binPath);
-    fs.chmodSync(tempPath, origStat.mode);
-
-    // Atomic rename
-    try {
-      fs.renameSync(tempPath, outputPath);
-    } catch (error) {
-      // Clean up temp file on failure
+      const fd = fs.openSync(tempPath, 'r+');
       try {
-        if (fs.existsSync(tempPath)) {
-          fs.unlinkSync(tempPath);
+        const bytesWritten = fs.writeSync(
+          fd,
+          sectionBuffer,
+          0,
+          sectionBuffer.length,
+          sectionFileOffset
+        );
+        debug(
+          `repackELFSection: Wrote ${bytesWritten} bytes at offset 0x${sectionFileOffset.toString(16)}`
+        );
+
+        if (bytesWritten !== sectionBuffer.length) {
+          throw new Error(
+            `Short write: expected ${sectionBuffer.length} bytes, wrote ${bytesWritten}`
+          );
         }
-      } catch {
-        // Ignore cleanup errors
+      } finally {
+        fs.closeSync(fd);
       }
 
+      const origStat = fs.statSync(binPath);
+      fs.chmodSync(tempPath, origStat.mode);
+
+      fs.renameSync(tempPath, outputPath);
+      tempCreated = false;
+
+      debug('repackELFSection: Write completed successfully');
+    } catch (error) {
       if (
         error instanceof Error &&
         'code' in error &&
@@ -1465,11 +1457,16 @@ function repackELFSection(
             'Please close all Claude instances and try again.'
         );
       }
-
       throw error;
+    } finally {
+      if (tempCreated) {
+        try {
+          fs.unlinkSync(tempPath);
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
     }
-
-    debug('repackELFSection: Write completed successfully');
   } catch (error) {
     console.error('repackELFSection failed:', error);
     throw error;
