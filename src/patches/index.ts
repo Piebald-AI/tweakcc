@@ -174,6 +174,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.ALWAYS_APPLIED,
     description: `Statusline updates will be properly throttled instead of queued (or debounced)`,
   },
+  {
+    id: 'fix-keybinding-immediate-commands',
+    name: 'Fix keybinding immediate commands',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description:
+      'Keybinding-triggered local slash commands (command:copy etc.) execute instantly instead of going through the model',
+  },
   // Misc Configurable
   {
     id: 'model-customizations',
@@ -423,13 +430,6 @@ const PATCH_DEFINITIONS = [
     description:
       'Enable /voice command for speech-to-text input (hold Space to record)',
   },
-  {
-    id: 'fix-keybinding-immediate-commands',
-    name: 'Fix keybinding immediate commands',
-    group: PatchGroup.ALWAYS_APPLIED,
-    description:
-      'Keybinding-triggered local slash commands (command:copy etc.) execute instantly instead of going through the model',
-  },
 ] as const;
 
 /** Union type of all valid patch IDs */
@@ -663,6 +663,9 @@ export const applyCustomization = async (
         ),
       condition: config.settings.misc?.statuslineThrottleMs != null,
     },
+    'fix-keybinding-immediate-commands': {
+      fn: c => writeKeybindingImmediateCommands(c),
+    },
     // Misc Configurable
     'patches-applied-indication': {
       fn: c =>
@@ -883,9 +886,6 @@ export const applyCustomization = async (
           config.settings.misc?.enableVoiceConciseOutput ?? true
         ),
       condition: !!config.settings.misc?.enableVoiceMode,
-    },
-    'fix-keybinding-immediate-commands': {
-      fn: c => writeKeybindingImmediateCommands(c),
     },
   };
 
