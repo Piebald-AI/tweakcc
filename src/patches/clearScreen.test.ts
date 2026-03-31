@@ -45,6 +45,13 @@ describe('clearScreen', () => {
     expect(result).toBeNull();
   });
 
+  it('preserves fallback for assistant messages without usage', () => {
+    const result = writeClearScreen(makeInput());
+
+    expect(result).not.toBeNull();
+    expect(result).toContain('if(!k&&m[i]?.type==="assistant")k=m[i]');
+  });
+
   it('works with different delimiters before useCallback', () => {
     for (const d of [',', ';', '}', '{']) {
       const result = writeClearScreen(makeInput(d));

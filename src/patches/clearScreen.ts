@@ -43,10 +43,11 @@ export const writeClearScreen = (oldFile: string): string | null => {
     'supportsNonInteractive:!1,' +
     'load:()=>Promise.resolve().then(()=>({call:(H,$)=>{' +
     '$.setMessages(m=>{' +
-    'for(let i=m.length-1;i>=0;i--)' +
-    'if(m[i]?.type==="assistant"&&m[i].message?.usage)' +
-    'return[{...m[i],message:{...m[i].message,content:[]}}];' +
-    'return[]});' +
+    'let k=null;' +
+    'for(let i=m.length-1;i>=0;i--){' +
+    'if(m[i]?.type==="assistant"&&m[i].message?.usage){k=m[i];break}' +
+    'if(!k&&m[i]?.type==="assistant")k=m[i]}' +
+    'return k?[{...k,message:{...k.message,content:[]}}]:[]});' +
     'process.stdout.write("\\x1b[3J");' +
     'globalThis.__tweakccForceRedraw?.();' +
     'return{type:"skip"}}}))}';
