@@ -130,7 +130,19 @@ const generateToolObject = (
   const promptJson = JSON.stringify(promptString);
   const descJson = JSON.stringify(tool.description);
   const cmdJson = JSON.stringify(tool.command);
-  const shellJson = JSON.stringify(tool.shell ?? 'sh');
+  const shell = tool.shell ?? 'sh';
+  const shellJson = JSON.stringify(shell);
+  const shellBasename = shell
+    .split(/[\\/]/)
+    .pop()!
+    .toLowerCase()
+    .replace(/\.exe$/, '');
+  const shellFlagJson =
+    shellBasename === 'cmd'
+      ? JSON.stringify('/c')
+      : shellBasename === 'powershell' || shellBasename === 'pwsh'
+        ? JSON.stringify('-Command')
+        : JSON.stringify('-c');
   const timeoutVal = tool.timeout ?? 30000;
   const workingDirExpr = tool.workingDir
     ? JSON.stringify(tool.workingDir)
@@ -245,7 +257,7 @@ async call(args){
   let cmd=${cmdJson};
   ${argsSubst}
   const {spawnSync}=${requireFunc}("child_process");
-  const result=spawnSync(${shellJson},["-c",cmd],{
+  const result=spawnSync(${shellJson},[${shellFlagJson},cmd],{
     encoding:"utf8",
     timeout:${timeoutVal},
     cwd:${workingDirExpr},
