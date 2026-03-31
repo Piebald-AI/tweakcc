@@ -464,12 +464,17 @@ export const writePatchesAppliedIndication = (
       chalkVar
     );
     if (!patch4Result) {
-      console.error('patch: patchesAppliedIndication: patch 4 failed');
-      return null;
+      // PATCH 4 can fail on React Compiler builds (CC ≥ 2.1.85) where the
+      // indicator view layout no longer uses static alignItems/minHeight
+      // props.  Gracefully skip — patches 1-3 still provide the header
+      // version and patches list.
+      console.warn(
+        'patch: patchesAppliedIndication: patch 4 skipped (indicator view tweakcc version)'
+      );
+    } else {
+      content = patch4Result.content;
+      patch4ClosingParenIndex = patch4Result.closingParenIndex;
     }
-
-    content = patch4Result.content;
-    patch4ClosingParenIndex = patch4Result.closingParenIndex;
   }
 
   // PATCH 5: Add patches applied list to indicator view (if enabled)
@@ -481,10 +486,12 @@ export const writePatchesAppliedIndication = (
         /alignItems:"center",minHeight:([$\w]+\?\d+:\d+|\d+),?/;
       const alignItemsMatch = content.match(alignItemsPattern);
       if (!alignItemsMatch || alignItemsMatch.index === undefined) {
-        console.error(
-          'patch: patchesAppliedIndication: failed to find reference point for PATCH 5'
+        // React Compiler builds (CC ≥ 2.1.85) may not have this pattern.
+        // Gracefully skip patches 4+5 — patches 1-3 still work.
+        console.warn(
+          'patch: patchesAppliedIndication: patch 5 skipped (no indicator view reference point)'
         );
-        return null;
+        return content;
       }
       patch4ClosingParenIndex =
         alignItemsMatch.index + alignItemsMatch[0].length;

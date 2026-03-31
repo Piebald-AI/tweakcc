@@ -95,6 +95,18 @@ const getOpenDocumentLocation = (oldFile: string): LocationResult | null => {
 };
 
 export const writeFixLspSupport = (oldFile: string): string | null => {
+  // CC ≥ 2.1.87 ships with native LSP didOpen support and removed the
+  // validation throws — skip if the feature is already present.
+  if (
+    oldFile.includes('textDocument/didOpen') &&
+    !oldFile.includes('restartOnCrash is not yet implemented')
+  ) {
+    console.log(
+      'patch: fixLspSupport: LSP fixes already present natively — skipping'
+    );
+    return oldFile;
+  }
+
   // Patch 1: Comment out the validation by replacing with nothing
   const validationPattern1 =
     /if\([$\w]+\.restartOnCrash!==void 0\)throw Error\(`LSP server '\$\{[$\w]+\}': restartOnCrash is not yet implemented\. Remove this field from the configuration\.`\);/g;

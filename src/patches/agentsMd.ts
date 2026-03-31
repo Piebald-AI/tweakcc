@@ -23,6 +23,15 @@ export const writeAgentsMd = (
   file: string,
   altNames: string[]
 ): string | null => {
+  // CC ≥ 2.1.87 ships with native AGENTS.md / alternative MD file support.
+  // Detect the fallback loop: endsWith("...CLAUDE.md")...for(let ... of [
+  if (/CLAUDE\.md.{0,100}for\(let \w+ of \["AGENTS\.md"/.test(file)) {
+    console.log(
+      'patch: agentsMd: alternative MD file support already present natively — skipping'
+    );
+    return file;
+  }
+
   // Step 1: Locate the content-processing function via the "Skipping" anchor.
   const funcPattern =
     /(function ([$\w]+)\(([$\w]+),([^)]+?))\)(?:.|\n){0,500}Skipping non-text file in @include/;

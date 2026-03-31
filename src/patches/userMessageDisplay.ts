@@ -147,7 +147,79 @@ export const writeUserMessageDisplay = (
   const pattern =
     /(No content found in user prompt message.{0,250}?\b)([$\w]+(?:\.default)?\.createElement.{0,30}\b[$\w]+(?:\.default)?\.createElement.{0,40}">.+?)?(([$\w]+(?:\.default)?\.createElement).{0,200})(\([$\w]+,(?:\{[^{}]+wrap:"wrap"\},([$\w]+)(?:\.trim\(\))?\)\)|\{text:([$\w]+)[^}]*\}\)\)?))/;
 
-  const match = oldFile.match(pattern);
+  let match = oldFile.match(pattern);
+
+  // CC ≥ 2.1.87 React-Compiler pattern: much simpler createElement chain with
+  // a formatting function call like K$(` > ${A} `)
+  if (!match) {
+    const patternNew =
+      /(No content found in user prompt message.{0,150}?return\s+)(([$\w]+(?:\.default)?)\.createElement\(([$\w]+),null,\3\.createElement\(([$\w]+),null,([$\w]+)\(` > \$\{([$\w]+)\} `\)\)\))/;
+    match = oldFile.match(patternNew);
+    if (match && match.index !== undefined) {
+      const createElFn = match[3] + '.createElement';
+      const msgVar = match[7];
+
+      // Build chalk chain (same logic as the legacy path below)
+      let chain = chalkVar;
+      if (config.foregroundColor !== 'default') {
+        const fgM = config.foregroundColor.match(/\d+/g);
+        if (fgM) chain += `.rgb(${fgM.join(',')})`;
+      }
+      if (
+        config.backgroundColor !== 'default' &&
+        config.backgroundColor !== null
+      ) {
+        const bgM = config.backgroundColor.match(/\d+/g);
+        if (bgM) chain += `.bgRgb(${bgM.join(',')})`;
+      }
+      if (config.styling.includes('bold')) chain += '.bold';
+      if (config.styling.includes('italic')) chain += '.italic';
+      if (config.styling.includes('underline')) chain += '.underline';
+      if (config.styling.includes('strikethrough')) chain += '.strikethrough';
+      if (config.styling.includes('inverse')) chain += '.inverse';
+
+      const fmt =
+        '`' + config.format.replace(/\{\}/g, '${' + msgVar + '}') + '`';
+      const chalkStr = `${chain}(${fmt})`;
+
+      // Build box attrs inline (same logic as legacy path below)
+      const bAttrs: string[] = [];
+      if (config.borderStyle !== 'none') {
+        if (config.borderStyle.startsWith('topBottom')) {
+          const borders: Record<string, string> = {
+            topBottomSingle: '─',
+            topBottomDouble: '═',
+            topBottomBold: '━',
+          };
+          const ch = borders[config.borderStyle] ?? '─';
+          bAttrs.push(
+            `borderStyle:{top:"${ch}",bottom:"${ch}",left:" ",right:" ",topLeft:" ",topRight:" ",bottomLeft:" ",bottomRight:" "}`
+          );
+        } else {
+          bAttrs.push(`borderStyle:"${config.borderStyle}"`);
+        }
+        const bcM = config.borderColor.match(/\d+/g);
+        if (bcM) bAttrs.push(`borderColor:"rgb(${bcM.join(',')})"`);
+      }
+      if (config.paddingX > 0) bAttrs.push(`paddingX:${config.paddingX}`);
+      if (config.paddingY > 0) bAttrs.push(`paddingY:${config.paddingY}`);
+      if (config.fitBoxToContent) bAttrs.push(`alignSelf:"flex-start"`);
+      const boxStr = bAttrs.length > 0 ? `{${bAttrs.join(',')}}` : 'null';
+
+      const replacement =
+        match[1] +
+        `${createElFn}(${boxComponent},${boxStr},${createElFn}(${textComponent},null,${chalkStr}))`;
+
+      const startIndex = match.index;
+      const endIndex = startIndex + match[0].length;
+
+      const newFile =
+        oldFile.slice(0, startIndex) + replacement + oldFile.slice(endIndex);
+
+      showDiff(oldFile, newFile, replacement, startIndex, endIndex);
+      return newFile;
+    }
+  }
 
   if (!match || match.index === undefined) {
     console.error(
