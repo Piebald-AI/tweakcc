@@ -228,21 +228,39 @@ const normalizeConfig = (config: TweakccConfig): void => {
   }
 
   // Validate each customTool entry — drop entries missing required fields.
-  if (config.settings.customTools) {
-    config.settings.customTools = config.settings.customTools.filter(tool => {
-      if (
-        !tool.name ||
-        !tool.command ||
-        !tool.description ||
-        !tool.parameters
-      ) {
-        console.warn(
-          `config: customTools: dropping invalid tool (missing required fields): ${JSON.stringify(tool)}`
-        );
-        return false;
+  if (!Array.isArray(config.settings.customTools)) {
+    console.warn('config: customTools must be an array; ignoring invalid value');
+    config.settings.customTools = [];
+  } else {
+    config.settings.customTools = config.settings.customTools.filter(
+      (tool, index) => {
+        const invalidKeys: string[] = [];
+        if (typeof tool?.name !== 'string' || tool.name.trim() === '')
+          invalidKeys.push('name');
+        if (typeof tool?.command !== 'string' || tool.command.trim() === '')
+          invalidKeys.push('command');
+        if (
+          typeof tool?.description !== 'string' ||
+          tool.description.trim() === ''
+        )
+          invalidKeys.push('description');
+        if (
+          !tool?.parameters ||
+          typeof tool.parameters !== 'object' ||
+          Array.isArray(tool.parameters)
+        )
+          invalidKeys.push('parameters');
+        if (invalidKeys.length > 0) {
+          const name =
+            typeof tool?.name === 'string' ? ` "${tool.name}"` : '';
+          console.warn(
+            `config: customTools: dropping invalid tool at index ${index}${name} (invalid/missing: ${invalidKeys.join(', ')})`
+          );
+          return false;
+        }
+        return true;
       }
-      return true;
-    });
+    );
   }
 
   // In v3.2.0 userMessageDisplay was restructured from prefix/message to a single format string.

@@ -1565,7 +1565,9 @@ describe('config.ts', () => {
 
       await expect(
         findClaudeCodeInstallation(mockConfig, { interactive: true })
-      ).rejects.toThrow('node-lief failed to load');
+      ).rejects.toThrow(
+        'Reason: node-lief failed to load: libstdc++.so.6'
+      );
     });
 
     it('should include NixOS hint in error when load error contains shared object message', async () => {
