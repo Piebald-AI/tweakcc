@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fix Linux native installation support (#644) - @signadou
+
 ## [v4.0.11](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.11) - 2026-03-05
 
 - Fix AGENTS.md patch replacing CLAUDE.md content instead of falling back (#579) - @TyceHerrman

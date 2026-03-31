@@ -570,7 +570,49 @@ function extractBunDataFromELFRaw(filePath: string): BunData {
 }
 
 /**
- * ELF layout:
+ * New ELF format (Bun >= 1.3.x, post-PR#26923):
+ * Bun data is stored in a .bun ELF section, using the same
+ * [u64 payload_len][payload bytes] format as macOS and PE.
+ *
+ * At build time, Bun's writeBunSection() appends the module graph data to
+ * the end of the ELF, creates a PT_LOAD segment for it, and updates the
+ * .bun section header to point there. The original BUN_COMPILED location
+ * (in the RW data segment) stores a vaddr pointing to the appended data.
+ *
+ * Returns null if the .bun section doesn't exist or doesn't have valid data.
+ */
+function extractBunDataFromELFSection(
+  elfBinary: LIEF.ELF.Binary
+): BunData | null {
+  try {
+    const bunSection = elfBinary.getSection('.bun');
+    if (!bunSection) {
+      debug('extractBunDataFromELFSection: .bun section not found');
+      return null;
+    }
+
+    const sectionContent = bunSection.content;
+    if (sectionContent.length < 8) {
+      debug('extractBunDataFromELFSection: .bun section too small');
+      return null;
+    }
+
+    debug(
+      `extractBunDataFromELFSection: .bun section found, size=${sectionContent.length}`
+    );
+
+    // The .bun section uses the same [u64 size][payload] format as macOS/PE
+    const result = extractBunDataFromSection(sectionContent);
+    debug('extractBunDataFromELFSection: successfully extracted data');
+    return result;
+  } catch (error) {
+    debug('extractBunDataFromELFSection: failed to extract:', error);
+    return null;
+  }
+}
+
+/**
+ * Legacy ELF layout (Bun < 1.3.x, pre-PR#26923):
  * [original ELF ...][Bun data...][Bun offsets][Bun trailer][u64 totalByteCount]
  *
  * Matches bun_unpack.py logic: parse Offsets structure and use its byteCount
@@ -698,7 +740,9 @@ function extractBunDataFromPE(peBinary: LIEF.PE.Binary): BunData {
   return extractBunDataFromSection(bunSection.content);
 }
 
-function getBunData(binary: LIEF.Abstract.Binary): BunData {
+function getBunData(
+  binary: LIEF.ELF.Binary | LIEF.PE.Binary | LIEF.MachO.Binary
+): BunData {
   debug(`getBunData: Binary format detected as ${binary.format}`);
 
   switch (binary.format) {
@@ -706,10 +750,24 @@ function getBunData(binary: LIEF.Abstract.Binary): BunData {
       return extractBunDataFromMachO(binary as LIEF.MachO.Binary);
     case 'PE':
       return extractBunDataFromPE(binary as LIEF.PE.Binary);
-    case 'ELF':
-      return extractBunDataFromELFOverlay(binary as LIEF.ELF.Binary);
-    default:
-      throw new Error(`Unsupported binary format: ${binary.format}`);
+    case 'ELF': {
+      // Try new .bun ELF section format first (Bun >= 1.3.x, post-PR#26923)
+      const elfBinary = binary as LIEF.ELF.Binary;
+      const sectionResult = extractBunDataFromELFSection(elfBinary);
+      if (sectionResult) {
+        debug('getBunData: Using new ELF .bun section format');
+        return sectionResult;
+      }
+      // Fall back to legacy overlay format
+      debug('getBunData: Falling back to legacy ELF overlay format');
+      return extractBunDataFromELFOverlay(elfBinary);
+    }
+    default: {
+      const _exhaustive: never = binary;
+      throw new Error(
+        `Unsupported binary format: ${(_exhaustive as LIEF.ELF.Binary | LIEF.PE.Binary | LIEF.MachO.Binary).format}`
+      );
+    }
   }
 }
 
@@ -1023,7 +1081,7 @@ function rebuildBunData(
  * @param originalPath - Original file to copy permissions from
  */
 function atomicWriteBinary(
-  binary: LIEF.Abstract.Binary,
+  binary: LIEF.ELF.Binary | LIEF.PE.Binary | LIEF.MachO.Binary,
   outputPath: string,
   originalPath: string,
   copyPermissions: boolean = true
@@ -1230,7 +1288,153 @@ function repackPE(
   }
 }
 
-function repackELF(
+/**
+ * Alignment constant used by BUN_COMPILED in c-bindings.cpp.
+ * The BUN_COMPILED symbol is placed with __attribute__((aligned(BLOB_HEADER_ALIGNMENT))).
+ */
+const BLOB_HEADER_ALIGNMENT = 16384;
+
+/**
+ * Repack an ELF binary that uses the new .bun section format (post-PR#26923).
+ *
+ * The .bun section uses the same [u64 payload_len][payload] format as macOS/PE.
+ * At build time, Bun's writeBunSection() creates a PT_LOAD segment to map the
+ * .bun section data, and stores the segment's vaddr in the BUN_COMPILED symbol
+ * (located at its original position in the RW data segment). At runtime, the
+ * Bun runtime reads BUN_COMPILED.size as a vaddr pointer to the mapped data.
+ *
+ * On repack we need to:
+ * 1. Set the .bun section content (LIEF handles file layout)
+ * 2. Update the PT_LOAD segment's fileSize/virtualSize to cover the new data
+ * 3. Patch BUN_COMPILED.size with the (possibly unchanged) vaddr
+ */
+function repackELFSection(
+  elfBinary: LIEF.ELF.Binary,
+  binPath: string,
+  newBunBuffer: Buffer,
+  outputPath: string,
+  sectionHeaderSize: number
+): void {
+  try {
+    const bunSection = elfBinary.getSection('.bun');
+    if (!bunSection) {
+      throw new Error('.bun section not found');
+    }
+
+    const newSectionData = buildSectionData(newBunBuffer, sectionHeaderSize);
+
+    debug(`repackELFSection: Original section size: ${bunSection.size}`);
+    debug(`repackELFSection: New section data size: ${newSectionData.length}`);
+
+    // Find the .bun PT_LOAD segment (read-only, vaddr matches .bun section)
+    const bunSectionVaddr = bunSection.virtualAddress;
+    const segments = elfBinary.segments();
+    const bunSegment = segments.find(
+      s =>
+        s.type === 'LOAD' &&
+        s.flags === 4 && // PF_R
+        s.virtualAddress === bunSectionVaddr
+    );
+
+    if (!bunSegment) {
+      throw new Error(
+        `.bun PT_LOAD segment not found (looking for LOAD with vaddr=0x${bunSectionVaddr.toString(16)})`
+      );
+    }
+
+    debug(
+      `repackELFSection: Found .bun segment: vaddr=0x${bunSegment.virtualAddress.toString(16)}, ` +
+        `filesz=0x${bunSegment.fileSize.toString(16)}, memsz=0x${bunSegment.virtualSize.toString(16)}`
+    );
+
+    // Find the original BUN_COMPILED location by searching for the .bun section's
+    // vaddr value at BLOB_HEADER_ALIGNMENT-aligned virtual addresses in the RW
+    // LOAD segment. writeBunSection() wrote the vaddr at the ORIGINAL .bun section
+    // location (where BUN_COMPILED lives in the base binary's data segment), then
+    // relocated the section header to point to the appended data.
+    const vaddrBytes = Buffer.alloc(8);
+    vaddrBytes.writeBigUInt64LE(bunSectionVaddr);
+
+    let bunCompiledVaddr: bigint | null = null;
+
+    // Find the RW LOAD segment (flags include W=2)
+    const rwSegment = segments.find(
+      s => s.type === 'LOAD' && (s.flags & 2) !== 0
+    );
+
+    if (rwSegment) {
+      const rwContent = rwSegment.content;
+      const rwVaddrStart = Number(rwSegment.virtualAddress);
+
+      // Search at BLOB_HEADER_ALIGNMENT-aligned virtual addresses
+      const firstAligned =
+        Math.ceil(rwVaddrStart / BLOB_HEADER_ALIGNMENT) * BLOB_HEADER_ALIGNMENT;
+
+      for (
+        let va = firstAligned;
+        va < rwVaddrStart + rwContent.length - 8;
+        va += BLOB_HEADER_ALIGNMENT
+      ) {
+        const off = va - rwVaddrStart;
+        if (rwContent.subarray(off, off + 8).equals(vaddrBytes)) {
+          bunCompiledVaddr = BigInt(va);
+          debug(
+            `repackELFSection: BUN_COMPILED at vaddr 0x${bunCompiledVaddr.toString(16)} ` +
+              `(offset ${off} in RW segment)`
+          );
+          break;
+        }
+      }
+    }
+
+    if (bunCompiledVaddr === null) {
+      throw new Error(
+        'Could not find original BUN_COMPILED location in binary'
+      );
+    }
+
+    // Set the new section content
+    bunSection.content = newSectionData;
+
+    // Update the PT_LOAD segment sizes to cover the new content.
+    // LIEF's ELF Builder handles the actual file layout, but we need to tell
+    // the segment how big the mapped region should be.
+    const pageSize = Number(bunSegment.alignment);
+    const alignedSize = BigInt(
+      Math.ceil(newSectionData.length / pageSize) * pageSize
+    );
+    bunSegment.fileSize = alignedSize;
+    bunSegment.virtualSize = alignedSize;
+
+    debug(
+      `repackELFSection: Updated segment: filesz=0x${bunSegment.fileSize.toString(16)}, ` +
+        `memsz=0x${bunSegment.virtualSize.toString(16)}`
+    );
+
+    // Patch BUN_COMPILED.size to point to the .bun section vaddr.
+    // The vaddr doesn't change (LIEF keeps the section at the same virtual address),
+    // so we just re-write the same value to ensure it's correct.
+    const vaddrPatch = Buffer.alloc(8);
+    vaddrPatch.writeBigUInt64LE(bunSectionVaddr);
+    elfBinary.patchAddress(bunCompiledVaddr, vaddrPatch);
+
+    debug(
+      `repackELFSection: Patched BUN_COMPILED at vaddr 0x${bunCompiledVaddr.toString(16)} -> 0x${bunSectionVaddr.toString(16)}`
+    );
+
+    // Write the modified binary
+    atomicWriteBinary(elfBinary, outputPath, binPath);
+    debug('repackELFSection: Write completed successfully');
+  } catch (error) {
+    console.error('repackELFSection failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Legacy ELF repack: data is appended as an overlay (pre-PR#26923).
+ */
+function repackELFOverlay(
   elfBinary: LIEF.ELF.Binary,
   binPath: string,
   newBunBuffer: Buffer,
@@ -1246,15 +1450,17 @@ function repackELF(
       newBunBuffer.length
     );
 
-    debug(`repackELF: Setting overlay data (${newOverlay.length} bytes)`);
+    debug(
+      `repackELFOverlay: Setting overlay data (${newOverlay.length} bytes)`
+    );
 
     elfBinary.overlay = newOverlay;
-    debug(`repackELF: Writing modified binary to ${outputPath}...`);
+    debug(`repackELFOverlay: Writing modified binary to ${outputPath}...`);
 
     atomicWriteBinary(elfBinary, outputPath, binPath);
-    debug('repackELF: Write completed successfully');
+    debug('repackELFOverlay: Write completed successfully');
   } catch (error) {
-    console.error('repackELF failed:', error);
+    console.error('repackELFOverlay failed:', error);
     throw error;
   }
 }
@@ -1400,9 +1606,30 @@ export function repackNativeInstallation(
       );
       break;
     case 'ELF':
-      repackELF(binary as LIEF.ELF.Binary, binPath, newBuffer, outputPath);
+      if (sectionHeaderSize) {
+        // New .bun section format (post-PR#26923)
+        repackELFSection(
+          binary as LIEF.ELF.Binary,
+          binPath,
+          newBuffer,
+          outputPath,
+          sectionHeaderSize
+        );
+      } else {
+        // Legacy overlay format
+        repackELFOverlay(
+          binary as LIEF.ELF.Binary,
+          binPath,
+          newBuffer,
+          outputPath
+        );
+      }
       break;
-    default:
-      throw new Error(`Unsupported binary format: ${binary.format}`);
+    default: {
+      const _exhaustive: never = binary;
+      throw new Error(
+        `Unsupported binary format: ${(_exhaustive as LIEF.ELF.Binary | LIEF.PE.Binary | LIEF.MachO.Binary).format}`
+      );
+    }
   }
 }

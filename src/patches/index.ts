@@ -70,6 +70,8 @@ import { writeAllowBypassPermsInSudo } from './allowBypassPermsInSudo';
 import { writeSuppressNativeInstallerWarning } from './suppressNativeInstallerWarning';
 import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeWorktreeMode } from './worktreeMode';
+import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
+import { writeVoiceMode } from './voiceMode';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -357,6 +359,13 @@ const PATCH_DEFINITIONS = [
   },
   // Features
   {
+    id: 'allow-custom-agent-models',
+    name: 'Allow custom agent models',
+    group: PatchGroup.FEATURES,
+    description:
+      'Allow arbitrary model names in custom agent frontmatter (e.g. gemini-2.5-flash)',
+  },
+  {
     id: 'worktree-mode',
     name: 'Worktree mode',
     group: PatchGroup.FEATURES,
@@ -405,6 +414,13 @@ const PATCH_DEFINITIONS = [
     name: 'Conversation title',
     group: PatchGroup.FEATURES,
     description: '/title command will be created & enabled',
+  },
+  {
+    id: 'voice-mode',
+    name: 'Voice mode',
+    group: PatchGroup.FEATURES,
+    description:
+      'Enable /voice command for speech-to-text input (hold Space to record)',
   },
 ] as const;
 
@@ -793,6 +809,10 @@ export const applyCustomization = async (
       condition: !!config.settings.misc?.filterScrollEscapeSequences,
     },
     // Features
+    'allow-custom-agent-models': {
+      fn: c => writeAllowCustomAgentModels(c),
+      condition: !!config.settings.misc?.allowCustomAgentModels,
+    },
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),
       condition:
@@ -847,6 +867,14 @@ export const applyCustomization = async (
           ccInstInfo.version &&
           compareVersions(ccInstInfo.version, '2.0.64') < 0
         ),
+    },
+    'voice-mode': {
+      fn: c =>
+        writeVoiceMode(
+          c,
+          config.settings.misc?.enableVoiceConciseOutput ?? true
+        ),
+      condition: !!config.settings.misc?.enableVoiceMode,
     },
   };
 

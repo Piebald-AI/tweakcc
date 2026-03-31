@@ -9,6 +9,7 @@ import {
 } from './systemPromptHashIndex';
 import chalk from 'chalk';
 import { SYSTEM_PROMPTS_DIR } from './config';
+import { debug } from './utils';
 
 /**
  * Prompt structure from strings-X.Y.Z.json files
@@ -1106,169 +1107,92 @@ const buildSearchRegexFromPieces = (
   return pattern;
 };
 
-/**
- * Finds unescaped backticks outside of ${...} interpolation regions using a stack-based parser.
- * Returns a Map of line number -> array of column numbers for each unescaped backtick found.
- */
-export const findUnescapedBackticks = (content: string) => {
-  const result = new Map<number, number[]>();
-  let depth = 0,
-    line = 1,
-    col = 1;
-
-  for (let i = 0; i < content.length; i++, col++) {
-    const ch = content[i];
-
-    if (ch === '\n') {
-      line++;
-      col = 0;
-      continue;
-    }
-
-    const next = content[i + 1];
-    if (ch === '$' && next === '{') {
-      depth++;
-      i++;
-      col++;
-      continue;
-    }
-
-    if (depth) {
-      if (ch === '{') depth++;
-      else if (ch === '}') depth--;
-      continue;
-    }
-
-    if (ch === '`' && content[i - 1] !== '\\') {
-      const arr = result.get(line) ?? [];
-      arr.push(col);
-      result.set(line, arr);
-    }
+const countPrecedingBackslashes = (content: string, pos: number): number => {
+  let count = 0;
+  let j = pos - 1;
+  while (j >= 0 && content[j] === '\\') {
+    count++;
+    j--;
   }
-
-  return result;
+  return count;
 };
 
 /**
- * Formats a Rust-style error message for unescaped backticks in a file.
+ * Escapes unescaped backticks at depth 0 (outside ${...} interpolations).
  */
-export const formatBacktickError = (
-  filePath: string,
-  lineNumber: number,
-  lineText: string,
-  columns: number[]
-): string => {
-  const lines: string[] = [];
-  const lineNumStr = String(lineNumber);
-  const lineNumWidth = lineNumStr.length;
-  const padding = ' '.repeat(lineNumWidth);
+export const escapeDepthZeroBackticks = (
+  content: string
+): { content: string; incomplete: boolean } => {
+  let out = '';
+  let depth = 0;
+  let inString = '';
+  const templateStack: number[] = [];
 
-  // First and last column for truncation logic
-  const firstColumn = columns[0];
-  const lastColumn = columns[columns.length - 1];
+  for (let i = 0; i < content.length; i++) {
+    const ch = content[i];
+    const next = content[i + 1];
+    const unescaped = countPrecedingBackslashes(content, i) % 2 === 0;
 
-  // Calculate truncation
-  const maxPrefix = 30;
-  const maxSuffix = 30;
-  const prefixLen = firstColumn - 1;
-  const suffixLen = lineText.length - lastColumn;
-
-  let displayLine = lineText;
-  let displayColumns = columns;
-  let prefixTruncation = '';
-  let suffixTruncation = '';
-  let prefixTruncationLen = 0; // Visible length without ANSI codes
-
-  if (prefixLen > maxPrefix || suffixLen > maxSuffix) {
-    // Need to truncate
-    let startIdx = 0;
-    let endIdx = lineText.length;
-    let colOffset = 0;
-
-    if (prefixLen > maxPrefix) {
-      const charsToSkip = prefixLen - maxPrefix;
-      startIdx = charsToSkip;
-      colOffset = -charsToSkip;
-      const prefixText = `[${charsToSkip} chars] ...`;
-      prefixTruncation = chalk.dim(prefixText);
-      prefixTruncationLen = prefixText.length;
+    if (depth) {
+      const inTemplate =
+        templateStack.length > 0 &&
+        depth === templateStack[templateStack.length - 1];
+      if (inTemplate) {
+        if (ch === '`' && unescaped) {
+          templateStack.pop();
+        } else if (ch === '$' && next === '{') {
+          if (unescaped) depth++;
+          out += '${';
+          i++;
+          continue;
+        }
+        out += ch;
+        continue;
+      }
+      if (!inString) {
+        if (ch === '$' && next === '{') {
+          if (unescaped) depth++;
+          out += '${';
+          i++;
+          continue;
+        } else if (ch === '"' || ch === "'") {
+          inString = ch;
+        } else if (ch === '`' && unescaped) {
+          templateStack.push(depth);
+        } else if (ch === '{') {
+          depth++;
+        } else if (ch === '}') {
+          depth--;
+        }
+      } else if (ch === inString && unescaped) {
+        inString = '';
+      }
+      out += ch;
+      continue;
     }
 
-    if (suffixLen > maxSuffix) {
-      const charsToSkip = suffixLen - maxSuffix;
-      endIdx = lineText.length - charsToSkip;
-      suffixTruncation = chalk.dim(`... [${charsToSkip} chars]`);
+    if (ch === '$' && next === '{' && !inString) {
+      if (unescaped) depth++;
+      out += '${';
+      i++;
+      continue;
     }
 
-    displayLine = lineText.substring(startIdx, endIdx);
-    displayColumns = columns.map(c => c + colOffset);
+    if (ch === '`' && unescaped) {
+      out += '\\`';
+    } else {
+      out += ch;
+    }
   }
 
-  // Header: error message
-  lines.push(
-    `${chalk.red.bold('error')}${chalk.bold(': system prompt file contains unescaped backtick')}`
-  );
-
-  // File location (use original column number)
-  lines.push(
-    `${chalk.blue.bold(' '.repeat(lineNumWidth) + ' -->')} ${filePath}:${lineNumber}:${firstColumn}`
-  );
-
-  // Empty pipe line
-  lines.push(`${padding} ${chalk.blue.bold('|')}`);
-
-  // The actual line with line number (with truncation indicators)
-  const fullDisplayLine = prefixTruncation + displayLine + suffixTruncation;
-  lines.push(
-    `${chalk.blue.bold(lineNumStr)} ${chalk.blue.bold('|')} ${fullDisplayLine}`
-  );
-
-  // Caret line pointing to first backtick (adjusted for prefix truncation text)
-  const caretOffset = prefixTruncationLen + displayColumns[0] - 1;
-  const caretLine = ' '.repeat(caretOffset) + '^' + ' unescaped backtick';
-  lines.push(`${padding} ${chalk.blue.bold('|')} ${chalk.red.bold(caretLine)}`);
-
-  // Empty pipe line before help
-  lines.push(`${padding} ${chalk.blue.bold('|')}`);
-
-  // Help message
-  lines.push(
-    `${chalk.cyan.bold('help')}: add \`\\\` before the backtick to escape it`
-  );
-
-  // Empty pipe line
-  lines.push(`${padding} ${chalk.blue.bold('|')}`);
-
-  // Fixed line with escaped backticks (using displayLine and displayColumns)
-  // Build the line with green backslashes
-  const fixedLineParts: string[] = [];
-  let lastPos = 0;
-  for (const col of displayColumns) {
-    fixedLineParts.push(displayLine.substring(lastPos, col - 1));
-    fixedLineParts.push(chalk.green('\\') + '`');
-    lastPos = col; // Skip the original backtick
-  }
-  fixedLineParts.push(displayLine.substring(lastPos));
-
-  const fullFixedLine =
-    prefixTruncation + fixedLineParts.join('') + suffixTruncation;
-  lines.push(
-    `${chalk.blue.bold(lineNumStr)} ${chalk.blue.bold('|')} ${fullFixedLine}`
-  );
-
-  // Plus signs under the added backslashes only (adjusted for prefix truncation)
-  let plusLine = '';
-  let offset = 0;
-  for (let i = 0; i < displayColumns.length; i++) {
-    const col = displayColumns[i];
-    const targetPos = prefixTruncationLen + col - 1 + offset;
-    plusLine = plusLine.padEnd(targetPos, ' ') + '+';
-    offset++; // Each added backslash shifts subsequent positions
+  const incomplete = depth > 0 || templateStack.length > 0;
+  if (incomplete) {
+    debug(
+      `escapeDepthZeroBackticks: unclosed interpolation detected (depth=${depth}). Some backticks may not have been escaped.`
+    );
   }
 
-  lines.push(`${padding} ${chalk.blue.bold('|')} ${chalk.green(plusLine)}`);
-
-  return lines.join('\n');
+  return { content: out, incomplete };
 };
 
 /**
