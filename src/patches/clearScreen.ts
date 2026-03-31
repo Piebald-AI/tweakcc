@@ -24,7 +24,7 @@ export const writeClearScreen = (oldFile: string): string | null => {
     `${delimiter}globalThis.__tweakccForceRedraw=()=>${mapVar}.get(process.stdout)?.forceRedraw();` +
     redrawMatch[0].slice(1);
 
-  const file =
+  let file =
     oldFile.slice(0, redrawMatch.index) +
     redrawReplacement +
     oldFile.slice(redrawMatch.index + redrawMatch[0].length);
@@ -37,18 +37,22 @@ export const writeClearScreen = (oldFile: string): string | null => {
     redrawMatch.index + redrawMatch[0].length
   );
 
+  const renderFilterResult = patchRenderFilter(file);
+  if (!renderFilterResult) {
+    debug('patch: clearScreen: failed to patch render filter g97');
+    return null;
+  }
+  file = renderFilterResult;
+
   const commandDef =
     ',{type:"local",name:"clear-screen",' +
     'description:"Clear screen without resetting conversation context",' +
     'supportsNonInteractive:!1,' +
     'load:()=>Promise.resolve().then(()=>({call:(H,$)=>{' +
     '$.setMessages(m=>{' +
-    'let k=null;' +
-    'for(let i=m.length-1;i>=0;i--){' +
-    'if(m[i]?.type==="assistant"&&m[i].message?.usage){k=m[i];break}' +
-    'if(!k&&m[i]?.type==="assistant")k=m[i]}' +
-    'return k?[{...k,message:{...k.message,content:[]}}]:[]});' +
-    'process.stdout.write("\\x1b[3J");' +
+    'globalThis.__tweakccHiddenUUIDs=new Set(m.map(x=>x.uuid?.slice(0,24)).filter(Boolean));' +
+    'return[...m]});' +
+    'process.stdout.write("\\x1b[2J\\x1b[H\\x1b[3J");' +
     'globalThis.__tweakccForceRedraw?.();' +
     'return{type:"skip"}}}))}';
 
@@ -57,6 +61,40 @@ export const writeClearScreen = (oldFile: string): string | null => {
     debug('patch: clearScreen: failed to register slash command');
     return null;
   }
+
+  return result;
+};
+
+export const patchRenderFilter = (oldFile: string): string | null => {
+  const pattern =
+    /(function [$\w]+\([$\w]+,[$\w]+\)\{)if\([$\w]+\.type!=="user"\)return!0;if\([$\w]+\.isMeta\)/;
+  const match = oldFile.match(pattern);
+  if (!match || match.index === undefined) {
+    return null;
+  }
+
+  const funcPrefix = match[1];
+  const firstArg = match[0].match(/function ([$\w]+)\(([$\w]+),/)?.[2];
+  if (!firstArg) {
+    return null;
+  }
+
+  const replacement =
+    `${funcPrefix}if(globalThis.__tweakccHiddenUUIDs?.has(${firstArg}.uuid?.slice(0,24)))return!1;` +
+    match[0].slice(funcPrefix.length);
+
+  const result =
+    oldFile.slice(0, match.index) +
+    replacement +
+    oldFile.slice(match.index + match[0].length);
+
+  showDiff(
+    oldFile,
+    result,
+    replacement,
+    match.index,
+    match.index + match[0].length
+  );
 
   return result;
 };
