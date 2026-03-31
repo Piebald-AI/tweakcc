@@ -784,19 +784,24 @@ export function extractClaudeJsFromNativeInstallation(
   nativeInstallationPath: string
 ): Buffer | null {
   try {
-    let bunOffsets: BunOffsets;
-    let bunData: Buffer;
-    let moduleStructSize: number;
+    let extracted: BunData | null = null;
 
     if (isELFFile(nativeInstallationPath)) {
-      ({ bunOffsets, bunData, moduleStructSize } = extractBunDataFromELFRaw(
-        nativeInstallationPath
-      ));
-    } else {
+      try {
+        extracted = extractBunDataFromELFRaw(nativeInstallationPath);
+      } catch {
+        debug(
+          'extractClaudeJsFromNativeInstallation: raw ELF extraction failed, falling back to LIEF'
+        );
+      }
+    }
+    if (!extracted) {
       LIEF.logging.disable();
       const binary = LIEF.parse(nativeInstallationPath);
-      ({ bunOffsets, bunData, moduleStructSize } = getBunData(binary));
+      extracted = getBunData(binary);
     }
+
+    const { bunOffsets, bunData, moduleStructSize } = extracted;
 
     debug(
       `extractClaudeJsFromNativeInstallation: Got bunData, size=${bunData.length} bytes, moduleStructSize=${moduleStructSize}`
@@ -1556,16 +1561,22 @@ export function repackNativeInstallation(
   outputPath: string
 ): void {
   if (isELFFile(binPath)) {
-    const { bunOffsets, bunData, moduleStructSize } =
-      extractBunDataFromELFRaw(binPath);
-    const newBuffer = rebuildBunData(
-      bunData,
-      bunOffsets,
-      modifiedClaudeJs,
-      moduleStructSize
-    );
-    repackELFRaw(binPath, newBuffer, outputPath);
-    return;
+    try {
+      const { bunOffsets, bunData, moduleStructSize } =
+        extractBunDataFromELFRaw(binPath);
+      const newBuffer = rebuildBunData(
+        bunData,
+        bunOffsets,
+        modifiedClaudeJs,
+        moduleStructSize
+      );
+      repackELFRaw(binPath, newBuffer, outputPath);
+      return;
+    } catch {
+      debug(
+        'repackNativeInstallation: raw ELF repack failed, falling back to LIEF'
+      );
+    }
   }
 
   LIEF.logging.disable();

@@ -227,6 +227,24 @@ const normalizeConfig = (config: TweakccConfig): void => {
     );
   }
 
+  // Validate each customTool entry — drop entries missing required fields.
+  if (config.settings.customTools) {
+    config.settings.customTools = config.settings.customTools.filter(tool => {
+      if (
+        !tool.name ||
+        !tool.command ||
+        !tool.description ||
+        !tool.parameters
+      ) {
+        console.warn(
+          `config: customTools: dropping invalid tool (missing required fields): ${JSON.stringify(tool)}`
+        );
+        return false;
+      }
+      return true;
+    });
+  }
+
   // In v3.2.0 userMessageDisplay was restructured from prefix/message to a single format string.
   migrateUserMessageDisplayToV320(config);
 

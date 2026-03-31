@@ -16,13 +16,48 @@ import {
 // ============================================================================
 
 const BUILTIN_TOOL_NAMES = new Set([
-  'Agent', 'AskUserQuestion', 'Bash', 'Brief', 'SendUserMessage', 'Config',
-  'CronCreate', 'CronDelete', 'CronList', 'Edit', 'EnterPlanMode', 'EnterWorktree',
-  'ExitPlanMode', 'ExitWorktree', 'Glob', 'Grep', 'LSP', 'ListMcpResourcesTool',
-  'NotebookEdit', 'PowerShell', 'REPL', 'Read', 'ReadMcpResource', 'RemoteTrigger',
-  'Skill', 'Sleep', 'SendMessage', 'StructuredOutput', 'Task', 'TaskCreate',
-  'TaskGet', 'TaskList', 'TaskOutput', 'TaskStop', 'TaskUpdate', 'TeamCreate',
-  'TeamDelete', 'TodoWrite', 'ToolSearch', 'WebFetch', 'WebSearch', 'Write',
+  'Agent',
+  'AskUserQuestion',
+  'Bash',
+  'Brief',
+  'SendUserMessage',
+  'Config',
+  'CronCreate',
+  'CronDelete',
+  'CronList',
+  'Edit',
+  'EnterPlanMode',
+  'EnterWorktree',
+  'ExitPlanMode',
+  'ExitWorktree',
+  'Glob',
+  'Grep',
+  'LSP',
+  'ListMcpResourcesTool',
+  'NotebookEdit',
+  'PowerShell',
+  'REPL',
+  'Read',
+  'ReadMcpResource',
+  'RemoteTrigger',
+  'Skill',
+  'Sleep',
+  'SendMessage',
+  'StructuredOutput',
+  'Task',
+  'TaskCreate',
+  'TaskGet',
+  'TaskList',
+  'TaskOutput',
+  'TaskStop',
+  'TaskUpdate',
+  'TeamCreate',
+  'TeamDelete',
+  'TodoWrite',
+  'ToolSearch',
+  'WebFetch',
+  'WebSearch',
+  'Write',
 ]);
 
 // ============================================================================
@@ -108,25 +143,41 @@ const generateToolObject = (
   const properties: Record<string, { type: string; description: string }> = {};
   const required: string[] = [];
   for (const [paramName, param] of Object.entries(tool.parameters)) {
-    properties[paramName] = { type: param.type, description: param.description };
+    properties[paramName] = {
+      type: param.type,
+      description: param.description,
+    };
     if (param.required !== false) {
       required.push(paramName);
     }
   }
   const schemaJson = JSON.stringify({ type: 'object', properties, required });
 
-  // Parameter substitution helpers — two variants for different variable names
+  // Escape a parameter name for safe embedding inside a regex literal.
+  const escapeForRegex = (s: string): string =>
+    s.replace(/[.*+?^${}()|[\]\\]/g, '\\\\$&');
+
+  // Parameter substitution helpers — two variants for different variable names.
+  // Parameter names are escaped before embedding in regex literals to handle
+  // names containing regex-special characters (e.g. "foo/bar", "a.b").
   const makeSubst = (varName: string): string =>
     Object.keys(tool.parameters)
-      .map(k => `cmd=cmd.replace(/\\{\\{${k}\\}\\}/g,String(${varName}[${JSON.stringify(k)}]??""));`)
+      .map(
+        k =>
+          `cmd=cmd.replace(/\\{\\{${escapeForRegex(k)}\\}\\}/g,String(${varName}[${JSON.stringify(k)}]??""));`
+      )
       .join('');
   const argsSubst = makeSubst('args');
   const inputSubst = makeSubst('input');
 
   // Safe substitution (try/catch per param) for renderToolUseMessage, which
   // receives partial input while the model is still streaming parameters.
+  // Uses the same empty-string fallback as argsSubst/inputSubst for consistency.
   const safeInputSubst = Object.keys(tool.parameters)
-    .map(k => `try{cmd=cmd.replace(/\\{\\{${k}\\}\\}/g,String(input[${JSON.stringify(k)}]??"?"));}catch(_){}`)
+    .map(
+      k =>
+        `try{cmd=cmd.replace(/\\{\\{${escapeForRegex(k)}\\}\\}/g,String(input[${JSON.stringify(k)}]??""));}catch(_){}`
+    )
     .join('');
 
   // validateInput: type-check declared parameters
@@ -135,8 +186,10 @@ const generateToolObject = (
       const kJson = JSON.stringify(k);
       const typeJson = JSON.stringify(p.type);
       if (p.required !== false) {
-        return `if(input[${kJson}]==null)return{result:false,message:${JSON.stringify(`${k} is required`)},errorCode:1};`
-             + `if(typeof input[${kJson}]!==${typeJson})return{result:false,message:${JSON.stringify(`${k} must be a ${p.type}`)},errorCode:1};`;
+        return (
+          `if(input[${kJson}]==null)return{result:false,message:${JSON.stringify(`${k} is required`)},errorCode:1};` +
+          `if(typeof input[${kJson}]!==${typeJson})return{result:false,message:${JSON.stringify(`${k} must be a ${p.type}`)},errorCode:1};`
+        );
       }
       return `if(input[${kJson}]!=null&&typeof input[${kJson}]!==${typeJson})return{result:false,message:${JSON.stringify(`${k} must be a ${p.type}`)},errorCode:1};`;
     })
@@ -223,7 +276,15 @@ const generateCustomToolsArray = (
   cwdFunc: string | undefined
 ): string => {
   const toolObjects = tools.map(t =>
-    generateToolObject(t, buildToolFunc, reactVar, textComponent, boxComponent, requireFunc, cwdFunc)
+    generateToolObject(
+      t,
+      buildToolFunc,
+      reactVar,
+      textComponent,
+      boxComponent,
+      requireFunc,
+      cwdFunc
+    )
   );
   return `[${toolObjects.join(',')}]`;
 };
@@ -252,6 +313,7 @@ export const writeCustomTools = (
     return oldFile;
   }
 
+  const seenToolNames = new Set<string>();
   for (const tool of customTools) {
     if (BUILTIN_TOOL_NAMES.has(tool.name)) {
       console.error(
@@ -259,6 +321,13 @@ export const writeCustomTools = (
       );
       return null;
     }
+    if (seenToolNames.has(tool.name)) {
+      console.error(
+        `patch: customTools: duplicate custom tool name "${tool.name}" — rename one of them`
+      );
+      return null;
+    }
+    seenToolNames.add(tool.name);
   }
 
   const buildToolFunc = findBuildToolFunc(oldFile);
@@ -288,7 +357,9 @@ export const writeCustomTools = (
   const requireFunc = getRequireFuncName(oldFile);
   const cwdFunc = getCwdFuncName(oldFile);
   if (!cwdFunc) {
-    console.warn('patch: customTools: could not detect session cwd function; falling back to process.cwd()');
+    console.warn(
+      'patch: customTools: could not detect session cwd function; falling back to process.cwd()'
+    );
   }
 
   const toolsArrayCode = generateCustomToolsArray(
@@ -332,7 +403,9 @@ export const writeCustomTools = (
   const originalMatch = oldFile.match(originalPattern);
 
   if (!originalMatch || originalMatch.index === undefined) {
-    console.error('patch: customTools: failed to find tool aggregation pattern');
+    console.error(
+      'patch: customTools: failed to find tool aggregation pattern'
+    );
     return null;
   }
 
