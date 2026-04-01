@@ -27,19 +27,21 @@ import { Installation } from './types';
  * @param installation - The installation to read from
  * @returns The JavaScript content as a string
  */
-export async function readContent(installation: Installation): Promise<string> {
+export async function readContent(
+  installation: Installation
+): Promise<{ content: string; clearBytecode: boolean }> {
   if (installation.kind === 'native') {
-    const { data: buffer } = await extractClaudeJsFromNativeInstallation(
-      installation.path
-    );
+    const { data: buffer, clearBytecode } =
+      await extractClaudeJsFromNativeInstallation(installation.path);
     if (!buffer) {
       throw new Error(
         `Failed to extract JavaScript from native installation: ${installation.path}`
       );
     }
-    return buffer.toString('utf8');
+    return { content: buffer.toString('utf8'), clearBytecode };
   } else {
-    return fs.readFile(installation.path, { encoding: 'utf8' });
+    const content = await fs.readFile(installation.path, { encoding: 'utf8' });
+    return { content, clearBytecode: false };
   }
 }
 
@@ -54,7 +56,8 @@ export async function readContent(installation: Installation): Promise<string> {
  */
 export async function writeContent(
   installation: Installation,
-  content: string
+  content: string,
+  clearBytecode: boolean
 ): Promise<void> {
   if (installation.kind === 'native') {
     const modifiedBuffer = Buffer.from(content, 'utf8');
@@ -62,7 +65,7 @@ export async function writeContent(
       installation.path,
       modifiedBuffer,
       installation.path,
-      false
+      clearBytecode
     );
   } else {
     await replaceFileBreakingHardLinks(installation.path, content, 'patch');
