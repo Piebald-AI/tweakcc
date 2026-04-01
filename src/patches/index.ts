@@ -72,6 +72,7 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
+import { writeChannelsMode } from './channelsMode';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -421,6 +422,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Enable /voice command for speech-to-text input (hold Space to record)',
+  },
+  {
+    id: 'channels-mode',
+    name: 'Channels mode',
+    group: PatchGroup.FEATURES,
+    description:
+      'Enable MCP channel notifications (--channels without allowlist or dev flag)',
   },
 ] as const;
 
@@ -875,6 +883,10 @@ export const applyCustomization = async (
           config.settings.misc?.enableVoiceConciseOutput ?? true
         ),
       condition: !!config.settings.misc?.enableVoiceMode,
+    },
+    'channels-mode': {
+      fn: c => writeChannelsMode(c),
+      condition: !!config.settings.misc?.enableChannelsMode,
     },
   };
 
