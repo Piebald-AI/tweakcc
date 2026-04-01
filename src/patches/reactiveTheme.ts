@@ -40,7 +40,7 @@ function findThemeProviderRegion(content: string): {
   start: number;
   end: number;
 } | null {
-  const marker = /\{themeSetting:[$\w]+,/;
+  const marker = /\{themeSetting:[$\w]+,[\s\S]*?currentTheme:[$\w]+\}/;
   const match = content.match(marker);
   if (!match || match.index == null) return null;
 
@@ -131,15 +131,12 @@ function patchThemeProviderUseEffect(
 
   const setStateVar = setStateMatch[2];
 
-  // Build replacement — inject CONFIG_DIR as a resolved string literal at
-  // apply time so the runtime path respects TWEAKCC_CONFIG_DIR / XDG overrides.
   const querierArg = dep2 ? `,${dep2}` : ',void 0';
-  const escapedConfigDir = CONFIG_DIR.replace(/\\/g, '\\\\');
-  const twJsPath = escapedConfigDir + '/tw.js';
+  const twJsPath = CONFIG_DIR + '/tw.js';
   const replacement =
     `${reactVar}.useEffect(()=>{try{if(${dep1}=="auto"){` +
-    `return require("${twJsPath}")` +
-    `(${setStateVar}${querierArg},"${config.darkThemeId}","${config.lightThemeId}","${escapedConfigDir}")` +
+    `return require(${JSON.stringify(twJsPath)})` +
+    `(${setStateVar}${querierArg},${JSON.stringify(config.darkThemeId)},${JSON.stringify(config.lightThemeId)},${JSON.stringify(CONFIG_DIR)})` +
     `}}catch{}},[${deps}])`;
 
   const absStart = region.start + useEffectMatch.index;

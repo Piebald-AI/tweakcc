@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { writeThemeDetection } from './themeDetection';
 import { clearCaches } from './helpers';
 
-// Synthetic COLORFGBG detect function from CC v2.1.89
 const DETECT_V289 =
   'function uG4(){let H=process.env.COLORFGBG;if(!H)return;' +
   'let _=H.split(";"),q=_[_.length-1];' +
@@ -11,7 +10,6 @@ const DETECT_V289 =
   'let K=Number(q);if(!Number.isInteger(K)||K<0||K>15)return;' +
   'return K<=6||K===8?"dark":"light"}';
 
-// Bun-style prefix for getRequireFuncName to resolve to "require"
 const BUN_PREFIX =
   'var j=(H,$,A)=>{A=H!=null?H:$};' +
   'var n7L=($)=>{var W=Symbol.for("react.transitional.element")};';
@@ -32,7 +30,6 @@ describe('themeDetection', () => {
     expect(result).toContain('defaults read -g AppleInterfaceStyle');
     expect(result).toContain('org.freedesktop.appearance color-scheme');
     expect(result).toContain('AppsUseLightTheme');
-    // COLORFGBG preserved as fallback
     expect(result).toContain('process.env.COLORFGBG');
   });
 
