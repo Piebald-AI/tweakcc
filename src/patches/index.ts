@@ -73,6 +73,7 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeReactiveTheme } from './reactiveTheme';
+import { writeThemeDetection } from './themeDetection';
 import { REACTIVE_THEME_WATCHER_JS } from '../reactiveThemeWatcher';
 import {
   restoreNativeBinaryFromBackup,
@@ -174,6 +175,13 @@ const PATCH_DEFINITIONS = [
     name: `Statusline update throttling correction`,
     group: PatchGroup.ALWAYS_APPLIED,
     description: `Statusline updates will be properly throttled instead of queued (or debounced)`,
+  },
+  {
+    id: 'fix-theme-detection',
+    name: 'Fix theme detection',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description:
+      'Cross-platform "auto" theme detection (macOS defaults, Linux gdbus, Windows registry) instead of COLORFGBG',
   },
   // Misc Configurable
   {
@@ -663,6 +671,9 @@ export const applyCustomization = async (
           config.settings.misc?.statuslineUseFixedInterval ?? false
         ),
       condition: config.settings.misc?.statuslineThrottleMs != null,
+    },
+    'fix-theme-detection': {
+      fn: c => writeThemeDetection(c),
     },
     // Misc Configurable
     'patches-applied-indication': {

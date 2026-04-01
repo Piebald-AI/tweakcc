@@ -147,28 +147,6 @@ describe('reactiveTheme', () => {
   });
 
   // ====================================================================
-  // COLORFGBG detect patching
-  // ====================================================================
-
-  it('patches the COLORFGBG detect function', () => {
-    const result = writeReactiveTheme(buildV289(), DEFAULT_CONFIG);
-
-    expect(result).not.toBeNull();
-    expect(result).toContain('defaults read -g AppleInterfaceStyle');
-    expect(result).toContain('org.freedesktop.appearance color-scheme');
-    expect(result).toContain('AppsUseLightTheme');
-    // COLORFGBG preserved as fallback
-    expect(result).toContain('process.env.COLORFGBG');
-  });
-
-  it('preserves the original function name in detect replacement', () => {
-    const result = writeReactiveTheme(buildV289(), DEFAULT_CONFIG);
-
-    expect(result).not.toBeNull();
-    expect(result).toContain('function uG4(){try{');
-  });
-
-  // ====================================================================
   // Idempotency
   // ====================================================================
 
