@@ -111,8 +111,8 @@ describe('reactiveTheme', () => {
     const result = writeReactiveTheme(buildV289(), DEFAULT_CONFIG);
 
     expect(result).not.toBeNull();
-    expect(result).toContain('.tweakcc","tw.js"');
-    expect(result).toContain('(A,f,"dark","light")');
+    expect(result).toContain('/tw.js"');
+    expect(result).toContain('(A,f,"dark","light",');
     expect(result).not.toContain('.useEffect(()=>{}');
   });
 
@@ -121,8 +121,8 @@ describe('reactiveTheme', () => {
     const result = writeReactiveTheme(buildV287(), DEFAULT_CONFIG);
 
     expect(result).not.toBeNull();
-    expect(result).toContain('.tweakcc","tw.js"');
-    expect(result).toContain('(A,w,"dark","light")');
+    expect(result).toContain('/tw.js"');
+    expect(result).toContain('(A,w,"dark","light",');
     expect(result).not.toContain('.useEffect(()=>{}');
   });
 
@@ -131,8 +131,8 @@ describe('reactiveTheme', () => {
     const result = writeReactiveTheme(buildV286(), DEFAULT_CONFIG);
 
     expect(result).not.toBeNull();
-    expect(result).toContain('.tweakcc","tw.js"');
-    expect(result).toContain('(w,J,"dark","light")');
+    expect(result).toContain('/tw.js"');
+    expect(result).toContain('(w,J,"dark","light",');
     expect(result).not.toContain('.useEffect(()=>{}');
   });
 

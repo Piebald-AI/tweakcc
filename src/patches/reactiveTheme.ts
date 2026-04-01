@@ -24,6 +24,7 @@
 
 import { escapeIdent, showDiff } from './index';
 import { getRequireFuncName } from './helpers';
+import { CONFIG_DIR } from '../config';
 
 export interface ReactiveThemeConfig {
   darkThemeId: string;
@@ -94,7 +95,7 @@ function patchThemeProviderUseEffect(
   const regionContent = content.slice(region.start, region.end);
 
   // Check if already patched
-  if (regionContent.includes('.tweakcc","tw.js"')) {
+  if (regionContent.includes('/tw.js")')) {
     return content;
   }
 
@@ -131,14 +132,15 @@ function patchThemeProviderUseEffect(
 
   const setStateVar = setStateMatch[2];
 
-  // Build replacement
-  const requireFunc = getRequireFuncName(content);
+  // Build replacement — inject CONFIG_DIR as a resolved string literal at
+  // apply time so the runtime path respects TWEAKCC_CONFIG_DIR / XDG overrides.
   const querierArg = dep2 ? `,${dep2}` : '';
+  const escapedConfigDir = CONFIG_DIR.replace(/\\/g, '\\\\');
+  const twJsPath = escapedConfigDir + '/tw.js';
   const replacement =
     `${reactVar}.useEffect(()=>{try{if(${dep1}=="auto"){` +
-    `var _p=${requireFunc}("path"),_o=${requireFunc}("os");` +
-    `return require(_p.join(_o.homedir(),".tweakcc","tw.js"))` +
-    `(${setStateVar}${querierArg},"${config.darkThemeId}","${config.lightThemeId}")` +
+    `return require("${twJsPath}")` +
+    `(${setStateVar}${querierArg},"${config.darkThemeId}","${config.lightThemeId}","${escapedConfigDir}")` +
     `}}catch{}},[${deps}])`;
 
   const absStart = region.start + useEffectMatch.index;

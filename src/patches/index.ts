@@ -906,10 +906,17 @@ export const applyCustomization = async (
   // ==========================================================================
   // Install external files for patches that need them
   // ==========================================================================
+  const twJsPath = path.join(CONFIG_DIR, 'tw.js');
   if (config.settings.misc?.enableReactiveTheme) {
-    const twJsPath = path.join(CONFIG_DIR, 'tw.js');
     fsSync.writeFileSync(twJsPath, REACTIVE_THEME_WATCHER_JS, 'utf8');
     debug(`Installed reactive theme watcher: ${twJsPath}`);
+  } else {
+    try {
+      fsSync.unlinkSync(twJsPath);
+      debug(`Removed reactive theme watcher: ${twJsPath}`);
+    } catch {
+      // File doesn't exist — nothing to clean up
+    }
   }
 
   // ==========================================================================

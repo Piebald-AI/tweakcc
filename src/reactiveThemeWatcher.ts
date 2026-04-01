@@ -134,13 +134,11 @@ function windowsDetect() {
   }
 }
 
-function watchWindows(setState, darkId, lightId) {
+function watchWindows(setState, darkId, lightId, configDir) {
   setState(themeName(windowsDetect(), darkId, lightId));
 
-  var configDir = _path.join(HOME, '.tweakcc');
   var psScript = _path.join(configDir, 'theme-watcher.ps1');
   try {
-    _fs.mkdirSync(configDir, { recursive: true });
     _fs.writeFileSync(psScript, [
       'Add-Type @"',
       'using System;',
@@ -247,13 +245,14 @@ function watchQuerier(setState, querier, darkId, lightId) {
 
 // Entry point -----------------------------------------------------------------
 
-module.exports = function(setState, querier, darkId, lightId) {
+module.exports = function(setState, querier, darkId, lightId, configDir) {
   darkId = darkId || 'dark';
   lightId = lightId || 'light';
+  configDir = configDir || _path.join(HOME, '.tweakcc');
   var platform = process.platform;
   if (platform === 'darwin') return watchDarwin(setState, darkId, lightId);
   if (platform === 'linux') return watchLinux(setState, darkId, lightId);
-  if (platform === 'win32') return watchWindows(setState, darkId, lightId);
+  if (platform === 'win32') return watchWindows(setState, darkId, lightId, configDir);
   if (querier) return watchQuerier(setState, querier, darkId, lightId);
   setState(darkId);
   return function() {};
