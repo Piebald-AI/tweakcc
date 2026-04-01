@@ -371,7 +371,18 @@ async function handleHookMode(install: boolean): Promise<void> {
   try {
     const raw = fsSync.readFileSync(settingsPath, 'utf8');
     try {
-      settings = JSON.parse(raw) as Record<string, unknown>;
+      const parsed = JSON.parse(raw);
+      if (
+        parsed === null ||
+        typeof parsed !== 'object' ||
+        Array.isArray(parsed)
+      ) {
+        console.error(
+          chalk.red(`Error: ${settingsPath} must contain a JSON object.`)
+        );
+        process.exit(1);
+      }
+      settings = parsed as Record<string, unknown>;
     } catch {
       console.error(
         chalk.red(
@@ -399,11 +410,9 @@ async function handleHookMode(install: boolean): Promise<void> {
     : [];
 
   const hookCommand = 'tweakcc --apply --quiet';
-  const hookMarker = 'tweakcc --apply';
 
-  // Check if our hook already exists
   const existingIdx = sessionStart.findIndex(entry =>
-    entry.hooks?.some(h => h.command?.includes(hookMarker))
+    entry.hooks?.some(h => h.command === hookCommand)
   );
 
   if (install) {
@@ -445,13 +454,23 @@ async function handleHookMode(install: boolean): Promise<void> {
     console.log(chalk.dim(`Location: ${settingsPath}`));
     console.log(chalk.dim('To remove: tweakcc --remove-hook'));
   } else {
-    // Remove mode
     if (existingIdx === -1) {
       console.log(chalk.yellow('No auto-reapply hook found to remove.'));
       process.exit(0);
     }
 
-    sessionStart.splice(existingIdx, 1);
+    const entry = sessionStart[existingIdx];
+    const hookIdx =
+      entry.hooks?.findIndex(h => h.command === hookCommand) ?? -1;
+    if (hookIdx !== -1 && entry.hooks) {
+      entry.hooks.splice(hookIdx, 1);
+      if (entry.hooks.length === 0) {
+        sessionStart.splice(existingIdx, 1);
+      }
+    } else {
+      sessionStart.splice(existingIdx, 1);
+    }
+
     if (sessionStart.length === 0) {
       delete hooks.SessionStart;
     } else {
