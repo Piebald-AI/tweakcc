@@ -117,7 +117,6 @@ describe('reactiveTheme', () => {
   });
 
   it('patches the empty useEffect in v2.1.87 style code', () => {
-    clearCaches();
     const result = writeReactiveTheme(buildV287(), DEFAULT_CONFIG);
 
     expect(result).not.toBeNull();
@@ -127,7 +126,6 @@ describe('reactiveTheme', () => {
   });
 
   it('patches the empty useEffect in v2.1.86 style code', () => {
-    clearCaches();
     const result = writeReactiveTheme(buildV286(), DEFAULT_CONFIG);
 
     expect(result).not.toBeNull();

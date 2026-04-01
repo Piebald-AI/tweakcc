@@ -133,7 +133,7 @@ function patchThemeProviderUseEffect(
 
   // Build replacement — inject CONFIG_DIR as a resolved string literal at
   // apply time so the runtime path respects TWEAKCC_CONFIG_DIR / XDG overrides.
-  const querierArg = dep2 ? `,${dep2}` : '';
+  const querierArg = dep2 ? `,${dep2}` : ',void 0';
   const escapedConfigDir = CONFIG_DIR.replace(/\\/g, '\\\\');
   const twJsPath = escapedConfigDir + '/tw.js';
   const replacement =

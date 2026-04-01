@@ -44,7 +44,6 @@ describe('themeDetection', () => {
   });
 
   it('handles different function names (v2.1.87)', () => {
-    clearCaches();
     const detect87 =
       'function MR4(){let H=process.env.COLORFGBG;if(!H)return;' +
       'let _=H.split(";"),q=_[_.length-1];' +
