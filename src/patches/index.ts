@@ -561,8 +561,10 @@ export const applyCustomization = async (
       `Extracting claude.js from ${backupExists ? 'backup' : 'native installation'}: ${pathToExtractFrom}`
     );
 
-    const claudeJsBuffer =
-      await extractClaudeJsFromNativeInstallation(pathToExtractFrom);
+    const claudeJsBuffer = await extractClaudeJsFromNativeInstallation(
+      pathToExtractFrom,
+      ccInstInfo.version
+    );
 
     if (!claudeJsBuffer) {
       throw new Error('Failed to extract claude.js from native installation');

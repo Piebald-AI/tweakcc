@@ -3,6 +3,8 @@
  */
 
 import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 import { execSync } from 'node:child_process';
 import LIEF from 'node-lief';
 import { isDebug, debug } from './utils';
@@ -151,6 +153,7 @@ export function resolveNixBinaryWrapper(binaryPath: string): string | null {
  * - flags: u32
  */
 const BUN_TRAILER = Buffer.from('\n---- Bun! ----\n');
+const BUN_BYTECODE_PREFIX = '// @bun @bytecode';
 
 // Size constants for binary structures
 const SIZEOF_OFFSETS = 32;
@@ -701,8 +704,63 @@ function getBunData(
  * real binary path here. This is handled at detection time in
  * `installationDetection.ts`.
  */
+/**
+ * Fetches the readable cli.js source from the npm package for a given CC version.
+ * Used as fallback when the native binary contains Bun bytecode instead of
+ * readable JS (bytecode function bodies can't be regex-patched).
+ *
+ * Downloads via `npm pack`, extracts cli.js, and returns its content.
+ * Returns null if the fetch fails (network error, version not on npm, etc.).
+ */
+function fetchNpmSource(version: string): Buffer | null {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tweakcc-npm-'));
+  try {
+    debug(`fetchNpmSource: Downloading @anthropic-ai/claude-code@${version}`);
+    execSync(
+      `npm pack @anthropic-ai/claude-code@${version} --pack-destination "${tmpDir}"`,
+      { stdio: 'pipe', timeout: 30_000, cwd: tmpDir }
+    );
+
+    // Find the tarball
+    const files = fs.readdirSync(tmpDir);
+    const tgz = files.find(f => f.endsWith('.tgz'));
+    if (!tgz) {
+      debug('fetchNpmSource: No .tgz file found after npm pack');
+      return null;
+    }
+
+    // Extract cli.js from the tarball
+    execSync(`tar xzf "${tgz}" package/cli.js`, {
+      stdio: 'pipe',
+      timeout: 30_000,
+      cwd: tmpDir,
+    });
+
+    const cliJsPath = path.join(tmpDir, 'package', 'cli.js');
+    if (!fs.existsSync(cliJsPath)) {
+      debug('fetchNpmSource: cli.js not found in extracted package');
+      return null;
+    }
+
+    const content = fs.readFileSync(cliJsPath);
+    debug(`fetchNpmSource: Got cli.js, ${content.length} bytes`);
+    return content;
+  } catch (error) {
+    debug('fetchNpmSource: Failed to fetch npm source:', error);
+    return null;
+  } finally {
+    // Clean up temp dir
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors
+    }
+  }
+}
+
 export function extractClaudeJsFromNativeInstallation(
-  nativeInstallationPath: string
+  nativeInstallationPath: string,
+  version?: string
 ): Buffer | null {
   try {
     LIEF.logging.disable();
@@ -741,6 +799,34 @@ export function extractClaudeJsFromNativeInstallation(
     );
 
     if (result) {
+      // Check if extracted content is Bun bytecode (not patchable with regex)
+      const head = result.subarray(0, 30).toString('utf8');
+      if (head.startsWith(BUN_BYTECODE_PREFIX)) {
+        debug(
+          'extractClaudeJsFromNativeInstallation: Extracted content is Bun bytecode — falling back to npm source'
+        );
+        console.log(
+          'Native binary contains Bun bytecode. Fetching readable source from npm...'
+        );
+
+        if (version) {
+          const npmSource = fetchNpmSource(version);
+          if (npmSource) {
+            debug(
+              `extractClaudeJsFromNativeInstallation: Using npm source (${npmSource.length} bytes) instead of bytecode`
+            );
+            return npmSource;
+          }
+          debug(
+            'extractClaudeJsFromNativeInstallation: npm source fetch failed, returning bytecode content as-is'
+          );
+        } else {
+          debug(
+            'extractClaudeJsFromNativeInstallation: No version provided, cannot fetch npm source'
+          );
+        }
+      }
+
       return result;
     }
 
@@ -786,14 +872,17 @@ function rebuildBunData(
 
     // Check if this is claude.js and we have modified contents
     let contentsBytes: Buffer;
+    let bytecodeBytes: Buffer;
     if (modifiedClaudeJs && isClaudeModule(moduleName)) {
       contentsBytes = modifiedClaudeJs;
+      // Clear bytecode so Bun uses the patched source JS instead of stale bytecode
+      bytecodeBytes = Buffer.alloc(0);
     } else {
       contentsBytes = getStringPointerContent(bunData, module.contents);
+      bytecodeBytes = getStringPointerContent(bunData, module.bytecode);
     }
 
     const sourcemapBytes = getStringPointerContent(bunData, module.sourcemap);
-    const bytecodeBytes = getStringPointerContent(bunData, module.bytecode);
     const moduleInfoBytes = getStringPointerContent(bunData, module.moduleInfo);
     const bytecodeOriginPathBytes = getStringPointerContent(
       bunData,

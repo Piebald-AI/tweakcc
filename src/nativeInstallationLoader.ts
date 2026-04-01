@@ -54,13 +54,17 @@ async function tryLoadNativeInstallationModule(): Promise<NativeInstallationModu
  * Returns null if node-lief is not available or extraction fails.
  */
 export async function extractClaudeJsFromNativeInstallation(
-  nativeInstallationPath: string
+  nativeInstallationPath: string,
+  version?: string
 ): Promise<Buffer | null> {
   const mod = await tryLoadNativeInstallationModule();
   if (!mod) {
     return null;
   }
-  return mod.extractClaudeJsFromNativeInstallation(nativeInstallationPath);
+  return mod.extractClaudeJsFromNativeInstallation(
+    nativeInstallationPath,
+    version
+  );
 }
 
 /**
