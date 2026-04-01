@@ -136,6 +136,9 @@ export interface MiscConfig {
   enableModelCustomizations: boolean;
   enableVoiceMode: boolean;
   enableVoiceConciseOutput: boolean;
+  enableReactiveTheme: boolean;
+  reactiveThemeDarkId: string;
+  reactiveThemeLightId: string;
 }
 
 export interface InputPatternHighlighter {

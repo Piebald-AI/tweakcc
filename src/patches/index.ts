@@ -72,6 +72,8 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
+import { writeReactiveTheme } from './reactiveTheme';
+import { REACTIVE_THEME_WATCHER_JS } from '../reactiveThemeWatcher';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -421,6 +423,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Enable /voice command for speech-to-text input (hold Space to record)',
+  },
+  {
+    id: 'reactive-theme',
+    name: 'Reactive theme switching',
+    group: PatchGroup.FEATURES,
+    description:
+      'Auto-switch theme when OS dark/light mode changes (macOS, Linux, Windows, SSH)',
   },
 ] as const;
 
@@ -876,6 +885,14 @@ export const applyCustomization = async (
         ),
       condition: !!config.settings.misc?.enableVoiceMode,
     },
+    'reactive-theme': {
+      fn: c =>
+        writeReactiveTheme(c, {
+          darkThemeId: config.settings.misc?.reactiveThemeDarkId ?? 'dark',
+          lightThemeId: config.settings.misc?.reactiveThemeLightId ?? 'light',
+        }),
+      condition: !!config.settings.misc?.enableReactiveTheme,
+    },
   };
 
   // ==========================================================================
@@ -885,6 +902,15 @@ export const applyCustomization = async (
     applyPatchImplementations(content, patchImplementations, patchFilter);
   content = patchedContent;
   allResults.push(...patchResults);
+
+  // ==========================================================================
+  // Install external files for patches that need them
+  // ==========================================================================
+  if (config.settings.misc?.enableReactiveTheme) {
+    const twJsPath = path.join(CONFIG_DIR, 'tw.js');
+    fsSync.writeFileSync(twJsPath, REACTIVE_THEME_WATCHER_JS, 'utf8');
+    debug(`Installed reactive theme watcher: ${twJsPath}`);
+  }
 
   // ==========================================================================
   // Write the modified content back
