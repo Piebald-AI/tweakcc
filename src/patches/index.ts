@@ -539,6 +539,7 @@ export const applyCustomization = async (
   patchFilter?: string[] | null
 ): Promise<ApplyCustomizationResult> => {
   let content: string;
+  let clearBytecode = false;
 
   if (ccInstInfo.nativeInstallationPath) {
     // For native installations: restore the binary, then extract to memory
@@ -561,16 +562,18 @@ export const applyCustomization = async (
       `Extracting claude.js from ${backupExists ? 'backup' : 'native installation'}: ${pathToExtractFrom}`
     );
 
-    const claudeJsBuffer = await extractClaudeJsFromNativeInstallation(
-      pathToExtractFrom,
-      ccInstInfo.version
-    );
+    const { data: claudeJsBuffer, clearBytecode: needsClearBytecode } =
+      await extractClaudeJsFromNativeInstallation(
+        pathToExtractFrom,
+        ccInstInfo.version
+      );
 
     if (!claudeJsBuffer) {
       throw new Error('Failed to extract claude.js from native installation');
     }
 
-    // Save original extracted JS for debugging
+    clearBytecode = needsClearBytecode;
+
     const origPath = path.join(CONFIG_DIR, 'native-claudejs-orig.js');
     fsSync.writeFileSync(origPath, claudeJsBuffer);
     debug(`Saved original extracted JS from native to: ${origPath}`);
@@ -906,7 +909,8 @@ export const applyCustomization = async (
     await repackNativeInstallation(
       ccInstInfo.nativeInstallationPath,
       modifiedBuffer,
-      ccInstInfo.nativeInstallationPath
+      ccInstInfo.nativeInstallationPath,
+      clearBytecode
     );
   } else {
     // For NPM installations: replace the cli.js file

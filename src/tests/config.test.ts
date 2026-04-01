@@ -429,7 +429,7 @@ describe('config.ts', () => {
       vi.spyOn(
         nativeInstallation,
         'extractClaudeJsFromNativeInstallation'
-      ).mockResolvedValue(mockJsBuffer);
+      ).mockResolvedValue({ data: mockJsBuffer, clearBytecode: false });
 
       const result = await findClaudeCodeInstallation(mockConfig, {
         interactive: true,
@@ -569,7 +569,7 @@ describe('config.ts', () => {
       vi.spyOn(
         nativeInstallation,
         'extractClaudeJsFromNativeInstallation'
-      ).mockResolvedValue(mockJsBuffer);
+      ).mockResolvedValue({ data: mockJsBuffer, clearBytecode: false });
 
       const result = await findClaudeCodeInstallation(mockConfig, {
         interactive: true,
@@ -693,7 +693,7 @@ describe('config.ts', () => {
       vi.spyOn(
         nativeInstallation,
         'extractClaudeJsFromNativeInstallation'
-      ).mockResolvedValue(mockJsBuffer);
+      ).mockResolvedValue({ data: mockJsBuffer, clearBytecode: false });
 
       const result = await findClaudeCodeInstallation(mockConfig, {
         interactive: true,
@@ -758,7 +758,7 @@ describe('config.ts', () => {
       vi.spyOn(
         nativeInstallation,
         'extractClaudeJsFromNativeInstallation'
-      ).mockResolvedValue(mockJsBuffer);
+      ).mockResolvedValue({ data: mockJsBuffer, clearBytecode: false });
 
       const result = await findClaudeCodeInstallation(mockConfig, {
         interactive: true,
@@ -1131,7 +1131,7 @@ describe('config.ts', () => {
       vi.spyOn(
         nativeInstallation,
         'extractClaudeJsFromNativeInstallation'
-      ).mockResolvedValue(mockJsBuffer);
+      ).mockResolvedValue({ data: mockJsBuffer, clearBytecode: false });
 
       const result = await findClaudeCodeInstallation(mockConfig, {
         interactive: true,
@@ -1323,11 +1323,10 @@ describe('config.ts', () => {
       // WASMagic reports binary
       mockMagicInstance.detect.mockReturnValue('application/octet-stream');
 
-      // Mock native extraction to return null (extraction failed)
       vi.spyOn(
         nativeInstallation,
         'extractClaudeJsFromNativeInstallation'
-      ).mockResolvedValue(null);
+      ).mockResolvedValue({ data: null, clearBytecode: false });
 
       vi.spyOn(fs, 'readFile').mockRejectedValue(createEnoent());
 
@@ -1461,10 +1460,12 @@ describe('config.ts', () => {
 
       mockMagicInstance.detect.mockReturnValue('application/octet-stream');
 
-      // Mock extractClaudeJsFromNativeInstallation to return content without VERSION
       vi.mocked(
         nativeInstallation.extractClaudeJsFromNativeInstallation
-      ).mockResolvedValue(Buffer.from('no version here'));
+      ).mockResolvedValue({
+        data: Buffer.from('no version here'),
+        clearBytecode: false,
+      });
 
       // Should throw error since no VERSION found
       await expect(
@@ -1513,10 +1514,9 @@ describe('config.ts', () => {
 
       mockMagicInstance.detect.mockReturnValue('application/octet-stream');
 
-      // Mock extractClaudeJsFromNativeInstallation to return null (extraction failed)
       vi.mocked(
         nativeInstallation.extractClaudeJsFromNativeInstallation
-      ).mockResolvedValue(null);
+      ).mockResolvedValue({ data: null, clearBytecode: false });
 
       // Should throw error since extraction failed
       await expect(

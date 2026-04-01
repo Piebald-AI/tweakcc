@@ -29,7 +29,7 @@ import { Installation } from './types';
  */
 export async function readContent(installation: Installation): Promise<string> {
   if (installation.kind === 'native') {
-    const buffer = await extractClaudeJsFromNativeInstallation(
+    const { data: buffer } = await extractClaudeJsFromNativeInstallation(
       installation.path
     );
     if (!buffer) {
@@ -61,7 +61,8 @@ export async function writeContent(
     await repackNativeInstallation(
       installation.path,
       modifiedBuffer,
-      installation.path
+      installation.path,
+      false
     );
   } else {
     await replaceFileBreakingHardLinks(installation.path, content, 'patch');

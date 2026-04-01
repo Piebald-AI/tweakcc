@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import LIEF from 'node-lief';
 import { isDebug, debug } from './utils';
 
@@ -704,24 +704,21 @@ function getBunData(
  * real binary path here. This is handled at detection time in
  * `installationDetection.ts`.
  */
-/**
- * Fetches the readable cli.js source from the npm package for a given CC version.
- * Used as fallback when the native binary contains Bun bytecode instead of
- * readable JS (bytecode function bodies can't be regex-patched).
- *
- * Downloads via `npm pack`, extracts cli.js, and returns its content.
- * Returns null if the fetch fails (network error, version not on npm, etc.).
- */
 function fetchNpmSource(version: string): Buffer | null {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tweakcc-npm-'));
   try {
     debug(`fetchNpmSource: Downloading @anthropic-ai/claude-code@${version}`);
-    execSync(
-      `npm pack @anthropic-ai/claude-code@${version} --pack-destination "${tmpDir}"`,
+    execFileSync(
+      'npm',
+      [
+        'pack',
+        `@anthropic-ai/claude-code@${version}`,
+        '--pack-destination',
+        tmpDir,
+      ],
       { stdio: 'pipe', timeout: 30_000, cwd: tmpDir }
     );
 
-    // Find the tarball
     const files = fs.readdirSync(tmpDir);
     const tgz = files.find(f => f.endsWith('.tgz'));
     if (!tgz) {
@@ -729,8 +726,7 @@ function fetchNpmSource(version: string): Buffer | null {
       return null;
     }
 
-    // Extract cli.js from the tarball
-    execSync(`tar xzf "${tgz}" package/cli.js`, {
+    execFileSync('tar', ['xzf', path.join(tmpDir, tgz), 'package/cli.js'], {
       stdio: 'pipe',
       timeout: 30_000,
       cwd: tmpDir,
@@ -749,7 +745,6 @@ function fetchNpmSource(version: string): Buffer | null {
     debug('fetchNpmSource: Failed to fetch npm source:', error);
     return null;
   } finally {
-    // Clean up temp dir
     try {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     } catch {
@@ -761,7 +756,7 @@ function fetchNpmSource(version: string): Buffer | null {
 export function extractClaudeJsFromNativeInstallation(
   nativeInstallationPath: string,
   version?: string
-): Buffer | null {
+): { data: Buffer | null; clearBytecode: boolean } {
   try {
     LIEF.logging.disable();
     const binary = LIEF.parse(nativeInstallationPath);
@@ -780,9 +775,6 @@ export function extractClaudeJsFromNativeInstallation(
           `extractClaudeJsFromNativeInstallation: Module ${index}: ${moduleName}`
         );
 
-        // Module name is typically:
-        // - Unix/macOS: /$bunfs/root/claude
-        // - Windows:    B:/~BUN/root/claude.exe
         if (!isClaudeModule(moduleName)) return undefined;
 
         const moduleContents = getStringPointerContent(
@@ -799,14 +791,10 @@ export function extractClaudeJsFromNativeInstallation(
     );
 
     if (result) {
-      // Check if extracted content is Bun bytecode (not patchable with regex)
       const head = result.subarray(0, 30).toString('utf8');
       if (head.startsWith(BUN_BYTECODE_PREFIX)) {
         debug(
           'extractClaudeJsFromNativeInstallation: Extracted content is Bun bytecode — falling back to npm source'
-        );
-        console.log(
-          'Native binary contains Bun bytecode. Fetching readable source from npm...'
         );
 
         if (version) {
@@ -815,7 +803,7 @@ export function extractClaudeJsFromNativeInstallation(
             debug(
               `extractClaudeJsFromNativeInstallation: Using npm source (${npmSource.length} bytes) instead of bytecode`
             );
-            return npmSource;
+            return { data: npmSource, clearBytecode: true };
           }
           debug(
             'extractClaudeJsFromNativeInstallation: npm source fetch failed, returning bytecode content as-is'
@@ -827,21 +815,21 @@ export function extractClaudeJsFromNativeInstallation(
         }
       }
 
-      return result;
+      return { data: result, clearBytecode: false };
     }
 
     debug(
       'extractClaudeJsFromNativeInstallation: claude module not found in any module'
     );
 
-    return null;
+    return { data: null, clearBytecode: false };
   } catch (error) {
     debug(
       'extractClaudeJsFromNativeInstallation: Error during extraction:',
       error
     );
 
-    return null;
+    return { data: null, clearBytecode: false };
   }
 }
 
@@ -849,7 +837,8 @@ function rebuildBunData(
   bunData: Buffer,
   bunOffsets: BunOffsets,
   modifiedClaudeJs: Buffer | null,
-  moduleStructSize: number
+  moduleStructSize: number,
+  clearBytecode: boolean
 ): Buffer {
   // Phase 1: Collect all string data
   const stringsData: Buffer[] = [];
@@ -875,8 +864,9 @@ function rebuildBunData(
     let bytecodeBytes: Buffer;
     if (modifiedClaudeJs && isClaudeModule(moduleName)) {
       contentsBytes = modifiedClaudeJs;
-      // Clear bytecode so Bun uses the patched source JS instead of stale bytecode
-      bytecodeBytes = Buffer.alloc(0);
+      bytecodeBytes = clearBytecode
+        ? Buffer.alloc(0)
+        : getStringPointerContent(bunData, module.bytecode);
     } else {
       contentsBytes = getStringPointerContent(bunData, module.contents);
       bytecodeBytes = getStringPointerContent(bunData, module.bytecode);
@@ -1481,19 +1471,20 @@ function repackELFOverlay(
 export function repackNativeInstallation(
   binPath: string,
   modifiedClaudeJs: Buffer,
-  outputPath: string
+  outputPath: string,
+  clearBytecode: boolean
 ): void {
   LIEF.logging.disable();
   const binary = LIEF.parse(binPath);
 
-  // Extract Bun data and rebuild with modified claude.js
   const { bunOffsets, bunData, sectionHeaderSize, moduleStructSize } =
     getBunData(binary);
   const newBuffer = rebuildBunData(
     bunData,
     bunOffsets,
     modifiedClaudeJs,
-    moduleStructSize
+    moduleStructSize,
+    clearBytecode
   );
 
   switch (binary.format) {
