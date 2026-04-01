@@ -234,6 +234,14 @@ const main = async () => {
       }
 
       // Handle --install-hook / --remove-hook flags
+      if (options.installHook && options.removeHook) {
+        console.error(
+          chalk.red(
+            'Error: Cannot use --install-hook and --remove-hook together.'
+          )
+        );
+        process.exit(1);
+      }
       if (options.installHook || options.removeHook) {
         await handleHookMode(!!options.installHook);
         return;
@@ -362,16 +370,33 @@ async function handleHookMode(install: boolean): Promise<void> {
   let settings: Record<string, unknown> = {};
   try {
     const raw = fsSync.readFileSync(settingsPath, 'utf8');
-    settings = JSON.parse(raw) as Record<string, unknown>;
+    try {
+      settings = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      console.error(
+        chalk.red(
+          `Error: ${settingsPath} contains invalid JSON. Please fix it manually.`
+        )
+      );
+      process.exit(1);
+    }
   } catch {
-    // File doesn't exist or isn't valid JSON — start fresh
+    // File doesn’t exist — start fresh
   }
 
-  const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
-  const sessionStart = (hooks.SessionStart ?? []) as Array<{
-    matcher?: string;
-    hooks?: Array<{ type?: string; command?: string; timeout?: number }>;
-  }>;
+  const hooks =
+    settings.hooks != null &&
+    typeof settings.hooks === 'object' &&
+    !Array.isArray(settings.hooks)
+      ? (settings.hooks as Record<string, unknown>)
+      : {};
+  const rawSessionStart = hooks.SessionStart;
+  const sessionStart = Array.isArray(rawSessionStart)
+    ? (rawSessionStart as Array<{
+        matcher?: string;
+        hooks?: Array<{ type?: string; command?: string; timeout?: number }>;
+      }>)
+    : [];
 
   const hookCommand = 'tweakcc --apply --quiet';
   const hookMarker = 'tweakcc --apply';
