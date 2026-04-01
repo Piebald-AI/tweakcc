@@ -228,11 +228,9 @@ export const writeChannelsMode = (oldFile: string): string | null => {
   newFile = patchPermissionRelay(newFile);
   if (!newFile) return null;
 
-  newFile = patchChannelsNotice(newFile);
-  if (!newFile) return null;
+  newFile = patchChannelsNotice(newFile) ?? newFile;
 
-  newFile = patchServerDevWarning(newFile);
-  if (!newFile) return null;
+  newFile = patchServerDevWarning(newFile) ?? newFile;
 
   return newFile;
 };
