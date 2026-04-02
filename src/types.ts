@@ -140,6 +140,9 @@ export interface MiscConfig {
   enableVerboseProperty: boolean;
   enableOpusplan1m: boolean;
   enableFixLspSupport: boolean;
+  enableCustomSessionColors: boolean;
+  customColorMap: Record<string, string> | null;
+  enableTitleVisibilityToggle: boolean;
 }
 
 export interface InputPatternHighlighter {

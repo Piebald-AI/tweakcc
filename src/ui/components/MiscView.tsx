@@ -88,6 +88,9 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableVerboseProperty: true,
     enableOpusplan1m: true,
     enableFixLspSupport: true,
+    enableCustomSessionColors: false,
+    customColorMap: null,
+    enableTitleVisibilityToggle: false,
   };
 
   const ensureMisc = () => {
@@ -489,6 +492,36 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.enableFixLspSupport =
               !settings.misc!.enableFixLspSupport;
+          });
+        },
+      },
+      {
+        id: 'enableCustomSessionColors',
+        title: 'Custom session colors',
+        description:
+          'Accept hex/rgb values in /color and define custom named colors via customColorMap in config.',
+        getValue: () =>
+          settings.misc?.enableCustomSessionColors ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableCustomSessionColors =
+              !settings.misc!.enableCustomSessionColors;
+          });
+        },
+      },
+      {
+        id: 'enableTitleVisibilityToggle',
+        title: 'Title visibility toggle (/session-title)',
+        description:
+          'Add /session-title command to toggle session title visibility in the prompt bar.',
+        getValue: () =>
+          settings.misc?.enableTitleVisibilityToggle ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableTitleVisibilityToggle =
+              !settings.misc!.enableTitleVisibilityToggle;
           });
         },
       },
