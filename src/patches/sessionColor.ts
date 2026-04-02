@@ -42,14 +42,15 @@ export const writeSessionColor = (oldFile: string): string | null => {
     const match = result.match(pattern);
     if (!match || match.index === undefined) continue;
 
+    const prePatch = result;
     const replacement = INJECTION + match[0];
     result =
-      result.slice(0, match.index) +
+      prePatch.slice(0, match.index) +
       replacement +
-      result.slice(match.index + match[0].length);
+      prePatch.slice(match.index + match[0].length);
 
     showDiff(
-      oldFile,
+      prePatch,
       result,
       replacement,
       match.index,
