@@ -391,8 +391,19 @@ async function handleHookMode(install: boolean): Promise<void> {
       );
       process.exit(1);
     }
-  } catch {
-    // File doesn’t exist — start fresh
+  } catch (readErr: unknown) {
+    const code =
+      readErr instanceof Error && 'code' in readErr
+        ? (readErr as NodeJS.ErrnoException).code
+        : undefined;
+    if (code !== 'ENOENT') {
+      console.error(
+        chalk.red(
+          `Error reading ${settingsPath}: ${readErr instanceof Error ? readErr.message : String(readErr)}`
+        )
+      );
+      process.exit(1);
+    }
   }
 
   const hooks =
