@@ -89,44 +89,5 @@ export const writeTitleVisibilityToggle = (oldFile: string): string | null => {
 
   showDiff(prevContent, content, newFunc, funcIdx, funcIdx + oldFunc.length);
 
-  // Step 4: Also suppress the color when title is hidden
-  // The rendering function has one of:
-  //   let R=Yy9(K.getState()),A=T?.color;if(R||A){...}  (older CC)
-  //   let w=jp7(T),f=_?.color;if(w||f)...               (CC 2.1.90+)
-  // We wrap the condition: if(!TWEAKCC_HIDE_TITLE&&(R||A))
-  const funcNameEscaped = funcName.replace(/\$/g, '\\$');
-  const colorBranchPattern = new RegExp(
-    `(let ([$\\w]+)=${funcNameEscaped}\\(` +
-      `[$\\w]+(?:\\.getState\\(\\))?\\),` +
-      `([$\\w]+)=([$\\w]+)\\?\\.color;)` +
-      `if\\(([$\\w]+)\\|\\|([$\\w]+)\\)`
-  );
-  const colorBranchMatch = content.match(colorBranchPattern);
-  if (!colorBranchMatch || colorBranchMatch.index === undefined) {
-    console.error('patch: titleVisibility: failed to find color branch');
-    return null;
-  }
-
-  const letClause = colorBranchMatch[1];
-  const condLeft = colorBranchMatch[5];
-  const condRight = colorBranchMatch[6];
-  const oldBranch = colorBranchMatch[0];
-  const newBranch =
-    `${letClause}if(!TWEAKCC_HIDE_TITLE&&(${condLeft}||${condRight}))`;
-
-  prevContent = content;
-  content =
-    content.slice(0, colorBranchMatch.index) +
-    newBranch +
-    content.slice(colorBranchMatch.index + oldBranch.length);
-
-  showDiff(
-    prevContent,
-    content,
-    newBranch,
-    colorBranchMatch.index,
-    colorBranchMatch.index + oldBranch.length
-  );
-
   return content;
 };
