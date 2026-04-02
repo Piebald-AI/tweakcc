@@ -7,7 +7,7 @@ export const writeTitleVisibilityToggle = (oldFile: string): string | null => {
   // Step 1: Add /hidetitle slash command
   const commandDef = `, {
   type: "local",
-  name: "hidetitle",
+  name: "session-title",
   description: "Toggle session title visibility in the prompt bar",
   isEnabled: () => !0,
   isHidden: !1,
@@ -23,7 +23,7 @@ export const writeTitleVisibilityToggle = (oldFile: string): string | null => {
     },
   }),
   userFacingName() {
-    return "hidetitle";
+    return "session-title";
   },
 }`;
 
