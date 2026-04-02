@@ -47,7 +47,6 @@ export const writeCustomSessionColors = (
   const funcPrefix = resolveMatch[1];
   const colorArg = resolveMatch[3];
   const colorMapVar = resolveMatch[4];
-  const fallbackSuffix = resolveMatch[5];
 
   const customMapJs = JSON.stringify(customColorMap);
   const oldResolve = resolveMatch[0];

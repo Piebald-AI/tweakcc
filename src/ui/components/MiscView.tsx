@@ -499,7 +499,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         id: 'enableCustomSessionColors',
         title: 'Custom session colors',
         description:
-          'Accept any color value in /color (hex, rgb, named CSS colors) instead of just the built-in 8.',
+          'Accept hex/rgb values in /color and define custom named colors via customColorMap in config.',
         getValue: () =>
           settings.misc?.enableCustomSessionColors ?? false,
         toggle: () => {

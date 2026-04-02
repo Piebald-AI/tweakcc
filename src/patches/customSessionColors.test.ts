@@ -2,13 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { writeCustomSessionColors } from './customSessionColors';
 
-const MOCK_COLOR_COMMAND =
-  'async function Gs1(H,_,q){' +
-  'let K=q.trim().toLowerCase();' +
-  'if(Rs1.includes(K)){return H("Session color reset to default",{display:"system"}),null}' +
-  'if(!aj.includes(K)){let T=aj.join(", ");return H(`Invalid color "${K}". Available colors: ${T}, default`,{display:"system"}),null}' +
-  'let $=v_();return H(`Session color set to: ${K}`,{display:"system"}),null}';
-
 const MOCK_RESOLVE =
   'function Ma_(H,_="cyan_FOR_SUBAGENTS_ONLY"){return H&&aj.includes(H)?KP[H]:_}';
 

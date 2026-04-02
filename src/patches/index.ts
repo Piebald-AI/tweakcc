@@ -437,7 +437,7 @@ const PATCH_DEFINITIONS = [
     name: 'Custom session colors',
     group: PatchGroup.FEATURES,
     description:
-      'Accept any color value in /color (hex, rgb, named) instead of just the built-in 8',
+      'Accept hex/rgb values in /color and define custom named colors via customColorMap in config',
   },
   {
     id: 'title-visibility-toggle',

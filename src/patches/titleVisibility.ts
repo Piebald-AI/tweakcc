@@ -4,7 +4,7 @@ import { writeSlashCommandDefinition as writeSlashCmd } from './slashCommands';
 export const writeTitleVisibilityToggle = (oldFile: string): string | null => {
   let content = oldFile;
 
-  // Step 1: Add /hidetitle slash command
+  // Step 1: Add /session-title slash command
   const commandDef = `, {
   type: "local",
   name: "session-title",
