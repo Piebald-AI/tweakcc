@@ -101,7 +101,7 @@ export const writeStatuslineUpdateThrottle = (
   //   Match[5]: The function call with parameter if newer format (e.g., "I(A)")
   //   Match[6]: The argument to the function if newer format (e.g., "A")
   const pattern =
-    /(,([$\w]+)=([$\w]+(?:\.default)?)\.useCallback.{0,1000}statusLineText.{0,200}?),([$\w]+)=([$\w.]+\(\(\)=>(\2\(([$\w]+)\)),300\)|[$\w]+\(\2,300\)|.{0,100}\{[$\w]+\.current=void 0,\2\(\)\},300\)\},\[\2\]\))/;
+    /(,([$\w]+)=([$\w]+(?:\.default)?)\.useCallback.{0,1000}statusLineText.{0,200}?),([$\w]+)=([$\w.]+\(\(\)=>(\2\(([$\w]+)\)),300\)|[$\w]+\(\2,300\)|.{0,100}\{[$\w]+\.current=void 0,\2\(\)\},300\)\},\[\2\]\)|[$\w]+\.useCallback\(\(\)=>\{if\([$\w]+\.current!==void 0\)clearTimeout\([$\w]+\.current\);[$\w]+\.current=setTimeout\(\([$\w]+,[$\w]+\)=>\{[$\w]+\.current=void 0,[$\w]+\(\)\},300,[$\w]+,\2\)\},\[\2\]\))/;
 
   const match = oldFile.match(pattern);
 

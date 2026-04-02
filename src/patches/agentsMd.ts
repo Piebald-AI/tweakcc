@@ -1,19 +1,18 @@
 // Please see the note about writing patches in ./index
 
-import { showDiff, escapeIdent } from './index';
+import { showDiff } from './index';
 
 /**
  * Patches the CLAUDE.md file reading function to also check for alternative
  * filenames (e.g., AGENTS.md) when CLAUDE.md doesn't exist.
  *
- * This finds the function that reads CLAUDE.md files and modifies it to:
- * 1. Add a `didReroute` parameter to the function
- * 2. At the early `return null` (when the file doesn't exist), check if the
- *    path ends with CLAUDE.md and try alternative names (unless didReroute
- *    is true)
- * 3. Recursive calls pass didReroute=true to avoid infinite loops
+ * Supports two code patterns across CC versions:
  *
- * CC 2.1.62 (approx. by Claude):
+ * CC <=2.1.69 (sync): Function uses readFileSync/existsSync/statSync directly
+ * CC >=2.1.83 (async): File reading is split into jh1 (async reader) and XB9 (processor)
+ *   The async reader catches ENOENT/EISDIR errors and returns {info:null,includePaths:[]}
+ *
+ * CC <=2.1.69:
  * ```diff
  * -function _t7(A, q) {
  * +function _t7(A, q, didReroute) {
@@ -21,36 +20,94 @@ import { showDiff, escapeIdent } from './index';
  *      let K = x1();
  * -    if (!K.existsSync(A) || !K.statSync(A).isFile()) return null;
  * +    if (!K.existsSync(A) || !K.statSync(A).isFile()) {
- * +      if (!didReroute && (A.endsWith("/CLAUDE.md") || A.endsWith("\\CLAUDE.md"))) {
- * +        for (let alt of ["AGENTS.md", "GEMINI.md", "QWEN.md"]) {
- * +          let altPath = A.slice(0, -9) + alt;
- * +          if (K.existsSync(altPath) && K.statSync(altPath).isFile())
- * +            return _t7(altPath, q, true);
- * +        }
- * +      }
+ * +      if (!didReroute && (A.endsWith("/CLAUDE.md") || ...)) { ... }
  * +      return null;
  * +    }
- *      let Y = UL9(A).toLowerCase();
- *      if (Y && !dL9.has(Y))
- *        return (I(`Skipping non-text file in @include: ${A}`), null);
- *      let z = K.readFileSync(A, { encoding: "utf-8" }),
- *        { content: w, paths: H } = cL9(z);
- *      return { path: A, type: q, content: w, globs: H };
- *    } catch (K) {
- *      if (K instanceof Error && K.message.includes("EACCES"))
- *        n("tengu_claude_md_permission_error", {
- *          is_access_error: 1,
- *          has_home_dir: A.includes(_8()) ? 1 : 0,
- *        });
- *    }
- *    return null;
- *  }
+ * ```
+ *
+ * CC >=2.1.83:
+ * ```diff
+ * -async function jh1(A, q, K) {
+ * +async function jh1(A, q, K, didReroute) {
+ *    try {
+ *      let z = await j8().readFile(A, {encoding:"utf-8"});
+ *      return XB9(z, A, q, K)
+ * -  } catch(_) { return DB9(_, A), {info:null,includePaths:[]} }
+ * +  } catch(_) {
+ * +    DB9(_, A);
+ * +    if (!didReroute && (A.endsWith("/CLAUDE.md") || ...)) {
+ * +      for (let alt of ["AGENTS.md",...]) {
+ * +        let altPath = A.slice(0,-9) + alt;
+ * +        try { let r = await jh1(altPath, q, K, true); if (r.info) return r; } catch {}
+ * +      }
+ * +    }
+ * +    return {info:null,includePaths:[]}
+ * +  }
  * ```
  */
 export const writeAgentsMd = (
   file: string,
   altNames: string[]
 ): string | null => {
+  // Try the new async pattern first (CC >=2.1.83)
+  const asyncResult = writeAgentsMdAsync(file, altNames);
+  if (asyncResult) return asyncResult;
+
+  // Fall back to the old sync pattern (CC <=2.1.69)
+  return writeAgentsMdSync(file, altNames);
+};
+
+const writeAgentsMdAsync = (
+  file: string,
+  altNames: string[]
+): string | null => {
+  // Match the async reader function that:
+  // 1. Contains readFile (async)
+  // 2. Has a catch block that calls a function with error code checks (ENOENT/EISDIR)
+  // 3. Returns {info:null,includePaths:[]}
+  const funcPattern =
+    /(async function ([$\w]+)\(([$\w]+),([$\w]+),([$\w]+))\)\{try\{let ([$\w]+)=await ([$\w]+)\(\)\.readFile\(\3,\{encoding:"utf-8"\}\);return ([$\w]+)\(\6,\3,\4,\5\)\}catch\(([$\w]+)\)\{return ([$\w]+)\(\9,\3\),\{info:null,includePaths:\[\]\}\}\}/;
+
+  const funcMatch = file.match(funcPattern);
+  if (!funcMatch || funcMatch.index === undefined) {
+    return null;
+  }
+
+  const fullMatch = funcMatch[0];
+  const funcSig = funcMatch[1]; // async function NAME(A,q,K
+  const funcName = funcMatch[2]; // jh1
+  const pathParam = funcMatch[3]; // A
+  const typeParam = funcMatch[4]; // q
+  const thirdParam = funcMatch[5]; // K
+  const readVar = funcMatch[6]; // z
+  const fsGetter = funcMatch[7]; // j8
+  const processorFunc = funcMatch[8]; // XB9
+  const catchVar = funcMatch[9]; // _
+  const errorHandler = funcMatch[10]; // DB9
+
+  const altNamesJson = JSON.stringify(altNames);
+
+  const replacement =
+    `${funcSig},didReroute){try{let ${readVar}=await ${fsGetter}().readFile(${pathParam},{encoding:"utf-8"});return ${processorFunc}(${readVar},${pathParam},${typeParam},${thirdParam})}catch(${catchVar}){${errorHandler}(${catchVar},${pathParam});` +
+    `if(!didReroute&&(${pathParam}.endsWith("/CLAUDE.md")||${pathParam}.endsWith("\\\\CLAUDE.md"))){` +
+    `for(let alt of ${altNamesJson}){` +
+    `let altPath=${pathParam}.slice(0,-9)+alt;` +
+    `try{let r=await ${funcName}(altPath,${typeParam},${thirdParam},true);if(r.info)return r}catch{}` +
+    `}}` +
+    `return{info:null,includePaths:[]}}}`;
+
+  const startIndex = funcMatch.index;
+  const endIndex = startIndex + fullMatch.length;
+
+  const newFile =
+    file.slice(0, startIndex) + replacement + file.slice(endIndex);
+
+  showDiff(file, newFile, replacement, startIndex, endIndex);
+
+  return newFile;
+};
+
+const writeAgentsMdSync = (file: string, altNames: string[]): string | null => {
   const funcPattern =
     /(function ([$\w]+)\(([$\w]+),([^)]+?))\)(?:.|\n){0,500}Skipping non-text file in @include/;
 
@@ -67,142 +124,35 @@ export const writeAgentsMd = (
 
   const fsPattern = /([$\w]+(?:\(\))?)\.(?:readFileSync|existsSync|statSync)/;
   const fsMatch = funcMatch[0].match(fsPattern);
+  let callerFsMatch: RegExpMatchArray | null = null;
   if (!fsMatch) {
-    // CC ≥2.1.80: file reading was split into a separate function (e.g. SI9).
-    // The "Skipping non-text file" function no longer does I/O.
-    // Find the caller function that does readFileSync and calls this function.
-    const funcName = functionName;
-    const callerPattern = new RegExp(
-      `(function ([$\\w]+)\\(([$\\w]+),[^)]+\\))\\{try\\{let [$\\w]+=([$\\w]+(?:\\(\\))?)\\.readFileSync\\(\\3.{0,50}${escapeIdent(funcName)}\\(`
-    );
-    const callerMatch = file.match(callerPattern);
-    if (!callerMatch || callerMatch.index === undefined) {
+    // Try the caller function for fs expression
+    const callerSearch = file.slice(Math.max(0, funcStart - 5000), funcStart);
+    callerFsMatch = callerSearch.match(fsPattern);
+    if (!callerFsMatch) {
       console.error(
         'patch: agentsMd: failed to find fs expression in function or caller'
       );
       return null;
     }
-    // Redirect the patch to target the caller function instead
-    const callerUpToParams = callerMatch[1];
-    const callerName = callerMatch[2];
-    const callerFirstParam = callerMatch[3];
-    const callerFsExpr = callerMatch[4];
-    const callerStart = callerMatch.index;
-
-    const altNamesJson = JSON.stringify(altNames);
-
-    // Add didReroute param to caller — insert before the closing )
-    const callerSigIndex = callerStart + callerUpToParams.length - 1;
-    let newFile =
-      file.slice(0, callerSigIndex) +
-      ',didReroute' +
-      file.slice(callerSigIndex);
-
-    showDiff(file, newFile, ',didReroute', callerSigIndex, callerSigIndex);
-
-    // Replace the catch block's "return errorHandler(args),null}" with fallback + return null
-    // Original: catch(ERR){return errorHandler(ERR,PATH),null}
-    // New: catch(ERR){errorHandler(ERR,PATH);if(!didReroute&&...){...fallback...}return null}
-    const callerBody = newFile.slice(callerStart, callerStart + 500);
-    const catchReturnPattern = /return ([$\w]+\([^)]+\)),null\}/;
-    const catchMatch = callerBody.match(catchReturnPattern);
-    if (!catchMatch || catchMatch.index === undefined) {
-      console.error(
-        'patch: agentsMd: failed to find catch return null in caller'
-      );
-      return null;
-    }
-
-    // Extract second param from the function signature: function NAME(FIRST,SECOND)
-    const secondParamMatch = callerUpToParams.match(/\([$\w]+,([$\w]+)/);
-    if (!secondParamMatch) {
-      console.error(
-        'patch: agentsMd: failed to extract second param from caller'
-      );
-      return null;
-    }
-    const callerSecondParam = secondParamMatch[1];
-
-    const errorHandlerCall = catchMatch[1]; // e.g. "g34(K,A)"
-    const replacement = `${errorHandlerCall};if(!didReroute&&(${callerFirstParam}.endsWith("/CLAUDE.md")||${callerFirstParam}.endsWith("\\\\CLAUDE.md"))){for(let alt of ${altNamesJson}){let altPath=${callerFirstParam}.slice(0,-9)+alt;try{${callerFsExpr}.statSync(altPath);return ${callerName}(altPath,${callerSecondParam},true)}catch(e){}}}return null}`;
-
-    const replaceStart = callerStart + catchMatch.index;
-    const replaceEnd = replaceStart + catchMatch[0].length;
-    const oldFile2 = newFile;
-    newFile =
-      newFile.slice(0, replaceStart) + replacement + newFile.slice(replaceEnd);
-
-    showDiff(oldFile2, newFile, replacement, replaceStart, replaceEnd);
-
-    // Also patch the async version (BV1) which is the main code path
-    const asyncPattern = new RegExp(
-      `(async function ([$\\w]+)\\(([$\\w]+),[^)]+\\))\\{try\\{let [$\\w]+=await ([$\\w]+(?:\\(\\))?)\\.readFile\\(\\3.{0,50}${escapeIdent(funcName)}\\(`
-    );
-    const asyncMatch = newFile.match(asyncPattern);
-    if (asyncMatch && asyncMatch.index !== undefined) {
-      const asyncUpToParams = asyncMatch[1];
-      const asyncName = asyncMatch[2];
-      const asyncFirstParam = asyncMatch[3];
-      const asyncFsExpr = asyncMatch[4];
-      const asyncStart = asyncMatch.index;
-
-      // Add didReroute param
-      const asyncSigIndex = asyncStart + asyncUpToParams.length - 1;
-      const oldFile3 = newFile;
-      newFile =
-        newFile.slice(0, asyncSigIndex) +
-        ',didReroute' +
-        newFile.slice(asyncSigIndex);
-      showDiff(oldFile3, newFile, ',didReroute', asyncSigIndex, asyncSigIndex);
-
-      // Find and replace catch return null
-      const asyncBody = newFile.slice(asyncStart, asyncStart + 500);
-      const asyncCatchMatch = asyncBody.match(
-        /return ([$\w]+\([^)]+\)),null\}/
-      );
-      if (asyncCatchMatch && asyncCatchMatch.index !== undefined) {
-        const asyncSecondMatch = asyncUpToParams.match(/\([$\w]+,([$\w]+)\)/);
-        const asyncSecondParam = asyncSecondMatch
-          ? asyncSecondMatch[1]
-          : callerSecondParam;
-        const asyncErrorHandler = asyncCatchMatch[1];
-        const asyncReplacement = `${asyncErrorHandler};if(!didReroute&&(${asyncFirstParam}.endsWith("/CLAUDE.md")||${asyncFirstParam}.endsWith("\\\\CLAUDE.md"))){for(let alt of ${altNamesJson}){let altPath=${asyncFirstParam}.slice(0,-9)+alt;try{await ${asyncFsExpr}.stat(altPath);return ${asyncName}(altPath,${asyncSecondParam},true)}catch(e){}}}return null}`;
-
-        const asyncReplaceStart = asyncStart + asyncCatchMatch.index;
-        const asyncReplaceEnd = asyncReplaceStart + asyncCatchMatch[0].length;
-        const oldFile4 = newFile;
-        newFile =
-          newFile.slice(0, asyncReplaceStart) +
-          asyncReplacement +
-          newFile.slice(asyncReplaceEnd);
-        showDiff(
-          oldFile4,
-          newFile,
-          asyncReplacement,
-          asyncReplaceStart,
-          asyncReplaceEnd
-        );
-      }
-    }
-
-    return newFile;
   }
-  const fsExpr = fsMatch[1];
+
+  const fsExpr = fsMatch
+    ? fsMatch[1]
+    : callerFsMatch
+      ? callerFsMatch[1]
+      : 'require("fs")';
 
   const altNamesJson = JSON.stringify(altNames);
 
-  // Step 1: Add didReroute parameter to function signature
   const sigIndex = funcStart + upToFuncParamsClosingParen.length;
   let newFile = file.slice(0, sigIndex) + ',didReroute' + file.slice(sigIndex);
 
   showDiff(file, newFile, ',didReroute', sigIndex, sigIndex);
 
-  // Step 2: Inject fallback at the early return null (when file doesn't exist)
   const funcBody = newFile.slice(funcStart);
 
-  // CC ≤2.1.62: existsSync/isFile check before reading
   const oldEarlyReturnPattern = /\.isFile\(\)\)return null/;
-  // CC ≥2.1.69: try/catch with ENOENT/EISDIR error codes
   const newEarlyReturnPattern = /==="EISDIR"\)return null/;
 
   const earlyReturnMatch =

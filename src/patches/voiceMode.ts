@@ -28,24 +28,38 @@
 import { showDiff } from './index';
 
 const patchAmberQuartz = (file: string): string | null => {
-  const pattern = /function [$\w]+\(\)\{return [$\w]+\("tengu_amber_quartz"/;
+  // CC <=2.1.69: function XXX(){return YYY("tengu_amber_quartz",!1)}
+  const legacyPattern =
+    /function [$\w]+\(\)\{return [$\w]+\("tengu_amber_quartz"/;
+  const legacyMatch = file.match(legacyPattern);
 
-  const match = file.match(pattern);
-
-  if (!match || match.index === undefined) {
-    console.error('patch: voiceMode: failed to find tengu_amber_quartz gate');
-    return null;
+  if (legacyMatch && legacyMatch.index !== undefined) {
+    const insertIndex = legacyMatch.index + legacyMatch[0].indexOf('{') + 1;
+    const insertion = 'return !0;';
+    const newFile =
+      file.slice(0, insertIndex) + insertion + file.slice(insertIndex);
+    showDiff(file, newFile, insertion, insertIndex, insertIndex);
+    return newFile;
   }
 
-  const insertIndex = match.index + match[0].indexOf('{') + 1;
-  const insertion = 'return !0;';
+  // CC >=2.1.83: function XXX(){return!YYY("tengu_amber_quartz_disabled",!1)}
+  // This returns true by default (flag defaults to false, negated = true).
+  // We still force it to always return true in case the flag gets enabled server-side.
+  const newPattern =
+    /function [$\w]+\(\)\{return![$\w]+\("tengu_amber_quartz_disabled"/;
+  const newMatch = file.match(newPattern);
 
-  const newFile =
-    file.slice(0, insertIndex) + insertion + file.slice(insertIndex);
+  if (newMatch && newMatch.index !== undefined) {
+    const insertIndex = newMatch.index + newMatch[0].indexOf('{') + 1;
+    const insertion = 'return !0;';
+    const newFile =
+      file.slice(0, insertIndex) + insertion + file.slice(insertIndex);
+    showDiff(file, newFile, insertion, insertIndex, insertIndex);
+    return newFile;
+  }
 
-  showDiff(file, newFile, insertion, insertIndex, insertIndex);
-
-  return newFile;
+  console.error('patch: voiceMode: failed to find tengu_amber_quartz gate');
+  return null;
 };
 
 const patchConciseOutput = (file: string): string | null => {
@@ -53,8 +67,9 @@ const patchConciseOutput = (file: string): string | null => {
   const match = file.match(pattern);
 
   if (!match || match.index === undefined) {
-    console.error('patch: voiceMode: failed to find tengu_sotto_voce gate');
-    return null;
+    // CC >=2.1.83: tengu_sotto_voce gate was removed entirely.
+    // Concise output may be always-on or handled differently.
+    return file;
   }
 
   const replacement = 'if(!0)';

@@ -3,19 +3,28 @@
 import { LocationResult, showDiff } from './index';
 
 /**
- * Find the file read token limit (25000) that's associated with the system-reminder.
+ * Find the file read token limit (25000) that's associated with file reading.
  *
- * Approach: Find "=25000," and verify "<system-reminder>" appears within
- * the next ~100 characters to ensure we're targeting the correct value.
+ * Approach: Find "=25000," and verify a known anchor appears nearby to ensure
+ * we're targeting the correct value. Supports multiple anchors across CC versions:
+ * - "<system-reminder>" (CC <2.1.83)
+ * - "tengu_amber_wren" (CC >=2.1.83)
  */
 const getFileReadLimitLocation = (oldFile: string): LocationResult | null => {
-  // Pattern: =25000, followed within ~100 chars by <system-reminder>
-  const pattern = /=25000,([\s\S]{0,100})<system-reminder>/;
-  const match = oldFile.match(pattern);
+  // Try anchors in order of preference
+  const anchors = ['<system-reminder>', 'tengu_amber_wren'];
+
+  let match: RegExpMatchArray | null = null;
+  for (const anchor of anchors) {
+    const escaped = anchor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`=25000,([\\s\\S]{0,200})${escaped}`);
+    match = oldFile.match(pattern);
+    if (match && match.index !== undefined) break;
+  }
 
   if (!match || match.index === undefined) {
     console.error(
-      'patch: increaseFileReadLimit: failed to find 25000 token limit near system-reminder'
+      'patch: increaseFileReadLimit: failed to find 25000 token limit near known anchor'
     );
     return null;
   }

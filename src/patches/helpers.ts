@@ -333,6 +333,17 @@ export const findBoxComponent = (fileContents: string): string | undefined => {
     return boxDisplayNameMatch[1];
   }
 
+  // Method 4: Find Box by function that uses O6(N) or obj.c(N) memo and creates "ink-box" (CC 2.1.83+)
+  // NPM minification: function NAME(A){let q=O6(44),...createElement("ink-box",...}
+  // Native minification: function NAME(A){let q=obj.c(44),...createElement("ink-box",...}
+  // The memo cache size (N) changes across versions (42 in 2.1.83, 44 in 2.1.89, etc.)
+  const memoBoxPattern =
+    /function ([$\w]+)\([$\w]+\)\{let [$\w]+=[$\w]+(?:\.[$\w]+)?\(\d+\).{0,3000}createElement\("ink-box"/;
+  const memoBoxMatch = fileContents.match(memoBoxPattern);
+  if (memoBoxMatch) {
+    return memoBoxMatch[1];
+  }
+
   console.error(
     'patch: findBoxComponent: failed to find Box component (neither ink-box createElement nor displayName found)'
   );
