@@ -718,6 +718,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableModelCustomizations: true,
     enableVoiceMode: false,
     enableVoiceConciseOutput: true,
+    enableChannelsMode: false,
     enableReactiveTheme: false,
     reactiveThemeDarkId: 'dark',
     reactiveThemeLightId: 'light',

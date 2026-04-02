@@ -72,6 +72,7 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
+import { writeChannelsMode } from './channelsMode';
 import { writeReactiveTheme } from './reactiveTheme';
 import { writeThemeDetection } from './themeDetection';
 import { REACTIVE_THEME_WATCHER_JS } from '../reactiveThemeWatcher';
@@ -431,6 +432,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Enable /voice command for speech-to-text input (hold Space to record)',
+  },
+  {
+    id: 'channels-mode',
+    name: 'Channels mode',
+    group: PatchGroup.FEATURES,
+    description:
+      'Enable MCP channel notifications (--channels without allowlist or dev flag)',
   },
   {
     id: 'reactive-theme',
@@ -895,6 +903,10 @@ export const applyCustomization = async (
           config.settings.misc?.enableVoiceConciseOutput ?? true
         ),
       condition: !!config.settings.misc?.enableVoiceMode,
+    },
+    'channels-mode': {
+      fn: c => writeChannelsMode(c),
+      condition: !!config.settings.misc?.enableChannelsMode,
     },
     'reactive-theme': {
       fn: c =>

@@ -84,6 +84,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableModelCustomizations: true,
     enableVoiceMode: false,
     enableVoiceConciseOutput: true,
+    enableChannelsMode: false,
     enableReactiveTheme: false,
     reactiveThemeDarkId: 'dark',
     reactiveThemeLightId: 'light',
@@ -433,6 +434,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.enableVoiceConciseOutput =
               !settings.misc!.enableVoiceConciseOutput;
+          });
+        },
+      },
+      {
+        id: 'enableChannelsMode',
+        title: 'Enable channels mode (MCP channel notifications)',
+        description:
+          'Force-enable MCP channel notifications by bypassing the tengu_harbor feature gate, allowlist, and permission relay.',
+        getValue: () => settings.misc?.enableChannelsMode ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableChannelsMode =
+              !settings.misc!.enableChannelsMode;
           });
         },
       },

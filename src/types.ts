@@ -136,6 +136,7 @@ export interface MiscConfig {
   enableModelCustomizations: boolean;
   enableVoiceMode: boolean;
   enableVoiceConciseOutput: boolean;
+  enableChannelsMode: boolean;
   enableReactiveTheme: boolean;
   reactiveThemeDarkId: string;
   reactiveThemeLightId: string;
