@@ -447,8 +447,9 @@ export async function handleRepack(
   );
 
   const newJs = await fs.readFile(inputJsPath, 'utf8');
+  const clearBytecode = !newJs.startsWith('// @bun @bytecode');
 
-  await writeContent(installation, newJs, false);
+  await writeContent(installation, newJs, clearBytecode);
 
   console.log(
     chalk.green(
