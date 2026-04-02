@@ -720,6 +720,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
     enableCustomSessionColors: false,
+    customColorMap: null,
     enableTitleVisibilityToggle: false,
   },
   toolsets: [],

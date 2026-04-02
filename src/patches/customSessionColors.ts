@@ -1,15 +1,12 @@
 import { showDiff } from './index';
 
-export const writeCustomSessionColors = (oldFile: string): string | null => {
+export const writeCustomSessionColors = (
+  oldFile: string,
+  customColorMap: Record<string, string>
+): string | null => {
   let content = oldFile;
 
   // Step 1: Remove the validation that rejects unknown colors.
-  // The color command has:
-  //   if(!COLORLIST.includes(K)){...return "Invalid color"...}
-  // We replace the rejection with a pass-through so any color value works.
-  //
-  // Pattern: if(!COLORLIST.includes(K)){let T=COLORLIST.join(", ");
-  //   return H(`Invalid color "${K}". Available colors: ${T}, default`,...),null}
   const rejectPattern =
     /if\(!([$\w]+)\.includes\(([$\w]+)\)\)\{let ([$\w]+)=\1\.join\(", "\);return [$\w]+\(`Invalid color "\$\{\2\}"[^`]+`,[^)]+\),null\}/;
   const rejectMatch = content.match(rejectPattern);
@@ -32,13 +29,12 @@ export const writeCustomSessionColors = (oldFile: string): string | null => {
     rejectMatch.index + rejectMatch[0].length
   );
 
-  // Step 2: Modify the color resolution function to pass through unknown colors.
-  // The function is: function Ma_(H,_="cyan_FOR_SUBAGENTS_ONLY"){return H&&COLORLIST.includes(H)?COLORMAP[H]:_}
-  // We change it to: ...return H?(COLORLIST.includes(H)?COLORMAP[H]:H):_
-  // So unknown colors are used as-is (hex, rgb, named CSS colors all work via chalk).
+  // Step 2: Modify the color resolution function.
+  // Original: function Ma_(H,_="cyan_..."){return H&&LIST.includes(H)?MAP[H]:_}
+  // New: built-in -> theme key, custom map -> user value, hex/rgb -> pass through, else fallback
   const colorListVar = rejectMatch[1];
   const resolvePattern = new RegExp(
-    `(function ([$\\w]+)\\([$\\w]+,[$\\w]+="[^"]+_FOR_SUBAGENTS_ONLY"\\)\\{return [$\\w]+)&&${colorListVar.replace(/\$/g, '\\$')}\\.includes\\([$\\w]+\\)\\?([$\\w]+)\\[[$\\w]+\\](:[$\\w]+\\})`
+    `(function ([$\\w]+)\\(([$\\w]+),[$\\w]+="[^"]+_FOR_SUBAGENTS_ONLY"\\)\\{return) [$\\w]+&&${colorListVar.replace(/\$/g, '\\$')}\\.includes\\([$\\w]+\\)\\?([$\\w]+)\\[[$\\w]+\\](:[$\\w]+\\})`
   );
   const resolveMatch = content.match(resolvePattern);
   if (!resolveMatch || resolveMatch.index === undefined) {
@@ -48,21 +44,21 @@ export const writeCustomSessionColors = (oldFile: string): string | null => {
     return null;
   }
 
-  const colorMapVar = resolveMatch[3];
-  const argPattern =
-    /function [$\w]+\(([$\w]+),[$\w]+="[^"]+_FOR_SUBAGENTS_ONLY"\)/;
-  const argMatch = resolveMatch[0].match(argPattern);
-  if (!argMatch) {
-    console.error(
-      'patch: customSessionColors: failed to find resolve function arg'
-    );
-    return null;
-  }
-  const colorArg = argMatch[1];
+  const funcPrefix = resolveMatch[1];
+  const colorArg = resolveMatch[3];
+  const colorMapVar = resolveMatch[4];
+  const fallbackSuffix = resolveMatch[5];
 
+  const customMapJs = JSON.stringify(customColorMap);
   const oldResolve = resolveMatch[0];
-  const newResolve =
-    `${resolveMatch[1]}?(${colorListVar}.includes(${colorArg})?${colorMapVar}[${colorArg}]:${colorArg})${resolveMatch[4]}`;
+  // Resolution: built-in -> custom map -> hex/rgb pass-through -> fallback
+  const newBody =
+    ` !${colorArg}?void 0:` +
+    `(${colorListVar}.includes(${colorArg})?${colorMapVar}[${colorArg}]` +
+    `:${customMapJs}[${colorArg}]` +
+    `||(${colorArg}[0]==="#"||${colorArg}.startsWith("rgb(")?${colorArg}:null))` +
+    `||_}`;
+  const newResolve = `${funcPrefix}${newBody}`;
 
   prevContent = content;
   content =
@@ -77,14 +73,10 @@ export const writeCustomSessionColors = (oldFile: string): string | null => {
     resolveMatch.index + oldResolve.length
   );
 
-  // Step 3: Patch the Text component so backgroundColor also supports raw
-  // color values (hex, rgb). The foreground `color` prop uses a resolver
-  // that passes through raw values like "#ff0099", but backgroundColor
-  // does a plain theme lookup: `y = K ? Z[K] : void 0`.
-  // We change it to use the same resolver: `y = K ? RESOLVER(K, Z) : void 0`.
-  //
+  // Step 3: Patch the Text component's backgroundColor to use the same
+  // resolver as foreground color. Without this, backgroundColor does a
+  // plain theme lookup (Z[K]) which returns undefined for custom colors.
   // Pattern: RESOLVER(fgArg,theme),bgVar=bgArg?theme[bgArg]:void 0
-  // This is unique in the codebase (only appears in the Text component).
   const bgPattern =
     /([$\w]+)\(([$\w]+),([$\w]+)\),([$\w]+)=([$\w]+)\?([$\w]+)\[\5\]:void 0/;
   const bgMatch = content.match(bgPattern);
@@ -116,8 +108,7 @@ export const writeCustomSessionColors = (oldFile: string): string | null => {
     bgAbsIdx + oldBg.length
   );
 
-  // Step 4: Remove "gray" and "grey" from the reset/default aliases array
-  // so they work as color values instead of resetting.
+  // Step 4: Remove "gray" and "grey" from the reset/default aliases array.
   // In CC 2.1.90+ these were already removed upstream, so this is optional.
   const ddOld = '["default","reset","none","gray","grey"]';
   const ddNew = '["default","reset","none"]';

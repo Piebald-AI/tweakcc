@@ -138,6 +138,7 @@ export interface MiscConfig {
   enableVoiceConciseOutput: boolean;
   enableChannelsMode: boolean;
   enableCustomSessionColors: boolean;
+  customColorMap: Record<string, string> | null;
   enableTitleVisibilityToggle: boolean;
 }
 

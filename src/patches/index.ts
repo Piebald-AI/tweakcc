@@ -905,7 +905,11 @@ export const applyCustomization = async (
       condition: !!config.settings.misc?.enableChannelsMode,
     },
     'custom-session-colors': {
-      fn: c => writeCustomSessionColors(c),
+      fn: c =>
+        writeCustomSessionColors(
+          c,
+          config.settings.misc?.customColorMap ?? {}
+        ),
       condition: !!config.settings.misc?.enableCustomSessionColors,
     },
     'title-visibility-toggle': {
