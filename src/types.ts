@@ -137,7 +137,7 @@ export interface MiscConfig {
   enableVoiceMode: boolean;
   enableVoiceConciseOutput: boolean;
   enableChannelsMode: boolean;
-  enableSessionColorGray: boolean;
+  enableCustomSessionColors: boolean;
   enableTitleVisibilityToggle: boolean;
 }
 

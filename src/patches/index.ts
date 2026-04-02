@@ -73,7 +73,7 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
-import { writeSessionColorGray } from './sessionColorGray';
+import { writeCustomSessionColors } from './customSessionColors';
 import { writeTitleVisibilityToggle } from './titleVisibility';
 import {
   restoreNativeBinaryFromBackup,
@@ -433,11 +433,11 @@ const PATCH_DEFINITIONS = [
       'Enable MCP channel notifications (--channels without allowlist or dev flag)',
   },
   {
-    id: 'session-color-gray',
-    name: 'Session color gray',
+    id: 'custom-session-colors',
+    name: 'Custom session colors',
     group: PatchGroup.FEATURES,
     description:
-      'Add gray/grey as a real /color option instead of resetting to default',
+      'Accept any color value in /color (hex, rgb, named) instead of just the built-in 8',
   },
   {
     id: 'title-visibility-toggle',
@@ -904,9 +904,9 @@ export const applyCustomization = async (
       fn: c => writeChannelsMode(c),
       condition: !!config.settings.misc?.enableChannelsMode,
     },
-    'session-color-gray': {
-      fn: c => writeSessionColorGray(c),
-      condition: !!config.settings.misc?.enableSessionColorGray,
+    'custom-session-colors': {
+      fn: c => writeCustomSessionColors(c),
+      condition: !!config.settings.misc?.enableCustomSessionColors,
     },
     'title-visibility-toggle': {
       fn: c => writeTitleVisibilityToggle(c),

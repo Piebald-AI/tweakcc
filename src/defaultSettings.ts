@@ -719,7 +719,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableVoiceMode: false,
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
-    enableSessionColorGray: false,
+    enableCustomSessionColors: false,
     enableTitleVisibilityToggle: false,
   },
   toolsets: [],
