@@ -11,7 +11,7 @@ export const writeCustomSessionColors = (oldFile: string): string | null => {
   // Pattern: if(!COLORLIST.includes(K)){let T=COLORLIST.join(", ");
   //   return H(`Invalid color "${K}". Available colors: ${T}, default`,...),null}
   const rejectPattern =
-    /if\(!([$\w]+)\.includes\(([$\w]+)\)\)\{let ([$\w]+)=\1\.join\(", "\);return [$\w]+\(`Invalid color "\$\{\2\}"[^`]+`,[^}]+\}/;
+    /if\(!([$\w]+)\.includes\(([$\w]+)\)\)\{let ([$\w]+)=\1\.join\(", "\);return [$\w]+\(`Invalid color "\$\{\2\}"[^`]+`,[^)]+\),null\}/;
   const rejectMatch = content.match(rejectPattern);
   if (!rejectMatch || rejectMatch.index === undefined) {
     console.error(
