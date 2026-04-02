@@ -137,6 +137,8 @@ export interface MiscConfig {
   enableVoiceMode: boolean;
   enableVoiceConciseOutput: boolean;
   enableChannelsMode: boolean;
+  enableSessionColorGray: boolean;
+  enableTitleVisibilityToggle: boolean;
 }
 
 export interface InputPatternHighlighter {

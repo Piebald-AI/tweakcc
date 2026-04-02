@@ -73,6 +73,8 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
+import { writeSessionColorGray } from './sessionColorGray';
+import { writeTitleVisibilityToggle } from './titleVisibility';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -429,6 +431,20 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Enable MCP channel notifications (--channels without allowlist or dev flag)',
+  },
+  {
+    id: 'session-color-gray',
+    name: 'Session color gray',
+    group: PatchGroup.FEATURES,
+    description:
+      'Add gray/grey as a real /color option instead of resetting to default',
+  },
+  {
+    id: 'title-visibility-toggle',
+    name: 'Title visibility toggle',
+    group: PatchGroup.FEATURES,
+    description:
+      'Add /hidetitle command to toggle session title visibility in the prompt bar',
   },
 ] as const;
 
@@ -887,6 +903,14 @@ export const applyCustomization = async (
     'channels-mode': {
       fn: c => writeChannelsMode(c),
       condition: !!config.settings.misc?.enableChannelsMode,
+    },
+    'session-color-gray': {
+      fn: c => writeSessionColorGray(c),
+      condition: !!config.settings.misc?.enableSessionColorGray,
+    },
+    'title-visibility-toggle': {
+      fn: c => writeTitleVisibilityToggle(c),
+      condition: !!config.settings.misc?.enableTitleVisibilityToggle,
     },
   };
 
