@@ -85,6 +85,9 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableVoiceMode: false,
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
+    enableVerboseProperty: true,
+    enableOpusplan1m: true,
+    enableFixLspSupport: true,
   };
 
   const ensureMisc = () => {
