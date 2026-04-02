@@ -85,6 +85,9 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableVoiceMode: false,
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
+    enableVerboseProperty: true,
+    enableOpusplan1m: true,
+    enableFixLspSupport: true,
     enableCustomSessionColors: false,
     customColorMap: null,
     enableTitleVisibilityToggle: false,
@@ -448,6 +451,47 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.enableChannelsMode =
               !settings.misc!.enableChannelsMode;
+          });
+        },
+      },
+      {
+        id: 'enableVerboseProperty',
+        title: 'Verbose token counter',
+        description:
+          'Token counter shows detailed info like (2s · ↓ 169 tokens · thinking).',
+        getValue: () => settings.misc?.enableVerboseProperty ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableVerboseProperty =
+              !settings.misc!.enableVerboseProperty;
+          });
+        },
+      },
+      {
+        id: 'enableOpusplan1m',
+        title: 'Opusplan[1m] model support',
+        description:
+          'Adds the "Opus Plan 1M" model option: Opus for planning, Sonnet with 1M context for building.',
+        getValue: () => settings.misc?.enableOpusplan1m ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableOpusplan1m = !settings.misc!.enableOpusplan1m;
+          });
+        },
+      },
+      {
+        id: 'enableFixLspSupport',
+        title: 'Fix LSP support',
+        description:
+          'Removes unimplemented-field validation errors and adds textDocument/didOpen notifications for LSP servers.',
+        getValue: () => settings.misc?.enableFixLspSupport ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableFixLspSupport =
+              !settings.misc!.enableFixLspSupport;
           });
         },
       },
