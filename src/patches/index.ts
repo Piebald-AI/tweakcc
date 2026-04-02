@@ -444,7 +444,7 @@ const PATCH_DEFINITIONS = [
     name: 'Title visibility toggle',
     group: PatchGroup.FEATURES,
     description:
-      'Add /hidetitle command to toggle session title visibility in the prompt bar',
+      'Add /session-title command to toggle session title visibility in the prompt bar',
   },
 ] as const;
 

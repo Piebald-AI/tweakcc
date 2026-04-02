@@ -451,6 +451,36 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         },
       },
       {
+        id: 'enableCustomSessionColors',
+        title: 'Custom session colors',
+        description:
+          'Accept any color value in /color (hex, rgb, named CSS colors) instead of just the built-in 8.',
+        getValue: () =>
+          settings.misc?.enableCustomSessionColors ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableCustomSessionColors =
+              !settings.misc!.enableCustomSessionColors;
+          });
+        },
+      },
+      {
+        id: 'enableTitleVisibilityToggle',
+        title: 'Title visibility toggle (/session-title)',
+        description:
+          'Add /session-title command to toggle session title visibility in the prompt bar.',
+        getValue: () =>
+          settings.misc?.enableTitleVisibilityToggle ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableTitleVisibilityToggle =
+              !settings.misc!.enableTitleVisibilityToggle;
+          });
+        },
+      },
+      {
         id: 'enableContextLimitOverride',
         title: 'Override context limit',
         description:
