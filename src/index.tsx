@@ -370,36 +370,29 @@ async function handleHookMode(install: boolean): Promise<void> {
   let settings: Record<string, unknown> = {};
   try {
     const raw = fsSync.readFileSync(settingsPath, 'utf8');
-    try {
-      const parsed = JSON.parse(raw);
-      if (
-        parsed === null ||
-        typeof parsed !== 'object' ||
-        Array.isArray(parsed)
-      ) {
-        console.error(
-          chalk.red(`Error: ${settingsPath} must contain a JSON object.`)
-        );
-        process.exit(1);
-      }
-      settings = parsed as Record<string, unknown>;
-    } catch {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed == null || Array.isArray(parsed) || typeof parsed !== 'object') {
+      console.error(
+        chalk.red(`Error: ${settingsPath} must contain a JSON object.`)
+      );
+      process.exit(1);
+    }
+    settings = parsed as Record<string, unknown>;
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException;
+    if (err.code === 'ENOENT') {
+      // File doesn't exist — start fresh
+    } else if (error instanceof SyntaxError) {
       console.error(
         chalk.red(
           `Error: ${settingsPath} contains invalid JSON. Please fix it manually.`
         )
       );
       process.exit(1);
-    }
-  } catch (readErr: unknown) {
-    const code =
-      readErr instanceof Error && 'code' in readErr
-        ? (readErr as NodeJS.ErrnoException).code
-        : undefined;
-    if (code !== 'ENOENT') {
+    } else {
       console.error(
         chalk.red(
-          `Error reading ${settingsPath}: ${readErr instanceof Error ? readErr.message : String(readErr)}`
+          `Error reading ${settingsPath}: ${error instanceof Error ? error.message : String(error)}`
         )
       );
       process.exit(1);
