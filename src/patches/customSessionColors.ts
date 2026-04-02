@@ -77,7 +77,46 @@ export const writeCustomSessionColors = (oldFile: string): string | null => {
     resolveMatch.index + oldResolve.length
   );
 
-  // Step 3: Remove "gray" and "grey" from the reset/default aliases array
+  // Step 3: Patch the Text component so backgroundColor also supports raw
+  // color values (hex, rgb). The foreground `color` prop uses a resolver
+  // that passes through raw values like "#ff0099", but backgroundColor
+  // does a plain theme lookup: `y = K ? Z[K] : void 0`.
+  // We change it to use the same resolver: `y = K ? RESOLVER(K, Z) : void 0`.
+  //
+  // Pattern: RESOLVER(fgArg,theme),bgVar=bgArg?theme[bgArg]:void 0
+  // This is unique in the codebase (only appears in the Text component).
+  const bgPattern =
+    /([$\w]+)\(([$\w]+),([$\w]+)\),([$\w]+)=([$\w]+)\?([$\w]+)\[\5\]:void 0/;
+  const bgMatch = content.match(bgPattern);
+  if (!bgMatch || bgMatch.index === undefined) {
+    console.error(
+      'patch: customSessionColors: failed to find backgroundColor in Text component'
+    );
+    return null;
+  }
+
+  const fgResolverName = bgMatch[1];
+  const themeVar = bgMatch[6];
+  const bgVar = bgMatch[4];
+  const bgColorArg = bgMatch[5];
+  const oldBg = `${bgVar}=${bgColorArg}?${themeVar}[${bgColorArg}]:void 0`;
+  const newBg = `${bgVar}=${bgColorArg}?${fgResolverName}(${bgColorArg},${themeVar}):void 0`;
+  const bgAbsIdx = bgMatch.index + bgMatch[0].indexOf(oldBg);
+
+  prevContent = content;
+  content =
+    content.slice(0, bgAbsIdx) +
+    newBg +
+    content.slice(bgAbsIdx + oldBg.length);
+  showDiff(
+    prevContent,
+    content,
+    newBg,
+    bgAbsIdx,
+    bgAbsIdx + oldBg.length
+  );
+
+  // Step 4: Remove "gray" and "grey" from the reset/default aliases array
   // so they work as color values instead of resetting.
   // In CC 2.1.90+ these were already removed upstream, so this is optional.
   const ddOld = '["default","reset","none","gray","grey"]';
