@@ -142,7 +142,7 @@ export interface ApplyCustomizationResult {
  * This is the single source of truth for patch IDs, names, groups, and descriptions.
  */
 const PATCH_DEFINITIONS = [
-  // Always Applied
+  // Misc Configurable (formerly Always Applied)
   {
     id: 'verbose-property',
     name: 'Verbose property',
@@ -634,7 +634,7 @@ export const applyCustomization = async (
   const modelCustomizationsEnabled =
     config.settings.misc?.enableModelCustomizations ?? true;
   const patchImplementations: Record<PatchId, PatchImplementation> = {
-    // Always Applied
+    // Misc Configurable (formerly Always Applied)
     'verbose-property': {
       fn: c => writeVerboseProperty(c),
       condition: config.settings.misc?.enableVerboseProperty ?? true,
