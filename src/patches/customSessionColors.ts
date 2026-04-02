@@ -53,7 +53,7 @@ export const writeCustomSessionColors = (
   const oldResolve = resolveMatch[0];
   // Resolution: built-in -> custom map -> hex/rgb pass-through -> fallback
   const newBody =
-    ` !${colorArg}?void 0:` +
+    ` !${colorArg}?"promptBorder":` +
     `(${colorListVar}.includes(${colorArg})?${colorMapVar}[${colorArg}]` +
     `:${customMapJs}[${colorArg}]` +
     `||(${colorArg}[0]==="#"||${colorArg}.startsWith("rgb(")?${colorArg}:null))` +
