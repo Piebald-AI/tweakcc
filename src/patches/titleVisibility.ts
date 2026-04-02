@@ -11,15 +11,17 @@ export const writeTitleVisibilityToggle = (oldFile: string): string | null => {
   description: "Toggle session title visibility in the prompt bar",
   isEnabled: () => !0,
   isHidden: !1,
-  async call(A, B) {
-    TWEAKCC_HIDE_TITLE = !TWEAKCC_HIDE_TITLE;
-    return {
-      type: "text",
-      value: TWEAKCC_HIDE_TITLE
-        ? "Session title hidden from prompt bar"
-        : "Session title visible in prompt bar",
-    }
-  },
+  load: () => Promise.resolve({
+    call: async (A, B) => {
+      TWEAKCC_HIDE_TITLE = !TWEAKCC_HIDE_TITLE;
+      return {
+        type: "text",
+        value: TWEAKCC_HIDE_TITLE
+          ? "Session title hidden from prompt bar"
+          : "Session title visible in prompt bar",
+      }
+    },
+  }),
   userFacingName() {
     return "hidetitle";
   },
