@@ -22,7 +22,11 @@ const INJECTION =
   `})()`;
 
 export const writeSessionColor = (oldFile: string): string | null => {
-  if (oldFile.includes('TWEAKCC_SESSION_COLOR')) {
+  if (
+    oldFile.includes(
+      'standaloneAgentContext:(()=>{let __c=process.env.TWEAKCC_SESSION_COLOR;'
+    )
+  ) {
     return oldFile;
   }
 
