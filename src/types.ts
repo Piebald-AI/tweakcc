@@ -137,6 +137,9 @@ export interface MiscConfig {
   enableVoiceMode: boolean;
   enableVoiceConciseOutput: boolean;
   enableChannelsMode: boolean;
+  enableVerboseProperty: boolean;
+  enableOpusplan1m: boolean;
+  enableFixLspSupport: boolean;
 }
 
 export interface InputPatternHighlighter {

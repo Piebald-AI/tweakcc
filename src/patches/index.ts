@@ -142,17 +142,17 @@ export interface ApplyCustomizationResult {
  * This is the single source of truth for patch IDs, names, groups, and descriptions.
  */
 const PATCH_DEFINITIONS = [
-  // Always Applied
+  // Misc Configurable
   {
     id: 'verbose-property',
     name: 'Verbose property',
-    group: PatchGroup.ALWAYS_APPLIED,
+    group: PatchGroup.MISC_CONFIGURABLE,
     description: 'Token counter will show (2s · ↓ 169 tokens · thinking)',
   },
   {
     id: 'opusplan1m',
     name: 'Opusplan[1m] support',
-    group: PatchGroup.ALWAYS_APPLIED,
+    group: PatchGroup.MISC_CONFIGURABLE,
     description:
       'Use the "Opus Plan 1M" model: Opus for planning, Sonnet 1M context for building',
   },
@@ -165,7 +165,7 @@ const PATCH_DEFINITIONS = [
   {
     id: 'fix-lsp-support',
     name: 'Fix LSP support',
-    group: PatchGroup.ALWAYS_APPLIED,
+    group: PatchGroup.MISC_CONFIGURABLE,
     description: 'Enable/fix nascent LSP support',
   },
   {
@@ -634,9 +634,10 @@ export const applyCustomization = async (
   const modelCustomizationsEnabled =
     config.settings.misc?.enableModelCustomizations ?? true;
   const patchImplementations: Record<PatchId, PatchImplementation> = {
-    // Always Applied
+    // Misc Configurable
     'verbose-property': {
       fn: c => writeVerboseProperty(c),
+      condition: config.settings.misc?.enableVerboseProperty ?? true,
     },
     'context-limit': {
       fn: c => writeContextLimit(c),
@@ -644,6 +645,7 @@ export const applyCustomization = async (
     },
     opusplan1m: {
       fn: c => writeOpusplan1m(c),
+      condition: config.settings.misc?.enableOpusplan1m ?? true,
     },
     'thinking-block-styling': {
       fn: c => writeThinkingBlockStyling(c),
@@ -653,6 +655,7 @@ export const applyCustomization = async (
     },
     'fix-lsp-support': {
       fn: c => writeFixLspSupport(c),
+      condition: config.settings.misc?.enableFixLspSupport ?? true,
     },
     'statusline-update-throttle': {
       fn: c =>
