@@ -67,7 +67,7 @@ export const writeClearScreen = (oldFile: string): string | null => {
 
 export const patchRenderFilter = (oldFile: string): string | null => {
   const pattern =
-    /([,;{}])(function [$\w]+\([$\w]+,[$\w]+\)\{)if\([$\w]+\.type!=="user"\)return!0;if\([$\w]+\.isMeta\)/;
+    /([,;{}])(function [$\w]+\(([$\w]+),[$\w]+\)\{)if\(\3\.type!=="user"\)return!0;if\(\3\.isMeta\)/;
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
     return null;
@@ -75,10 +75,7 @@ export const patchRenderFilter = (oldFile: string): string | null => {
 
   const delimiter = match[1];
   const funcPrefix = match[2];
-  const firstArg = match[0].match(/function ([$\w]+)\(([$\w]+),/)?.[2];
-  if (!firstArg) {
-    return null;
-  }
+  const firstArg = match[3];
 
   const replacement =
     `${delimiter}${funcPrefix}if(globalThis.__tweakccHiddenUUIDs?.has(${firstArg}.uuid?.slice(0,24)))return!1;` +
