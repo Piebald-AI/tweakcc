@@ -4,10 +4,12 @@ import { showDiff } from './index';
 export const writeSuppressRateLimitWarning = (
   oldFile: string
 ): string | null => {
-  const alreadyPatched = /\.severity\s*===\s*"warning"\)\s*return null;/;
+  const alreadyPatched =
+    /[,;{}]if\(([$\w]+)&&\1\.severity==="warning"\)return null;/;
   if (alreadyPatched.test(oldFile)) return oldFile;
 
-  const pattern = /\.severity\s*===\s*"warning"\)\s*return ([$\w]+)\.message;/;
+  const pattern =
+    /[,;{}]if\(([$\w]+)&&\1\.severity==="warning"\)return \1\.message;/;
 
   const match = oldFile.match(pattern);
 
@@ -18,11 +20,10 @@ export const writeSuppressRateLimitWarning = (
     return null;
   }
 
+  const varName = match[1];
   const original = match[0];
-  const replacement = original.replace(
-    /return ([$\w]+)\.message;/,
-    'return null;'
-  );
+  const delimiter = original[0];
+  const replacement = `${delimiter}if(${varName}&&${varName}.severity==="warning")return null;`;
   const startIndex = match.index;
   const endIndex = startIndex + original.length;
 
