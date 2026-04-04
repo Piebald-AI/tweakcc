@@ -58,6 +58,7 @@ import { writeHideStartupClawd } from './hideStartupClawd';
 import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
 import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
+import { writeSuppressRateLimitWarning } from './suppressRateLimitWarning';
 import { writeSessionMemory } from './sessionMemory';
 import { writeRememberSkill } from './rememberSkill';
 import { writeThinkingBlockStyling } from './thinkingBlockStyling';
@@ -310,6 +311,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.MISC_CONFIGURABLE,
     description:
       "/rate-limit-options won't be injected when limits are reached",
+  },
+  {
+    id: 'suppress-rate-limit-warning',
+    name: 'Suppress rate limit warning',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Rate limit warning banners will be suppressed (errors still shown)',
   },
   {
     id: 'token-count-rounding',
@@ -780,6 +788,10 @@ export const applyCustomization = async (
     'suppress-rate-limit-options': {
       fn: c => writeSuppressRateLimitOptions(c),
       condition: !!config.settings.misc?.suppressRateLimitOptions,
+    },
+    'suppress-rate-limit-warning': {
+      fn: c => writeSuppressRateLimitWarning(c),
+      condition: !!config.settings.misc?.suppressRateLimitWarning,
     },
     'token-count-rounding': {
       fn: c =>
