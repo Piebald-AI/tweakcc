@@ -25,6 +25,16 @@ describe('writeSuppressRateLimitWarning', () => {
     expect(result).toBeNull();
   });
 
+  it('should preserve error-path message returns', () => {
+    const input =
+      'function Rp8(H,$){let q=d2K(H,$)}if(q&&q.severity==="error")return q.message;return null}' +
+      'function Ip8(H,$){let q=d2K(H,$)}if(q&&q.severity==="warning")return q.message;return null}';
+    const result = writeSuppressRateLimitWarning(input);
+    expect(result).not.toBeNull();
+    expect(result).toContain('severity==="error")return q.message;');
+    expect(result).toContain('severity==="warning")return null;');
+  });
+
   it('should work with different delimiters', () => {
     for (const d of [',', ';', '}', '{']) {
       const result = writeSuppressRateLimitWarning(makeInput(d));
