@@ -9,7 +9,7 @@ const renderFilter =
   'function g97(H,$){if(H.type!=="user")return!0;if(H.isMeta){if(H.origin?.kind==="channel")return!0;return!1}if(H.isVisibleInTranscriptOnly&&!$)return!1;return!0}';
 
 const makeInput = (delimiter = ';') =>
-  'const x=1' +
+  'const x=1;' +
   renderFilter +
   slashCommandArray +
   `${delimiter}let Z=G_H.useCallback(()=>{Nw.get(process.stdout)?.forceRedraw()})`;
@@ -90,16 +90,16 @@ describe('clearScreen', () => {
 
 describe('patchRenderFilter', () => {
   it('adds __tweakccHiddenUUIDs check at the start of the function', () => {
-    const result = patchRenderFilter(renderFilter);
+    const result = patchRenderFilter(';' + renderFilter);
 
     expect(result).not.toBeNull();
     expect(result).toContain(
-      'function g97(H,$){if(globalThis.__tweakccHiddenUUIDs?.has(H.uuid?.slice(0,24)))return!1;if(H.type!=="user")'
+      ';function g97(H,$){if(globalThis.__tweakccHiddenUUIDs?.has(H.uuid?.slice(0,24)))return!1;if(H.type!=="user")'
     );
   });
 
   it('preserves the rest of the function', () => {
-    const result = patchRenderFilter(renderFilter);
+    const result = patchRenderFilter(';' + renderFilter);
 
     expect(result).not.toBeNull();
     expect(result).toContain('if(H.isMeta)');
@@ -112,9 +112,19 @@ describe('patchRenderFilter', () => {
     expect(result).toBeNull();
   });
 
+  it('works with different delimiters before function', () => {
+    for (const d of [',', ';', '}', '{']) {
+      const result = patchRenderFilter(d + renderFilter);
+      expect(result).not.toBeNull();
+      expect(result).toContain(
+        'if(globalThis.__tweakccHiddenUUIDs?.has(H.uuid?.slice(0,24)))return!1;'
+      );
+    }
+  });
+
   it('works with different function and argument names', () => {
     const input =
-      'function abc(X$,Y$){if(X$.type!=="user")return!0;if(X$.isMeta){if(X$.origin?.kind==="channel")return!0;return!1}return!0}';
+      ';function abc(X$,Y$){if(X$.type!=="user")return!0;if(X$.isMeta){if(X$.origin?.kind==="channel")return!0;return!1}return!0}';
     const result = patchRenderFilter(input);
 
     expect(result).not.toBeNull();
