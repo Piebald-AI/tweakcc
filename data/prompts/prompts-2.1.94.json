@@ -26,9 +26,9 @@
       "version": "2.1.94"
     },
     {
-      "name": "System Prompt: Subagent delegation examples",
-      "id": "system-prompt-subagent-delegation-examples",
-      "description": "Provides example usage patterns demonstrating how to delegate tasks to subagents with self-contained, well-structured prompts",
+      "name": "System Prompt: Subagent prompt-writing examples",
+      "id": "system-prompt-subagent-prompt-writing-examples",
+      "description": "Provides example usage patterns demonstrating how to write self-contained, well-structured prompts when delegating tasks to subagents",
       "pieces": [
         "Example usage:\n\n<example>\nuser: \"What's left on this branch before we can ship?\"\nassistant: <thinking>A survey question across git state, tests, and config. I'll delegate it and ask for a short report so the raw command output stays out of my context.</thinking>\n${",
         "}({\n  description: \"Branch ship-readiness audit\",\n  prompt: \"Audit what's left before this branch can ship. Check: uncommitted changes, commits ahead of main, whether tests exist, whether the GrowthBook gate is wired up, whether CI-relevant files changed. Report a punch list — done vs. missing. Under 200 words.\"\n})\n<commentary>\nThe prompt is self-contained: it states the goal, lists what to check, and caps the response length. The agent's report comes back as the tool result; relay the findings to the user.\n</commentary>\n</example>\n\n<example>\nuser: \"Can you get a second opinion on whether this migration is safe?\"\nassistant: <thinking>I'll ask the code-reviewer agent — it won't see my analysis, so it can give an independent read.</thinking>\n${",
@@ -92,9 +92,9 @@
       "version": "2.1.94"
     },
     {
-      "name": "System Prompt: Memory description of user feedback",
-      "id": "system-prompt-memory-description-of-user-feedback",
-      "description": "Describes the feedback memory type that captures user guidance on work approaches, emphasizing recording both successes and failures and checking for contradictions with team feedback",
+      "name": "System Prompt: Memory description of user feedback (with explicit save)",
+      "id": "system-prompt-memory-description-of-user-feedback-with-explicit-save",
+      "description": "Describes the feedback memory type that captures user guidance on work approaches, emphasizing recording both successes and failures and explicitly instructing to save a new memory noting contradictions with team feedback",
       "pieces": [
         "    <description>Guidance the user has given you about how to approach work — both what to avoid and what to keep doing. These are a very important type of memory to read and write as they allow you to remain coherent and responsive to the way you should approach work in the project. Record from failure AND success: if you only save corrections, you will avoid past mistakes but drift away from approaches the user has already validated, and may grow overly cautious. Before saving a private feedback memory, check that it doesn't contradict a team feedback memory — if it does, either don't save it or save a new private feedback memory that explicitly notes the override.</description>"
       ],
