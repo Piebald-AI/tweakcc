@@ -59,7 +59,11 @@ const patchPresentTenseVerbs = (
 };
 
 const patchPastTenseVerbs = (file: string, verbs: string[]): string | null => {
-  const pattern = /\[("[A-Z][a-z'é\-\\xA-F0-9]+ed",?){5,}\]/;
+  // CC ≥ 2.1.87 includes non-"ed" words like "Beboppin'" in the past-tense
+  // array, so we can't require every entry to end in "ed".  Match any
+  // capitalised word (same character class as the present-tense pattern) and
+  // rely on the {50,} minimum count to avoid false positives.
+  const pattern = /\[("[A-Z][a-z'é\-\\xA-F0-9]+",?){50,}\]/;
 
   const match = file.match(pattern);
 

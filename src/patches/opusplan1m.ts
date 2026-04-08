@@ -293,6 +293,14 @@ const patchAlwaysShowInModelSelector = (oldFile: string): string | null => {
  * Main entry point: Apply all opusplan[1m] patches
  */
 export const writeOpusplan1m = (oldFile: string): string | null => {
+  // CC ≥ 2.1.87 ships opusplan[1m] natively — skip if already present.
+  if (oldFile.includes('"opusplan[1m]"')) {
+    console.log(
+      'patch: opusplan1m: opusplan[1m] already supported natively — skipping'
+    );
+    return oldFile;
+  }
+
   let newFile = oldFile;
 
   // Patch 1: Mode switching function

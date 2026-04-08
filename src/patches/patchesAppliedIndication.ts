@@ -31,15 +31,42 @@ export const findVersionOutputLocation = (
 };
 
 /**
+ * Find the Claude Code version display pattern.
+ *
+ * Supports two shapes:
+ *  - **Inline (pre-React Compiler):**
+ *    `createElement(TEXT,{bold:!0},"Claude Code")," ",createElement(TEXT,{dimColor:!0},"v",VER)`
+ *  - **Memoized (React Compiler, CC ≥ 2.1.85):**
+ *    The bold "Claude Code" is cached in a variable, then referenced in
+ *    `createElement(TEXT,null,CACHED," ",createElement(TEXT,{dimColor:!0},"v",VER))`
+ */
+const findVersionDisplay = (fileContents: string): RegExpMatchArray | null => {
+  // Strategy 1: inline pattern
+  const inlinePattern =
+    /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)/;
+  const inlineMatch = fileContents.match(inlinePattern);
+  if (inlineMatch) return inlineMatch;
+
+  // Strategy 2: React Compiler memoized
+  const memoPattern =
+    /([$\w]+)=([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)/;
+  const memoMatch = fileContents.match(memoPattern);
+  if (!memoMatch) return null;
+
+  const cachedVar = memoMatch[1];
+  const versionPattern = new RegExp(
+    `[^$\\w][$\\w]+\\.createElement\\([$\\w]+,null,${escapeIdent(cachedVar)}," ",[$\\w]+\\.createElement\\([$\\w]+,\\{dimColor:!0\\},"v",[$\\w]+\\)`
+  );
+  return fileContents.match(versionPattern);
+};
+
+/**
  * PATCH 2: Finds the location to insert tweakcc version in the header
  */
 const findTweakccVersionLocation = (
   fileContents: string
 ): LocationResult | null => {
-  // Find Claude Code version display
-  const pattern =
-    /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)/;
-  const match = fileContents.match(pattern);
+  const match = findVersionDisplay(fileContents);
   if (!match || match.index === undefined) {
     console.error(
       'patch: patchesAppliedIndication: failed to find Claude Code version pattern'
@@ -246,10 +273,8 @@ const applyIndicatorPatchesListPatch = (
 const findPatchesListLocation = (
   fileContents: string
 ): LocationResult | null => {
-  // 1. Find the same regex as patch 2
-  const pattern =
-    /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)/;
-  const match = fileContents.match(pattern);
+  // 1. Find the version display (same helper as patch 2)
+  const match = findVersionDisplay(fileContents);
   if (!match || match.index === undefined) {
     console.error(
       'patch: patchesAppliedIndication: failed to find Claude Code version pattern for patch 3'
@@ -439,12 +464,17 @@ export const writePatchesAppliedIndication = (
       chalkVar
     );
     if (!patch4Result) {
-      console.error('patch: patchesAppliedIndication: patch 4 failed');
-      return null;
+      // PATCH 4 can fail on React Compiler builds (CC ≥ 2.1.85) where the
+      // indicator view layout no longer uses static alignItems/minHeight
+      // props.  Gracefully skip — patches 1-3 still provide the header
+      // version and patches list.
+      console.warn(
+        'patch: patchesAppliedIndication: patch 4 skipped (indicator view tweakcc version)'
+      );
+    } else {
+      content = patch4Result.content;
+      patch4ClosingParenIndex = patch4Result.closingParenIndex;
     }
-
-    content = patch4Result.content;
-    patch4ClosingParenIndex = patch4Result.closingParenIndex;
   }
 
   // PATCH 5: Add patches applied list to indicator view (if enabled)
@@ -456,10 +486,12 @@ export const writePatchesAppliedIndication = (
         /alignItems:"center",minHeight:([$\w]+\?\d+:\d+|\d+),?/;
       const alignItemsMatch = content.match(alignItemsPattern);
       if (!alignItemsMatch || alignItemsMatch.index === undefined) {
-        console.error(
-          'patch: patchesAppliedIndication: failed to find reference point for PATCH 5'
+        // React Compiler builds (CC ≥ 2.1.85) may not have this pattern.
+        // Gracefully skip patches 4+5 — patches 1-3 still work.
+        console.warn(
+          'patch: patchesAppliedIndication: patch 5 skipped (no indicator view reference point)'
         );
-        return null;
+        return content;
       }
       patch4ClosingParenIndex =
         alignItemsMatch.index + alignItemsMatch[0].length;
@@ -475,10 +507,16 @@ export const writePatchesAppliedIndication = (
       patchesApplies
     );
     if (!finalContent) {
-      console.error('patch: patchesAppliedIndication: patch 5 failed');
-      return null;
+      // PATCH 5 can fail on React Compiler builds (CC ≥ 2.1.85) where the
+      // component tree is flattened into variable assignments, making the
+      // paren-counting stack machine invalid.  Gracefully skip — patches 1-4
+      // still provide the tweakcc version and header list.
+      console.warn(
+        'patch: patchesAppliedIndication: patch 5 skipped (indicator view patches list)'
+      );
+    } else {
+      content = finalContent;
     }
-    content = finalContent;
   }
 
   return content;

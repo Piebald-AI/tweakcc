@@ -210,6 +210,47 @@ function getStringPointerContent(
   );
 }
 
+/**
+ * Bun CJS wrapper that wraps module contents in newer native binaries.
+ * The wrapper is: `// @bun @bytecode @bun-cjs\n(function(...) {` ... `})`.
+ * Patches expect raw JS without this wrapper.
+ */
+const BUN_CJS_PREFIX =
+  '// @bun @bytecode @bun-cjs\n(function(exports, require, module, __filename, __dirname) {';
+const BUN_CJS_SUFFIX = '})\n';
+
+/**
+ * Strip the Bun CJS wrapper from module contents if present.
+ * Returns the unwrapped JS and a flag indicating if stripping occurred.
+ */
+function stripBunCjsWrapper(content: Buffer): {
+  stripped: Buffer;
+  hadWrapper: boolean;
+} {
+  const str = content.toString('utf-8');
+  if (str.startsWith(BUN_CJS_PREFIX) && str.endsWith(BUN_CJS_SUFFIX)) {
+    const inner = str.slice(
+      BUN_CJS_PREFIX.length,
+      str.length - BUN_CJS_SUFFIX.length
+    );
+    debug(
+      `stripBunCjsWrapper: stripped CJS wrapper (${content.length} -> ${inner.length} bytes)`
+    );
+    return { stripped: Buffer.from(inner, 'utf-8'), hadWrapper: true };
+  }
+  return { stripped: content, hadWrapper: false };
+}
+
+/**
+ * Re-wrap JS content with the Bun CJS wrapper.
+ */
+function addBunCjsWrapper(content: Buffer): Buffer {
+  return Buffer.from(
+    BUN_CJS_PREFIX + content.toString('utf-8') + BUN_CJS_SUFFIX,
+    'utf-8'
+  );
+}
+
 function parseStringPointer(buffer: Buffer, offset: number): StringPointer {
   return {
     offset: buffer.readUInt32LE(offset),
@@ -439,23 +480,22 @@ function extractBunDataFromSection(sectionData: Buffer): BunData {
   let headerSize: number;
   let bunDataSize: number;
 
-  // Check which format matches the section length (allowing for padding up to 4KB)
-  if (
-    sectionData.length >= 8 &&
-    expectedLengthU64 <= sectionData.length &&
-    expectedLengthU64 >= sectionData.length - 4096
-  ) {
-    // u64 format matches
+  const isValidPayload = (hdrSize: number, dataSize: number): boolean => {
+    if (dataSize <= 0 || hdrSize + dataSize > sectionData.length) return false;
+    if (dataSize < BUN_TRAILER.length) return false;
+    const trailerOffset = hdrSize + dataSize - BUN_TRAILER.length;
+    return sectionData
+      .subarray(trailerOffset, trailerOffset + BUN_TRAILER.length)
+      .equals(BUN_TRAILER);
+  };
+
+  if (sectionData.length >= 8 && isValidPayload(8, bunDataSizeU64)) {
     headerSize = 8;
     bunDataSize = bunDataSizeU64;
     debug(
       `extractBunDataFromSection: detected u64 header format (Bun >= 1.3.4)`
     );
-  } else if (
-    expectedLengthU32 <= sectionData.length &&
-    expectedLengthU32 >= sectionData.length - 4096
-  ) {
-    // u32 format matches
+  } else if (isValidPayload(4, bunDataSizeU32)) {
     headerSize = 4;
     bunDataSize = bunDataSizeU32;
     debug(
@@ -727,10 +767,10 @@ export function extractClaudeJsFromNativeInstallation(
         // - Windows:    B:/~BUN/root/claude.exe
         if (!isClaudeModule(moduleName)) return undefined;
 
-        const moduleContents = getStringPointerContent(
-          bunData,
-          module.contents
-        );
+        const rawContents = getStringPointerContent(bunData, module.contents);
+
+        // Strip Bun CJS wrapper if present (Bun >= 1.3.x native binaries)
+        const { stripped: moduleContents } = stripBunCjsWrapper(rawContents);
 
         debug(
           `extractClaudeJsFromNativeInstallation: Found claude module, contents length=${moduleContents.length}`
@@ -759,11 +799,43 @@ export function extractClaudeJsFromNativeInstallation(
   }
 }
 
+/**
+ * Calculate the total bun data blob size without allocating the buffer.
+ * This mirrors the layout logic in rebuildBunData phases 2-3.
+ *
+ * Layout: [strings with null terminators][modules list][compileExecArgv + null][OFFSETS][TRAILER]
+ */
+function calculateBunDataSize(
+  stringsData: Buffer[],
+  moduleCount: number,
+  moduleStructSize: number,
+  bunOffsets: BunOffsets
+): number {
+  let size = 0;
+
+  // Strings with null terminators
+  for (const s of stringsData) {
+    size += s.length + 1;
+  }
+
+  // Module structures
+  size += moduleCount * moduleStructSize;
+
+  // compileExecArgv (we just need its length from the original offsets)
+  size += bunOffsets.compileExecArgvPtr.length + 1;
+
+  // Offsets struct + trailer
+  size += SIZEOF_OFFSETS + BUN_TRAILER.length;
+
+  return size;
+}
+
 function rebuildBunData(
   bunData: Buffer,
   bunOffsets: BunOffsets,
   modifiedClaudeJs: Buffer | null,
-  moduleStructSize: number
+  moduleStructSize: number,
+  sectionSizeBudget?: number
 ): Buffer {
   // Phase 1: Collect all string data
   const stringsData: Buffer[] = [];
@@ -787,7 +859,16 @@ function rebuildBunData(
     // Check if this is claude.js and we have modified contents
     let contentsBytes: Buffer;
     if (modifiedClaudeJs && isClaudeModule(moduleName)) {
-      contentsBytes = modifiedClaudeJs;
+      // Check if the original had a CJS wrapper — if so, re-wrap the modified JS
+      const originalContents = getStringPointerContent(
+        bunData,
+        module.contents
+      );
+      const originalHadWrapper =
+        stripBunCjsWrapper(originalContents).hadWrapper;
+      contentsBytes = originalHadWrapper
+        ? addBunCjsWrapper(modifiedClaudeJs)
+        : modifiedClaudeJs;
     } else {
       contentsBytes = getStringPointerContent(bunData, module.contents);
     }
@@ -829,6 +910,64 @@ function rebuildBunData(
   });
 
   const stringsPerModule = moduleStructSize === SIZEOF_MODULE_NEW ? 6 : 4;
+  const EMPTY = Buffer.alloc(0);
+
+  // Phase 1.5: If we have a size budget, do a trial layout to check fit.
+  // If the full data exceeds the budget, truncate expendable fields
+  // (sourcemaps, bytecodes, moduleInfo, bytecodeOriginPath) to make room.
+  // These are non-essential: sourcemaps only affect error stack traces,
+  // bytecodes are re-generated at runtime, and the others are metadata.
+  if (sectionSizeBudget !== undefined) {
+    const trialSize = calculateBunDataSize(
+      stringsData,
+      modulesMetadata.length,
+      moduleStructSize,
+      bunOffsets
+    );
+    if (trialSize > sectionSizeBudget) {
+      debug(
+        `rebuildBunData: trial size ${trialSize} exceeds budget ${sectionSizeBudget}, ` +
+          `truncating sourcemaps/bytecodes/moduleInfo/bytecodeOriginPath to fit`
+      );
+
+      // Zero out expendable fields in both stringsData and modulesMetadata
+      for (let i = 0; i < modulesMetadata.length; i++) {
+        const baseIdx = i * stringsPerModule;
+        // String layout per module:
+        //   [0]=name, [1]=contents, [2]=sourcemap, [3]=bytecode
+        //   For new format: [4]=moduleInfo, [5]=bytecodeOriginPath
+        stringsData[baseIdx + 2] = EMPTY; // sourcemap
+        stringsData[baseIdx + 3] = EMPTY; // bytecode
+        modulesMetadata[i].sourcemap = EMPTY;
+        modulesMetadata[i].bytecode = EMPTY;
+
+        if (moduleStructSize === SIZEOF_MODULE_NEW) {
+          stringsData[baseIdx + 4] = EMPTY; // moduleInfo
+          stringsData[baseIdx + 5] = EMPTY; // bytecodeOriginPath
+          modulesMetadata[i].moduleInfo = EMPTY;
+          modulesMetadata[i].bytecodeOriginPath = EMPTY;
+        }
+      }
+
+      const truncatedSize = calculateBunDataSize(
+        stringsData,
+        modulesMetadata.length,
+        moduleStructSize,
+        bunOffsets
+      );
+      debug(
+        `rebuildBunData: size after truncation: ${truncatedSize} (budget: ${sectionSizeBudget})`
+      );
+
+      if (truncatedSize > sectionSizeBudget) {
+        throw new Error(
+          `Even after truncating sourcemaps/bytecodes, rebuilt data (${truncatedSize} bytes) ` +
+            `still exceeds section budget (${sectionSizeBudget} bytes). ` +
+            `The patched JS content is too large to fit.`
+        );
+      }
+    }
+  }
 
   // Phase 2: Calculate buffer layout
   let currentOffset = 0;
@@ -1200,12 +1339,6 @@ function repackPE(
 }
 
 /**
- * Alignment constant used by BUN_COMPILED in c-bindings.cpp.
- * The BUN_COMPILED symbol is placed with __attribute__((aligned(BLOB_HEADER_ALIGNMENT))).
- */
-const BLOB_HEADER_ALIGNMENT = 16384;
-
-/**
  * Repack an ELF binary that uses the new .bun section format (post-PR#26923).
  *
  * The .bun section uses the same [u64 payload_len][payload] format as macOS/PE.
@@ -1214,10 +1347,14 @@ const BLOB_HEADER_ALIGNMENT = 16384;
  * (located at its original position in the RW data segment). At runtime, the
  * Bun runtime reads BUN_COMPILED.size as a vaddr pointer to the mapped data.
  *
- * On repack we need to:
- * 1. Set the .bun section content (LIEF handles file layout)
- * 2. Update the PT_LOAD segment's fileSize/virtualSize to cover the new data
- * 3. Patch BUN_COMPILED.size with the (possibly unchanged) vaddr
+ * Uses direct file I/O instead of LIEF's binary.write() to avoid std::bad_alloc
+ * errors on large ELF binaries (~228MB). LIEF is used only to parse the binary
+ * structure and locate the .bun section's file offset. The new section data is
+ * written directly at that offset, which is safe because:
+ * - The rebuilt bun data blob is the same size (patches preserve content length
+ *   via the CJS wrapper round-trip)
+ * - No ELF structural changes are needed (section/segment headers stay the same)
+ * - The BUN_COMPILED vaddr pointer doesn't change
  */
 function repackELFSection(
   elfBinary: LIEF.ELF.Binary,
@@ -1233,109 +1370,103 @@ function repackELFSection(
     }
 
     const newSectionData = buildSectionData(newBunBuffer, sectionHeaderSize);
+    const originalSectionSize = Number(bunSection.size);
+    const sectionFileOffset = Number(bunSection.offset);
 
-    debug(`repackELFSection: Original section size: ${bunSection.size}`);
+    debug(`repackELFSection: Original section size: ${originalSectionSize}`);
     debug(`repackELFSection: New section data size: ${newSectionData.length}`);
-
-    // Find the .bun PT_LOAD segment (read-only, vaddr matches .bun section)
-    const bunSectionVaddr = bunSection.virtualAddress;
-    const segments = elfBinary.segments();
-    const bunSegment = segments.find(
-      s =>
-        s.type === 'LOAD' &&
-        s.flags === 4 && // PF_R
-        s.virtualAddress === bunSectionVaddr
+    debug(
+      `repackELFSection: Section file offset: 0x${sectionFileOffset.toString(16)}`
     );
 
-    if (!bunSegment) {
+    if (newSectionData.length > originalSectionSize) {
       throw new Error(
-        `.bun PT_LOAD segment not found (looking for LOAD with vaddr=0x${bunSectionVaddr.toString(16)})`
+        `New .bun section data (${newSectionData.length} bytes) exceeds original section ` +
+          `(${originalSectionSize} bytes). Cannot grow ELF sections with direct write. ` +
+          `Ensure patches do not change the overall content size.`
       );
     }
 
-    debug(
-      `repackELFSection: Found .bun segment: vaddr=0x${bunSegment.virtualAddress.toString(16)}, ` +
-        `filesz=0x${bunSegment.fileSize.toString(16)}, memsz=0x${bunSegment.virtualSize.toString(16)}`
-    );
+    // Build a buffer that is exactly the original section size.
+    // If the new data is smaller, zero-pad the remainder. The Bun runtime
+    // reads the payload length from the u64 header, so trailing zeros are
+    // ignored.
+    let sectionBuffer: Buffer;
+    if (newSectionData.length === originalSectionSize) {
+      sectionBuffer = newSectionData;
+    } else {
+      debug(
+        `repackELFSection: Padding new data from ${newSectionData.length} to ${originalSectionSize} bytes`
+      );
+      sectionBuffer = Buffer.alloc(originalSectionSize, 0);
+      newSectionData.copy(sectionBuffer, 0);
+    }
 
-    // Find the original BUN_COMPILED location by searching for the .bun section's
-    // vaddr value at BLOB_HEADER_ALIGNMENT-aligned virtual addresses in the RW
-    // LOAD segment. writeBunSection() wrote the vaddr at the ORIGINAL .bun section
-    // location (where BUN_COMPILED lives in the base binary's data segment), then
-    // relocated the section header to point to the appended data.
-    const vaddrBytes = Buffer.alloc(8);
-    vaddrBytes.writeBigUInt64LE(bunSectionVaddr);
+    // Write the section data directly to the file at the section's file offset.
+    // This bypasses LIEF's ELF builder which fails with std::bad_alloc on large
+    // binaries. We use atomic copy-then-write to avoid corrupting the binary.
+    const tempPath = outputPath + '.tmp';
+    let tempCreated = false;
 
-    let bunCompiledVaddr: bigint | null = null;
+    try {
+      debug(
+        `repackELFSection: Copying ${binPath} to ${tempPath} for atomic write...`
+      );
+      fs.copyFileSync(binPath, tempPath);
+      tempCreated = true;
 
-    // Find the RW LOAD segment (flags include W=2)
-    const rwSegment = segments.find(
-      s => s.type === 'LOAD' && (s.flags & 2) !== 0
-    );
+      const fd = fs.openSync(tempPath, 'r+');
+      try {
+        const bytesWritten = fs.writeSync(
+          fd,
+          sectionBuffer,
+          0,
+          sectionBuffer.length,
+          sectionFileOffset
+        );
+        debug(
+          `repackELFSection: Wrote ${bytesWritten} bytes at offset 0x${sectionFileOffset.toString(16)}`
+        );
 
-    if (rwSegment) {
-      const rwContent = rwSegment.content;
-      const rwVaddrStart = Number(rwSegment.virtualAddress);
-
-      // Search at BLOB_HEADER_ALIGNMENT-aligned virtual addresses
-      const firstAligned =
-        Math.ceil(rwVaddrStart / BLOB_HEADER_ALIGNMENT) * BLOB_HEADER_ALIGNMENT;
-
-      for (
-        let va = firstAligned;
-        va < rwVaddrStart + rwContent.length - 8;
-        va += BLOB_HEADER_ALIGNMENT
-      ) {
-        const off = va - rwVaddrStart;
-        if (rwContent.subarray(off, off + 8).equals(vaddrBytes)) {
-          bunCompiledVaddr = BigInt(va);
-          debug(
-            `repackELFSection: BUN_COMPILED at vaddr 0x${bunCompiledVaddr.toString(16)} ` +
-              `(offset ${off} in RW segment)`
+        if (bytesWritten !== sectionBuffer.length) {
+          throw new Error(
+            `Short write: expected ${sectionBuffer.length} bytes, wrote ${bytesWritten}`
           );
-          break;
+        }
+      } finally {
+        fs.closeSync(fd);
+      }
+
+      const origStat = fs.statSync(binPath);
+      fs.chmodSync(tempPath, origStat.mode);
+
+      fs.renameSync(tempPath, outputPath);
+      tempCreated = false;
+
+      debug('repackELFSection: Write completed successfully');
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error.code === 'ETXTBSY' ||
+          error.code === 'EBUSY' ||
+          error.code === 'EPERM')
+      ) {
+        throw new Error(
+          'Cannot update the Claude executable while it is running.\n' +
+            'Please close all Claude instances and try again.'
+        );
+      }
+      throw error;
+    } finally {
+      if (tempCreated) {
+        try {
+          fs.unlinkSync(tempPath);
+        } catch {
+          // Ignore cleanup errors
         }
       }
     }
-
-    if (bunCompiledVaddr === null) {
-      throw new Error(
-        'Could not find original BUN_COMPILED location in binary'
-      );
-    }
-
-    // Set the new section content
-    bunSection.content = newSectionData;
-
-    // Update the PT_LOAD segment sizes to cover the new content.
-    // LIEF's ELF Builder handles the actual file layout, but we need to tell
-    // the segment how big the mapped region should be.
-    const pageSize = Number(bunSegment.alignment);
-    const alignedSize = BigInt(
-      Math.ceil(newSectionData.length / pageSize) * pageSize
-    );
-    bunSegment.fileSize = alignedSize;
-    bunSegment.virtualSize = alignedSize;
-
-    debug(
-      `repackELFSection: Updated segment: filesz=0x${bunSegment.fileSize.toString(16)}, ` +
-        `memsz=0x${bunSegment.virtualSize.toString(16)}`
-    );
-
-    // Patch BUN_COMPILED.size to point to the .bun section vaddr.
-    // The vaddr doesn't change (LIEF keeps the section at the same virtual address),
-    // so we just re-write the same value to ensure it's correct.
-    const vaddrPatch = Buffer.alloc(8);
-    vaddrPatch.writeBigUInt64LE(bunSectionVaddr);
-    elfBinary.patchAddress(bunCompiledVaddr, vaddrPatch);
-
-    debug(
-      `repackELFSection: Patched BUN_COMPILED at vaddr 0x${bunCompiledVaddr.toString(16)} -> 0x${bunSectionVaddr.toString(16)}`
-    );
-
-    // Write the modified binary
-    atomicWriteBinary(elfBinary, outputPath, binPath);
-    debug('repackELFSection: Write completed successfully');
   } catch (error) {
     console.error('repackELFSection failed:', error);
     throw error;
@@ -1400,11 +1531,31 @@ export function repackNativeInstallation(
   // Extract Bun data and rebuild with modified claude.js
   const { bunOffsets, bunData, sectionHeaderSize, moduleStructSize } =
     getBunData(binary);
+
+  // For the ELF .bun section format, we use direct file I/O and cannot grow the
+  // section. Compute a size budget so rebuildBunData() can truncate expendable
+  // fields (sourcemaps, bytecodes) when the patched JS is larger than the original.
+  let sectionSizeBudget: number | undefined;
+  if (binary.format === 'ELF' && sectionHeaderSize) {
+    const elfBinary = binary as LIEF.ELF.Binary;
+    const bunSection = elfBinary.getSection('.bun');
+    if (bunSection) {
+      // The section holds [u64/u32 header][bun data blob].
+      // The bun data blob must fit in (sectionSize - headerSize).
+      sectionSizeBudget = Number(bunSection.size) - sectionHeaderSize;
+      debug(
+        `repackNativeInstallation: ELF .bun section budget = ${sectionSizeBudget} bytes ` +
+          `(section=${Number(bunSection.size)}, header=${sectionHeaderSize})`
+      );
+    }
+  }
+
   const newBuffer = rebuildBunData(
     bunData,
     bunOffsets,
     modifiedClaudeJs,
-    moduleStructSize
+    moduleStructSize,
+    sectionSizeBudget
   );
 
   switch (binary.format) {

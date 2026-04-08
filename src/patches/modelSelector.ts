@@ -68,6 +68,16 @@ const findCustomModelListInsertionPoint = (
 };
 
 export const writeModelCustomizations = (oldFile: string): string | null => {
+  // Skip if custom models are already injected (e.g. from a previous
+  // tweakcc run baked into the backup, or future native support).
+  // The JSON.stringify format uses quoted keys: {"value":"claude-opus-4-6",...}
+  if (oldFile.includes('"value":"claude-opus-4-6"')) {
+    console.log(
+      'patch: modelCustomizations: custom models already present — skipping'
+    );
+    return oldFile;
+  }
+
   const found = findCustomModelListInsertionPoint(oldFile);
   if (!found) return null;
 

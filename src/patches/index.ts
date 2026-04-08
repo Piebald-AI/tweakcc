@@ -846,7 +846,10 @@ export const applyCustomization = async (
     },
     'mcp-non-blocking': {
       fn: c => writeMcpNonBlocking(c),
-      condition: !!config.settings.misc?.mcpConnectionNonBlocking,
+      condition:
+        !!config.settings.misc?.mcpConnectionNonBlocking &&
+        (ccInstInfo.version == null ||
+          compareVersions(ccInstInfo.version, '2.1.85') < 0),
     },
     'mcp-batch-size': {
       fn: c => writeMcpBatchSize(c, config.settings.misc!.mcpServerBatchSize!),

@@ -36,6 +36,16 @@ import { showDiff } from './index';
  */
 
 export const writeThinkingVisibility = (oldFile: string): string | null => {
+  // CC ≥ 2.1.87 ships with thinking blocks always visible — skip if already configured.
+  const nativeCheck =
+    /case"thinking":\{(?:(?!case")[^]){0,600}isTranscriptMode:true/;
+  if (nativeCheck.test(oldFile)) {
+    console.log(
+      'patch: thinkingVisibility: already configured natively — skipping'
+    );
+    return oldFile;
+  }
+
   // Unified pattern that matches both formats:
   // - Group 1: `case"thinking":` (+/- `{`)
   // - Group 2: `if(...) return null;` (the early return we want to remove)

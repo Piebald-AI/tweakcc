@@ -296,7 +296,7 @@ export const findTextComponent = (fileContents: string): string | undefined => {
   // The minified Text component has this signature:
   // function X({color:A,backgroundColor:B,dimColor:C=!1,bold:D=!1,...})
   const textComponentPattern =
-    /\bfunction ([$\w]+).{0,20}color:[$\w]+,backgroundColor:[$\w]+,dimColor:[$\w]+(?:=![01])?,bold:[$\w]+(?:=![01])?/;
+    /\bfunction ([$\w]+).{0,80}color:[$\w]+,backgroundColor:[$\w]+,dimColor:[$\w]+(?:=![01])?,bold:[$\w]+(?:=![01])?/;
   const match = fileContents.match(textComponentPattern);
   if (!match) {
     console.log('patch: findTextComponent: failed to find text component');
@@ -311,7 +311,7 @@ export const findTextComponent = (fileContents: string): string | undefined => {
 export const findBoxComponent = (fileContents: string): string | undefined => {
   // Method 1: Find Box by ink-box createElement with local variable (CC ~2.0.x)
   const inkBoxPattern =
-    /function ([$\w]+)\(.{0,2000}[^$\w]([$\w]+)=[$\w]+(?:\.default)?\.createElement\("ink-box".{0,200}?return \2/;
+    /function ([$\w]+)\(.{0,2000}[^$\w]([$\w]+)=[$\w]+(?:\.default)?\.createElement\("ink-box".{0,500}?return \2/;
   const inkBoxMatch = fileContents.match(inkBoxPattern);
   if (inkBoxMatch) {
     return inkBoxMatch[1];
@@ -320,7 +320,7 @@ export const findBoxComponent = (fileContents: string): string | undefined => {
   // Method 2: Find Box by direct return of createElement("ink-box"...) (CC 2.1.20+)
   // Pattern: function NAME({children:T,...}){...createElement("ink-box",...),T)}
   const directReturnPattern =
-    /function ([$\w]+)\(\{children:[$\w]+,flexWrap:[$\w]+.{0,2000}?\.createElement\("ink-box"/;
+    /function ([$\w]+)\(.{0,200}children:[$\w]+,flexWrap:[$\w]+.{0,2000}?\.createElement\("ink-box"/;
   const directReturnMatch = fileContents.match(directReturnPattern);
   if (directReturnMatch) {
     return directReturnMatch[1];
