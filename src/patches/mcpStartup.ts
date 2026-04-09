@@ -19,12 +19,34 @@ import { showDiff, LocationResult } from './index';
 const getNonBlockingCheckLocation = (
   oldFile: string
 ): LocationResult | null => {
-  // Match: !VARNAME(process.env.MCP_CONNECTION_NONBLOCKING)
-  // The variable name changes between npm/native builds, so we match any identifier
-  const pattern = /![$\w]+\(process\.env\.MCP_CONNECTION_NONBLOCKING\)/;
-  const match = oldFile.match(pattern);
+  // CC ≥2.1.97: R3=B6(process.env.MCP_CONNECTION_NONBLOCKING)
+  // We replace the assignment value with !0 (true) to force non-blocking
+  const newPattern =
+    /([$\w]+)=[$\w]+\(process\.env\.MCP_CONNECTION_NONBLOCKING\)/;
+  const newMatch = oldFile.match(newPattern);
 
-  if (!match || match.index === undefined) {
+  if (newMatch && newMatch.index !== undefined) {
+    // Replace the whole assignment RHS: VAR=B6(...) → VAR=!0
+    const varName = newMatch[1];
+    return {
+      startIndex: newMatch.index,
+      endIndex: newMatch.index + newMatch[0].length,
+      identifiers: [varName],
+    };
+  }
+
+  // Fall back to old pattern: !VARNAME(process.env.MCP_CONNECTION_NONBLOCKING)
+  const oldPattern = /![$\w]+\(process\.env\.MCP_CONNECTION_NONBLOCKING\)/;
+  const oldMatch = oldFile.match(oldPattern);
+
+  if (!oldMatch || oldMatch.index === undefined) {
+    // CC ≥2.1.97: non-blocking may be hardcoded as R3=!0 (already default)
+    // Check if the flag is already true — if so, no patch needed
+    const hardcodedPattern = /([$\w]+)=!0,.{0,100}MCP_CONNECTION_NONBLOCKING/;
+    if (oldFile.match(hardcodedPattern)) {
+      return null; // Already non-blocking by default
+    }
+
     console.error(
       'patch: mcpStartup: failed to find MCP_CONNECTION_NONBLOCKING check'
     );
@@ -32,8 +54,8 @@ const getNonBlockingCheckLocation = (
   }
 
   return {
-    startIndex: match.index,
-    endIndex: match.index + match[0].length,
+    startIndex: oldMatch.index,
+    endIndex: oldMatch.index + oldMatch[0].length,
   };
 };
 
@@ -44,30 +66,41 @@ const getNonBlockingCheckLocation = (
  * We want to replace the "3" with a higher value.
  */
 const getBatchSizeLocation = (oldFile: string): LocationResult | null => {
-  // Match the full pattern and capture position of the default "3"
-  // Pattern: MCP_SERVER_CONNECTION_BATCH_SIZE||"",10)||3
-  const pattern = /MCP_SERVER_CONNECTION_BATCH_SIZE\|\|"",10\)\|\|(\d+)/;
-  const match = oldFile.match(pattern);
+  // CC ≥2.1.97: return q>0?q:3  (inside a function that parses the env var)
+  const newPattern =
+    /MCP_SERVER_CONNECTION_BATCH_SIZE\|\|"",10\);return [$\w]+>0\?[$\w]+:(\d+)/;
+  const newMatch = oldFile.match(newPattern);
 
-  if (!match || match.index === undefined) {
+  if (newMatch && newMatch.index !== undefined) {
+    const fullMatch = newMatch[0];
+    const defaultValue = newMatch[1];
+    const defaultValueOffset = fullMatch.lastIndexOf(defaultValue);
+
+    const startIndex = newMatch.index + defaultValueOffset;
+    const endIndex = startIndex + defaultValue.length;
+
+    return { startIndex, endIndex };
+  }
+
+  // Fall back to old pattern: MCP_SERVER_CONNECTION_BATCH_SIZE||"",10)||3
+  const oldPattern = /MCP_SERVER_CONNECTION_BATCH_SIZE\|\|"",10\)\|\|(\d+)/;
+  const oldMatch = oldFile.match(oldPattern);
+
+  if (!oldMatch || oldMatch.index === undefined) {
     console.error(
       'patch: mcpStartup: failed to find MCP_SERVER_CONNECTION_BATCH_SIZE default'
     );
     return null;
   }
 
-  // Find the position of the default number (the captured group)
-  const fullMatch = match[0];
-  const defaultValue = match[1];
+  const fullMatch = oldMatch[0];
+  const defaultValue = oldMatch[1];
   const defaultValueOffset = fullMatch.lastIndexOf(defaultValue);
 
-  const startIndex = match.index + defaultValueOffset;
+  const startIndex = oldMatch.index + defaultValueOffset;
   const endIndex = startIndex + defaultValue.length;
 
-  return {
-    startIndex,
-    endIndex,
-  };
+  return { startIndex, endIndex };
 };
 
 /**
@@ -76,11 +109,17 @@ const getBatchSizeLocation = (oldFile: string): LocationResult | null => {
 export const writeMcpNonBlocking = (oldFile: string): string | null => {
   const location = getNonBlockingCheckLocation(oldFile);
   if (!location) {
+    // CC ≥2.1.97: non-blocking is already the default (hardcoded !0)
+    const hardcoded = /([$\w]+)=!0,.{0,100}MCP_CONNECTION_NONBLOCKING/;
+    if (oldFile.match(hardcoded)) return oldFile;
     return null;
   }
 
-  // Replace the check with "false" to force non-blocking mode
-  const newValue = 'false';
+  // New pattern (CC ≥2.1.97): replace VAR=B6(...) with VAR=!0
+  // Old pattern: replace !fn(...) with false
+  const newValue = location.identifiers
+    ? `${location.identifiers[0]}=!0`
+    : 'false';
   const newFile =
     oldFile.slice(0, location.startIndex) +
     newValue +

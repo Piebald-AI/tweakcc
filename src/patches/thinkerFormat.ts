@@ -39,6 +39,28 @@ const getThinkerFormatLocation = (oldFile: string): LocationResult | null => {
     };
   }
 
+  // CC ≥2.1.97 template literal form: =`${EXPR}… `
+  const formatPatternTemplate =
+    /,([$\w]+)(=(`\$\{([$\w]+&&![$\w]+\.isIdle\?[$\w]+\.spinnerVerb\?\?[$\w]+:[$\w]+)\}(?:…|\\u2026) `))/;
+  const formatMatchTemplate = searchSection.match(formatPatternTemplate);
+
+  if (formatMatchTemplate && formatMatchTemplate.index != undefined) {
+    return {
+      startIndex:
+        approxAreaMatch.index +
+        formatMatchTemplate.index +
+        formatMatchTemplate[1].length +
+        1,
+      endIndex:
+        approxAreaMatch.index +
+        formatMatchTemplate.index +
+        formatMatchTemplate[1].length +
+        formatMatchTemplate[2].length +
+        1,
+      identifiers: [formatMatchTemplate[4]],
+    };
+  }
+
   // Fallback pattern: =($a&&!$b.isIdle?$c.spinnerVerb??$d:$e)+"…"
   const formatPatternNew =
     /,([$\w]+)(=(\([$\w]+&&![$\w]+\.isIdle\?[$\w]+\.spinnerVerb\?\?[$\w]+:[$\w]+\))\+"(?:…|\\u2026)")/;

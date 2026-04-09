@@ -73,6 +73,8 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
+import { writeDisableGarnetLoom } from './garnetLoom';
+import { writeMaxAgentTurns } from './maxAgentTurns';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -429,6 +431,20 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Enable MCP channel notifications (--channels without allowlist or dev flag)',
+  },
+  {
+    id: 'disable-garnet-loom',
+    name: 'Disable garnet loom',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Prevent server-side auto-downgrade of Opus subagents to Sonnet',
+  },
+  {
+    id: 'max-agent-turns',
+    name: 'Max agent turns',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Make subagent maxTurns configurable via CLAUDE_CODE_MAX_AGENT_TURNS env var',
   },
 ] as const;
 
@@ -887,6 +903,14 @@ export const applyCustomization = async (
     'channels-mode': {
       fn: c => writeChannelsMode(c),
       condition: !!config.settings.misc?.enableChannelsMode,
+    },
+    'disable-garnet-loom': {
+      fn: c => writeDisableGarnetLoom(c),
+      condition: !!config.settings.misc?.disableGarnetLoom,
+    },
+    'max-agent-turns': {
+      fn: c => writeMaxAgentTurns(c),
+      condition: !!config.settings.misc?.enableMaxAgentTurnsOverride,
     },
   };
 

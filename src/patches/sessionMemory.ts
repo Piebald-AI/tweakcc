@@ -177,18 +177,25 @@ const patchUpdateThresholds = (file: string): string | null => {
 };
 
 /**
- * Combined patch - applies extraction, past sessions, token limits, and update thresholds
+ * Combined patch - applies extraction, past sessions, token limits, and update thresholds.
+ * Past sessions, token limits, and update thresholds are non-fatal (patterns may be absent
+ * in newer CC versions where the feature is restructured).
  */
 export const writeSessionMemory = (oldFile: string): string | null => {
   let newFile = patchExtraction(oldFile);
   if (!newFile) return null;
 
-  newFile = patchPastSessions(newFile);
-  if (!newFile) return null;
+  // Past sessions patch is non-fatal — tengu_coral_fern may be absent or restructured
+  const pastResult = patchPastSessions(newFile);
+  if (pastResult) newFile = pastResult;
 
-  newFile = patchTokenLimits(newFile);
-  if (!newFile) return null;
+  // Token limits patch is non-fatal — constants may be renamed or restructured
+  const limitsResult = patchTokenLimits(newFile);
+  if (limitsResult) newFile = limitsResult;
 
-  newFile = patchUpdateThresholds(newFile);
+  // Update thresholds patch is non-fatal — constants may be renamed or restructured
+  const threshResult = patchUpdateThresholds(newFile);
+  if (threshResult) newFile = threshResult;
+
   return newFile;
 };

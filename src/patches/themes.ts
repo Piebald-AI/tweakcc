@@ -20,8 +20,10 @@ function getThemesLocation(oldFile: string): {
 
   const objArrPat =
     /\[(?:\.\.\.\[\],)?(?:\{label:"(?:Dark|Light|Auto)[^"]*",value:"[^"]+"\},?)+\]/;
+  // CC ≥2.1.97: assignment form XZY={auto:"Auto...",dark:"Dark...",...}
+  // CC <2.1.97: return form return{auto:"Auto...",dark:"Dark...",...}
   const objPat =
-    /return\{(?:(?:[$\w]+|"[^"]+"):"(?:Auto|Dark|Light)[^"]*",?)+\}/;
+    /(?:return|[$\w]+\s*=)\{(?:(?:[$\w]+|"[^"]+"):"(?:[Aa]uto|[Dd]ark|[Ll]ight)[^"]*",?)+\}/;
   const objArrMatch = oldFile.match(objArrPat);
   const objMatch = oldFile.match(objPat);
 
@@ -70,8 +72,16 @@ export const writeThemes = (
   // Process in reverse order to avoid index shifting
 
   // Update theme mapping object (obj)
+  // Detect whether original used "return{...}" or "VAR={...}" form
+  const origObjText = oldFile.slice(
+    locations.obj.startIndex,
+    locations.obj.endIndex
+  );
+  const objPrefix = origObjText.startsWith('return')
+    ? 'return'
+    : origObjText.slice(0, origObjText.indexOf('{'));
   const obj =
-    'return' +
+    objPrefix +
     JSON.stringify(
       Object.fromEntries(themes.map(theme => [theme.id, theme.name]))
     );

@@ -33,30 +33,41 @@ export const writeTokenCountRounding = (
   let post: string;
   let startIndex: number;
 
-  // Try newer version pattern first
-  // Pattern: overrideMessage:..., VAR=FUNC(EXPR),...key:"tokens"..., VAR," tokens"
-  const m1 = oldFile.match(
-    /(overrideMessage:.{0,10000},([$\w]+)=[$\w]+\()(.+?)(\),.{0,1000}key:"tokens".{0,200},\2," tokens")/
+  // CC ≥2.1.97: token count computed directly as H6=W&&!W.isIdle?W.progress?.tokenCount??0:O6+D
+  // Look for the tokenCount assignment near " tokens" (template literal or string)
+  const m0 = oldFile.match(
+    /(,([$\w]+)=)([$\w]+&&![$\w]+\.isIdle\?[$\w]+\.progress\?\.tokenCount\?\?0:[$\w]+\+[$\w]+)(,.{0,200} tokens)/
   );
 
-  if (m1 && m1.index !== undefined) {
-    [fullMatch, pre, , partToWrap, post] = m1;
-    startIndex = m1.index;
+  if (m0 && m0.index !== undefined) {
+    [fullMatch, pre, , partToWrap, post] = m0;
+    startIndex = m0.index;
   } else {
-    // Try older version pattern
-    // Pattern: overrideMessage:...,key:"tokens"...FUNC(Math.round(...))
-    const m2 = oldFile.match(
-      /(overrideMessage:.{0,10000},key:"tokens".{0,200}[$\w]+\()(Math\.round\(.+?\))(\))/
+    // Try newer version pattern
+    // Pattern: overrideMessage:..., VAR=FUNC(EXPR),...key:"tokens"..., VAR," tokens"
+    const m1 = oldFile.match(
+      /(overrideMessage:.{0,10000},([$\w]+)=[$\w]+\()(.+?)(\),.{0,1000}key:"tokens".{0,200},\2," tokens")/
     );
 
-    if (m2 && m2.index !== undefined) {
-      [fullMatch, pre, partToWrap, post] = m2;
-      startIndex = m2.index;
+    if (m1 && m1.index !== undefined) {
+      [fullMatch, pre, , partToWrap, post] = m1;
+      startIndex = m1.index;
     } else {
-      console.error(
-        'patch: tokenCountRounding: cannot find token count pattern in either newer or older CC format'
+      // Try older version pattern
+      // Pattern: overrideMessage:...,key:"tokens"...FUNC(Math.round(...))
+      const m2 = oldFile.match(
+        /(overrideMessage:.{0,10000},key:"tokens".{0,200}[$\w]+\()(Math\.round\(.+?\))(\))/
       );
-      return null;
+
+      if (m2 && m2.index !== undefined) {
+        [fullMatch, pre, partToWrap, post] = m2;
+        startIndex = m2.index;
+      } else {
+        console.error(
+          'patch: tokenCountRounding: cannot find token count pattern in either newer or older CC format'
+        );
+        return null;
+      }
     }
   }
 

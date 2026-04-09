@@ -333,6 +333,35 @@ export const findBoxComponent = (fileContents: string): string | undefined => {
     return boxDisplayNameMatch[1];
   }
 
+  // Method 4: Find Box by createElement usage near known anchor (CC 2.1.97+)
+  // In 2.1.97, ink-box is no longer used via createElement directly in most code.
+  // Instead, a Box wrapper component is assigned to a short local variable (e.g. `u`)
+  // and used as createElement(u, {flexDirection:...}). We find it by locating a known
+  // anchor (the "Claude Code" bold text in the header) and checking which variable
+  // is used with flexDirection props nearby.
+  const headerAnchor = fileContents.match(
+    /createElement\([$\w]+,\{bold:!0\},"Claude Code"\)/
+  );
+  if (headerAnchor && headerAnchor.index !== undefined) {
+    const searchStart = Math.max(0, headerAnchor.index - 2000);
+    const searchEnd = Math.min(fileContents.length, headerAnchor.index + 2000);
+    const region = fileContents.slice(searchStart, searchEnd);
+    const boxUsage = region.match(
+      /createElement\(([$\w]+),\{(?:flexDirection|gap|marginBottom)/
+    );
+    if (boxUsage) {
+      return boxUsage[1];
+    }
+  }
+
+  // Method 4b: Fallback — find Box wrapper by border prop destructuring
+  const borderBoxPattern =
+    /function ([$\w]+)\([$\w]+\)\{.{0,200}borderColor:[$\w]+,borderTopColor:[$\w]+,borderBottomColor:[$\w]+,borderLeftColor:[$\w]+,borderRightColor:[$\w]+,backgroundColor:[$\w]+,children:[$\w]+,ref:[$\w]+/;
+  const borderBoxMatch = fileContents.match(borderBoxPattern);
+  if (borderBoxMatch) {
+    return borderBoxMatch[1];
+  }
+
   console.error(
     'patch: findBoxComponent: failed to find Box component (neither ink-box createElement nor displayName found)'
   );

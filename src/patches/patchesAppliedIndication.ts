@@ -40,15 +40,38 @@ const findTweakccVersionLocation = (
   const pattern =
     /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)/;
   const match = fileContents.match(pattern);
-  if (!match || match.index === undefined) {
+  if (match && match.index !== undefined) {
+    // Insert right after this match
+    const insertIndex = match.index + match[0].length;
+    return {
+      startIndex: insertIndex,
+      endIndex: insertIndex,
+    };
+  }
+
+  // CC 2.1.97+: version display is in a memo-cached wrapper
+  // createElement(T,null,x," ",createElement(T,{dimColor:!0},"v",G))
+  // Insert after inner createElement (before outer closing paren)
+  const boldIdx = fileContents.indexOf('{bold:!0},"Claude Code"');
+  if (boldIdx === -1) {
     console.error(
       'patch: patchesAppliedIndication: failed to find Claude Code version pattern'
     );
     return null;
   }
 
-  // Insert right after this match
-  const insertIndex = match.index + match[0].length;
+  const searchRegion = fileContents.slice(boldIdx, boldIdx + 500);
+  const versionPattern =
+    /\.createElement\([$\w]+,\{dimColor:!0\},"v",[$\w]+\)(?=\))/;
+  const versionMatch = searchRegion.match(versionPattern);
+  if (!versionMatch || versionMatch.index === undefined) {
+    console.error(
+      'patch: patchesAppliedIndication: failed to find Claude Code version pattern (2.1.97+)'
+    );
+    return null;
+  }
+
+  const insertIndex = boldIdx + versionMatch.index + versionMatch[0].length;
   return {
     startIndex: insertIndex,
     endIndex: insertIndex,
@@ -183,7 +206,10 @@ const applyIndicatorPatchesListPatch = (
   let currentIndex = startIndex;
   let insertionIndex = -1;
 
-  while (currentIndex < fileContents.length) {
+  while (
+    currentIndex < fileContents.length &&
+    currentIndex < startIndex + 5000
+  ) {
     const ch = fileContents[currentIndex];
     if (ch === '(') {
       level++;
@@ -196,6 +222,23 @@ const applyIndicatorPatchesListPatch = (
       level--;
     }
     currentIndex++;
+  }
+
+  // CC 2.1.97+: memo caching flattens the nesting, so the stack machine won't find
+  // level 1. Instead, find the Fragment createElement near the end of the enclosing
+  // function and insert our element as an additional child.
+  if (insertionIndex === -1) {
+    // Find the enclosing function's return statement by looking for
+    // createElement(REACT.Fragment,null,...) after the startIndex
+    const searchRegion = fileContents.slice(startIndex, startIndex + 5000);
+    const fragmentPattern =
+      /\.createElement\(([$\w]+)\.Fragment,null,(?:[$\w]+,)*[$\w]+\)/;
+    const fragmentMatch = searchRegion.match(fragmentPattern);
+    if (fragmentMatch && fragmentMatch.index !== undefined) {
+      // Insert before the closing ) of the Fragment createElement
+      insertionIndex =
+        startIndex + fragmentMatch.index + fragmentMatch[0].length - 1;
+    }
   }
 
   if (insertionIndex === -1) {
@@ -246,10 +289,17 @@ const applyIndicatorPatchesListPatch = (
 const findPatchesListLocation = (
   fileContents: string
 ): LocationResult | null => {
-  // 1. Find the same regex as patch 2
-  const pattern =
+  // 1. Find "Claude Code" bold text as anchor
+  // Try full version pattern first (pre-2.1.97), then fallback to simpler pattern
+  let pattern: RegExp =
     /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)/;
-  const match = fileContents.match(pattern);
+  let match = fileContents.match(pattern);
+  if (!match) {
+    // CC 2.1.97+: version is memo-cached separately, use simpler anchor
+    pattern =
+      /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)/;
+    match = fileContents.match(pattern);
+  }
   if (!match || match.index === undefined) {
     console.error(
       'patch: patchesAppliedIndication: failed to find Claude Code version pattern for patch 3'
