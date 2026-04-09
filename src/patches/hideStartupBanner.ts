@@ -3,22 +3,35 @@
 import { LocationResult, showDiff } from './index';
 
 const getStartupBannerLocation = (oldFile: string): LocationResult | null => {
-  // Find the createElement with isBeforeFirstMessage:!1
-  const pattern =
+  // Try old pattern first: createElement with isBeforeFirstMessage:!1
+  const oldPattern =
     /,[$\w]+\.createElement\([$\w]+,\{isBeforeFirstMessage:!1\}\),/;
-  const match = oldFile.match(pattern);
+  const oldMatch = oldFile.match(oldPattern);
 
-  if (!match || match.index === undefined) {
-    console.error(
-      'patch: hideStartupBanner: failed to find startup banner createElement'
-    );
-    return null;
+  if (oldMatch && oldMatch.index !== undefined) {
+    return {
+      startIndex: oldMatch.index,
+      endIndex: oldMatch.index + oldMatch[0].length,
+    };
   }
 
-  return {
-    startIndex: match.index,
-    endIndex: match.index + match[0].length,
-  };
+  // CC ≥2.1.97: startup redesigned to IDE onboarding screen
+  // Function: function YI4(){let q=j8(),K=_y.terminal||"unknown";return q.hasIdeOnboardingBeenShown?.[K]===!0}
+  const newPattern =
+    /function ([$\w]+)\(\)\{let [$\w]+=[$\w]+\(\),[$\w]+=[$\w]+\.terminal\|\|"unknown";return [$\w]+\.hasIdeOnboardingBeenShown\?\.\[[$\w]+\]===!0\}/;
+  const newMatch = oldFile.match(newPattern);
+
+  if (newMatch && newMatch.index !== undefined) {
+    return {
+      startIndex: newMatch.index,
+      endIndex: newMatch.index + newMatch[0].length,
+    };
+  }
+
+  console.error(
+    'patch: hideStartupBanner: failed to find startup banner pattern'
+  );
+  return null;
 };
 
 export const writeHideStartupBanner = (oldFile: string): string | null => {
@@ -27,12 +40,30 @@ export const writeHideStartupBanner = (oldFile: string): string | null => {
     return null;
   }
 
-  // Remove the element by slicing it out (replace with just a comma to maintain syntax)
+  const originalText = oldFile.slice(location.startIndex, location.endIndex);
+
+  let replacement: string;
+
+  if (originalText.startsWith(',')) {
+    // Old pattern: remove the element by replacing with just a comma
+    replacement = ',';
+  } else {
+    // New pattern (CC ≥2.1.97): force YI4() to always return true (skip onboarding)
+    // Insert return !0; right after the opening brace
+    replacement = originalText.replace(/\{let/, '{return !0;let');
+  }
+
   const newFile =
     oldFile.slice(0, location.startIndex) +
-    ',' +
+    replacement +
     oldFile.slice(location.endIndex);
 
-  showDiff(oldFile, newFile, ',', location.startIndex, location.endIndex);
+  showDiff(
+    oldFile,
+    newFile,
+    replacement,
+    location.startIndex,
+    location.endIndex
+  );
   return newFile;
 };

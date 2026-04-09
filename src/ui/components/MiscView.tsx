@@ -85,6 +85,8 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableVoiceMode: false,
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
+    disableGarnetLoom: false,
+    enableMaxAgentTurnsOverride: false,
   };
 
   const ensureMisc = () => {
@@ -445,6 +447,34 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.enableChannelsMode =
               !settings.misc!.enableChannelsMode;
+          });
+        },
+      },
+      {
+        id: 'disableGarnetLoom',
+        title: 'Disable garnet loom (prevent Opus→Sonnet downgrade)',
+        description:
+          'Prevents server-side auto-downgrade of Opus subagents to Sonnet when context is under 200K tokens.',
+        getValue: () => settings.misc?.disableGarnetLoom ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.disableGarnetLoom =
+              !settings.misc!.disableGarnetLoom;
+          });
+        },
+      },
+      {
+        id: 'enableMaxAgentTurnsOverride',
+        title: 'Max agent turns override (env var)',
+        description:
+          'Makes subagent maxTurns configurable via CLAUDE_CODE_MAX_AGENT_TURNS env var. Default: 20, max: 100.',
+        getValue: () => settings.misc?.enableMaxAgentTurnsOverride ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableMaxAgentTurnsOverride =
+              !settings.misc!.enableMaxAgentTurnsOverride;
           });
         },
       },

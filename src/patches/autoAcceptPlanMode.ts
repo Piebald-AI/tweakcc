@@ -47,9 +47,11 @@ export const writeAutoAcceptPlanMode = (oldFile: string): string | null => {
 
   // Look for onChange handler after Ready to code
   const afterReady = oldFile.slice(readyIdx, readyIdx + 3000);
-  const onChangeMatch = afterReady.match(
-    /onChange:\([$\w]+\)=>([$\w]+)\([$\w]+\),onCancel/
-  );
+  // CC ≥2.1.97: onChange:J6,onCancel (direct reference)
+  // CC <2.1.97: onChange:(X)=>FUNC(X),onCancel (arrow wrapper)
+  const onChangeMatch =
+    afterReady.match(/onChange:([$\w]+),onCancel/) ||
+    afterReady.match(/onChange:\([$\w]+\)=>([$\w]+)\([$\w]+\),onCancel/);
   if (!onChangeMatch) {
     console.error('patch: autoAcceptPlanMode: failed to find onChange handler');
     return null;
@@ -67,8 +69,10 @@ export const writeAutoAcceptPlanMode = (oldFile: string): string | null => {
 
   // Match the end of the "Exit plan mode?" conditional and the start of
   // the "Ready to code?" return.
+  // CC ≥2.1.97: wrapper changed from Fragment to Box (u) with props
+  // CC <2.1.97: wrapper is Fragment with null
   const pattern =
-    /(\}\}\)\)\)\);)(return [$\w]+\.default\.createElement\([$\w]+\.default\.Fragment,null,[$\w]+\.default\.createElement\([$\w]+,\{color:"planMode",title:"Ready to code\?")/;
+    /(\}\}\)\)\)\);)(return [$\w]+\.default\.createElement\((?:[$\w]+\.default\.Fragment,null|[$\w]+,\{[^}]*\}),[$\w]+\.default\.createElement\([$\w]+,\{color:"planMode",title:"Ready to code\?")/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {

@@ -5,8 +5,9 @@ import { showDiff } from './index';
 export const writeSuppressRateLimitOptions = (
   oldFile: string
 ): string | null => {
+  // CC ≥2.1.97: shorter prefix to avoid match failure from wide .createElement prefix
   const pattern =
-    /\.createElement.{0,500},showAllInTranscript:[$\w]+,agentDefinitions:[$\w]+,onOpenRateLimitOptions:([$\w]+)/;
+    /showAllInTranscript:[$\w]+,agentDefinitions:[$\w]+,onOpenRateLimitOptions:([$\w]+)/;
 
   const match = oldFile.match(pattern);
 

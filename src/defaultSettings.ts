@@ -719,6 +719,8 @@ export const DEFAULT_SETTINGS: Settings = {
     enableVoiceMode: false,
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
+    disableGarnetLoom: false,
+    enableMaxAgentTurnsOverride: false,
   },
   toolsets: [],
   defaultToolset: null,

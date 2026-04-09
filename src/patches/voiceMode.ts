@@ -28,16 +28,35 @@
 import { showDiff } from './index';
 
 const patchAmberQuartz = (file: string): string | null => {
-  const pattern = /function [$\w]+\(\)\{return [$\w]+\("tengu_amber_quartz"/;
+  // CC ≥2.1.97: flag renamed to tengu_amber_quartz_disabled with inverted logic
+  // Pattern: function Z36(){return!R8("tengu_amber_quartz_disabled",!1)}
+  const newPattern =
+    /function ([$\w]+)\(\)\{return![$\w]+\("tengu_amber_quartz_disabled"/;
+  const newMatch = file.match(newPattern);
 
-  const match = file.match(pattern);
+  if (newMatch && newMatch.index !== undefined) {
+    // Inverted logic: return!flagCheck means "return true if NOT disabled"
+    // We want to always return true, so insert return !0; at start of function body
+    const insertIndex = newMatch.index + newMatch[0].indexOf('{') + 1;
+    const insertion = 'return !0;';
 
-  if (!match || match.index === undefined) {
+    const newFile =
+      file.slice(0, insertIndex) + insertion + file.slice(insertIndex);
+
+    showDiff(file, newFile, insertion, insertIndex, insertIndex);
+    return newFile;
+  }
+
+  // Fall back to old pattern: function qX_(){return A9("tengu_amber_quartz",!1)}
+  const oldPattern = /function [$\w]+\(\)\{return [$\w]+\("tengu_amber_quartz"/;
+  const oldMatch = file.match(oldPattern);
+
+  if (!oldMatch || oldMatch.index === undefined) {
     console.error('patch: voiceMode: failed to find tengu_amber_quartz gate');
     return null;
   }
 
-  const insertIndex = match.index + match[0].indexOf('{') + 1;
+  const insertIndex = oldMatch.index + oldMatch[0].indexOf('{') + 1;
   const insertion = 'return !0;';
 
   const newFile =
@@ -82,8 +101,9 @@ export const writeVoiceMode = (
   if (!newFile) return null;
 
   if (enableConciseOutput) {
-    newFile = patchConciseOutput(newFile);
-    if (!newFile) return null;
+    // sotto_voce was removed in CC ≥2.1.97 — make non-fatal
+    const result = patchConciseOutput(newFile);
+    if (result) newFile = result;
   }
 
   return newFile;

@@ -144,21 +144,33 @@ export const writeUserMessageDisplay = (
   // See the older examples above.  We explictly look for and match the component and subcomponent
   // that renders the ">" in older versions so that we can silently drop it in the replacement,
   // removing it in versions where it's present and not failing on versions where it's not.
-  const pattern =
-    /(No content found in user prompt message.{0,150}?\b)([$\w]+(?:\.default)?\.createElement.{0,30}\b[$\w]+(?:\.default)?\.createElement.{0,40}">.+?)?(([$\w]+(?:\.default)?\.createElement).{0,100})(\([$\w]+,(?:\{[^{}]+wrap:"wrap"\},([$\w]+)(?:\.trim\(\))?\)\)|\{text:([$\w]+)(?:,thinkingMetadata:[$\w]+)?\}\)\)?))/;
+  // Pattern for CC ≤2.1.21: uses createElement nesting with wrap/text props
+  const patternOld =
+    /(No content found in user prompt message.{0,150}?\b)([$\w]+(?:\.default)?\.createElement.{0,30}\b[$\w]+(?:\.default)?\.createElement.{0,40}">.+?)?(([$\w]+(?:\.default)?\.createElement).{0,300})(\([$\w]+,(?:\{[^{}]+wrap:"wrap"\},([$\w]+)(?:\.trim\(\))?\)\)|\{text:([$\w]+)(?:,thinkingMetadata:[$\w]+)?\}\)\)?|\{text:([$\w]+)[^}]*\}\)\)?))/;
 
-  const match = oldFile.match(pattern);
+  // Pattern for CC 2.1.97+: simplified return with template literal
+  // return CE(u,null,CE(T,null,Y8(` > ${w} `)))
+  const pattern297 =
+    /(No content found in user prompt message.{0,150}?return )([$\w]+(?:\.default)?\.createElement)\([$\w]+,null,\2\([$\w]+,null,[$\w]+\(` > \$\{([$\w]+)\} `\)\)\)/;
 
-  if (!match || match.index === undefined) {
-    console.error(
-      'patch: userMessageDisplay: failed to find user message display pattern'
-    );
-    return null;
+  let match = oldFile.match(patternOld);
+  let createElementFn: string;
+  let messageVar: string;
+
+  if (match && match.index !== undefined) {
+    createElementFn = match[4];
+    messageVar = match[6] ?? match[7] ?? match[8];
+  } else {
+    match = oldFile.match(pattern297);
+    if (!match || match.index === undefined) {
+      console.error(
+        'patch: userMessageDisplay: failed to find user message display pattern'
+      );
+      return null;
+    }
+    createElementFn = match[2];
+    messageVar = match[3];
   }
-
-  const createElementFn = match[4];
-  // Either match[6] or match[7] will be present (never both)
-  const messageVar = match[6] ?? match[7];
 
   // Build box attributes (border and padding)
   const boxAttrs: string[] = [];

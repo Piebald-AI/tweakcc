@@ -91,8 +91,8 @@ export const writeStatuslineUpdateThrottle = (
   useFixedInterval: boolean = false
 ): string | null => {
   // Pattern breakdown:
-  // - (([$\w]+)=([$\w]+(?:\.default)?)\.useCallback.{0,1000}statusLineText.{0,200}?)
-  //   Match[1]: Everything up to and including the statusLineText context (firstPart)
+  // - (([$\w]+)=([$\w]+(?:\.default)?)\.useCallback.{0,1000}statusLineText.{0,100}\},\[[$\w,]+\]\))
+  //   Match[1]: Everything up to and including the useCallback deps array (firstPart)
   //   Match[2]: The status line update function name (statuslineUpdateFn)
   //   Match[3]: The React variable, possibly with .default (reactVar)
   //
@@ -100,8 +100,9 @@ export const writeStatuslineUpdateThrottle = (
   //   Match[4]: The old debounced invocation (to be replaced)
   //   Match[5]: The function call with parameter if newer format (e.g., "I(A)")
   //   Match[6]: The argument to the function if newer format (e.g., "A")
+  // CC 2.1.97 setTimeout extra-arg form: setTimeout((R,x)=>{R.current=void 0,x()},300,f,Z)
   const pattern =
-    /(,([$\w]+)=([$\w]+(?:\.default)?)\.useCallback.{0,1000}statusLineText.{0,200}?),([$\w]+)=([$\w.]+\(\(\)=>(\2\(([$\w]+)\)),300\)|[$\w]+\(\2,300\)|.{0,100}\{[$\w]+\.current=void 0,\2\(\)\},300\)\},\[\2\]\))/;
+    /(,([$\w]+)=([$\w]+(?:\.default)?)\.useCallback.{0,1000}statusLineText.{0,100}\},\[[$\w,]+\]\)),([$\w]+)=([$\w.]+\(\(\)=>(\2\(([$\w]+)\)),300\)|[$\w]+\(\2,300\)|.{0,100}\{[$\w]+\.current=void 0,\2\(\)\},300\)\},\[\2\]\)|.{0,100}setTimeout\(\(([$\w]+),([$\w]+)\)=>\{[$\w]+\.current=void 0,[$\w]+\(\)\},300,[$\w]+,\2\)\},\[\2\]\))/;
 
   const match = oldFile.match(pattern);
 

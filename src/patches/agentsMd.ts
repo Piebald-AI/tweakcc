@@ -67,10 +67,19 @@ export const writeAgentsMd = (
 
   const fsPattern = /([$\w]+(?:\(\))?)\.(?:readFileSync|existsSync|statSync)/;
   const fsMatch = funcMatch[0].match(fsPattern);
+
   if (!fsMatch) {
-    console.error('patch: agentsMd: failed to find fs expression in function');
-    return null;
+    // CC 2.1.97+: reading and processing are split into separate functions.
+    // The content processor (sa_) has "Skipping non-text file" but no fs calls.
+    // Check if the feature is already built into this CC version.
+    if (file.includes('didReroute') && file.includes('AGENTS.md')) {
+      // CC 2.1.97+ already has AGENTS.md fallback built in — no patch needed
+      return file;
+    }
+    // Otherwise, patch the async reader function.
+    return writeAgentsMdAsync(file, altNames);
   }
+
   const fsExpr = fsMatch[1];
 
   const altNamesJson = JSON.stringify(altNames);
@@ -116,6 +125,126 @@ export const writeAgentsMd = (
     newFile.slice(earlyReturnStart + oldStr.length);
 
   showDiff(file, newFile, newStr, earlyReturnStart, earlyReturnStart);
+
+  return newFile;
+};
+
+/**
+ * CC 2.1.97+ variant: the file reading function is async and split from processing.
+ *
+ * Structure:
+ * ```
+ * async function yP4(q,K,_){
+ *   try {
+ *     let Y = await X8().readFile(q, {encoding:"utf-8"});
+ *     return sa_(Y, q, K, _);
+ *   } catch(z) {
+ *     return ta_(z, q), {info:null, includePaths:[]};
+ *   }
+ * }
+ * ```
+ *
+ * We patch the catch block to try alternative filenames when ENOENT + CLAUDE.md.
+ */
+const writeAgentsMdAsync = (
+  file: string,
+  altNames: string[]
+): string | null => {
+  const infoNullStr = '{info:null,includePaths:[]}';
+
+  // Find the async reader function by locating {info:null,includePaths:[]}
+  // near a readFile call
+  let infoNullIdx = -1;
+  let searchStart = 0;
+  while (true) {
+    const idx = file.indexOf(infoNullStr, searchStart);
+    if (idx === -1) break;
+
+    const lookback = file.slice(Math.max(0, idx - 500), idx);
+    if (lookback.includes('.readFile')) {
+      infoNullIdx = idx;
+      break;
+    }
+    searchStart = idx + 1;
+  }
+
+  if (infoNullIdx === -1) {
+    console.error(
+      'patch: agentsMd: failed to find async CLAUDE.md reader function (2.1.97+)'
+    );
+    return null;
+  }
+
+  const lookback = file.slice(Math.max(0, infoNullIdx - 500), infoNullIdx);
+
+  // Find the async function definition
+  const asyncFuncPattern =
+    /async function ([$\w]+)\(([$\w]+),([$\w]+),([$\w]+)\)\{/g;
+  const funcMatches = Array.from(lookback.matchAll(asyncFuncPattern));
+  if (funcMatches.length === 0) {
+    console.error(
+      'patch: agentsMd: failed to find async function definition (2.1.97+)'
+    );
+    return null;
+  }
+  const lastFunc = funcMatches[funcMatches.length - 1];
+  const funcName = lastFunc[1];
+  const pathParam = lastFunc[2];
+  const typeParam = lastFunc[3];
+  const resolvedParam = lastFunc[4];
+
+  // Find the catch variable
+  const catchPattern = /catch\(([$\w]+)\)\{/g;
+  const catchMatches = Array.from(lookback.matchAll(catchPattern));
+  if (catchMatches.length === 0) {
+    console.error('patch: agentsMd: failed to find catch block (2.1.97+)');
+    return null;
+  }
+  const catchVar = catchMatches[catchMatches.length - 1][1];
+
+  // Step 1: Add didReroute parameter to the function signature
+  const sigStr = `async function ${funcName}(${pathParam},${typeParam},${resolvedParam})`;
+  const sigIdx = file.indexOf(sigStr);
+  if (sigIdx === -1) {
+    console.error(
+      'patch: agentsMd: failed to locate function signature for injection (2.1.97+)'
+    );
+    return null;
+  }
+  const closingParenIdx = sigIdx + sigStr.length - 1;
+  let newFile =
+    file.slice(0, closingParenIdx) +
+    ',didReroute' +
+    file.slice(closingParenIdx);
+
+  showDiff(file, newFile, ',didReroute', closingParenIdx, closingParenIdx);
+
+  // Step 2: Inject fallback in the catch block before {info:null,...}
+  // The catch block is: catch(z){return ta_(z,q),{info:null,includePaths:[]}}
+  // We inject before the return statement.
+  const catchBlockStr = `catch(${catchVar}){`;
+  const catchBlockIdx = newFile.indexOf(catchBlockStr, sigIdx);
+  if (catchBlockIdx === -1) {
+    console.error(
+      'patch: agentsMd: failed to locate catch block for injection (2.1.97+)'
+    );
+    return null;
+  }
+  const returnIdx = catchBlockIdx + catchBlockStr.length;
+
+  const altNamesJson = JSON.stringify(altNames);
+  const fallback =
+    `if(${catchVar}&&${catchVar}.code==="ENOENT"&&!didReroute` +
+    `&&(${pathParam}.endsWith("/CLAUDE.md")||${pathParam}.endsWith("\\\\CLAUDE.md")))` +
+    `{for(let alt of ${altNamesJson})` +
+    `{try{let altPath=${pathParam}.slice(0,-9)+alt;` +
+    `let r=await ${funcName}(altPath,${typeParam},${resolvedParam},true);` +
+    `if(r.info)return r}catch(e){}}}`;
+
+  const oldFile = newFile;
+  newFile = newFile.slice(0, returnIdx) + fallback + newFile.slice(returnIdx);
+
+  showDiff(oldFile, newFile, fallback, returnIdx, returnIdx);
 
   return newFile;
 };
