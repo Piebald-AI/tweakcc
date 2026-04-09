@@ -3,49 +3,74 @@
 import { showDiff } from './index';
 
 /**
- * Find all Clawd component function body start indices.
+ * Find the Clawd wrapper component function body start index.
+ *
+ * The Clawd rendering has two layers:
+ * - Inner component (e.g., MKz): renders Apple_Terminal Clawd
+ * - Wrapper component (e.g., cE6): renders MKz on Apple or ASCII art otherwise
+ *
+ * We target the WRAPPER to avoid layout issues from nulling just the inner.
  *
  * Steps:
- * 1. Find ALL occurrences of '▛███▜' (the Clawd ASCII art header)
- * 2. For each occurrence:
- *    a. Get 2000 chars previous
- *    b. Find the LAST /function [$\w]+\(\)\{/ in that subsection
- *    c. Get the index after the `{`
- *    d. Add that to a list of indices
- * 3. Return all gotten indices
+ * 1. Find the inner component by looking for '▛███▜' (Clawd ASCII art)
+ * 2. Trace back to find the inner function name
+ * 3. Find the wrapper function that createElement's the inner component
+ * 4. Return the wrapper function body start index
  */
 const findStartupClawdComponents = (oldFile: string): number[] => {
   const indices: number[] = [];
 
   const clawdPattern = /▛███▜|\\u259B\\u2588\\u2588\\u2588\\u259C/gi;
 
-  let clawdMatch: RegExpExecArray | null;
-  while ((clawdMatch = clawdPattern.exec(oldFile)) !== null) {
-    const clawdIndex = clawdMatch.index;
+  // Find the inner component function name
+  const clawdMatch = clawdPattern.exec(oldFile);
+  if (!clawdMatch) return indices;
 
-    // Get 2000 chars before this occurrence
-    const lookbackStart = Math.max(0, clawdIndex - 2000);
-    const beforeText = oldFile.slice(lookbackStart, clawdIndex);
+  const clawdIndex = clawdMatch.index;
+  const lookbackStart = Math.max(0, clawdIndex - 2000);
+  const beforeText = oldFile.slice(lookbackStart, clawdIndex);
 
-    // Find the LAST occurrence of /function [$\w]+\(\)\{/ in that subsection
-    const functionPattern = /function [$\w]+\(\)\{/g;
-    let lastFunctionMatch: RegExpExecArray | null = null;
-    let match: RegExpExecArray | null;
+  const functionPattern = /function ([$\w]+)\([^)]*\)\{/g;
+  let lastFunctionMatch: RegExpExecArray | null = null;
+  let match: RegExpExecArray | null;
+  while ((match = functionPattern.exec(beforeText)) !== null) {
+    lastFunctionMatch = match;
+  }
 
-    while ((match = functionPattern.exec(beforeText)) !== null) {
-      lastFunctionMatch = match;
-    }
+  if (!lastFunctionMatch) {
+    console.error(
+      `patch: hideStartupClawd: failed to find inner Clawd function`
+    );
+    return indices;
+  }
 
-    if (lastFunctionMatch) {
-      // Calculate the absolute index after the `{`
-      const absoluteIndex =
-        lookbackStart + lastFunctionMatch.index + lastFunctionMatch[0].length;
-      indices.push(absoluteIndex);
-    } else {
-      console.error(
-        `patch: hideStartupClawd: failed to find function pattern before Clawd at position ${clawdIndex}`
-      );
-    }
+  const innerFuncName = lastFunctionMatch[1];
+
+  // Find the wrapper function that directly createElement's the inner component.
+  // Iterate all functions and find one where createElement(INNER,) appears
+  // before any nested function definition.
+  const wrapperFuncPattern = /function ([$\w]+)\([^)]*\)\{/g;
+  let wrapperExec: RegExpExecArray | null;
+  let wrapperMatch: { index: number; length: number } | null = null;
+  while ((wrapperExec = wrapperFuncPattern.exec(oldFile)) !== null) {
+    const bodyStart = wrapperExec.index + wrapperExec[0].length;
+    const body = oldFile.slice(bodyStart, bodyStart + 500);
+    const elemIdx = body.indexOf(`createElement(${innerFuncName},`);
+    if (elemIdx === -1) continue;
+    const nextFuncIdx = body.indexOf('function ');
+    if (nextFuncIdx !== -1 && nextFuncIdx < elemIdx) continue;
+    wrapperMatch = { index: wrapperExec.index, length: wrapperExec[0].length };
+    break;
+  }
+
+  if (wrapperMatch) {
+    const absoluteIndex = wrapperMatch.index + wrapperMatch.length;
+    indices.push(absoluteIndex);
+  } else {
+    // Fallback: target the inner function directly (old behavior)
+    const absoluteIndex =
+      lookbackStart + lastFunctionMatch.index + lastFunctionMatch[0].length;
+    indices.push(absoluteIndex);
   }
 
   return indices;

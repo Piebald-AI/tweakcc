@@ -33,8 +33,9 @@ export const writeTokenCountRounding = (
   let post: string;
   let startIndex: number;
 
-  // Try newer version pattern first
-  // Pattern: overrideMessage:..., VAR=FUNC(EXPR),...key:"tokens"..., VAR," tokens"
+  // Try multiple patterns for different CC versions
+
+  // Pattern 1 (CC <2.1.83): overrideMessage anchor nearby
   const m1 = oldFile.match(
     /(overrideMessage:.{0,10000},([$\w]+)=[$\w]+\()(.+?)(\),.{0,1000}key:"tokens".{0,200},\2," tokens")/
   );
@@ -43,20 +44,30 @@ export const writeTokenCountRounding = (
     [fullMatch, pre, , partToWrap, post] = m1;
     startIndex = m1.index;
   } else {
-    // Try older version pattern
-    // Pattern: overrideMessage:...,key:"tokens"...FUNC(Math.round(...))
+    // Pattern 2 (CC >=2.1.83): Direct match on formatter call near key:"tokens"
+    // Matches: VAR=FUNC(EXPR),...key:"tokens"...,VAR," tokens"
     const m2 = oldFile.match(
-      /(overrideMessage:.{0,10000},key:"tokens".{0,200}[$\w]+\()(Math\.round\(.+?\))(\))/
+      /(([$\w]+)=([$\w]+)\()(.+?)(\),.{0,2000}key:"tokens".{0,200},\2," tokens")/
     );
 
     if (m2 && m2.index !== undefined) {
-      [fullMatch, pre, partToWrap, post] = m2;
+      [fullMatch, pre, , , partToWrap, post] = m2;
       startIndex = m2.index;
     } else {
-      console.error(
-        'patch: tokenCountRounding: cannot find token count pattern in either newer or older CC format'
+      // Pattern 3 (CC 1.x): older format
+      const m3 = oldFile.match(
+        /(overrideMessage:.{0,10000},key:"tokens".{0,200}[$\w]+\()(Math\.round\(.+?\))(\))/
       );
-      return null;
+
+      if (m3 && m3.index !== undefined) {
+        [fullMatch, pre, partToWrap, post] = m3;
+        startIndex = m3.index;
+      } else {
+        console.error(
+          'patch: tokenCountRounding: cannot find token count pattern in any CC format'
+        );
+        return null;
+      }
     }
   }
 

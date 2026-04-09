@@ -27,6 +27,18 @@ export const writeScrollEscapeSequenceFilter = (
 ): string | null => {
   const index = getScrollEscapeSequenceFilterLocation(oldFile);
 
+  // Only filter scroll-specific sequences, NOT cursor positioning (CSI H)
+  // or cursor up (CSI A) which ink needs for rendering.
+  //
+  // Filtered sequences:
+  // - \x1b[<n>S  — Scroll up (SU): scroll content up by n lines
+  // - \x1b[<n>T  — Scroll down (SD): scroll content down by n lines
+  // - \x1b[<n>;<n>r — Set scroll region (DECSTBM)
+  // - \x1b[r     — Reset scroll region
+  //
+  // NOT filtered (ink needs these):
+  // - \x1b[<n>;<n>H — Cursor position (CUP)
+  // - \x1b[<n>A     — Cursor up (CUU)
   const filterCode = `// SCROLLING FIX PATCH START
 const _origStdoutWrite=process.stdout.write;
 process.stdout.write=function(chunk,encoding,cb){
@@ -34,8 +46,9 @@ if(typeof chunk!=='string'){
 return _origStdoutWrite.call(process.stdout,chunk,encoding,cb);
 }
 const filtered=chunk
-.replace(/\\x1b\\[(?:\\d+;?\\d*)?H/g,'')
-.replace(/\\x1b\\[\\d*A/g,'');
+.replace(/\\x1b\\[\\d*S/g,'')
+.replace(/\\x1b\\[\\d*T/g,'')
+.replace(/\\x1b\\[\\d*;?\\d*r/g,'');
 return _origStdoutWrite.call(process.stdout,filtered,encoding,cb);
 };
 // SCROLLING FIX PATCH END
