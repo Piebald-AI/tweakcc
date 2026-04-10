@@ -16,9 +16,11 @@ const INJECTION =
   `,standaloneAgentContext:` +
   `(()=>{` +
   `let __c=process.env.TWEAKCC_SESSION_COLOR;` +
-  `return __c&&${JSON.stringify(VALID_COLORS)}.includes(__c)` +
-  `?{name:"",color:__c}` +
-  `:void 0` +
+  `if(!__c||!${JSON.stringify(VALID_COLORS)}.includes(__c))return void 0;` +
+  `queueMicrotask(()=>{` +
+  `if(globalThis.__tweakccSaveAgentColor)globalThis.__tweakccSaveAgentColor(__c)` +
+  `});` +
+  `return{name:"",color:__c}` +
   `})()`;
 
 export const writeSessionColor = (oldFile: string): string | null => {
@@ -63,6 +65,53 @@ export const writeSessionColor = (oldFile: string): string | null => {
     debug('patch: sessionColor: failed to find app state init patterns');
     return null;
   }
+
+  const saveColorResult = patchSaveAgentColor(result);
+  if (!saveColorResult) {
+    debug('patch: sessionColor: failed to patch saveAgentColor');
+    return null;
+  }
+
+  return saveColorResult;
+};
+
+export const patchSaveAgentColor = (oldFile: string): string | null => {
+  const pattern = new RegExp(
+    '([,;{}])' +
+      '(async function ([$\\w]+)' +
+      '\\(([$\\w]+),([$\\w]+),([$\\w]+)\\)' +
+      '\\{let [$\\w]+=\\6\\?\\?[$\\w]+\\(\\4\\);' +
+      'if\\([$\\w]+\\([$\\w]+,' +
+      '\\{type:"agent-color",agentColor:\\5,sessionId:\\4\\}\\),' +
+      '\\4===([$\\w]+)\\(\\)\\))'
+  );
+  const match = oldFile.match(pattern);
+  if (!match || match.index === undefined) {
+    return null;
+  }
+
+  const delimiter = match[1];
+  const funcBody = match[2];
+  const funcName = match[3];
+  const getSessionIdName = match[7];
+
+  const replacement =
+    `${delimiter}globalThis.__tweakccSaveAgentColor=` +
+    `(c)=>${funcName}(${getSessionIdName}(),c);` +
+    funcBody;
+
+  const result =
+    oldFile.slice(0, match.index) +
+    replacement +
+    oldFile.slice(match.index + match[0].length);
+
+  showDiff(
+    oldFile,
+    result,
+    replacement,
+    match.index,
+    match.index + match[0].length
+  );
 
   return result;
 };
