@@ -671,6 +671,9 @@ export const applyCustomization = async (
         ),
       condition: config.settings.misc?.statuslineThrottleMs != null,
     },
+    'session-color': {
+      fn: c => writeSessionColor(c),
+    },
     // Misc Configurable
     'patches-applied-indication': {
       fn: c =>
@@ -895,9 +898,6 @@ export const applyCustomization = async (
     'channels-mode': {
       fn: c => writeChannelsMode(c),
       condition: !!config.settings.misc?.enableChannelsMode,
-    },
-    'session-color': {
-      fn: c => writeSessionColor(c),
     },
   };
 

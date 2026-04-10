@@ -54,7 +54,7 @@ export const writeSessionColor = (oldFile: string): string | null => {
     showDiff(
       prePatch,
       result,
-      replacement,
+      INJECTION,
       match.index,
       match.index + match[0].length
     );
@@ -95,10 +95,11 @@ export const patchSaveAgentColor = (oldFile: string): string | null => {
   const funcName = match[3];
   const getSessionIdName = match[7];
 
-  const replacement =
-    `${delimiter}globalThis.__tweakccSaveAgentColor=` +
-    `(c)=>${funcName}(${getSessionIdName}(),c);` +
-    funcBody;
+  const injection =
+    `globalThis.__tweakccSaveAgentColor=` +
+    `(c)=>${funcName}(${getSessionIdName}(),c);`;
+
+  const replacement = `${delimiter}${injection}${funcBody}`;
 
   const result =
     oldFile.slice(0, match.index) +
@@ -108,7 +109,7 @@ export const patchSaveAgentColor = (oldFile: string): string | null => {
   showDiff(
     oldFile,
     result,
-    replacement,
+    injection,
     match.index,
     match.index + match[0].length
   );
