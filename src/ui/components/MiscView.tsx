@@ -85,6 +85,9 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableVoiceMode: false,
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
+    enableReactiveTheme: false,
+    reactiveThemeDarkId: 'dark',
+    reactiveThemeLightId: 'light',
   };
 
   const ensureMisc = () => {

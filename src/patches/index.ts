@@ -73,6 +73,9 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
+import { writeReactiveTheme } from './reactiveTheme';
+import { writeThemeDetection } from './themeDetection';
+import { REACTIVE_THEME_WATCHER_JS } from '../reactiveThemeWatcher';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -173,6 +176,13 @@ const PATCH_DEFINITIONS = [
     name: `Statusline update throttling correction`,
     group: PatchGroup.ALWAYS_APPLIED,
     description: `Statusline updates will be properly throttled instead of queued (or debounced)`,
+  },
+  {
+    id: 'fix-theme-detection',
+    name: 'Fix theme detection',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description:
+      'Cross-platform "auto" theme detection (macOS defaults, Linux gdbus, Windows registry) instead of COLORFGBG',
   },
   // Misc Configurable
   {
@@ -430,6 +440,13 @@ const PATCH_DEFINITIONS = [
     description:
       'Enable MCP channel notifications (--channels without allowlist or dev flag)',
   },
+  {
+    id: 'reactive-theme',
+    name: 'Reactive theme switching',
+    group: PatchGroup.FEATURES,
+    description:
+      'Auto-switch theme when OS dark/light mode changes (macOS, Linux, Windows, SSH)',
+  },
 ] as const;
 
 /** Union type of all valid patch IDs */
@@ -663,6 +680,9 @@ export const applyCustomization = async (
         ),
       condition: config.settings.misc?.statuslineThrottleMs != null,
     },
+    'fix-theme-detection': {
+      fn: c => writeThemeDetection(c),
+    },
     // Misc Configurable
     'patches-applied-indication': {
       fn: c =>
@@ -888,6 +908,14 @@ export const applyCustomization = async (
       fn: c => writeChannelsMode(c),
       condition: !!config.settings.misc?.enableChannelsMode,
     },
+    'reactive-theme': {
+      fn: c =>
+        writeReactiveTheme(c, {
+          darkThemeId: config.settings.misc?.reactiveThemeDarkId ?? 'dark',
+          lightThemeId: config.settings.misc?.reactiveThemeLightId ?? 'light',
+        }),
+      condition: !!config.settings.misc?.enableReactiveTheme,
+    },
   };
 
   // ==========================================================================
@@ -897,6 +925,22 @@ export const applyCustomization = async (
     applyPatchImplementations(content, patchImplementations, patchFilter);
   content = patchedContent;
   allResults.push(...patchResults);
+
+  // ==========================================================================
+  // Install external files for patches that need them
+  // ==========================================================================
+  const twJsPath = path.join(CONFIG_DIR, 'tw.js');
+  if (config.settings.misc?.enableReactiveTheme) {
+    fsSync.writeFileSync(twJsPath, REACTIVE_THEME_WATCHER_JS, 'utf8');
+    debug(`Installed reactive theme watcher: ${twJsPath}`);
+  } else {
+    try {
+      fsSync.unlinkSync(twJsPath);
+      debug(`Removed reactive theme watcher: ${twJsPath}`);
+    } catch {
+      // File doesn't exist — nothing to clean up
+    }
+  }
 
   // ==========================================================================
   // Write the modified content back
