@@ -380,7 +380,7 @@ async function extractVersionFromJsFile(cliPath: string): Promise<string> {
 async function extractVersionFromNativeBinary(
   binaryPath: string
 ): Promise<string> {
-  const claudeJsBuffer =
+  const { data: claudeJsBuffer } =
     await extractClaudeJsFromNativeInstallation(binaryPath);
 
   if (!claudeJsBuffer) {
