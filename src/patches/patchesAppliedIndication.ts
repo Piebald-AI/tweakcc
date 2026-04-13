@@ -496,7 +496,7 @@ export const writePatchesAppliedIndication = (
       const oldStr = bannerMatch[0];
       const n7Fn = bannerMatch[2];
       const themeVar = bannerMatch[3];
-      const newStr = `${bannerMatch[1]} \${${n7Fn}("warning",${themeVar})("+ tweakcc v${tweakccVersion}")} \`,`;
+      const newStr = `${bannerMatch[1]} \${${n7Fn}("success",${themeVar})("+ tweakcc v${tweakccVersion}")} \`,`;
       content = content.replace(oldStr, newStr);
     }
 
@@ -513,7 +513,7 @@ export const writePatchesAppliedIndication = (
 
     // Step 1: Insert variable declaration after the "Claude Code" bold element
     const varName = '_tw';
-    const varDecl = `let ${varName}=${locs.reactVar}.createElement(${locs.textComponent},null,${chalkVar}.hex("#FF8400").bold("+ tweakcc v${tweakccVersion}"));`;
+    const varDecl = `let ${varName}=${locs.reactVar}.createElement(${locs.textComponent},{color:"success",bold:true},"+ tweakcc v${tweakccVersion}");`;
 
     const oldContent2a = content;
     content =

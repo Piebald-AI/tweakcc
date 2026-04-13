@@ -634,7 +634,7 @@ export const applyCustomization = async (
   const escapeForCliJs = (str: string): string =>
     str.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
   const legacyItems: string[] = sortedSystemPromptResults
-    .filter(r => r.applied && r.details)
+    .filter(r => r.applied && r.details && r.details !== 'unchanged')
     .map(r => escapeForCliJs(`${r.name}: ${r.details}`));
 
   // Extract config values that are used multiple times or need pre-computation
@@ -909,10 +909,7 @@ export const applyCustomization = async (
     },
     'custom-session-colors': {
       fn: c =>
-        writeCustomSessionColors(
-          c,
-          config.settings.misc?.customColorMap ?? {}
-        ),
+        writeCustomSessionColors(c, config.settings.misc?.customColorMap ?? {}),
       condition: !!config.settings.misc?.enableCustomSessionColors,
     },
     'title-visibility-toggle': {
