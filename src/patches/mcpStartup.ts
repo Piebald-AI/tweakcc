@@ -25,9 +25,7 @@ const getNonBlockingCheckLocation = (
   const match = oldFile.match(pattern);
 
   if (!match || match.index === undefined) {
-    console.error(
-      'patch: mcpStartup: failed to find MCP_CONNECTION_NONBLOCKING check'
-    );
+    // CC ≥2.1.79 removed this env var — non-blocking is now the default.
     return null;
   }
 
@@ -76,7 +74,9 @@ const getBatchSizeLocation = (oldFile: string): LocationResult | null => {
 export const writeMcpNonBlocking = (oldFile: string): string | null => {
   const location = getNonBlockingCheckLocation(oldFile);
   if (!location) {
-    return null;
+    // CC ≥2.1.79 removed MCP_CONNECTION_NONBLOCKING — non-blocking is now default.
+    // Return file unchanged (no-op) instead of failing.
+    return oldFile;
   }
 
   // Replace the check with "false" to force non-blocking mode

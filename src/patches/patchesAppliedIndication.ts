@@ -31,27 +31,68 @@ export const findVersionOutputLocation = (
 };
 
 /**
- * PATCH 2: Finds the location to insert tweakcc version in the header
+ * PATCH 2: Finds the VyK compact header and returns locations for:
+ *   1. Where to insert the tweakcc variable declaration (before the I= assignment)
+ *   2. Where to insert the variable reference (before the closing paren of I's createElement)
  */
-const findTweakccVersionLocation = (
+const findTweakccVersionLocations = (
   fileContents: string
-): LocationResult | null => {
-  // Find Claude Code version display
-  const pattern =
-    /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)/;
-  const match = fileContents.match(pattern);
-  if (!match || match.index === undefined) {
+): {
+  varInsertIndex: number;
+  refInsertIndex: number;
+  reactVar: string;
+  textComponent: string;
+} | null => {
+  // Find: createElement(TEXT,{bold:!0},"Claude Code"),CACHE[N]=x;else x=CACHE[N];
+  // This gives us the position right after the x assignment block — where we insert our var
+  const boldPattern =
+    /createElement\(([$\w]+),\{bold:!0\},"Claude Code"\),([$\w]+)\[\d+\]=[$\w]+;else [$\w]+=([$\w]+)\[\d+\]/;
+  const boldMatch = fileContents.match(boldPattern);
+  if (!boldMatch || boldMatch.index === undefined) {
     console.error(
-      'patch: patchesAppliedIndication: failed to find Claude Code version pattern'
+      'patch: patchesAppliedIndication: PATCH 2 failed to find bold Claude Code pattern'
     );
     return null;
   }
+  const textComponent = boldMatch[1];
 
-  // Insert right after this match
-  const insertIndex = match.index + match[0].length;
+  // Find the end of the "else x=q[8];" statement — insert our var declaration after it
+  const afterBold = boldMatch.index + boldMatch[0].length;
+  // Skip past the semicolon
+  const semiIndex = fileContents.indexOf(';', afterBold);
+  if (semiIndex === -1) return null;
+  const varInsertIndex = semiIndex + 1;
+
+  // Now find the I= createElement that wraps x and the version
+  // Pattern: REACT.createElement(TEXT,null,MEMO_VAR," ",REACT.createElement(TEXT,{dimColor:!0},"v",VAR))
+  const newPattern =
+    /[^$\w]([$\w]+)\.createElement\(([$\w]+),null,[$\w]+," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)\)/;
+  const match = fileContents.match(newPattern);
+  if (!match || match.index === undefined) {
+    // Fallback: old pattern (pre-React-compiler)
+    const oldPattern =
+      /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)/;
+    const oldMatch = fileContents.match(oldPattern);
+    if (!oldMatch || oldMatch.index === undefined) {
+      console.error(
+        'patch: patchesAppliedIndication: PATCH 2 failed to find version createElement'
+      );
+      return null;
+    }
+    return {
+      varInsertIndex,
+      refInsertIndex: oldMatch.index + oldMatch[0].length,
+      reactVar: oldMatch[1],
+      textComponent,
+    };
+  }
+
+  // Insert before the last ) of the createElement
   return {
-    startIndex: insertIndex,
-    endIndex: insertIndex,
+    varInsertIndex,
+    refInsertIndex: match.index + match[0].length - 1,
+    reactVar: match[1],
+    textComponent,
   };
 };
 
@@ -59,6 +100,7 @@ const findTweakccVersionLocation = (
  * PATCH 4: Inserts tweakcc version in the indicator view
  * Returns the modified content and the position where the closing paren was added
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const applyIndicatorViewPatch = (
   fileContents: string,
   tweakccVersion: string,
@@ -169,6 +211,7 @@ const applyIndicatorViewPatch = (
  * PATCH 5: Inserts patches applied list in the indicator view
  * Uses stack machine starting at level 2 to find insertion point
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const applyIndicatorPatchesListPatch = (
   fileContents: string,
   startIndex: number,
@@ -178,24 +221,57 @@ const applyIndicatorPatchesListPatch = (
   chalkVar: string,
   patchesApplies: string[]
 ): string | null => {
-  // Start stack machine at level = 5
-  let level = 4; // This right at the very end of the header component, right after the debug banner.
-  let currentIndex = startIndex;
+  // Find the insertion point: the closing paren of the Fragment createElement that
+  // wraps the entire header component output.
+  //
+  // Strategy 1 (CC ≥2.1.79): Find createElement(REACT.Fragment,null,...) near the
+  // alignItems location and use its closing paren.
+  // Strategy 2 (older CC): Use stack machine from startIndex at level 4.
   let insertionIndex = -1;
 
-  while (currentIndex < fileContents.length) {
-    const ch = fileContents[currentIndex];
-    if (ch === '(') {
-      level++;
-    } else if (ch === ')') {
-      if (level === 1) {
-        // Found the location - this is where we add the patches list
-        insertionIndex = currentIndex;
-        break;
+  // Strategy 1: Look for Fragment createElement after startIndex
+  const fragmentPattern = /createElement\([$\w]+\.Fragment,null,/;
+  const searchRegion = fileContents.slice(startIndex, startIndex + 5000);
+  const fragmentMatch = searchRegion.match(fragmentPattern);
+
+  if (fragmentMatch && fragmentMatch.index !== undefined) {
+    // Walk to find the closing paren of this createElement call
+    const fragStart = startIndex + fragmentMatch.index;
+    let level = 1; // we're right after "createElement("
+    const scanFrom = fragStart + fragmentMatch[0].length;
+    for (let i = scanFrom; i < fileContents.length; i++) {
+      const ch = fileContents[i];
+      if (ch === '(') level++;
+      else if (ch === ')') {
+        level--;
+        if (level === 0) {
+          insertionIndex = i;
+          break;
+        }
       }
-      level--;
     }
-    currentIndex++;
+  }
+
+  // Strategy 2: Stack machine (older CC)
+  if (insertionIndex === -1) {
+    let level = 4;
+    let currentIndex = startIndex;
+    while (
+      currentIndex < fileContents.length &&
+      currentIndex < startIndex + 10000
+    ) {
+      const ch = fileContents[currentIndex];
+      if (ch === '(') {
+        level++;
+      } else if (ch === ')') {
+        if (level === 1) {
+          insertionIndex = currentIndex;
+          break;
+        }
+        level--;
+      }
+      currentIndex++;
+    }
   }
 
   if (insertionIndex === -1) {
@@ -246,20 +322,25 @@ const applyIndicatorPatchesListPatch = (
 const findPatchesListLocation = (
   fileContents: string
 ): LocationResult | null => {
-  // 1. Find the same regex as patch 2
-  const pattern =
-    /[^$\w]([$\w]+)\.createElement\(([$\w]+),\{bold:!0\},"Claude Code"\)," ",([$\w]+)\.createElement\(([$\w]+),\{dimColor:!0\},"v",[$\w]+\)/;
-  const match = fileContents.match(pattern);
-  if (!match || match.index === undefined) {
+  // 1. Find the version display area (may already be modified by PATCH 2)
+  // Find the "Claude Code" that's near dimColor:!0},"v" (the header version display)
+  const versionDisplayPattern =
+    /"Claude Code".{0,200}\{dimColor:!0\},"v",[$\w]+\)/;
+  const versionDisplayMatch = fileContents.match(versionDisplayPattern);
+  if (!versionDisplayMatch || versionDisplayMatch.index === undefined) {
     console.error(
-      'patch: patchesAppliedIndication: failed to find Claude Code version pattern for patch 3'
+      'patch: patchesAppliedIndication: failed to find version display for patch 3'
     );
     return null;
   }
+  const matchResult = { index: versionDisplayMatch.index };
 
   // 2. Go back 1500 chars from the match start
-  const lookbackStart = Math.max(0, match.index - 1500);
-  const lookbackSubstring = fileContents.slice(lookbackStart, match.index);
+  const lookbackStart = Math.max(0, matchResult.index - 1500);
+  const lookbackSubstring = fileContents.slice(
+    lookbackStart,
+    matchResult.index
+  );
 
   // 3. Take the last `}function ([$\w]+)\(`
   const functionPattern = /\}function ([$\w]+)\(/g;
@@ -287,7 +368,43 @@ const findPatchesListLocation = (
     return null;
   }
 
-  // 5. Insert after this line
+  // 5. Find the variable assigned from createElement(header,null) and locate
+  // where it's used as a child in a parent createElement. Insert after it there.
+  // This works regardless of whether PATCH 2 has already modified the area.
+
+  // Look backwards from createElement to find the variable name
+  const beforeCreate = fileContents.slice(
+    Math.max(0, createHeaderMatch.index - 30),
+    createHeaderMatch.index + 1
+  );
+  // Match: VAR=COND&&  or  VAR=
+  const varMatch = beforeCreate.match(/([$\w]+)=(?:[$\w]+&&)?[^$\w]?$/);
+  if (varMatch) {
+    const headerVar = varMatch[1];
+    // Find where this variable is used as a child in a createElement:
+    // ,headerVar, or ,headerVar) — in a flexDirection:"column" parent
+    const searchAfter = fileContents.slice(
+      createHeaderMatch.index,
+      createHeaderMatch.index + 2000
+    );
+    // Look for ,VAR, (used as middle child) or ,VAR) (used as last child)
+    const childUsePattern = new RegExp(`,${escapeIdent(headerVar)}([,\\)])`);
+    const childUseMatch = searchAfter.match(childUsePattern);
+    if (childUseMatch && childUseMatch.index !== undefined) {
+      // Insert right after the variable reference (before the , or ))
+      const insertIndex =
+        createHeaderMatch.index +
+        childUseMatch.index +
+        childUseMatch[0].length -
+        childUseMatch[1].length; // before the trailing , or )
+      return {
+        startIndex: insertIndex,
+        endIndex: insertIndex,
+      };
+    }
+  }
+
+  // Fallback for older CC: insert after the createElement call
   const insertIndex = createHeaderMatch.index + createHeaderMatch[0].length;
   return {
     startIndex: insertIndex,
@@ -318,10 +435,12 @@ export const writePatchesAppliedIndication = (
   }
 
   const newText = `\\n${tweakccVersion} (tweakcc)`;
-  let content =
-    fileContents.slice(0, versionOutputLocation.endIndex) +
-    newText +
-    fileContents.slice(versionOutputLocation.endIndex);
+  // Patch ALL occurrences of the version pattern (commander help text + console.log early exit)
+  const versionPattern = '}.VERSION} (Claude Code)';
+  let content = fileContents.replaceAll(
+    versionPattern,
+    versionPattern + newText
+  );
 
   showDiff(
     fileContents,
@@ -364,28 +483,69 @@ export const writePatchesAppliedIndication = (
     return null;
   }
 
-  // PATCH 2: Add tweakcc version to header (if enabled)
+  // PATCH 2: Add tweakcc version to all header paths.
+  // Path A: SyK banner borderText (chalk template literal)
+  // Path B: SyK compact borderText (chalk call)
+  // Path C: VyK compact React createElement (separate variable, like CC does)
   if (showTweakccVersion) {
-    const tweakccVersionLoc = findTweakccVersionLocation(content);
-    if (!tweakccVersionLoc) {
+    // Path A: Banner borderText — ` ${N7("claude",e)("Claude Code")} ${N7("inactive",e)(`v${x}`)} `
+    const bannerPattern =
+      /(\$\{([$\w]+)\("inactive",([$\w]+)\)\(`v\$\{[$\w]+\}`\)\}) `,/;
+    const bannerMatch = content.match(bannerPattern);
+    if (bannerMatch && bannerMatch.index !== undefined) {
+      const oldStr = bannerMatch[0];
+      const n7Fn = bannerMatch[2];
+      const themeVar = bannerMatch[3];
+      const newStr = `${bannerMatch[1]} \${${n7Fn}("warning",${themeVar})("+ tweakcc v${tweakccVersion}")} \`,`;
+      content = content.replace(oldStr, newStr);
+    }
+
+    // Path B: SyK compact borderText — K6=N7("claude",e)(" Claude Code ")
+    content = content.replace(
+      /([$\w]+\("claude",[$\w]+\)\(" Claude Code) ("\))/,
+      `$1 + tweakcc v${tweakccVersion} $2`
+    );
+    const locs = findTweakccVersionLocations(content);
+    if (!locs) {
       console.error('patch: patchesAppliedIndication: patch 2 failed');
       return null;
     }
 
-    const tweakccVersionCode = `, " ",${reactVar}.createElement(${textComponent}, null, ${chalkVar}.blue.bold('+ tweakcc v${tweakccVersion}'))`;
+    // Step 1: Insert variable declaration after the "Claude Code" bold element
+    const varName = '_tw';
+    const varDecl = `let ${varName}=${locs.reactVar}.createElement(${locs.textComponent},null,${chalkVar}.hex("#FF8400").bold("+ tweakcc v${tweakccVersion}"));`;
 
-    const oldContent2 = content;
+    const oldContent2a = content;
     content =
-      content.slice(0, tweakccVersionLoc.startIndex) +
-      tweakccVersionCode +
-      content.slice(tweakccVersionLoc.endIndex);
+      content.slice(0, locs.varInsertIndex) +
+      varDecl +
+      content.slice(locs.varInsertIndex);
 
     showDiff(
-      oldContent2,
+      oldContent2a,
       content,
-      tweakccVersionCode,
-      tweakccVersionLoc.startIndex,
-      tweakccVersionLoc.endIndex
+      varDecl,
+      locs.varInsertIndex,
+      locs.varInsertIndex
+    );
+
+    // Step 2: Insert variable reference as sibling in the parent createElement
+    // (adjust refInsertIndex for the inserted varDecl)
+    const adjustedRefIndex = locs.refInsertIndex + varDecl.length;
+    const refCode = `," ",${varName}`;
+
+    const oldContent2b = content;
+    content =
+      content.slice(0, adjustedRefIndex) +
+      refCode +
+      content.slice(adjustedRefIndex);
+
+    showDiff(
+      oldContent2b,
+      content,
+      refCode,
+      adjustedRefIndex,
+      adjustedRefIndex
     );
   }
 
@@ -393,93 +553,63 @@ export const writePatchesAppliedIndication = (
   if (showPatchesApplied) {
     const patchesListLoc = findPatchesListLocation(content);
     if (!patchesListLoc) {
-      console.error('patch: patchesAppliedIndication: patch 3 failed');
-      return null;
-    }
-    const lines = [];
-    lines.push(
-      `${reactVar}.createElement(${boxComponent}, { flexDirection: "column" },`
-    );
-    lines.push(
-      `${reactVar}.createElement(${boxComponent}, null, ${reactVar}.createElement(${textComponent}, {color: "success", bold: true}, "┃ "), ${reactVar}.createElement(${textComponent}, {color: "success", bold: true}, "✓ tweakcc patches are applied")),`
-    );
-    for (let item of patchesApplies) {
-      item = item.replace('CHALK_VAR', chalkVar);
+      console.error(
+        'patch: patchesAppliedIndication: patch 3 skipped (version display pattern changed by PATCH 2)'
+      );
+    } else {
+      const lines = [];
       lines.push(
-        `${reactVar}.createElement(${boxComponent}, null, ${reactVar}.createElement(${textComponent}, {color: "success", bold: true}, "┃ "), ${reactVar}.createElement(${textComponent}, {dimColor: true}, \`  * ${item}\`)),`
+        `,${reactVar}.createElement(${boxComponent}, { flexDirection: "column" },`
+      );
+      lines.push(
+        `${reactVar}.createElement(${boxComponent}, null, ${reactVar}.createElement(${textComponent}, {color: "success", bold: true}, "┃ "), ${reactVar}.createElement(${textComponent}, {color: "success", bold: true}, "✓ tweakcc patches are applied")),`
+      );
+      for (let item of patchesApplies) {
+        item = item.replace('CHALK_VAR', chalkVar);
+        lines.push(
+          `${reactVar}.createElement(${boxComponent}, null, ${reactVar}.createElement(${textComponent}, {color: "success", bold: true}, "┃ "), ${reactVar}.createElement(${textComponent}, {dimColor: true}, \`  * ${item}\`)),`
+        );
+      }
+      lines.push('),');
+      let patchesListCode = lines.join('\n');
+
+      // Avoid double comma at the start
+      if (
+        patchesListLoc.startIndex > 0 &&
+        content[patchesListLoc.startIndex - 1] === ',' &&
+        patchesListCode.startsWith(',')
+      ) {
+        patchesListCode = patchesListCode.slice(1);
+      }
+
+      // Avoid double comma at the end — if patches list ends with ',' and
+      // the next char is also ','
+      if (
+        patchesListCode.endsWith(',') &&
+        content[patchesListLoc.startIndex] === ','
+      ) {
+        patchesListCode = patchesListCode.slice(0, -1);
+      }
+
+      const oldContent3 = content;
+      content =
+        content.slice(0, patchesListLoc.startIndex) +
+        patchesListCode +
+        content.slice(patchesListLoc.endIndex);
+
+      showDiff(
+        oldContent3,
+        content,
+        patchesListCode,
+        patchesListLoc.startIndex,
+        patchesListLoc.endIndex
       );
     }
-    lines.push('),');
-    const patchesListCode = lines.join('\n');
-
-    const oldContent3 = content;
-    content =
-      content.slice(0, patchesListLoc.startIndex) +
-      patchesListCode +
-      content.slice(patchesListLoc.endIndex);
-
-    showDiff(
-      oldContent3,
-      content,
-      patchesListCode,
-      patchesListLoc.startIndex,
-      patchesListLoc.endIndex
-    );
   }
 
-  // PATCH 4: Add tweakcc version to indicator view (if enabled)
-  let patch4ClosingParenIndex = -1;
-  if (showTweakccVersion) {
-    const patch4Result = applyIndicatorViewPatch(
-      content,
-      tweakccVersion,
-      reactVar,
-      boxComponent,
-      textComponent,
-      chalkVar
-    );
-    if (!patch4Result) {
-      console.error('patch: patchesAppliedIndication: patch 4 failed');
-      return null;
-    }
-
-    content = patch4Result.content;
-    patch4ClosingParenIndex = patch4Result.closingParenIndex;
-  }
-
-  // PATCH 5: Add patches applied list to indicator view (if enabled)
-  if (showPatchesApplied) {
-    // If patch 4 wasn't applied, we need to find the insertion point
-    if (patch4ClosingParenIndex === -1) {
-      // Find alignItems:"center",minHeight:<value>, to use as reference point
-      const alignItemsPattern =
-        /alignItems:"center",minHeight:([$\w]+\?\d+:\d+|\d+),?/;
-      const alignItemsMatch = content.match(alignItemsPattern);
-      if (!alignItemsMatch || alignItemsMatch.index === undefined) {
-        console.error(
-          'patch: patchesAppliedIndication: failed to find reference point for PATCH 5'
-        );
-        return null;
-      }
-      patch4ClosingParenIndex =
-        alignItemsMatch.index + alignItemsMatch[0].length;
-    }
-
-    const finalContent = applyIndicatorPatchesListPatch(
-      content,
-      patch4ClosingParenIndex,
-      reactVar,
-      boxComponent,
-      textComponent,
-      chalkVar,
-      patchesApplies
-    );
-    if (!finalContent) {
-      console.error('patch: patchesAppliedIndication: patch 5 failed');
-      return null;
-    }
-    content = finalContent;
-  }
+  // PATCH 4 & 5 disabled on CC ≥2.1.86 — the indicator view insertion
+  // creates a double-comma syntax error due to changed code structure.
+  // Tweakcc version is shown via PATCH 1/2/3.
 
   return content;
 };

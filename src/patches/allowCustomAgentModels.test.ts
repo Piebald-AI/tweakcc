@@ -99,11 +99,10 @@ describe('allowCustomAgentModels', () => {
       expect(result).not.toContain('hWH.includes(E)');
     });
 
-    it('should return null when no patterns found', () => {
-      const result = writeAllowCustomAgentModels(
-        'totally unrelated code with no patterns'
-      );
-      expect(result).toBeNull();
+    it('should return file unchanged when no patterns found (CC >=2.1.83)', () => {
+      const input = 'totally unrelated code with no patterns';
+      const result = writeAllowCustomAgentModels(input);
+      expect(result).toBe(input);
     });
 
     it('should return null when only Zod pattern found', () => {

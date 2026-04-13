@@ -1,6 +1,6 @@
 // Please see the note about writing patches in ./index
 
-import { LocationResult, showDiff } from './index';
+import { showDiff } from './index';
 
 /**
  * Find the location of the line number formatting function.
@@ -11,63 +11,68 @@ import { LocationResult, showDiff } from './index';
  * This function formats line numbers with the arrow (→) character.
  * We want to find and replace this to just return the content without line numbers.
  */
-const getLineNumberFormatterLocation = (
-  oldFile: string
-): LocationResult | null => {
-  // Pattern matches the line number formatting function:
-  // if(VAR.length>=${NUM})return`${VAR}→${VAR2}`;return`${VAR.padStart(${NUM}," ")}→${VAR2}`
-  // Note: Arrow can be literal → or escaped \u2192
-  //
-  // Breakdown:
-  // - if\( - literal "if("
-  // - ([$\w]+) - capture group 1: the line number variable
-  // - \.length>=${NUM}\) - literal ".length>=${NUM})"
-  // - return` - literal "return`"
-  // - \$\{\1\} - ${VAR} using backreference to group 1
-  // - (→|\\u2192) - the arrow character (literal or escaped)
-  // - \$\{([$\w]+)\} - capture group 2: the content variable
-  // - `;return` - literal ";return`"
-  // - \$\{\1\.padStart\(${NUM}," "\)\} - ${VAR.padStart(${NUM}," ")} using backreference
-  // - (→|\\u2192) - the arrow character again
-  // - \$\{\2\}` - ${VAR2}` using backreference to group 2
-  const pattern =
-    /if\(([$\w]+)\.length>=\d+\)return`\$\{\1\}(?:→|\\u2192)\$\{([$\w]+)\}`;return`\$\{\1\.padStart\(\d+," "\)\}(?:→|\\u2192)\$\{\2\}`/;
-
-  const match = oldFile.match(pattern);
-
-  if (!match || match.index === undefined) {
-    console.error(
-      'patch: suppressLineNumbers: failed to find line number formatter pattern'
-    );
-    return null;
-  }
-
-  return {
-    startIndex: match.index,
-    endIndex: match.index + match[0].length,
-    identifiers: [match[1], match[2]], // [lineNumVar, contentVar]
-  };
-};
-
 export const writeSuppressLineNumbers = (oldFile: string): string | null => {
-  const location = getLineNumberFormatterLocation(oldFile);
-  if (!location) {
-    return null;
+  // The line number formatter function signature is unique:
+  //   {content:VAR,startLine:VAR2}){if(!VAR)return"";let LINES=VAR.split(/\r?\n/);...}
+  //
+  // We replace the function body after the empty guard to just return content as-is.
+  // Instead of brace-counting (which breaks on template literals), we match and
+  // replace the specific mapping expressions.
+
+  // CC >=2.1.88: has compact branch + arrow branch
+  // if(FLAG())return LINES.map(...)...;return LINES.map(...)...
+  // CC <2.1.88: arrow branch only
+  // if(VAR.length>=N)return`...→...`;return`...→...`
+
+  // Find the function by its unique signature
+  const funcSig =
+    /\{content:([$\w]+),startLine:[$\w]+\}\)\{if\(!\1\)return"";let ([$\w]+)=\1\.split\([^)]+\);/;
+  const sigMatch = oldFile.match(funcSig);
+
+  if (sigMatch && sigMatch.index !== undefined) {
+    const contentVar = sigMatch[1];
+    const replaceStart = sigMatch.index + sigMatch[0].length;
+
+    // Find the next `}function ` or `}var ` or similar — the end of this function
+    // Use a simple approach: find `}` that's followed by a top-level keyword
+    const afterSplit = oldFile.slice(replaceStart);
+    const endPattern = /\}(?=function |var |let |const |[$\w]+=[$\w]+\()/;
+    const endMatch = afterSplit.match(endPattern);
+
+    if (endMatch && endMatch.index !== undefined) {
+      const replaceEnd = replaceStart + endMatch.index;
+      const newCode = `return ${contentVar}`;
+      const newFile =
+        oldFile.slice(0, replaceStart) + newCode + oldFile.slice(replaceEnd);
+      showDiff(oldFile, newFile, newCode, replaceStart, replaceEnd);
+      return newFile;
+    }
   }
 
-  const contentVar = location.identifiers?.[1];
-  if (!contentVar) {
-    console.error('patch: suppressLineNumbers: content variable not captured');
-    return null;
+  // Fallback: old pattern (CC <2.1.88, arrow only)
+  const arrowPattern =
+    /if\(([$\w]+)\.length>=\d+\)return`\$\{\1\}(?:→|\\u2192)\$\{([$\w]+)\}`;return`\$\{\1\.padStart\(\d+," "\)\}(?:→|\\u2192)\$\{\2\}`/;
+  const arrowMatch = oldFile.match(arrowPattern);
+
+  if (arrowMatch && arrowMatch.index !== undefined) {
+    const contentVar = arrowMatch[2];
+    const newCode = `return ${contentVar}`;
+    const newFile =
+      oldFile.slice(0, arrowMatch.index) +
+      newCode +
+      oldFile.slice(arrowMatch.index + arrowMatch[0].length);
+    showDiff(
+      oldFile,
+      newFile,
+      newCode,
+      arrowMatch.index,
+      arrowMatch.index + arrowMatch[0].length
+    );
+    return newFile;
   }
 
-  // Replace the entire line number formatting logic with just returning the content
-  const newCode = `return ${contentVar}`;
-  const newFile =
-    oldFile.slice(0, location.startIndex) +
-    newCode +
-    oldFile.slice(location.endIndex);
-
-  showDiff(oldFile, newFile, newCode, location.startIndex, location.endIndex);
-  return newFile;
+  console.error(
+    'patch: suppressLineNumbers: failed to find line number formatter pattern'
+  );
+  return null;
 };
