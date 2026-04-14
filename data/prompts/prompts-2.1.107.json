@@ -507,6 +507,17 @@
       "version": "2.1.84"
     },
     {
+      "name": "Agent Prompt: /rename auto-generate session name",
+      "id": "agent-prompt-rename-auto-generate-session-name",
+      "description": "Prompt used by /rename (no args) to auto-generate a kebab-case session name from conversation context",
+      "pieces": [
+        "Generate a short kebab-case name (2-4 words) that captures the main topic of this conversation. Use lowercase words separated by hyphens. Examples: \"fix-login-bug\", \"add-auth-feature\", \"refactor-api-client\", \"debug-test-failures\". Return JSON with a \"name\" field."
+      ],
+      "identifiers": [],
+      "identifierMap": {},
+      "version": "2.1.107"
+    },
+    {
       "name": "Agent Prompt: /review-pr slash command",
       "id": "agent-prompt-review-pr-slash-command",
       "description": "System prompt for reviewing GitHub pull requests with code analysis",
@@ -2810,6 +2821,22 @@
         "0": "ATTACHMENT_OBJECT"
       },
       "version": "2.1.18"
+    },
+    {
+      "name": "System Reminder: Hook blocking error",
+      "id": "system-reminder-hook-blocking-error",
+      "description": "Error from a blocking hook command",
+      "pieces": [
+        "Stop hook blocking error from command \"${",
+        "}\":"
+      ],
+      "identifiers": [
+        0
+      ],
+      "identifierMap": {
+        "0": ""
+      },
+      "version": "2.1.107"
     },
     {
       "name": "System Reminder: Hook blocking error",
