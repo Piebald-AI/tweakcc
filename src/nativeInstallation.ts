@@ -1061,14 +1061,7 @@ function repackMachO(
   sectionHeaderSize: number
 ): void {
   try {
-    // CRITICAL: Remove code signature first - it will be invalidated by modifications
-    debug(`repackMachO: Has code signature: ${machoBinary.hasCodeSignature}`);
-    if (machoBinary.hasCodeSignature) {
-      debug('repackMachO: Removing code signature...');
-      machoBinary.removeSignature();
-    }
-
-    // Find __BUN segment and __bun section
+    // Find __BUN segment and __bun section to get file offset + original size
     const bunSegment = machoBinary.getSegment('__BUN');
     if (!bunSegment) {
       throw new Error('__BUN segment not found');
@@ -1079,65 +1072,113 @@ function repackMachO(
       throw new Error('__bun section not found');
     }
 
-    // Use the same header size as the original binary
     const newSectionData = buildSectionData(newBunBuffer, sectionHeaderSize);
+    const origSectionSize = Number(bunSection.size);
+    const origSegmentFileSize = Number(bunSegment.fileSize);
+    const sectionFileOffset = Number(bunSegment.fileOffset);
 
-    debug(`repackMachO: Original section size: ${bunSection.size}`);
-    debug(`repackMachO: Original segment fileSize: ${bunSegment.fileSize}`);
-    debug(
-      `repackMachO: Original segment virtualSize: ${bunSegment.virtualSize}`
-    );
+    debug(`repackMachO: Original section size: ${origSectionSize}`);
+    debug(`repackMachO: Original segment fileSize: ${origSegmentFileSize}`);
+    debug(`repackMachO: Section file offset: ${sectionFileOffset}`);
     debug(`repackMachO: New data size: ${newSectionData.length}`);
-    debug(`repackMachO: Using header size: ${sectionHeaderSize}`);
 
-    // Calculate how much we need to expand
-    const sizeDiff = newSectionData.length - Number(bunSection.size);
+    // =========================================================================
+    // Direct file patch: copy original binary, overwrite __bun section in-place.
+    //
+    // __BUN is always the last segment — we write the new section data at the
+    // same file offset and extend the file if needed. This avoids LIEF's
+    // extendSegment which shifts other segments and corrupts Bun 1.3.13's
+    // internal bytecode/code-page layout.
+    // =========================================================================
 
-    if (sizeDiff > 0) {
-      // CRITICAL: Round up to page alignment
-      // See #180.
-      // macOS requires segments to be page-aligned, otherwise __LINKEDIT becomes misaligned
-      // Page size depends on architecture:
-      // - x86_64: 4KB (4096 bytes)
-      // - ARM64 (Apple Silicon): 16KB (16384 bytes)
-      const isARM64 =
-        machoBinary.header.cpuType === LIEF.MachO.Header.CPU_TYPE.ARM64;
-      const PAGE_SIZE = isARM64 ? 16384 : 4096;
-      const alignedSizeDiff = Math.ceil(sizeDiff / PAGE_SIZE) * PAGE_SIZE;
+    // Copy original binary to output
+    fs.copyFileSync(binPath, outputPath);
 
-      debug(`repackMachO: CPU type: ${isARM64 ? 'ARM64' : 'x86_64'}`);
-      debug(`repackMachO: Page size: ${PAGE_SIZE} bytes`);
-      debug(`repackMachO: Need to expand by ${sizeDiff} bytes`);
-      debug(
-        `repackMachO: Rounding up to page-aligned: ${alignedSizeDiff} bytes`
+    // Open output for in-place writing
+    const fd = fs.openSync(outputPath, 'r+');
+    try {
+      // Write new section data at segment file offset (may extend file)
+      fs.writeSync(
+        fd,
+        newSectionData,
+        0,
+        newSectionData.length,
+        sectionFileOffset
       );
 
-      const success = machoBinary.extendSegment(bunSegment, alignedSizeDiff);
-      debug(`repackMachO: extendSegment returned: ${success}`);
-
-      if (!success) {
-        throw new Error('Failed to extend __BUN segment');
+      // If new data is smaller, zero-fill the remainder within original bounds
+      const remaining = origSegmentFileSize - newSectionData.length;
+      if (remaining > 0) {
+        const zeros = Buffer.alloc(Math.min(remaining, 65536));
+        let written = 0;
+        while (written < remaining) {
+          const chunk = Math.min(remaining - written, zeros.length);
+          fs.writeSync(
+            fd,
+            zeros,
+            0,
+            chunk,
+            sectionFileOffset + newSectionData.length + written
+          );
+          written += chunk;
+        }
       }
 
-      debug(`repackMachO: Section size after extend: ${bunSection.size}`);
-      debug(
-        `repackMachO: Segment fileSize after extend: ${bunSegment.fileSize}`
-      );
-      debug(
-        `repackMachO: Segment virtualSize after extend: ${bunSegment.virtualSize}`
-      );
+      // If the section grew, update the segment's fileSize and virtualSize in the
+      // Mach-O load command so the kernel maps the full new content.
+      if (newSectionData.length > origSegmentFileSize) {
+        const isARM64 =
+          machoBinary.header.cpuType === LIEF.MachO.Header.CPU_TYPE.ARM64;
+        const PAGE_SIZE = isARM64 ? 16384 : 4096;
+        const newSegSize = BigInt(
+          Math.ceil(newSectionData.length / PAGE_SIZE) * PAGE_SIZE
+        );
+
+        // Read only the Mach-O header region (first 32 bytes + load commands).
+        // LC_SEGMENT_64 layout:
+        //   cmd(4) cmdsize(4) segname(16) vmaddr(8) vmsize(8) fileoff(8) filesize(8) maxprot(4) initprot(4) nsects(4) flags(4)
+        // Offsets within LC_SEGMENT_64: vmsize=+24, fileoff=+32, filesize=+40
+        const headerBuf = Buffer.allocUnsafe(32);
+        fs.readSync(fd, headerBuf, 0, 32, 0);
+        const ncmds = headerBuf.readUInt32LE(16);
+        const sizeofcmds = headerBuf.readUInt32LE(20);
+        const lcBuf = Buffer.allocUnsafe(sizeofcmds);
+        fs.readSync(fd, lcBuf, 0, sizeofcmds, 32);
+
+        let cmdOffset = 0;
+        for (let i = 0; i < ncmds; i++) {
+          const cmd = lcBuf.readUInt32LE(cmdOffset);
+          const cmdsize = lcBuf.readUInt32LE(cmdOffset + 4);
+          if (cmd === 0x19 /* LC_SEGMENT_64 */) {
+            const segname = lcBuf
+              .subarray(cmdOffset + 8, cmdOffset + 24)
+              .toString('utf8')
+              .replace(/\0/g, '');
+            if (segname === '__BUN') {
+              const patch = Buffer.allocUnsafe(8);
+              patch.writeBigUInt64LE(newSegSize);
+              // vmsize at lcBuf[cmdOffset+24], filesize at lcBuf[cmdOffset+40]
+              // File positions: 32 (mach header) + cmdOffset + field offset
+              fs.writeSync(fd, patch, 0, 8, 32 + cmdOffset + 24); // vmsize
+              fs.writeSync(fd, patch, 0, 8, 32 + cmdOffset + 40); // filesize
+              debug(
+                `repackMachO: Updated __BUN segment sizes to ${newSegSize} bytes`
+              );
+              break;
+            }
+          }
+          cmdOffset += cmdsize;
+        }
+      }
+    } finally {
+      fs.closeSync(fd);
     }
 
-    // Update section content
-    bunSection.content = newSectionData;
-    bunSection.size = BigInt(newSectionData.length);
+    // Fix permissions
+    const origStat = fs.statSync(binPath);
+    fs.chmodSync(outputPath, origStat.mode);
 
-    debug(`repackMachO: Final section size: ${bunSection.size}`);
-    debug(`repackMachO: Writing modified binary to ${outputPath}...`);
-
-    atomicWriteBinary(machoBinary, outputPath, binPath);
-
-    // Re-sign the binary with an ad-hoc signature
+    // Re-sign with ad-hoc signature
     try {
       debug(`repackMachO: Re-signing binary with ad-hoc signature...`);
       execSync(`codesign -s - -f "${outputPath}"`, {
