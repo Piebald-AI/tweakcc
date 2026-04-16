@@ -1,0 +1,55 @@
+name: Integration Test (macOS ARM64)
+
+on:
+  push:
+    branches: [fix/macho-inplace-repack, main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  integration:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.13.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build project
+        run: pnpm run build
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Verify Claude Code works before patch
+        run: claude --version
+
+      - name: Install tweakcc from local build
+        run: npm install -g .
+
+      - name: Apply tweakcc patches
+        run: tweakcc --apply --yes
+        env:
+          TWEAKCC_CI: "1"
+
+      - name: Verify Claude Code works after patch
+        run: claude --version
+
+      - name: Revert patches
+        run: tweakcc --revert
+
+      - name: Verify Claude Code works after revert
+        run: claude --version
