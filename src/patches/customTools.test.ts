@@ -3,6 +3,7 @@ import { writeCustomTools } from './customTools';
 import {
   findBuildToolFunc,
   getCwdFuncName,
+  getRequireFuncName,
   clearReactVarCache,
   clearRequireFuncNameCache,
 } from './helpers';
@@ -62,6 +63,78 @@ const OPTIONAL_PARAM_TOOL: CustomTool = {
   timeout: 5000,
   workingDir: '/tmp/work',
   env: { MY_VAR: 'hello' },
+};
+
+interface GeneratedToolValidationResult {
+  result: boolean;
+  message?: string;
+  errorCode?: number;
+}
+
+interface GeneratedToolCallResult {
+  data: {
+    stdout: string;
+    stderr: string;
+    exitCode: number;
+  };
+}
+
+interface GeneratedTool {
+  prompt(): Promise<string>;
+  validateInput(input: unknown): Promise<GeneratedToolValidationResult>;
+  toAutoClassifierInput(input: unknown): string;
+  call(args: unknown): Promise<GeneratedToolCallResult>;
+}
+
+const buildGeneratedTool = (
+  tool: CustomTool
+): { tool: GeneratedTool; spawnSync: ReturnType<typeof vi.fn> } => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+  try {
+    const result = writeCustomTools(MOCK_STRATEGY_B, [tool]);
+    expect(result).not.toBeNull();
+
+    const toolsMatch = result!.match(
+      /let TOOLS=\[\.\.\.agg\(ctx,state\.tools,opts\),\.\.\.(\[[\s\S]*\])\],x=1;/
+    );
+    expect(toolsMatch).not.toBeNull();
+
+    const buildToolFunc = findBuildToolFunc(MOCK_BASE);
+    const requireFunc = getRequireFuncName(MOCK_BASE);
+    const cwdFunc = getCwdFuncName(MOCK_BASE);
+
+    expect(buildToolFunc).toBeDefined();
+    expect(cwdFunc).toBeDefined();
+
+    const spawnSync = vi.fn(() => ({ stdout: '', stderr: '', status: 0 }));
+    const tools = new Function(
+      buildToolFunc!,
+      'R',
+      'Tx',
+      'Bx',
+      requireFunc,
+      cwdFunc!,
+      `return ${toolsMatch![1]};`
+    )(
+      (definition: unknown) => definition,
+      { createElement: (...args: unknown[]) => ({ args }) },
+      'Tx',
+      'Bx',
+      (moduleName: string) => {
+        if (moduleName === 'child_process') {
+          return { spawnSync };
+        }
+
+        throw new Error(`Unexpected module: ${moduleName}`);
+      },
+      () => '/cwd'
+    ) as unknown as GeneratedTool[];
+
+    return { tool: tools[0], spawnSync };
+  } finally {
+    warn.mockRestore();
+  }
 };
 
 // ============================================================================
@@ -321,6 +394,45 @@ describe('writeCustomTools', () => {
       } finally {
         warn.mockRestore();
       }
+    });
+  });
+
+  describe('generated tool runtime', () => {
+    it('honors explicit empty prompt overrides', async () => {
+      const { tool } = buildGeneratedTool({ ...MINIMAL_TOOL, prompt: '' });
+      await expect(tool.prompt()).resolves.toBe('');
+    });
+
+    it('treats $ replacement sequences literally in parameter values', async () => {
+      const { tool, spawnSync } = buildGeneratedTool(MINIMAL_TOOL);
+      const value = "$& $$ $` $'";
+
+      await tool.call({ msg: value });
+
+      expect(spawnSync).toHaveBeenCalledWith(
+        'sh',
+        ['-c', `echo ${value}`],
+        expect.objectContaining({ cwd: '/cwd' })
+      );
+    });
+
+    it('returns structured errors for non-object input and args', async () => {
+      const { tool, spawnSync } = buildGeneratedTool(MINIMAL_TOOL);
+
+      await expect(tool.validateInput(null)).resolves.toEqual({
+        result: false,
+        message: 'input must be an object',
+        errorCode: 1,
+      });
+      expect(tool.toAutoClassifierInput(undefined)).toBe('echo ');
+      await expect(tool.call(undefined)).resolves.toEqual({
+        data: { stdout: '', stderr: '', exitCode: 0 },
+      });
+      expect(spawnSync).toHaveBeenCalledWith(
+        'sh',
+        ['-c', 'echo '],
+        expect.objectContaining({ cwd: '/cwd' })
+      );
     });
   });
 

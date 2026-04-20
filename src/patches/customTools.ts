@@ -65,7 +65,7 @@ const BUILTIN_TOOL_NAMES = new Set([
 // ============================================================================
 
 const generatePromptString = (tool: CustomTool): string => {
-  if (tool.prompt) {
+  if (tool.prompt !== undefined) {
     return tool.prompt;
   }
 
@@ -165,32 +165,23 @@ const generateToolObject = (
   }
   const schemaJson = JSON.stringify({ type: 'object', properties, required });
 
-  // Escape a parameter name for safe embedding inside a regex literal.
   const escapeForRegex = (s: string): string =>
     s.replace(/[.*+?^${}()|[\]\\]/g, '\\\\$&');
 
-  // Parameter substitution helpers — two variants for different variable names.
-  // Parameter names are escaped before embedding in regex literals to handle
-  // names containing regex-special characters (e.g. "foo/bar", "a.b").
+  const normalizeObjectExpr = (varName: string): string =>
+    `${varName}=typeof ${varName}==="object"&&${varName}!==null&&!Array.isArray(${varName})?${varName}:{};`;
+
   const makeSubst = (varName: string): string =>
     Object.keys(tool.parameters)
       .map(
         k =>
-          `cmd=cmd.replace(/\\{\\{${escapeForRegex(k)}\\}\\}/g,String(${varName}[${JSON.stringify(k)}]??""));`
+          `cmd=cmd.replace(/\\{\\{${escapeForRegex(k)}\\}\\}/g,()=>String(${varName}[${JSON.stringify(k)}]??""));`
       )
       .join('');
+  const normalizeInput = normalizeObjectExpr('input');
+  const normalizeArgs = normalizeObjectExpr('args');
   const argsSubst = makeSubst('args');
   const inputSubst = makeSubst('input');
-
-  // Safe substitution (try/catch per param) for renderToolUseMessage, which
-  // receives partial input while the model is still streaming parameters.
-  // Uses the same empty-string fallback as argsSubst/inputSubst for consistency.
-  const safeInputSubst = Object.keys(tool.parameters)
-    .map(
-      k =>
-        `try{cmd=cmd.replace(/\\{\\{${escapeForRegex(k)}\\}\\}/g,String(input[${JSON.stringify(k)}]??""));}catch(_){}`
-    )
-    .join('');
 
   // validateInput: type-check declared parameters
   const paramValidations = Object.entries(tool.parameters)
@@ -221,11 +212,13 @@ async prompt(){return ${promptJson}},
 isConcurrencySafe(){return false},
 isReadOnly(){return false},
 toAutoClassifierInput(input){
+  ${normalizeInput}
   let cmd=${cmdJson};
   ${inputSubst}
   return cmd;
 },
 checkPermissions(input,context){
+  ${normalizeInput}
   let cmd=${cmdJson};
   ${inputSubst}
   const bashTool=context.options.tools.find(t=>t.name==="Bash");
@@ -233,12 +226,14 @@ checkPermissions(input,context){
   return Promise.resolve({behavior:"passthrough",message:"Permission required to run "+${nameJson}});
 },
 async validateInput(input){
+  if(typeof input!=="object"||input===null||Array.isArray(input))return{result:false,message:"input must be an object",errorCode:1};
   ${paramValidations}
   return{result:true};
 },
 renderToolUseMessage(input){
+  ${normalizeInput}
   let cmd=${cmdJson};
-  ${safeInputSubst}
+  ${inputSubst}
   return ${R}.createElement(${B},{flexDirection:"column"},
     ${R}.createElement(${T},{bold:true},${nameJson}),
     ${R}.createElement(${T},{dimColor:true},cmd)
@@ -254,6 +249,7 @@ renderToolResultMessage(content){
   return ${R}.createElement(${B},{flexDirection:"column"},...parts);
 },
 async call(args){
+  ${normalizeArgs}
   let cmd=${cmdJson};
   ${argsSubst}
   const {spawnSync}=${requireFunc}("child_process");
