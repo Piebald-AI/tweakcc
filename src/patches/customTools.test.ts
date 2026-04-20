@@ -467,6 +467,40 @@ describe('writeCustomTools', () => {
       );
     });
 
+    it('falls back to the default timeout for non-finite timeout values', async () => {
+      const { tool, spawnSync } = buildGeneratedTool({
+        ...MINIMAL_TOOL,
+        timeout: Number.NaN,
+      });
+
+      await tool.call({ msg: 'ok' });
+
+      expect(spawnSync).toHaveBeenCalledWith(
+        'sh',
+        ['-c', 'echo ok'],
+        expect.objectContaining({ timeout: 30000 })
+      );
+    });
+
+    it('returns stderr and exitCode -1 when spawnSync reports an error', async () => {
+      const { tool, spawnSync } = buildGeneratedTool(MINIMAL_TOOL);
+      spawnSync.mockReturnValueOnce({
+        error: new Error('ETIMEDOUT'),
+        stdout: null,
+        stderr: null,
+        status: null,
+      });
+
+      await expect(tool.call(undefined)).resolves.toEqual({
+        data: { stdout: '', stderr: 'ETIMEDOUT', exitCode: -1 },
+      });
+      expect(spawnSync).toHaveBeenCalledWith(
+        'sh',
+        ['-c', 'echo '],
+        expect.objectContaining({ cwd: '/cwd' })
+      );
+    });
+
     it('escapes regex-special parameter names in substitutions', async () => {
       const { tool, spawnSync } = buildGeneratedTool(SPECIAL_PARAM_TOOL);
 

@@ -60,6 +60,9 @@ const BUILTIN_TOOL_NAMES = new Set([
   'Write',
 ]);
 
+const DEFAULT_TIMEOUT_MS = 30000;
+const MAX_RESULT_SIZE_CHARS = 100000;
+
 // ============================================================================
 // PROMPT GENERATION
 // ============================================================================
@@ -143,7 +146,10 @@ const generateToolObject = (
       : shellBasename === 'powershell' || shellBasename === 'pwsh'
         ? JSON.stringify('-Command')
         : JSON.stringify('-c');
-  const timeoutVal = tool.timeout ?? 30000;
+  const timeoutVal =
+    typeof tool.timeout === 'number' && Number.isFinite(tool.timeout)
+      ? tool.timeout
+      : DEFAULT_TIMEOUT_MS;
   const workingDirExpr = tool.workingDir
     ? JSON.stringify(tool.workingDir)
     : cwdFunc
@@ -204,7 +210,7 @@ const generateToolObject = (
 
   return `${buildToolFunc}({
 name:${nameJson},
-maxResultSizeChars:100000,
+maxResultSizeChars:${MAX_RESULT_SIZE_CHARS},
 inputJSONSchema:${schemaJson},
 inputSchema:{safeParse:(i)=>({success:true,data:i}),parse:(i)=>i},
 async description(){return ${descJson}},
