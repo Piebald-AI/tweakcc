@@ -228,6 +228,22 @@ describe('writeCustomTools', () => {
         err.mockRestore();
       }
     });
+
+    it('returns null and logs error for duplicate custom tool names', () => {
+      const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const result = writeCustomTools(MOCK_STRATEGY_B, [
+          MINIMAL_TOOL,
+          { ...MINIMAL_TOOL },
+        ]);
+        expect(result).toBeNull();
+        expect(err).toHaveBeenCalledWith(
+          expect.stringContaining('duplicate custom tool name "MyTool"')
+        );
+      } finally {
+        err.mockRestore();
+      }
+    });
   });
 
   describe('missing helper patterns', () => {
@@ -427,14 +443,19 @@ describe('writeCustomTools', () => {
       );
     });
 
-    it('returns structured errors for non-object input and args', async () => {
-      const { tool, spawnSync } = buildGeneratedTool(MINIMAL_TOOL);
+    it('returns structured errors for non-object input', async () => {
+      const { tool } = buildGeneratedTool(MINIMAL_TOOL);
 
       await expect(tool.validateInput(null)).resolves.toEqual({
         result: false,
         message: 'input must be an object',
         errorCode: 1,
       });
+    });
+
+    it('normalizes non-object input and args before spawning', async () => {
+      const { tool, spawnSync } = buildGeneratedTool(MINIMAL_TOOL);
+
       expect(tool.toAutoClassifierInput(undefined)).toBe('echo ');
       await expect(tool.call(undefined)).resolves.toEqual({
         data: { stdout: '', stderr: '', exitCode: 0 },
