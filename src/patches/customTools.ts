@@ -166,7 +166,7 @@ const generateToolObject = (
   const schemaJson = JSON.stringify({ type: 'object', properties, required });
 
   const escapeForRegex = (s: string): string =>
-    s.replace(/[.*+?^${}()|[\]\\]/g, '\\\\$&');
+    s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
   const normalizeObjectExpr = (varName: string): string =>
     `${varName}=typeof ${varName}==="object"&&${varName}!==null&&!Array.isArray(${varName})?${varName}:{};`;

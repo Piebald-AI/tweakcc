@@ -65,6 +65,17 @@ const OPTIONAL_PARAM_TOOL: CustomTool = {
   env: { MY_VAR: 'hello' },
 };
 
+const SPECIAL_PARAM_TOOL: CustomTool = {
+  name: 'RegexTool',
+  description: 'Tool with regex-special parameter names',
+  parameters: {
+    'a.b': { type: 'string', description: 'Dot param', required: true },
+    '$count': { type: 'string', description: 'Dollar param', required: true },
+    'foo/bar': { type: 'string', description: 'Slash param', required: true },
+  },
+  command: 'echo {{a.b}} {{foo/bar}} {{$count}}',
+};
+
 interface GeneratedToolValidationResult {
   result: boolean;
   message?: string;
@@ -431,6 +442,22 @@ describe('writeCustomTools', () => {
       expect(spawnSync).toHaveBeenCalledWith(
         'sh',
         ['-c', 'echo '],
+        expect.objectContaining({ cwd: '/cwd' })
+      );
+    });
+
+    it('escapes regex-special parameter names in substitutions', async () => {
+      const { tool, spawnSync } = buildGeneratedTool(SPECIAL_PARAM_TOOL);
+
+      await tool.call({
+        'a.b': 'dot',
+        '$count': 'dollar',
+        'foo/bar': 'slash',
+      });
+
+      expect(spawnSync).toHaveBeenCalledWith(
+        'sh',
+        ['-c', 'echo dot slash dollar'],
         expect.objectContaining({ cwd: '/cwd' })
       );
     });
