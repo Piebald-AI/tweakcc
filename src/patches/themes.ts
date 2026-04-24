@@ -89,7 +89,9 @@ function getThemesLocation(oldFile: string): ThemesLocation | null {
     startIndex: objArrMatch.index,
     endIndex: objArrMatch.index + objArrMatch[0].length,
   };
-  const objArrItemCount = (objArrMatch[0].match(/"?value"?:/g) || []).length;
+  // Count items by object-opening label key to avoid false positives from
+  // label text that happens to contain the substring "value:".
+  const objArrItemCount = (objArrMatch[0].match(/\{"?label"?:/g) || []).length;
   if (objArrItemCount === 1) {
     // Find the variable name holding this single-item array (e.g. "HH")
     const beforeObjArr = oldFile.slice(
@@ -97,30 +99,37 @@ function getThemesLocation(oldFile: string): ThemesLocation | null {
       objArrMatch.index
     );
     const varNameMatch = beforeObjArr.match(/([A-Za-z_$][\w$]*)=$/);
-    if (varNameMatch) {
-      const autoVarName = varNameMatch[1].replace(/[$]/g, '\\$');
-      // Find assembly: [...autoVar, theme1, theme2, ..., ...customThemes.map(
-      const assemblyPat = new RegExp(
-        `\\[\\.\\.\\.${autoVarName}(?:,[A-Za-z_$][\\w$]*){2,},\\.\\.\\.`
-      );
-      const assemblyMatch = oldFile.match(assemblyPat);
-      if (assemblyMatch && assemblyMatch.index != undefined) {
-        // assemblyMatch[0] ends with ",..." — endIndex is right before "..."
-        // Replacement "[{theme},..." joins cleanly with remaining "...X.map(kB1),...FH]"
-        objArrLocation = {
-          startIndex: assemblyMatch.index,
-          endIndex: assemblyMatch.index + assemblyMatch[0].length - 3,
-          isAssemblyPrefix: true,
-        };
-      }
+    if (!varNameMatch) {
+      console.error('patch: themes: failed to find auto-option variable name');
+      return null;
     }
+    const autoVarName = varNameMatch[1].replace(/[$]/g, '\\$');
+    // Find assembly: [...autoVar, theme1, theme2, ..., ...customThemes.map(
+    const assemblyPat = new RegExp(
+      `\\[\\.\\.\\.${autoVarName}(?:,[A-Za-z_$][\\w$]*){2,},\\.\\.\\.`
+    );
+    const assemblyMatch = oldFile.match(assemblyPat);
+    if (!assemblyMatch || assemblyMatch.index == undefined) {
+      console.error(
+        `patch: themes: failed to find assembly spread for variable "${varNameMatch[1]}"`,
+      );
+      return null;
+    }
+    // assemblyMatch[0] ends with ",..." — endIndex is right before "..."
+    // Replacement "[{theme},..." joins cleanly with remaining "...X.map(kB1),...FH]"
+    objArrLocation = {
+      startIndex: assemblyMatch.index,
+      endIndex: assemblyMatch.index + assemblyMatch[0].length - 3,
+      isAssemblyPrefix: true,
+    };
   }
 
   // === Theme Name Mapping Object ===
   // Old: return{dark:"Dark mode",...}
   // New (CC >=2.1.92): VAR={auto:"Auto...",dark:"Dark mode",...}
+  // Capture group 1 holds the prefix so we can preserve it in the replacement.
   const objPat =
-    /(?:return|[$\w]+=)\{(?:"?(?:[$\w-]+)"?:"(?:Auto |Dark|Light|Monochrome)[^"]*",?)+\}/;
+    /(return|[$\w]+=)\{(?:"?(?:[$\w-]+)"?:"(?:Auto |Dark|Light|Monochrome)[^"]*",?)+\}/;
   const objMatch = oldFile.match(objPat);
 
   if (!objMatch || objMatch.index == undefined) {
@@ -129,7 +138,7 @@ function getThemesLocation(oldFile: string): ThemesLocation | null {
   }
 
   // Preserve the original prefix (either "return" or "VARNAME=")
-  const objPrefix = objMatch[0].slice(0, objMatch[0].indexOf('{'));
+  const objPrefix = objMatch[1];
 
   return {
     switchStatement: {
