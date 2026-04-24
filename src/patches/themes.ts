@@ -3,11 +3,13 @@
 import { Theme } from '../types';
 import { LocationResult, showDiff } from './index';
 
-function getThemesLocation(oldFile: string): {
+type ThemesLocation = {
   switchStatement: LocationResult;
-  objArr: LocationResult;
-  obj: LocationResult;
-} | null {
+  objArr: LocationResult & { isAssemblyPrefix?: boolean };
+  obj: LocationResult & { prefix: string };
+};
+
+function getThemesLocation(oldFile: string): ThemesLocation | null {
   // === Switch Statement ===
   // CC >=2.1.83: switch(A){case"light":return LX9;...default:return CX9}
   // CC <2.1.83: switch(A){case"light":return{...};...}
@@ -70,7 +72,9 @@ function getThemesLocation(oldFile: string): {
   }
 
   // === Theme Options Array ===
-  // Both old and new: [{label:"...",value:"..."}, ...] or [{"label":"...",...]
+  // Old format: [{label:"Dark mode",value:"dark"},{label:"Light mode",value:"light"},...]
+  // New format (CC >=2.1.92): HH=[{label:"Auto (match terminal)",value:"auto"}] only,
+  //   with individual vars DH,YH,... spread in assembly: e=[...HH,DH,YH,...,...X.map(kB1),...FH]
   const objArrPat =
     /\[(?:\.\.\.\[\],)?(?:\{"?label"?:"(?:Dark|Light|Auto|Monochrome)[^"]*","?value"?:"[^"]+"\},?)+\]/;
   const objArrMatch = oldFile.match(objArrPat);
@@ -80,10 +84,52 @@ function getThemesLocation(oldFile: string): {
     return null;
   }
 
+  // Check if new assembly format: objArr has only 1 item (just "auto" option)
+  let objArrLocation: LocationResult & { isAssemblyPrefix?: boolean } = {
+    startIndex: objArrMatch.index,
+    endIndex: objArrMatch.index + objArrMatch[0].length,
+  };
+  // Count items by object-opening label key to avoid false positives from
+  // label text that happens to contain the substring "value:".
+  const objArrItemCount = (objArrMatch[0].match(/\{"?label"?:/g) || []).length;
+  if (objArrItemCount === 1) {
+    // Find the variable name holding this single-item array (e.g. "HH")
+    const beforeObjArr = oldFile.slice(
+      Math.max(0, objArrMatch.index - 30),
+      objArrMatch.index
+    );
+    const varNameMatch = beforeObjArr.match(/([A-Za-z_$][\w$]*)=$/);
+    if (!varNameMatch) {
+      console.error('patch: themes: failed to find auto-option variable name');
+      return null;
+    }
+    const autoVarName = varNameMatch[1].replace(/[$]/g, '\\$');
+    // Find assembly: [...autoVar, theme1, theme2, ..., ...customThemes.map(
+    const assemblyPat = new RegExp(
+      `\\[\\.\\.\\.${autoVarName}(?:,[A-Za-z_$][\\w$]*){1,},\\.\\.\\.`
+    );
+    const assemblyMatch = oldFile.match(assemblyPat);
+    if (!assemblyMatch || assemblyMatch.index == undefined) {
+      console.error(
+        `patch: themes: failed to find assembly spread for variable "${varNameMatch[1]}"`
+      );
+      return null;
+    }
+    // assemblyMatch[0] ends with ",..." — endIndex is right before "..."
+    // Replacement "[{theme},..." joins cleanly with remaining "...X.map(kB1),...FH]"
+    objArrLocation = {
+      startIndex: assemblyMatch.index,
+      endIndex: assemblyMatch.index + assemblyMatch[0].length - 3,
+      isAssemblyPrefix: true,
+    };
+  }
+
   // === Theme Name Mapping Object ===
-  // {dark:"Dark mode",...} or {"dark":"Dark mode",...}
+  // Old: return{dark:"Dark mode",...}
+  // New (CC >=2.1.92): VAR={auto:"Auto...",dark:"Dark mode",...}
+  // Capture group 1 holds the prefix so we can preserve it in the replacement.
   const objPat =
-    /(?:return|[$\w]+=)\{(?:"?(?:[$\w-]+)"?:"(?:Auto |Dark|Light|Monochrome)[^"]*",?)+\}/;
+    /(return|[$\w]+=)\{(?:"?(?:[$\w-]+)"?:"(?:Auto |Dark|Light|Monochrome)[^"]*",?)+\}/;
   const objMatch = oldFile.match(objPat);
 
   if (!objMatch || objMatch.index == undefined) {
@@ -91,19 +137,20 @@ function getThemesLocation(oldFile: string): {
     return null;
   }
 
+  // Preserve the original prefix (either "return" or "VARNAME=")
+  const objPrefix = objMatch[1];
+
   return {
     switchStatement: {
       startIndex: switchStart,
       endIndex: switchEnd,
       identifiers: [switchIdent],
     },
-    objArr: {
-      startIndex: objArrMatch.index,
-      endIndex: objArrMatch.index + objArrMatch[0].length,
-    },
+    objArr: objArrLocation,
     obj: {
       startIndex: objMatch.index,
       endIndex: objMatch.index + objMatch[0].length,
+      prefix: objPrefix,
     },
   };
 }
@@ -126,8 +173,10 @@ export const writeThemes = (
   // Process in reverse order to avoid index shifting
 
   // Update theme mapping object (obj)
+  // Preserve the original prefix ("return" or "VARNAME=") to avoid turning a
+  // module-level variable assignment into an invalid return statement.
   const obj =
-    'return' +
+    locations.obj.prefix +
     JSON.stringify(
       Object.fromEntries(themes.map(theme => [theme.id, theme.name]))
     );
@@ -145,9 +194,16 @@ export const writeThemes = (
   oldFile = newFile;
 
   // Update theme options array (objArr)
-  const objArr = JSON.stringify(
+  // In new assembly format (CC >=2.1.92), objArr points to the prefix of the
+  // spread expression "[...auto,theme1,...,themeN," (endIndex is just before
+  // the custom-themes spread "...U.map(...)").  We emit an open array without
+  // the closing "]" so the existing suffix "...U.map(kB1),...FH]" completes it.
+  const themeItems = JSON.stringify(
     themes.map(theme => ({ label: theme.name, value: theme.id }))
   );
+  const objArr = locations.objArr.isAssemblyPrefix
+    ? themeItems.slice(0, -1) + ',' // "[{...},"  — no closing ], suffix provides it
+    : themeItems;
   newFile =
     newFile.slice(0, locations.objArr.startIndex) +
     objArr +
