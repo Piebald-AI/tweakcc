@@ -111,7 +111,7 @@ function getThemesLocation(oldFile: string): ThemesLocation | null {
     const assemblyMatch = oldFile.match(assemblyPat);
     if (!assemblyMatch || assemblyMatch.index == undefined) {
       console.error(
-        `patch: themes: failed to find assembly spread for variable "${varNameMatch[1]}"`,
+        `patch: themes: failed to find assembly spread for variable "${varNameMatch[1]}"`
       );
       return null;
     }
