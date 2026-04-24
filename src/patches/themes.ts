@@ -106,7 +106,7 @@ function getThemesLocation(oldFile: string): ThemesLocation | null {
     const autoVarName = varNameMatch[1].replace(/[$]/g, '\\$');
     // Find assembly: [...autoVar, theme1, theme2, ..., ...customThemes.map(
     const assemblyPat = new RegExp(
-      `\\[\\.\\.\\.${autoVarName}(?:,[A-Za-z_$][\\w$]*){2,},\\.\\.\\.`
+      `\\[\\.\\.\\.${autoVarName}(?:,[A-Za-z_$][\\w$]*){1,},\\.\\.\\.`
     );
     const assemblyMatch = oldFile.match(assemblyPat);
     if (!assemblyMatch || assemblyMatch.index == undefined) {
