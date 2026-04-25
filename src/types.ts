@@ -155,6 +155,24 @@ export interface Toolset {
   allowedTools: string[] | '*';
 }
 
+export interface CustomToolParameter {
+  type: 'string' | 'number' | 'boolean';
+  description: string;
+  required?: boolean;
+}
+
+export interface CustomTool {
+  name: string;
+  description: string;
+  parameters: Record<string, CustomToolParameter>;
+  command: string;
+  shell?: string;
+  timeout?: number;
+  workingDir?: string;
+  env?: Record<string, string>;
+  prompt?: string;
+}
+
 export interface SubagentModelsConfig {
   plan: string | null;
   explore: string | null;
@@ -171,6 +189,7 @@ export interface Settings {
   toolsets: Toolset[];
   defaultToolset: string | null;
   planModeToolset: string | null;
+  customTools: CustomTool[];
   subagentModels: SubagentModelsConfig;
   inputPatternHighlighters: InputPatternHighlighter[];
   inputPatternHighlightersTestText: string; // Global test text for previewing highlighters

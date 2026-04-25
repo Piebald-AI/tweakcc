@@ -31,6 +31,7 @@ vi.mock('node:child_process', () => ({
 }));
 vi.mock('../nativeInstallationLoader', () => ({
   extractClaudeJsFromNativeInstallation: vi.fn(),
+  getNativeModuleLoadError: vi.fn().mockReturnValue(null),
   repackNativeInstallation: vi.fn(),
   resolveNixBinaryWrapper: vi.fn().mockResolvedValue(null),
 }));
@@ -1522,6 +1523,143 @@ describe('config.ts', () => {
       await expect(
         findClaudeCodeInstallation(mockConfig, { interactive: true })
       ).rejects.toThrow('Could not extract JS from native binary');
+    });
+
+    it('should include node-lief load reason in error when getNativeModuleLoadError returns a message', async () => {
+      const mockConfig = {
+        ccInstallationPath: null,
+        changesApplied: false,
+        ccVersion: '',
+        lastModified: '',
+        settings: DEFAULT_SETTINGS,
+      };
+
+      const nativeBinaryPath = '/usr/local/bin/claude';
+
+      vi.spyOn(fs, 'stat').mockImplementation(async filePath => {
+        if (filePath === nativeBinaryPath) return {} as Stats;
+        throw createEnoent();
+      });
+      vi.mocked(whichMock).mockResolvedValue(nativeBinaryPath);
+      lstatSpy.mockImplementation(async filePath => {
+        if (filePath === nativeBinaryPath) return createRegularStats();
+        throw createEnoent();
+      });
+      vi.spyOn(fs, 'realpath').mockResolvedValue(nativeBinaryPath);
+      vi.spyOn(fs, 'open').mockResolvedValue({
+        read: async ({ buffer }: { buffer: Buffer }) => {
+          const contentBuffer = Buffer.from('fake binary content');
+          contentBuffer.copy(buffer);
+          return { bytesRead: contentBuffer.length, buffer };
+        },
+        close: async () => {},
+      } as unknown as fs.FileHandle);
+      mockMagicInstance.detect.mockReturnValue('application/octet-stream');
+      vi.spyOn(
+        nativeInstallation,
+        'extractClaudeJsFromNativeInstallation'
+      ).mockResolvedValue(null);
+      vi.spyOn(nativeInstallation, 'getNativeModuleLoadError').mockReturnValue(
+        'libstdc++.so.6: cannot open shared object file: No such file or directory'
+      );
+
+      await expect(
+        findClaudeCodeInstallation(mockConfig, { interactive: true })
+      ).rejects.toThrow(
+        'Reason: node-lief failed to load: libstdc++.so.6'
+      );
+    });
+
+    it('should include NixOS hint in error when load error contains shared object message', async () => {
+      const mockConfig = {
+        ccInstallationPath: null,
+        changesApplied: false,
+        ccVersion: '',
+        lastModified: '',
+        settings: DEFAULT_SETTINGS,
+      };
+
+      const nativeBinaryPath = '/usr/local/bin/claude';
+
+      vi.spyOn(fs, 'stat').mockImplementation(async filePath => {
+        if (filePath === nativeBinaryPath) return {} as Stats;
+        throw createEnoent();
+      });
+      vi.mocked(whichMock).mockResolvedValue(nativeBinaryPath);
+      lstatSpy.mockImplementation(async filePath => {
+        if (filePath === nativeBinaryPath) return createRegularStats();
+        throw createEnoent();
+      });
+      vi.spyOn(fs, 'realpath').mockResolvedValue(nativeBinaryPath);
+      vi.spyOn(fs, 'open').mockResolvedValue({
+        read: async ({ buffer }: { buffer: Buffer }) => {
+          const contentBuffer = Buffer.from('fake binary content');
+          contentBuffer.copy(buffer);
+          return { bytesRead: contentBuffer.length, buffer };
+        },
+        close: async () => {},
+      } as unknown as fs.FileHandle);
+      mockMagicInstance.detect.mockReturnValue('application/octet-stream');
+      vi.spyOn(
+        nativeInstallation,
+        'extractClaudeJsFromNativeInstallation'
+      ).mockResolvedValue(null);
+      vi.spyOn(nativeInstallation, 'getNativeModuleLoadError').mockReturnValue(
+        'libstdc++.so.6: cannot open shared object file: No such file or directory'
+      );
+
+      await expect(
+        findClaudeCodeInstallation(mockConfig, { interactive: true })
+      ).rejects.toThrow('On NixOS with Bun');
+    });
+
+    it('should include load reason but not NixOS hint for non-shared-object load errors', async () => {
+      const mockConfig = {
+        ccInstallationPath: null,
+        changesApplied: false,
+        ccVersion: '',
+        lastModified: '',
+        settings: DEFAULT_SETTINGS,
+      };
+
+      const nativeBinaryPath = '/usr/local/bin/claude';
+
+      vi.spyOn(fs, 'stat').mockImplementation(async filePath => {
+        if (filePath === nativeBinaryPath) return {} as Stats;
+        throw createEnoent();
+      });
+      vi.mocked(whichMock).mockResolvedValue(nativeBinaryPath);
+      lstatSpy.mockImplementation(async filePath => {
+        if (filePath === nativeBinaryPath) return createRegularStats();
+        throw createEnoent();
+      });
+      vi.spyOn(fs, 'realpath').mockResolvedValue(nativeBinaryPath);
+      vi.spyOn(fs, 'open').mockResolvedValue({
+        read: async ({ buffer }: { buffer: Buffer }) => {
+          const contentBuffer = Buffer.from('fake binary content');
+          contentBuffer.copy(buffer);
+          return { bytesRead: contentBuffer.length, buffer };
+        },
+        close: async () => {},
+      } as unknown as fs.FileHandle);
+      mockMagicInstance.detect.mockReturnValue('application/octet-stream');
+      vi.spyOn(
+        nativeInstallation,
+        'extractClaudeJsFromNativeInstallation'
+      ).mockResolvedValue(null);
+      vi.spyOn(nativeInstallation, 'getNativeModuleLoadError').mockReturnValue(
+        'unexpected header in node-lief'
+      );
+
+      await expect(
+        findClaudeCodeInstallation(mockConfig, { interactive: true })
+      ).rejects.toThrow(
+        'node-lief failed to load: unexpected header in node-lief'
+      );
+
+      await expect(
+        findClaudeCodeInstallation(mockConfig, { interactive: true })
+      ).rejects.not.toThrow('On NixOS with Bun');
     });
   });
 

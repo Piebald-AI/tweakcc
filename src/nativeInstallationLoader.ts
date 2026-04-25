@@ -21,6 +21,7 @@ interface NativeInstallationModule {
 }
 
 let cachedModule: NativeInstallationModule | null = null;
+let loadError: string | null = null;
 
 /**
  * Attempts to load the nativeInstallation module.
@@ -36,17 +37,22 @@ async function tryLoadNativeInstallationModule(): Promise<NativeInstallationModu
     await import('node-lief');
     // If it is, dynamically import the module that uses it
     cachedModule = await import('./nativeInstallation');
+    loadError = null;
     return cachedModule;
   } catch (err) {
-    debug(
-      `Error loading native installation module: ${err instanceof Error ? err.message : String(err)}`
-    );
+    loadError = err instanceof Error ? err.message : String(err);
+    debug(`Error loading native installation module: ${loadError}`);
     if (err instanceof Error) {
       debug(err);
     }
     // node-lief not available
     return null;
   }
+}
+
+/** Returns the reason node-lief failed to load, or null if it loaded successfully. */
+export function getNativeModuleLoadError(): string | null {
+  return loadError;
 }
 
 /**
