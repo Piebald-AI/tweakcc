@@ -400,7 +400,7 @@ export async function handleUnpack(
     `Extracting JS from native binary: ${chalk.cyan(installation.path)} (v${installation.version})`
   );
 
-  const content = await readContent(installation);
+  const { content } = await readContent(installation);
 
   await fs.writeFile(outputJsPath, content, 'utf8');
 
@@ -447,8 +447,9 @@ export async function handleRepack(
   );
 
   const newJs = await fs.readFile(inputJsPath, 'utf8');
+  const clearBytecode = !newJs.startsWith('// @bun @bytecode');
 
-  await writeContent(installation, newJs);
+  await writeContent(installation, newJs, clearBytecode);
 
   console.log(
     chalk.green(
@@ -471,7 +472,7 @@ async function handleAdhocPatchString(
   installation: Installation,
   skipConfirmation = false
 ): Promise<void> {
-  const content = await readContent(installation);
+  const { content, clearBytecode } = await readContent(installation);
 
   let modified: string;
   let count: number;
@@ -531,7 +532,7 @@ async function handleAdhocPatchString(
     return;
   }
 
-  await writeContent(installation, modified);
+  await writeContent(installation, modified, clearBytecode);
 
   console.log(
     chalk.green(
@@ -597,7 +598,7 @@ async function handleAdhocPatchRegex(
   installation: Installation,
   skipConfirmation = false
 ): Promise<void> {
-  const content = await readContent(installation);
+  const { content, clearBytecode } = await readContent(installation);
 
   let parsed: { pattern: string; flags: string };
   try {
@@ -671,7 +672,7 @@ async function handleAdhocPatchRegex(
     return;
   }
 
-  await writeContent(installation, modified);
+  await writeContent(installation, modified, clearBytecode);
 
   console.log(
     chalk.green(
@@ -689,7 +690,7 @@ async function handleAdhocPatchScriptImpl(
   skipConfirmation = false,
   dangerousNoScriptSandbox = false
 ): Promise<void> {
-  const content = await readContent(installation);
+  const { content, clearBytecode } = await readContent(installation);
 
   const script = await resolveScriptSource(scriptArg);
 
@@ -742,7 +743,7 @@ async function handleAdhocPatchScriptImpl(
     return;
   }
 
-  await writeContent(installation, modified);
+  await writeContent(installation, modified, clearBytecode);
 
   console.log(
     chalk.green(`✓ Script patch applied to ${chalk.cyan(installation.path)}`)
