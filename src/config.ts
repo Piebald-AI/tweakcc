@@ -6,6 +6,7 @@ import { EOL } from 'node:os';
 import chalk from 'chalk';
 
 import {
+  CustomTool,
   RemoteConfig,
   Settings,
   Theme,
@@ -166,6 +167,139 @@ const createDefaultConfig = (): TweakccConfig => ({
   settings: DEFAULT_SETTINGS,
 });
 
+const normalizeCustomTool = (
+  tool: unknown,
+  index: number
+): CustomTool | null => {
+  const invalidKeys: string[] = [];
+
+  if (!tool || typeof tool !== 'object' || Array.isArray(tool)) {
+    console.warn(
+      `config: customTools: dropping invalid tool at index ${index} (expected object)`
+    );
+    return null;
+  }
+
+  const candidate = tool as Partial<CustomTool>;
+
+  if (typeof candidate.name !== 'string' || candidate.name.trim() === '') {
+    invalidKeys.push('name');
+  }
+  if (
+    typeof candidate.description !== 'string' ||
+    candidate.description.trim() === ''
+  ) {
+    invalidKeys.push('description');
+  }
+  if (
+    typeof candidate.command !== 'string' ||
+    candidate.command.trim() === ''
+  ) {
+    invalidKeys.push('command');
+  }
+
+  const rawParameters = candidate.parameters;
+  if (
+    !rawParameters ||
+    typeof rawParameters !== 'object' ||
+    Array.isArray(rawParameters)
+  ) {
+    invalidKeys.push('parameters');
+  } else {
+    for (const [paramName, param] of Object.entries(rawParameters)) {
+      if (
+        paramName.trim() === '' ||
+        !param ||
+        typeof param !== 'object' ||
+        Array.isArray(param)
+      ) {
+        invalidKeys.push('parameters');
+        break;
+      }
+
+      const typedParam = param as {
+        type?: unknown;
+        description?: unknown;
+        required?: unknown;
+      };
+
+      if (
+        typedParam.type !== 'string' &&
+        typedParam.type !== 'number' &&
+        typedParam.type !== 'boolean'
+      ) {
+        invalidKeys.push('parameters');
+        break;
+      }
+
+      if (
+        typeof typedParam.description !== 'string' ||
+        typedParam.description.trim() === ''
+      ) {
+        invalidKeys.push('parameters');
+        break;
+      }
+
+      if (
+        typedParam.required !== undefined &&
+        typeof typedParam.required !== 'boolean'
+      ) {
+        invalidKeys.push('parameters');
+        break;
+      }
+    }
+  }
+
+  if (
+    candidate.shell !== undefined &&
+    (typeof candidate.shell !== 'string' || candidate.shell.trim() === '')
+  ) {
+    invalidKeys.push('shell');
+  }
+
+  if (
+    candidate.timeout !== undefined &&
+    (!Number.isInteger(candidate.timeout) || candidate.timeout <= 0)
+  ) {
+    invalidKeys.push('timeout');
+  }
+
+  if (
+    candidate.workingDir !== undefined &&
+    (typeof candidate.workingDir !== 'string' ||
+      candidate.workingDir.trim() === '')
+  ) {
+    invalidKeys.push('workingDir');
+  }
+
+  if (
+    candidate.env !== undefined &&
+    (!candidate.env ||
+      typeof candidate.env !== 'object' ||
+      Array.isArray(candidate.env) ||
+      Object.entries(candidate.env).some(
+        ([key, value]) => key.trim() === '' || typeof value !== 'string'
+      ))
+  ) {
+    invalidKeys.push('env');
+  }
+
+  if (candidate.prompt !== undefined && typeof candidate.prompt !== 'string') {
+    invalidKeys.push('prompt');
+  }
+
+  if (invalidKeys.length > 0) {
+    const name =
+      typeof candidate.name === 'string' ? ` "${candidate.name}"` : '';
+    console.warn(
+      `config: customTools: dropping invalid tool at index ${index}${name} (invalid/missing: ${Array.from(new Set(invalidKeys)).join(', ')})`
+    );
+    return null;
+  }
+
+  return candidate as CustomTool;
+};
+
 /**
  * Applies migrations and normalizations to a parsed config object.
  * This handles:
@@ -225,6 +359,18 @@ const normalizeConfig = (config: TweakccConfig): void => {
     config.settings.themes = config.settings.themes.map(
       theme => deepMergeWithDefaults(theme, DEFAULT_THEME) as Theme
     );
+  }
+
+  // Validate each customTool entry — drop entries missing required fields.
+  if (!Array.isArray(config.settings.customTools)) {
+    console.warn(
+      'config: customTools must be an array; ignoring invalid value'
+    );
+    config.settings.customTools = [];
+  } else {
+    config.settings.customTools = config.settings.customTools
+      .map((tool, index) => normalizeCustomTool(tool, index))
+      .filter((tool): tool is CustomTool => tool !== null);
   }
 
   // In v3.2.0 userMessageDisplay was restructured from prefix/message to a single format string.

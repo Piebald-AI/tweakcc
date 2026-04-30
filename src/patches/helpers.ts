@@ -289,6 +289,68 @@ export const clearCaches = (): void => {
 };
 
 /**
+ * Find the getCwd function variable name (no caching — cheap regex, called once).
+ *
+ * Claude Code tracks the session working directory in module-level state
+ * (STATE.cwd) with optional per-async-context overrides. process.cwd() is
+ * wrong: it does not reflect `cd` commands, worktree switches, or subagent
+ * cwd overrides made during a session.
+ *
+ * Detection strategy (three-step chain mirroring cwd.ts):
+ *   1. getCwdState: function X(){return STATE.cwd}   → pattern: return Y.cwd
+ *   2. pwd:         function X(){return getCwdState()} → wraps step 1
+ *   3. getCwd:      try{return pwd()}catch{return ...} → wraps step 2 in try-catch
+ */
+export const getCwdFuncName = (fileContents: string): string | undefined => {
+  const getCwdStatePattern = /function ([$\w]+)\(\)\{return ([$\w]+)\.cwd\}/;
+  const getCwdStateMatch = fileContents.match(getCwdStatePattern);
+  if (!getCwdStateMatch) {
+    console.log('patch: getCwdFuncName: failed to find getCwdState');
+    return undefined;
+  }
+  const getCwdStateName = getCwdStateMatch[1];
+
+  const pwdPattern = new RegExp(
+    `function ([$\\w]+)\\(\\)\\{return ${escapeIdent(getCwdStateName)}\\(\\)\\}`
+  );
+  const pwdMatch = fileContents.match(pwdPattern);
+  const pwdName = pwdMatch?.[1] ?? getCwdStateName;
+
+  const getCwdPattern = new RegExp(
+    `function ([$\\w]+)\\(\\)\\{try\\{return ${escapeIdent(pwdName)}\\(\\)\\}catch`
+  );
+  const getCwdMatch = fileContents.match(getCwdPattern);
+  if (getCwdMatch) {
+    return getCwdMatch[1];
+  }
+
+  return pwdName;
+};
+
+/**
+ * Find the buildTool function variable name.
+ *
+ * buildTool() is Claude Code's tool factory (Tool.ts). It spreads TOOL_DEFAULTS
+ * onto the provided definition, then overrides userFacingName with a closure
+ * that returns def.name. The pattern in the minified bundle is highly specific:
+ *
+ *   function NAME(PARAM){return{...DEFAULTS,userFacingName:()=>PARAM.name,...PARAM}}
+ *
+ * Using buildTool ensures custom tools inherit all CC default method implementations
+ * automatically rather than manually specifying every optional method.
+ */
+export const findBuildToolFunc = (fileContents: string): string | undefined => {
+  const pattern =
+    /function ([$\w]+)\(([$\w]+)\)\{return\{\.{3}[$\w]+,userFacingName:\(\)=>\2\.name,\.\.\.\2\}\}/;
+  const match = fileContents.match(pattern);
+  if (!match) {
+    console.log('patch: findBuildToolFunc: failed to find buildTool function');
+    return undefined;
+  }
+  return match[1];
+};
+
+/**
  * Find the Text component variable name from Ink
  */
 export const findTextComponent = (fileContents: string): string | undefined => {

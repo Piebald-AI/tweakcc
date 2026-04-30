@@ -155,6 +155,24 @@ export interface Toolset {
   allowedTools: string[] | '*';
 }
 
+export interface CustomToolParameter {
+  type: 'string' | 'number' | 'boolean';
+  description: string;
+  required?: boolean;
+}
+
+export interface CustomTool {
+  name: string;
+  description: string;
+  parameters: Record<string, CustomToolParameter>;
+  command: string;
+  shell?: string;
+  timeout?: number;
+  workingDir?: string;
+  env?: Record<string, string>;
+  prompt?: string;
+}
+
 export interface SubagentModelsConfig {
   plan: string | null;
   explore: string | null;
@@ -171,6 +189,7 @@ export interface Settings {
   toolsets: Toolset[];
   defaultToolset: string | null;
   planModeToolset: string | null;
+  customTools: CustomTool[];
   subagentModels: SubagentModelsConfig;
   inputPatternHighlighters: InputPatternHighlighter[];
   inputPatternHighlightersTestText: string; // Global test text for previewing highlighters
@@ -234,6 +253,7 @@ export enum MainMenuItem {
   INPUT_PATTERN_HIGHLIGHTERS = 'Input pattern highlighters',
   MISC = 'Misc',
   TOOLSETS = 'Toolsets',
+  CUSTOM_TOOLS = 'Custom tools',
   SUBAGENT_MODELS = 'Subagent models',
   CLAUDE_MD_ALT_NAMES = 'CLAUDE.md alternative names',
   VIEW_SYSTEM_PROMPTS = 'View system prompts',
