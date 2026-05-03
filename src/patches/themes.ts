@@ -9,6 +9,19 @@ type ThemesLocation = {
   obj: LocationResult & { prefix: string };
 };
 
+/**
+ * Locates the three theme-related code sections in the CC bundle that need to
+ * be rewritten: the switch statement (colors per theme), the options array
+ * (dropdown items), and the name-mapping object (theme ID → display name).
+ *
+ * Handles two assembly formats:
+ * - CC <2.1.92: options array is a single inline `[{label,value},...]` literal.
+ * - CC >=2.1.92: "auto" option is its own variable; remaining built-ins are
+ *   spread in an assembly expression `[...autoVar,t1,t2,...,...custom.map()]`.
+ *
+ * @param oldFile - The CC bundle source as a string
+ * @returns Locations of the three sections, or null if any section is not found
+ */
 function getThemesLocation(oldFile: string): ThemesLocation | null {
   // === Switch Statement ===
   // CC >=2.1.83: switch(A){case"light":return LX9;...default:return CX9}
@@ -155,6 +168,17 @@ function getThemesLocation(oldFile: string): ThemesLocation | null {
   };
 }
 
+/**
+ * Rewrites the theme-related sections of the CC bundle to inject custom themes.
+ *
+ * Replaces the switch statement, options dropdown array, and name-mapping object
+ * so that all provided themes (including built-ins like dark/light) are available
+ * via `/theme`. Processes in reverse index order to avoid offset shifts.
+ *
+ * @param oldFile - The CC bundle source as a string
+ * @param themes  - Full list of themes to inject (built-ins + custom)
+ * @returns The modified bundle, or null if any required section was not found
+ */
 export const writeThemes = (
   oldFile: string,
   themes: Theme[]
