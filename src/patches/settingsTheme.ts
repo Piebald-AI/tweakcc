@@ -1,15 +1,24 @@
 import { globalReplace } from './index';
 
-// CC validates the settings.json `theme` field against built-in enum + "custom:" prefix:
-//   theme:VAR.union([VAR.enum(THEMES),VAR.string().startsWith("custom:").transform(fn)])
-//             .optional().catch(void 0)
-// Tweakcc custom themes have plain IDs (e.g. "winter") that fail both constraints,
-// causing the persisted theme value to be silently reset on every CC startup.
-// Widen the schema to accept any string so custom IDs round-trip through settings.json.
-//
-// CC 2.1.x diff:
-// -theme:h.union([h.enum(k7$),h.string().startsWith("custom:").transform((q)=>q)]).optional().catch(void 0)
-// +theme:h.string().optional().catch(void 0)
+/**
+ * Widens the settings.json `theme` field schema to accept arbitrary theme IDs.
+ *
+ * CC validates the theme field against built-in IDs (enum) or a `"custom:"` prefix.
+ * Tweakcc custom themes use plain IDs (e.g. `"winter"`) that fail both checks;
+ * the `.catch(void 0)` silently resets the field on every startup, so the theme
+ * never persists. This patch replaces the union validator with `z.string()`.
+ *
+ * Applies to both user-settings and managed-settings schema instances (two occurrences).
+ *
+ * CC 2.1.x diff (per occurrence):
+ * ```
+ * -theme:h.union([h.enum(k7$),h.string().startsWith("custom:").transform((q)=>q)]).optional().catch(void 0)
+ * +theme:h.string().optional().catch(void 0)
+ * ```
+ *
+ * @param file - The CC bundle source as a string
+ * @returns The modified bundle, or null if the schema pattern was not found
+ */
 export const writeSettingsTheme = (file: string): string | null => {
   const pattern =
     /,theme:([$\w]+)\.union\(\[\1\.enum\([$\w$]+\),\1\.string\(\)\.startsWith\("[^"]*"\)\.transform\(\([^)]+\)=>[^)]+\)\]\)\.optional\(\)\.catch\(void 0\)/;
