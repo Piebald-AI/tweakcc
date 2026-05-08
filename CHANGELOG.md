@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v4.0.12](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.12) - 2026-05-07
+
+- Add voice mode patch (tengu_amber_quartz + tengu_sotto_voce) (#587) - @TyceHerrman
+- Fix auto-escape backticks in template literal context instead of skipping (#576) - @tesles
+- Fix `defaultToolset` fallback when persisted state has no toolset field (#592) - @y0usaf
+- Add `allow-custom-agent-models` patch (#593) - @GMNGeoffrey
+- Support Claude Code 2.1.69+ patch patterns (#595) - @paradoxally
+- Add support for community themes (see [claude-code-themes](https://github.com/Piebald-AI/claude-code-themes)) (#598) - @georpar
+- Don't blindly escape all quotes in the prompts (#620) - @mike1858
+- Fix patching for 2.1.81+ (#624) - @basekevin
 - Fix Linux native installation support (#644) - @signadou
+- Add channels mode patch (`tengu_harbor` bypass) (#653) - @viceversaco
 - Windows: look for `~/.local/bin/claude.exe`, skip `maybeResolveNixWrapper` (#721) - @bl-ue
 
 ## [v4.0.11](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.11) - 2026-03-05
