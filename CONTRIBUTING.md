@@ -6,7 +6,7 @@ Thank you for your interest in contributing to tweakcc! This document provides g
 
 ### Prerequisites
 
-- **Node.js**: 22.x (20.0.0 or higher required)
+- **Node.js**: 24.x (20.0.0 or higher required)
 - **pnpm**: 10.13.1 or higher
 
 ```bash
