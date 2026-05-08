@@ -330,3 +330,66 @@ describe('getClijsSearchPathsWithInfo - glob error handling', () => {
     expect(globPattern?.expandedPaths).toEqual(expectedPaths);
   });
 });
+
+describe('getNativeSearchPathsWithInfo', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+    // Default: globbySync returns empty so we don't depend on the real fs
+    vi.mocked(globbySync).mockImplementation(() => []);
+  });
+
+  it('should include the bare ~/.local/bin/claude path', async () => {
+    const { NATIVE_SEARCH_PATH_INFO } = await import('../installationPaths');
+
+    const sep = process.platform === 'win32' ? '\\' : '/';
+    const expectedTail = `${sep}.local${sep}bin${sep}claude`;
+
+    const match = NATIVE_SEARCH_PATH_INFO.find(
+      info => !info.isGlob && info.pattern.endsWith(expectedTail)
+    );
+
+    expect(match).toBeDefined();
+  });
+
+  it.skipIf(process.platform !== 'win32')(
+    'should include ~/.local/bin/claude.exe on Windows',
+    async () => {
+      const { NATIVE_SEARCH_PATH_INFO } = await import('../installationPaths');
+
+      const expectedTail = '\\.local\\bin\\claude.exe';
+
+      const match = NATIVE_SEARCH_PATH_INFO.find(
+        info => !info.isGlob && info.pattern.endsWith(expectedTail)
+      );
+
+      expect(match).toBeDefined();
+    }
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'should not include claude.exe on non-Windows platforms',
+    async () => {
+      const { NATIVE_SEARCH_PATH_INFO } = await import('../installationPaths');
+
+      const match = NATIVE_SEARCH_PATH_INFO.find(
+        info => !info.isGlob && info.pattern.endsWith('claude.exe')
+      );
+
+      expect(match).toBeUndefined();
+    }
+  );
+
+  it('should include the versions directory glob', async () => {
+    const { NATIVE_SEARCH_PATH_INFO } = await import('../installationPaths');
+
+    const sep = process.platform === 'win32' ? '\\' : '/';
+    const expectedTail = `${sep}.local${sep}share${sep}claude${sep}versions${sep}*`;
+
+    const match = NATIVE_SEARCH_PATH_INFO.find(
+      info => info.isGlob && info.pattern.endsWith(expectedTail)
+    );
+
+    expect(match).toBeDefined();
+  });
+});

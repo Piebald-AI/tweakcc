@@ -247,6 +247,9 @@ const getNativeSearchPathsWithInfo = (): SearchPathInfo[] => {
 
   // Direct binary path
   addPath(`${home}/.local/bin/claude`);
+  if (process.platform === 'win32') {
+    addPath(`${home}/.local/bin/claude.exe`);
+  }
 
   // Versioned binaries (filenames are versions like 2.0.65)
   addPath(`${home}/.local/share/claude/versions/*`, true);

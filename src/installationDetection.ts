@@ -224,6 +224,12 @@ async function readFilePrefix(
  * operations (backup, extract, repack) operate on the right file.
  */
 async function maybeResolveNixWrapper(binaryPath: string): Promise<string> {
+  // Nix `makeBinaryWrapper` produces ELF/Mach-O wrappers; on Windows the
+  // concept doesn't apply, and lief throws "Failed to parse binary file" on
+  // PE binaries. Short-circuit to avoid the noise and the wasted work.
+  if (process.platform === 'win32') {
+    return binaryPath;
+  }
   const resolved = await resolveNixBinaryWrapper(binaryPath);
   if (resolved) {
     debug(
@@ -310,6 +316,8 @@ export async function resolvePathToInstallationType(
  * Cross-platform: works on Windows, macOS, and Linux.
  */
 async function getClaudeFromPath(): Promise<string | null> {
+  debug(`getClaudeFromPath: PATH = ${process.env.PATH}`);
+  debug(`getClaudeFromPath: PATHEXT = ${process.env.PATHEXT}`);
   try {
     const claudePath = await which('claude');
     debug(`getClaudeFromPath: Found claude at ${claudePath}`);
@@ -671,7 +679,8 @@ export async function findClaudeCodeInstallation(
     const resolved = await resolvePathToInstallationType(pathClaudeExe);
     if (!resolved) {
       debug(
-        `Unable to detect installation type from 'claude' on PATH (${pathClaudeExe}). ` +
+        `Found 'claude' on PATH at '${pathClaudeExe}', but it isn't a Claude Code cli.js or native binary ` +
+          `(likely a CMD/BAT shim from a Node version manager such as Volta or nvm-windows). ` +
           `Falling back to hardcoded search paths.`
       );
     } else {
