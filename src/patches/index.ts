@@ -31,6 +31,7 @@ import { DEFAULT_SETTINGS } from '../defaultSettings';
 
 import { writeShowMoreItemsInSelectMenus } from './showMoreItemsInSelectMenus';
 import { writeThemes } from './themes';
+import { writeSettingsTheme } from './settingsTheme';
 import { writeContextLimit } from './contextLimit';
 import { writeInputBoxBorder } from './inputBorderBox';
 import { writeThinkerFormat } from './thinkerFormat';
@@ -211,6 +212,12 @@ const PATCH_DEFINITIONS = [
     name: 'Themes',
     group: PatchGroup.MISC_CONFIGURABLE,
     description: 'Your custom themes will be available via /theme',
+  },
+  {
+    id: 'settings-theme-schema',
+    name: 'Settings theme schema',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Allows custom theme IDs to persist in settings.json',
   },
   {
     id: 'thinking-verbs',
@@ -688,6 +695,15 @@ export const applyCustomization = async (
     },
     themes: {
       fn: c => writeThemes(c, config.settings.themes!),
+      condition: !!(
+        config.settings.themes &&
+        config.settings.themes.length > 0 &&
+        JSON.stringify(config.settings.themes) !==
+          JSON.stringify(DEFAULT_SETTINGS.themes)
+      ),
+    },
+    'settings-theme-schema': {
+      fn: c => writeSettingsTheme(c),
       condition: !!(
         config.settings.themes &&
         config.settings.themes.length > 0 &&
