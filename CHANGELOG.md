@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fix native binary patching on Linux (#730) - @signadou
+
 ## [v4.0.12](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.12) - 2026-05-07
 
 - Add voice mode patch (tengu_amber_quartz + tengu_sotto_voce) (#587) - @TyceHerrman
