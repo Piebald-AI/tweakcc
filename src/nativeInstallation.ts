@@ -1242,11 +1242,15 @@ function repackELFSection(
     let bunCompiledVaddr: bigint | null = null;
     const rwContent = rwSegment.content;
     const rwVaddrStart = rwSegment.virtualAddress;
-    const firstAligned = alignBigInt(rwVaddrStart, BigInt(BLOB_HEADER_ALIGNMENT));
+    const firstAligned = alignBigInt(
+      rwVaddrStart,
+      BigInt(BLOB_HEADER_ALIGNMENT)
+    );
+    const lastCandidate = rwVaddrStart + BigInt(rwContent.length) - 8n;
 
     for (
       let va = firstAligned;
-      va < rwVaddrStart + BigInt(rwContent.length) - 8n;
+      va <= lastCandidate;
       va += BigInt(BLOB_HEADER_ALIGNMENT)
     ) {
       const off = Number(va - rwVaddrStart);
@@ -1272,7 +1276,9 @@ function repackELFSection(
     const extensionSize = newFileOffset + alignedNewSize - oldRwFileEnd;
 
     if (extensionSize < 0n) {
-      throw new Error('New .bun location overlaps existing writable ELF segment');
+      throw new Error(
+        'New .bun location overlaps existing writable ELF segment'
+      );
     }
 
     debug(

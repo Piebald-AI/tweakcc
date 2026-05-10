@@ -7,7 +7,7 @@ Thank you for your interest in contributing to tweakcc! This document provides g
 ### Prerequisites
 
 - **Node.js**: 24.x (20.0.0 or higher required)
-- **pnpm**: 10.13.1 or higher
+- **pnpm**: 11.0.9 or higher
 
 ```bash
 pnpm install
