@@ -80,7 +80,7 @@
     "gray-matter": "^4.0.3",
     "ink": "^6.1.0",
     "ink-link": "^4.1.0",
-    "node-lief": "^1.1.1",
+    "node-lief": "^1.3.0",
     "oxfmt": "^0.28.0",
     "react": "^19.1.1",
     "wasmagic": "^1.0.7",
