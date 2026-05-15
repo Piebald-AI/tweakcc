@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import * as os from 'node:os';
+import * as fsSync from 'node:fs';
+import * as path from 'node:path';
 import { render } from 'ink';
 import { Command } from 'commander';
 import chalk from 'chalk';
@@ -181,6 +184,12 @@ const main = async () => {
       '--config-url <url>',
       'fetch configuration from a URL instead of local config.json'
     )
+    .option(
+      '--install-hook',
+      'install a SessionStart hook so patches auto-reapply after CC updates'
+    )
+    .option('--remove-hook', 'remove the auto-reapply SessionStart hook')
+    .option('-q, --quiet', 'suppress output (for use with --apply in hooks)')
     .action(async () => {
       // This action handles the default case (no subcommand).
       // All the --flag handling lives here so that Commander's subcommand
@@ -224,6 +233,20 @@ const main = async () => {
         return;
       }
 
+      // Handle --install-hook / --remove-hook flags
+      if (options.installHook && options.removeHook) {
+        console.error(
+          chalk.red(
+            'Error: Cannot use --install-hook and --remove-hook together.'
+          )
+        );
+        process.exit(1);
+      }
+      if (options.installHook || options.removeHook) {
+        await handleHookMode(!!options.installHook);
+        return;
+      }
+
       // Handle --apply flag for non-interactive mode
       if (options.apply) {
         // Parse patch filter if provided
@@ -232,7 +255,7 @@ const main = async () => {
               .split(',')
               .map((id: string) => id.trim())
           : null;
-        await handleApplyMode(patchFilter, options.configUrl);
+        await handleApplyMode(patchFilter, options.configUrl, !!options.quiet);
         return;
       }
 
@@ -335,6 +358,148 @@ const main = async () => {
 };
 
 /**
+ * Handles --install-hook / --remove-hook flags.
+ * Installs or removes a Claude Code SessionStart hook that runs
+ * `tweakcc --apply --quiet` after CC auto-updates.
+ */
+async function handleHookMode(install: boolean): Promise<void> {
+  const home = os.homedir();
+  const settingsPath = path.join(home, '.claude', 'settings.json');
+
+  // Read existing settings
+  let settings: Record<string, unknown> = {};
+  try {
+    const raw = fsSync.readFileSync(settingsPath, 'utf8');
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed == null || Array.isArray(parsed) || typeof parsed !== 'object') {
+      console.error(
+        chalk.red(`Error: ${settingsPath} must contain a JSON object.`)
+      );
+      process.exit(1);
+    }
+    settings = parsed as Record<string, unknown>;
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException;
+    if (err.code === 'ENOENT') {
+      // File doesn't exist — start fresh
+    } else if (error instanceof SyntaxError) {
+      console.error(
+        chalk.red(
+          `Error: ${settingsPath} contains invalid JSON. Please fix it manually.`
+        )
+      );
+      process.exit(1);
+    } else {
+      console.error(
+        chalk.red(
+          `Error reading ${settingsPath}: ${error instanceof Error ? error.message : String(error)}`
+        )
+      );
+      process.exit(1);
+    }
+  }
+
+  const hooks =
+    settings.hooks != null &&
+    typeof settings.hooks === 'object' &&
+    !Array.isArray(settings.hooks)
+      ? (settings.hooks as Record<string, unknown>)
+      : {};
+  const rawSessionStart = hooks.SessionStart;
+  const sessionStart = Array.isArray(rawSessionStart)
+    ? (rawSessionStart as Array<{
+        matcher?: string;
+        hooks?: Array<{ type?: string; command?: string; timeout?: number }>;
+      }>)
+    : [];
+
+  const hookCommand = 'tweakcc --apply --quiet';
+
+  const existingIdx = sessionStart.findIndex(entry =>
+    entry.hooks?.some(h => h.command === hookCommand)
+  );
+
+  if (install) {
+    if (existingIdx !== -1) {
+      console.log(chalk.green('Auto-reapply hook is already installed.'));
+      console.log(chalk.dim(`Location: ${settingsPath}`));
+      process.exit(0);
+    }
+
+    sessionStart.push({
+      matcher: '',
+      hooks: [
+        {
+          type: 'command',
+          command: hookCommand,
+          timeout: 30,
+        },
+      ],
+    });
+
+    hooks.SessionStart = sessionStart;
+    settings.hooks = hooks;
+
+    fsSync.mkdirSync(path.dirname(settingsPath), { recursive: true });
+    fsSync.writeFileSync(
+      settingsPath,
+      JSON.stringify(settings, null, 2) + '\n',
+      'utf8'
+    );
+
+    console.log(
+      chalk.green('Auto-reapply hook installed in Claude Code settings.')
+    );
+    console.log(
+      chalk.dim(
+        'After CC updates, patches will be reapplied automatically on next session start.'
+      )
+    );
+    console.log(chalk.dim(`Location: ${settingsPath}`));
+    console.log(chalk.dim('To remove: tweakcc --remove-hook'));
+  } else {
+    if (existingIdx === -1) {
+      console.log(chalk.yellow('No auto-reapply hook found to remove.'));
+      process.exit(0);
+    }
+
+    const entry = sessionStart[existingIdx];
+    const hookIdx =
+      entry.hooks?.findIndex(h => h.command === hookCommand) ?? -1;
+    if (hookIdx !== -1 && entry.hooks) {
+      entry.hooks.splice(hookIdx, 1);
+      if (entry.hooks.length === 0) {
+        sessionStart.splice(existingIdx, 1);
+      }
+    } else {
+      sessionStart.splice(existingIdx, 1);
+    }
+
+    if (sessionStart.length === 0) {
+      delete hooks.SessionStart;
+    } else {
+      hooks.SessionStart = sessionStart;
+    }
+    if (Object.keys(hooks).length === 0) {
+      delete settings.hooks;
+    } else {
+      settings.hooks = hooks;
+    }
+
+    fsSync.writeFileSync(
+      settingsPath,
+      JSON.stringify(settings, null, 2) + '\n',
+      'utf8'
+    );
+
+    console.log(chalk.green('Auto-reapply hook removed.'));
+    console.log(chalk.dim(`Location: ${settingsPath}`));
+  }
+
+  process.exit(0);
+}
+
+/**
  * Handles the --apply flag for non-interactive mode.
  * All errors in detection will throw with detailed messages.
  * @param patchFilter - Optional list of patch IDs to apply (if null, apply all)
@@ -342,24 +507,27 @@ const main = async () => {
  */
 async function handleApplyMode(
   patchFilter: string[] | null,
-  configUrl?: string
+  configUrl?: string,
+  quiet: boolean = false
 ): Promise<void> {
-  console.log('Applying saved customizations to Claude Code...');
+  const log = quiet ? () => {} : console.log.bind(console);
+
+  log('Applying saved customizations to Claude Code...');
 
   // Read the configuration (from URL or local file)
   let config;
   if (configUrl) {
-    console.log(`Fetching configuration from: ${configUrl}`);
+    log(`Fetching configuration from: ${configUrl}`);
     try {
       config = await fetchConfigFromUrl(configUrl);
-      console.log('Configuration fetched successfully.');
+      log('Configuration fetched successfully.');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(chalk.red(`Error: ${message}`));
       process.exit(1);
     }
   } else {
-    console.log(`Configuration saved at: ${CONFIG_FILE}`);
+    log(`Configuration saved at: ${CONFIG_FILE}`);
     config = await readConfigFile();
   }
 
@@ -383,21 +551,21 @@ async function handleApplyMode(
     const { ccInstInfo } = result.startupCheckInfo;
 
     if (ccInstInfo.nativeInstallationPath) {
-      console.log(
+      log(
         `Found Claude Code (native installation): ${ccInstInfo.nativeInstallationPath}`
       );
     } else {
-      console.log(`Found Claude Code at: ${ccInstInfo.cliPath}`);
+      log(`Found Claude Code at: ${ccInstInfo.cliPath}`);
     }
-    console.log(`Version: ${ccInstInfo.version}`);
+    log(`Version: ${ccInstInfo.version}`);
 
     // Preload strings file for system prompts
-    console.log('Loading system prompts...');
+    log('Loading system prompts...');
     const preloadResult = await preloadStringsFile(ccInstInfo.version);
     if (!preloadResult.success) {
-      console.log(chalk.red('\n✖ Error downloading system prompts:'));
-      console.log(chalk.red(`  ${preloadResult.errorMessage}`));
-      console.log(
+      log(chalk.red('\n✖ Error downloading system prompts:'));
+      log(chalk.red(`  ${preloadResult.errorMessage}`));
+      log(
         chalk.yellow(
           '\n⚠ System prompts not available - skipping system prompt customizations'
         )
@@ -405,7 +573,7 @@ async function handleApplyMode(
     }
 
     // Apply the customizations
-    console.log('Applying customizations...');
+    log('Applying customizations...');
     const { results } = await applyCustomization(
       config,
       ccInstInfo,
@@ -413,7 +581,9 @@ async function handleApplyMode(
     );
 
     // Print patch results
-    printPatchResults(results, patchFilter);
+    if (!quiet) {
+      printPatchResults(results, patchFilter);
+    }
 
     // Check if any patches failed
     const hasFailures = results.some(r => r.failed);
@@ -422,28 +592,28 @@ async function handleApplyMode(
     );
 
     if (hasFailures) {
-      console.log(chalk.yellow('Customizations applied with some failures.'));
-      console.log(
+      log(chalk.yellow('Customizations applied with some failures.'));
+      log(
         chalk.dim(
           'These patching errors do not affect your system prompt patches.'
         )
       );
       if (hasSystemPromptChanges) {
-        console.log(
+        log(
           chalk.dim(
             'Your system prompt customizations were still applied successfully.'
           )
         );
       }
-      console.log(
+      log(
         chalk.dim(
           'Please open an issue on https://github.com/Piebald-AI/tweakcc/issues/new reporting these patching errors.'
         )
       );
     } else {
-      console.log(chalk.green('Customizations applied successfully!'));
+      log(chalk.green('Customizations applied successfully!'));
     }
-    console.log(
+    log(
       chalk.dim(
         'Run with --restore/--revert to revert Claude Code to its original state.'
       )
