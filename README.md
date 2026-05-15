@@ -71,6 +71,7 @@ With tweakcc, you can
 
 - Customize all of Claude Code's **system prompts** (**NEW:** also see all of [**Claude Code's system prompts**](https://github.com/Piebald-AI/claude-code-system-prompts))
 - Create custom **toolsets** that can be used in Claude Code with the new **`/toolset`** command
+- Create custom **shell-command tools** that Claude Code can call
 - **Highlight** custom patterns while you type in the CC input box with custom colors and styling, like how `ultrathink` used to be rainbow-highlighted.
 - Manually name **sessions** in Claude Code with `/title my chat name` or `/rename` (see [**our blog post**](https://piebald.ai/blog/messages-as-commits-claude-codes-git-like-dag-of-conversations) for implementation details)
 - Create **custom themes** with a graphical HSL/RGB color picker
@@ -113,6 +114,7 @@ $ pnpm dlx tweakcc
 - [API](#api)
 - [System prompts](#system-prompts)
 - [Toolsets](#toolsets)
+- [Custom tools](#custom-tools)
 - [**Features**](#features)
   - [System prompts](#system-prompts)
   - Themes
@@ -135,6 +137,7 @@ $ pnpm dlx tweakcc
   - Session memory
   - `/remember` skill
   - [Toolsets](#toolsets)
+  - [Custom tools](#custom-tools)
   - User message display customization
   - Token indicator display
   - [Add support for dangerously bypassing permissions in sudo](#feature-bypass-permissions-check-in-sudo)
@@ -662,6 +665,69 @@ Toolsets are collections of built-in tools that Claude is allowed to call. Unlik
 Toolsets can be helpful both for using Claude in different modes, e.g. a research mode where you might only include `WebFetch` and `WebSearch`, and for reducing the size of your system prompt by trimming out tools you don't ever want Claude to call. The description of each tool call is placed in the system prompt (see [here](https://github.com/Piebald-AI/claude-code-system-prompts#builtin-tool-descriptions)), and if there are multiple tools you don't care about (like `Skill`, `SlashCommand`, `BashOutput`, etc.), the accumulated size of their descriptions and parameters can bloat the context by several thousand tokens.
 
 To create a toolset, run `npx tweakcc`, go to `Toolsets`, and hit `n` to create a new toolset. Set a name and enable/disable some tools, run `tweakcc --apply` to apply your customizations, and then run `claude`. If you marked a toolset as the default in tweakcc, it will be automatically selected.
+
+## Custom tools
+
+Custom tools let you register your own shell-command tools alongside Claude Code's built-in tools. Each custom tool declares a name, description, parameter schema, and command template. When Claude calls the tool, tweakcc substitutes `{{parameterName}}` placeholders into the command, executes it in a shell, and returns stdout, stderr, and exit code back to Claude.
+
+You can create them in the tweakcc UI by going to `Custom tools`, or by editing `settings.customTools` in [`config.json`](#configuration-directory) directly. After changing them, run `tweakcc --apply`.
+
+> **Shell safety (accepted trade-off):** `{{parameter}}` placeholders are inserted verbatim into the command string — tweakcc does not shell-quote them. A string parameter containing `;`, `&`, `|`, or `$(...)` will be executed as-is by the shell. This is intentional: quoting every parameter would break tools that deliberately pass flags or expressions through a parameter. As the tool author, you are responsible for quoting parameters that need it (e.g. write `"{{path}}"` in the command template, not `{{path}}`). Each invocation goes through Claude Code's normal Bash permissions check, so the full interpolated command is shown to the user before execution.
+
+Example:
+
+```json
+"customTools": [
+  {
+    "name": "RipgrepTodo",
+    "description": "Search for TODO comments under a path",
+    "parameters": {
+      "path": {
+        "type": "string",
+        "description": "Path to search",
+        "required": true
+      }
+    },
+    "command": "rg -n TODO \"{{path}}\"",
+    "shell": "bash",
+    "timeout": 5000,
+    "workingDir": "/home/user/project",
+    "env": {
+      "RG_COLORS": "match:fg:yellow"
+    }
+  }
+]
+```
+
+Schema:
+
+```typescript
+type CustomTool = {
+  name: string;
+  description: string;
+  parameters: Record<
+    string,
+    {
+      type: 'string' | 'number' | 'boolean';
+      description: string;
+      required?: boolean;
+    }
+  >;
+  command: string;
+  shell?: string;
+  timeout?: number;
+  workingDir?: string;
+  env?: Record<string, string>;
+  prompt?: string;
+};
+```
+
+Notes:
+
+- `prompt` is optional. If omitted, tweakcc generates a prompt from the description, parameters, and command template.
+- Custom tool names must be unique and must not collide with built-in Claude Code tool names such as `Bash`, `Read`, or `Write`.
+- Invalid custom tool entries are dropped when tweakcc loads the config.
+- Custom tools are currently appended after built-in toolset filtering, so they remain available even when a toolset is active.
 
 ## Feature: Thinking verbs customization
 

@@ -33,6 +33,10 @@ const baseMenuItems: SelectItem[] = [
     desc: 'Manage toolsets to control which tools are available',
   },
   {
+    name: MainMenuItem.CUSTOM_TOOLS,
+    desc: 'Create shell-command tools that Claude Code can call',
+  },
+  {
     name: MainMenuItem.SUBAGENT_MODELS,
     desc: 'Configure which Claude model each subagent uses (Plan, Explore, etc.)',
   },
