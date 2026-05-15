@@ -73,6 +73,7 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
+import { writeClearScreen } from './clearScreen';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -173,6 +174,12 @@ const PATCH_DEFINITIONS = [
     name: `Statusline update throttling correction`,
     group: PatchGroup.ALWAYS_APPLIED,
     description: `Statusline updates will be properly throttled instead of queued (or debounced)`,
+  },
+  {
+    id: 'clear-screen',
+    name: 'Clear screen command',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description: 'Register /clear-screen command (clear scrollback + redraw)',
   },
   // Misc Configurable
   {
@@ -662,6 +669,9 @@ export const applyCustomization = async (
           config.settings.misc?.statuslineUseFixedInterval ?? false
         ),
       condition: config.settings.misc?.statuslineThrottleMs != null,
+    },
+    'clear-screen': {
+      fn: c => writeClearScreen(c),
     },
     // Misc Configurable
     'patches-applied-indication': {
