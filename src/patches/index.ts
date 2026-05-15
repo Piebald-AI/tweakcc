@@ -73,6 +73,7 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
+import { writeSessionColor } from './sessionColor';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -173,6 +174,13 @@ const PATCH_DEFINITIONS = [
     name: `Statusline update throttling correction`,
     group: PatchGroup.ALWAYS_APPLIED,
     description: `Statusline updates will be properly throttled instead of queued (or debounced)`,
+  },
+  {
+    id: 'session-color',
+    name: 'Session color from env',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description:
+      'Set session prompt bar color via TWEAKCC_SESSION_COLOR env var',
   },
   // Misc Configurable
   {
@@ -662,6 +670,9 @@ export const applyCustomization = async (
           config.settings.misc?.statuslineUseFixedInterval ?? false
         ),
       condition: config.settings.misc?.statuslineThrottleMs != null,
+    },
+    'session-color': {
+      fn: c => writeSessionColor(c),
     },
     // Misc Configurable
     'patches-applied-indication': {
