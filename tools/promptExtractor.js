@@ -29,6 +29,22 @@ function validateInput(text, minLength = 500) {
   if (text.includes('IMPORTANT: Assist with authorized security testing'))
     return true;
 
+  // Short prompts from the "Doing tasks" section (rJ3 function in cli.js)
+  if (text.includes('exploratory questions')) return true;
+  if (text.includes('well-named identifiers already do that')) return true;
+  if (text.includes('golden path and edge cases')) return true;
+  if (text.includes('Prefer editing existing files')) return true;
+  if (text.includes('Default to writing no comments')) return true;
+  if (text.startsWith("Don't add features, refactor")) return true;
+
+  // Short prompts from the "Tone and style" section (HM3 function in cli.js)
+  if (text.includes('Only use emojis if the user explicitly')) return true;
+  if (text === 'Your responses should be short and concise.') return true;
+  if (text.includes('Do not use a colon before tool calls')) return true;
+
+  // Short prompts from the memory "What NOT to save" section
+  if (text.includes('What NOT to save in memory')) return true;
+
   // ////////////////
   // What to exclude.
   // ////////////////
