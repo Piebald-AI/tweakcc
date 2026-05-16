@@ -3,7 +3,9 @@
  */
 
 import fs from 'node:fs';
-import { execSync } from 'node:child_process';
+import path from 'node:path';
+import os from 'node:os';
+import { execSync, execFileSync } from 'node:child_process';
 import LIEF from 'node-lief';
 import { isDebug, debug } from './utils';
 
@@ -151,6 +153,7 @@ export function resolveNixBinaryWrapper(binaryPath: string): string | null {
  * - flags: u32
  */
 const BUN_TRAILER = Buffer.from('\n---- Bun! ----\n');
+const BUN_BYTECODE_PREFIX = '// @bun @bytecode';
 
 // Size constants for binary structures
 const SIZEOF_OFFSETS = 32;
@@ -701,9 +704,59 @@ function getBunData(
  * real binary path here. This is handled at detection time in
  * `installationDetection.ts`.
  */
+function fetchNpmSource(version: string): Buffer | null {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tweakcc-npm-'));
+  try {
+    debug(`fetchNpmSource: Downloading @anthropic-ai/claude-code@${version}`);
+    execFileSync(
+      'npm',
+      [
+        'pack',
+        `@anthropic-ai/claude-code@${version}`,
+        '--pack-destination',
+        tmpDir,
+      ],
+      { stdio: 'pipe', timeout: 30_000, cwd: tmpDir }
+    );
+
+    const files = fs.readdirSync(tmpDir);
+    const tgz = files.find(f => f.endsWith('.tgz'));
+    if (!tgz) {
+      debug('fetchNpmSource: No .tgz file found after npm pack');
+      return null;
+    }
+
+    execFileSync('tar', ['xzf', path.join(tmpDir, tgz), 'package/cli.js'], {
+      stdio: 'pipe',
+      timeout: 30_000,
+      cwd: tmpDir,
+    });
+
+    const cliJsPath = path.join(tmpDir, 'package', 'cli.js');
+    if (!fs.existsSync(cliJsPath)) {
+      debug('fetchNpmSource: cli.js not found in extracted package');
+      return null;
+    }
+
+    const content = fs.readFileSync(cliJsPath);
+    debug(`fetchNpmSource: Got cli.js, ${content.length} bytes`);
+    return content;
+  } catch (error) {
+    debug('fetchNpmSource: Failed to fetch npm source:', error);
+    return null;
+  } finally {
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors
+    }
+  }
+}
+
 export function extractClaudeJsFromNativeInstallation(
-  nativeInstallationPath: string
-): Buffer | null {
+  nativeInstallationPath: string,
+  version?: string
+): { data: Buffer | null; clearBytecode: boolean } {
   try {
     LIEF.logging.disable();
     const binary = LIEF.parse(nativeInstallationPath);
@@ -722,9 +775,6 @@ export function extractClaudeJsFromNativeInstallation(
           `extractClaudeJsFromNativeInstallation: Module ${index}: ${moduleName}`
         );
 
-        // Module name is typically:
-        // - Unix/macOS: /$bunfs/root/claude
-        // - Windows:    B:/~BUN/root/claude.exe
         if (!isClaudeModule(moduleName)) return undefined;
 
         const moduleContents = getStringPointerContent(
@@ -741,21 +791,45 @@ export function extractClaudeJsFromNativeInstallation(
     );
 
     if (result) {
-      return result;
+      const head = result.subarray(0, 30).toString('utf8');
+      if (head.startsWith(BUN_BYTECODE_PREFIX)) {
+        debug(
+          'extractClaudeJsFromNativeInstallation: Extracted content is Bun bytecode — falling back to npm source'
+        );
+
+        if (version) {
+          const npmSource = fetchNpmSource(version);
+          if (npmSource) {
+            debug(
+              `extractClaudeJsFromNativeInstallation: Using npm source (${npmSource.length} bytes) instead of bytecode`
+            );
+            return { data: npmSource, clearBytecode: true };
+          }
+          debug(
+            'extractClaudeJsFromNativeInstallation: npm source fetch failed, returning bytecode content as-is'
+          );
+        } else {
+          debug(
+            'extractClaudeJsFromNativeInstallation: No version provided, cannot fetch npm source'
+          );
+        }
+      }
+
+      return { data: result, clearBytecode: false };
     }
 
     debug(
       'extractClaudeJsFromNativeInstallation: claude module not found in any module'
     );
 
-    return null;
+    return { data: null, clearBytecode: false };
   } catch (error) {
     debug(
       'extractClaudeJsFromNativeInstallation: Error during extraction:',
       error
     );
 
-    return null;
+    return { data: null, clearBytecode: false };
   }
 }
 
@@ -763,7 +837,8 @@ function rebuildBunData(
   bunData: Buffer,
   bunOffsets: BunOffsets,
   modifiedClaudeJs: Buffer | null,
-  moduleStructSize: number
+  moduleStructSize: number,
+  clearBytecode: boolean
 ): Buffer {
   // Phase 1: Collect all string data
   const stringsData: Buffer[] = [];
@@ -786,14 +861,18 @@ function rebuildBunData(
 
     // Check if this is claude.js and we have modified contents
     let contentsBytes: Buffer;
+    let bytecodeBytes: Buffer;
     if (modifiedClaudeJs && isClaudeModule(moduleName)) {
       contentsBytes = modifiedClaudeJs;
+      bytecodeBytes = clearBytecode
+        ? Buffer.alloc(0)
+        : getStringPointerContent(bunData, module.bytecode);
     } else {
       contentsBytes = getStringPointerContent(bunData, module.contents);
+      bytecodeBytes = getStringPointerContent(bunData, module.bytecode);
     }
 
     const sourcemapBytes = getStringPointerContent(bunData, module.sourcemap);
-    const bytecodeBytes = getStringPointerContent(bunData, module.bytecode);
     const moduleInfoBytes = getStringPointerContent(bunData, module.moduleInfo);
     const bytecodeOriginPathBytes = getStringPointerContent(
       bunData,
@@ -1363,19 +1442,20 @@ function repackELFOverlay(
 export function repackNativeInstallation(
   binPath: string,
   modifiedClaudeJs: Buffer,
-  outputPath: string
+  outputPath: string,
+  clearBytecode: boolean
 ): void {
   LIEF.logging.disable();
   const binary = LIEF.parse(binPath);
 
-  // Extract Bun data and rebuild with modified claude.js
   const { bunOffsets, bunData, sectionHeaderSize, moduleStructSize } =
     getBunData(binary);
   const newBuffer = rebuildBunData(
     bunData,
     bunOffsets,
     modifiedClaudeJs,
-    moduleStructSize
+    moduleStructSize,
+    clearBytecode
   );
 
   switch (binary.format) {
