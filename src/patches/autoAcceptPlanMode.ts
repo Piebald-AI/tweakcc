@@ -14,6 +14,38 @@
 
 import { showDiff } from './index';
 
+const findEnclosingFunctionReturn = (
+  oldFile: string,
+  readyIdx: number
+): number | null => {
+  const functionStart = oldFile.lastIndexOf('function ', readyIdx);
+  if (functionStart === -1) return null;
+
+  const openBrace = oldFile.indexOf('{', functionStart);
+  if (openBrace === -1 || openBrace > readyIdx) return null;
+
+  let depth = 0;
+  for (let index = openBrace; index < oldFile.length; index++) {
+    const char = oldFile[index];
+    if (char === '{') depth++;
+    else if (char === '}') {
+      depth--;
+      if (depth === 0) {
+        const functionTail = oldFile.slice(readyIdx, index + 1);
+        const returnPattern = /return ([$\w]+)\}/g;
+        let match: RegExpExecArray | null;
+        let lastMatch: RegExpExecArray | null = null;
+        while ((match = returnPattern.exec(functionTail)) !== null) {
+          lastMatch = match;
+        }
+        return lastMatch ? readyIdx + lastMatch.index : null;
+      }
+    }
+  }
+
+  return null;
+};
+
 export const writeAutoAcceptPlanMode = (oldFile: string): string | null => {
   const readyIdx = oldFile.indexOf('title:"Ready to code?"');
   if (readyIdx === -1) {
@@ -99,10 +131,28 @@ export const writeAutoAcceptPlanMode = (oldFile: string): string | null => {
     // Simpler approach: find "return" before "Ready to code?" that starts the component tree
     const simpleReturnIdx = beforeReady.lastIndexOf('return ');
     if (simpleReturnIdx === -1) {
-      console.error(
-        'patch: autoAcceptPlanMode: failed to find return before "Ready to code?"'
+      const enclosingReturnIdx = findEnclosingFunctionReturn(oldFile, readyIdx);
+      if (enclosingReturnIdx === null) {
+        console.error(
+          'patch: autoAcceptPlanMode: failed to find return before "Ready to code?"'
+        );
+        return null;
+      }
+
+      const insertion = `${acceptFuncName}("yes-accept-edits");return null;`;
+      const newFile =
+        oldFile.slice(0, enclosingReturnIdx) +
+        insertion +
+        oldFile.slice(enclosingReturnIdx);
+
+      showDiff(
+        oldFile,
+        newFile,
+        insertion,
+        enclosingReturnIdx,
+        enclosingReturnIdx
       );
-      return null;
+      return newFile;
     }
 
     const absoluteReturnIdx = Math.max(0, readyIdx - 500) + simpleReturnIdx;

@@ -30,7 +30,7 @@ const getOpenDocumentLocation = (oldFile: string): LocationResult | null => {
   const varName = sendRequestMatch[1];
 
   // Step 5: In the previous 1000-2000 characters, search for `async function {varName}\([$\w]+,`
-  const searchStart = Math.max(0, ensureMatch.index - 2000);
+  const searchStart = Math.max(0, ensureMatch.index - 4000);
   const searchChunk = oldFile.slice(searchStart, ensureMatch.index);
   const functionPattern = new RegExp(
     `async function ${escapeIdent(varName)}\\(([$\\w]+),`,

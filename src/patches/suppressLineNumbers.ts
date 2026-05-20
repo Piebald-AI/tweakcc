@@ -24,9 +24,12 @@ export const writeSuppressLineNumbers = (oldFile: string): string | null => {
   // CC <2.1.88: arrow branch only
   // if(VAR.length>=N)return`...→...`;return`...→...`
 
-  // Find the function by its unique signature
+  // Find the function by its unique signature.
+  // CC 2.1.140+ adds an optional `tabAwareSeparator:VAR=!1` param and replaces
+  // the `split(/\r?\n/)` body with an indexOf-based loop, so we only anchor on
+  // the destructured-params + empty-guard prefix (which is still unique).
   const funcSig =
-    /\{content:([$\w]+),startLine:[$\w]+\}\)\{if\(!\1\)return"";let ([$\w]+)=\1\.split\([^)]+\);/;
+    /\{content:([$\w]+),startLine:[$\w]+(?:,tabAwareSeparator:[$\w]+=!1)?\}\)\{if\(!\1\)return"";/;
   const sigMatch = oldFile.match(funcSig);
 
   if (sigMatch && sigMatch.index !== undefined) {

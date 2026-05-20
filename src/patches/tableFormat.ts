@@ -221,6 +221,12 @@ export const writeTableFormat = (
   oldFile: string,
   tableFormat: TableFormat
 ): string | null => {
+  // Accept 'markdown' as an alias for 'ascii' (the ascii mode produces
+  // markdown-style tables, per the patch's own docs).
+  if ((tableFormat as string) === 'markdown') {
+    tableFormat = 'ascii';
+  }
+
   // If tableFormat is 'default', don't modify anything (keep original box-drawing)
   if (tableFormat === 'default') {
     debug('Table format is "default", no patching needed');
@@ -404,6 +410,9 @@ export const writeTableFormat = (
   // Unknown format
   // ==========================================================================
   else {
+    console.error(
+      `patch: tableFormat: failed to find handler for unknown format "${tableFormat}"`
+    );
     debug(`Unknown table format "${tableFormat}", skipping`);
     return null;
   }
@@ -412,6 +421,9 @@ export const writeTableFormat = (
   // Final reporting
   // ==========================================================================
   if (patchCount === 0) {
+    console.error(
+      `patch: tableFormat: failed to find any table-rendering patterns to patch for format "${tableFormat}" (border-definition object, vertical-border chars, horizontal separator, or inter-row separator)`
+    );
     verbose(
       'No table format patches were applied - patterns may not have matched'
     );

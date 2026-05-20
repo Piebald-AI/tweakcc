@@ -392,9 +392,10 @@ export const writeComputeToolsFilter = (
   // stateInfo validated above — computeTools reads toolset from STORE.getState() directly
 
   // Find the computeTools closure pattern:
-  // VAR=()=>{let STATE=STORE.getState(),ASSEMBLED=ASSEMBLE(STATE.toolPermissionContext,STATE.mcp.tools),MERGED=MERGE(INIT,ASSEMBLED,STATE.toolPermissionContext.mode);if(!AGENT)return MERGED;return RESOLVE(AGENT,MERGED,!1,!0).resolvedTools}
+  // Old form: VAR=()=>{let STATE=STORE.getState(),ASSEMBLED=ASSEMBLE(STATE.toolPermissionContext,STATE.mcp.tools),MERGED=MERGE(INIT,ASSEMBLED,STATE.toolPermissionContext.mode);if(!AGENT)return MERGED;return RESOLVE(AGENT,MERGED,!1,!0).resolvedTools}
+  // CC 2.1.140+: VAR=NS.useCallback(()=>{...let ASSEMBLED=ASSEMBLE(STATE.toolPermissionContext,STATE.mcp.tools,{skillTools:STATE.skillTools}),...},[deps])
   const pattern =
-    /([$\w]+)=\(\)=>\{let ([$\w]+)=([$\w]+)\.getState\(\),([$\w]+)=([$\w]+)\(\2\.toolPermissionContext,\2\.mcp\.tools\),([$\w]+)=([$\w]+)\([$\w]+,\4,\2\.toolPermissionContext\.mode\);if\(!([$\w]+)\)return \6;return ([$\w]+)\(\8,\6,!1,!0\)\.resolvedTools\}/;
+    /([$\w]+)=(?:([$\w]+\.useCallback\())?\(\)=>\{let ([$\w]+)=([$\w]+)\.getState\(\),([$\w]+)=([$\w]+)\(\3\.toolPermissionContext,\3\.mcp\.tools(?:,\{skillTools:\3\.skillTools\})?\),([$\w]+)=([$\w]+)\([$\w]+,\5,\3\.toolPermissionContext\.mode\);if\(!([$\w]+)\)return \7;return ([$\w]+)\(\9,\7,!1,!0\)\.resolvedTools\}/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
@@ -405,14 +406,18 @@ export const writeComputeToolsFilter = (
   }
 
   const closureVar = match[1];
-  const stateVar = match[2];
-  const storeVar = match[3];
-  const assembledVar = match[4];
-  const assembleFn = match[5];
-  const mergedVar = match[6];
-  const mergeFn = match[7];
-  const agentVar = match[8];
-  const resolveFn = match[9];
+  const useCallbackPrefix = match[2] || '';
+  const stateVar = match[3];
+  const storeVar = match[4];
+  const assembledVar = match[5];
+  const assembleFn = match[6];
+  const mergedVar = match[7];
+  const mergeFn = match[8];
+  const agentVar = match[9];
+  const resolveFn = match[10];
+  const skillToolsArg = match[0].includes(`{skillTools:${stateVar}.skillTools}`)
+    ? `,{skillTools:${stateVar}.skillTools}`
+    : '';
 
   // Create toolsets mapping
   const toolsetsJSON = JSON.stringify(
@@ -445,7 +450,7 @@ export const writeComputeToolsFilter = (
   const initVar = mergeCallMatch[1];
 
   // Set globalThis.__tweakcc_toolset so the error message helper can read it
-  const newClosure = `${closureVar}=()=>{let ${stateVar}=${storeVar}.getState(),${assembledVar}=${assembleFn}(${stateVar}.toolPermissionContext,${stateVar}.mcp.tools),${mergedVar}=${mergeFn}(${initVar},${assembledVar},${stateVar}.toolPermissionContext.mode);const __ts=${toolsetsJSON},__tc=${stateVar}.toolset??${fallback},__tf=(t)=>{globalThis.__tweakcc_toolset={name:__tc,tools:__ts[__tc]};if(__ts.hasOwnProperty(__tc)){const a=__ts[__tc];if(a==="*")return t;return t.filter(d=>a.includes(d.name))}return t};if(!${agentVar})return __tf(${mergedVar});return __tf(${resolveFn}(${agentVar},${mergedVar},!1,!0).resolvedTools)}`;
+  const newClosure = `${closureVar}=${useCallbackPrefix}()=>{let ${stateVar}=${storeVar}.getState(),${assembledVar}=${assembleFn}(${stateVar}.toolPermissionContext,${stateVar}.mcp.tools${skillToolsArg}),${mergedVar}=${mergeFn}(${initVar},${assembledVar},${stateVar}.toolPermissionContext.mode);const __ts=${toolsetsJSON},__tc=${stateVar}.toolset??${fallback},__tf=(t)=>{globalThis.__tweakcc_toolset={name:__tc,tools:__ts[__tc]};if(__ts.hasOwnProperty(__tc)){const a=__ts[__tc];if(a==="*")return t;return t.filter(d=>a.includes(d.name))}return t};if(!${agentVar})return __tf(${mergedVar});return __tf(${resolveFn}(${agentVar},${mergedVar},!1,!0).resolvedTools)}`;
 
   const startIndex = match.index;
   const endIndex = startIndex + fullMatch.length;
@@ -478,10 +483,13 @@ export const writeToolsetAwareErrors = (
   // Note: toolsets/defaultToolset params are unused — the helper reads from
   // globalThis.__tweakcc_toolset at runtime (set by writeComputeToolsFilter).
 
-  // Replace the error template strings with toolset-aware versions
-  // Pattern: `<tool_use_error>Error: No such tool available: ${VARNAME}</tool_use_error>`
+  // Replace the error template strings with toolset-aware versions.
+  // CC <2.1.140 pattern: `<tool_use_error>Error: No such tool available: ${VARNAME}</tool_use_error>`
+  // CC >=2.1.140 pattern: `<tool_use_error>Error: No such tool available: ${VARNAME}${HINT}</tool_use_error>`
+  //   (second interpolation is an extra hint produced by a helper like $N6,
+  //    e.g. ". <tool> exists but is not enabled in this context.")
   const errorPattern =
-    /`<tool_use_error>Error: No such tool available: \$\{([$\w.]+)\}<\/tool_use_error>`/g;
+    /`<tool_use_error>Error: No such tool available: \$\{([$\w.]+)\}(?:\$\{([$\w.]+)\})?<\/tool_use_error>`/g;
 
   let newFile = oldFile;
   let matchCount = 0;
@@ -489,17 +497,20 @@ export const writeToolsetAwareErrors = (
   // Helper reads from globalThis.__tweakcc_toolset (set by computeTools filter in sub-patch 2b)
   const helperName = '__tweakcc_toolErrorMsg';
   const helperFn =
-    `function ${helperName}(toolName){` +
+    `function ${helperName}(toolName,hint){` +
+    `hint=hint||"";` +
     `var info=globalThis.__tweakcc_toolset;` +
     `if(info&&info.tools&&info.tools!=="*"&&Array.isArray(info.tools)){` +
-    `return "<tool_use_error>Error: No such tool available: "+toolName+". The active toolset is '"+info.name+"' which only includes: "+info.tools.join(", ")+". Do not attempt to use "+toolName+" again — it will fail. If the user switches toolsets via /toolset, you may retry.</tool_use_error>"` +
-    `}return "<tool_use_error>Error: No such tool available: "+toolName+"</tool_use_error>"` +
+    `return "<tool_use_error>Error: No such tool available: "+toolName+hint+". The active toolset is '"+info.name+"' which only includes: "+info.tools.join(", ")+". Do not attempt to use "+toolName+" again — it will fail. If the user switches toolsets via /toolset, you may retry.</tool_use_error>"` +
+    `}return "<tool_use_error>Error: No such tool available: "+toolName+hint+"</tool_use_error>"` +
     `};`;
 
   // Replace all error template literals with helper calls
-  newFile = newFile.replace(errorPattern, (_match, varName) => {
+  newFile = newFile.replace(errorPattern, (_match, varName, hintVar) => {
     matchCount++;
-    return `${helperName}(${varName})`;
+    return hintVar
+      ? `${helperName}(${varName},${hintVar})`
+      : `${helperName}(${varName})`;
   });
 
   if (matchCount === 0) {
@@ -510,9 +521,13 @@ export const writeToolsetAwareErrors = (
   }
 
   // Also replace the toolUseResult versions (without XML tags)
-  const resultPattern = /`Error: No such tool available: \$\{([$\w.]+)\}`/g;
-  newFile = newFile.replace(resultPattern, (_match, varName) => {
-    return `${helperName}(${varName}).replace(/<\\/?tool_use_error>/g,"")`;
+  const resultPattern =
+    /`Error: No such tool available: \$\{([$\w.]+)\}(?:\$\{([$\w.]+)\})?`/g;
+  newFile = newFile.replace(resultPattern, (_match, varName, hintVar) => {
+    const call = hintVar
+      ? `${helperName}(${varName},${hintVar})`
+      : `${helperName}(${varName})`;
+    return `${call}.replace(/<\\/?tool_use_error>/g,"")`;
   });
 
   // Inject the helper function at the top of the file (after the shebang/comments)
@@ -694,8 +709,9 @@ export const writeToolsetComponentDefinition = (
 export const findShiftTabAppStateVarInsertionPoint = (
   oldFile: string
 ): number | null => {
-  // Search for the bash mode indicator
-  const bashModePattern = /\{color:"bashBorder"\},"! for bash mode"/;
+  // Search for the bash mode indicator.
+  // CC <2.1.140 used "! for bash mode"; CC >=2.1.140 renamed it to "! for shell mode".
+  const bashModePattern = /\{color:"bashBorder"\},"! for (?:bash|shell) mode"/;
   const match = oldFile.match(bashModePattern);
 
   if (!match || match.index === undefined) {

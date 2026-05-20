@@ -183,16 +183,12 @@ export const writeShowMoreItemsInSelectMenus = (
     );
   }
 
-  // Also patch the slash command autocomplete suggestions cap
+  // Also patch the slash command autocomplete suggestions cap when present.
   // Math.min(6,Math.max(1,rows-3)) → Math.max(1,rows-3)
-  // The Math.min(6,...) hardcaps visible suggestions to 6
+  // CC 2.1.138 removed this obsolete non-overlay fallback, so absence is OK.
   const suggestionsPatched = patchSuggestionsCap(newFile);
   if (suggestionsPatched) {
     newFile = suggestionsPatched;
-  } else {
-    console.error(
-      'patch: writeShowMoreItemsInSelectMenus: failed to find suggestions cap pattern'
-    );
   }
 
   return newFile;

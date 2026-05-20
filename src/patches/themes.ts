@@ -70,14 +70,49 @@ function getThemesLocation(oldFile: string): {
   }
 
   // === Theme Options Array ===
-  // Both old and new: [{label:"...",value:"..."}, ...] or [{"label":"...",...]
-  const objArrPat =
-    /\[(?:\.\.\.\[\],)?(?:\{"?label"?:"(?:Dark|Light|Auto|Monochrome)[^"]*","?value"?:"[^"]+"\},?)+\]/;
-  const objArrMatch = oldFile.match(objArrPat);
+  // Old form (CC ≤2.1.138): inline array literal
+  //   [{label:"Dark mode",value:"dark"},{label:"Light mode",value:"light"},...]
+  // New form (CC ≥2.1.140): each option assigned to its own var (React-compiler
+  // memoization), then collected via `[i,e,DH,YH,s,o,HH,...m.map(VA5),...mH]`.
+  // We must preserve the trailing `,...spread` chunks (custom themes, "New custom
+  // theme..." sentinel) so users can still add custom themes through CC's UI.
+  let objArrStart = -1;
+  let objArrEnd = -1;
+  let objArrTrailingSpreads = '';
 
-  if (!objArrMatch || objArrMatch.index == undefined) {
-    console.error('patch: themes: failed to find objArrMatch');
-    return null;
+  const oldObjArrPat =
+    /\[(?:\.\.\.\[\],)?(?:\{"?label"?:"(?:Dark|Light|Auto|Monochrome)[^"]*","?value"?:"[^"]+"\},?)+\]/;
+  const oldObjArrMatch = oldFile.match(oldObjArrPat);
+
+  if (oldObjArrMatch && oldObjArrMatch.index !== undefined) {
+    objArrStart = oldObjArrMatch.index;
+    objArrEnd = oldObjArrMatch.index + oldObjArrMatch[0].length;
+  } else {
+    // Find each `var={label:"Theme Name",value:"theme-id"}` assignment.
+    const themeVarAssignPat =
+      /([$\w]+)=\{label:"(?:Auto|Dark|Light|Monochrome)[^"]*",value:"[^"]+"\}/g;
+    const assigns = [...oldFile.matchAll(themeVarAssignPat)];
+    if (assigns.length < 2) {
+      console.error('patch: themes: failed to find objArrMatch');
+      return null;
+    }
+    const themeVars = assigns.map(m => m[1]);
+
+    // Find an array whose prefix is exactly these vars (in order), optionally
+    // followed by `...spread` chunks. The vars must not be preceded by `,` so
+    // we don't accidentally land in the middle of a longer array.
+    const escVars = themeVars.map(v => v.replace(/\$/g, '\\$')).join(',');
+    const arrayPat = new RegExp(`\\[${escVars}((?:,\\.\\.\\.[^\\]]+)*)\\]`);
+    const arrayMatch = oldFile.match(arrayPat);
+    if (!arrayMatch || arrayMatch.index === undefined) {
+      console.error(
+        'patch: themes: failed to find objArrMatch (new var-collected form)'
+      );
+      return null;
+    }
+    objArrStart = arrayMatch.index;
+    objArrEnd = arrayMatch.index + arrayMatch[0].length;
+    objArrTrailingSpreads = arrayMatch[1];
   }
 
   // === Theme Name Mapping Object ===
@@ -98,8 +133,11 @@ function getThemesLocation(oldFile: string): {
       identifiers: [switchIdent],
     },
     objArr: {
-      startIndex: objArrMatch.index,
-      endIndex: objArrMatch.index + objArrMatch[0].length,
+      startIndex: objArrStart,
+      endIndex: objArrEnd,
+      // Stash the trailing `,...spread,...spread` so the writer can preserve it
+      // (only present in the new var-collected form; empty string for old form).
+      identifiers: [objArrTrailingSpreads],
     },
     obj: {
       startIndex: objMatch.index,
@@ -144,10 +182,14 @@ export const writeThemes = (
   );
   oldFile = newFile;
 
-  // Update theme options array (objArr)
-  const objArr = JSON.stringify(
-    themes.map(theme => ({ label: theme.name, value: theme.id }))
-  );
+  // Update theme options array (objArr).
+  // For 2.1.140+ var-collected form, preserve trailing `,...m.map(...),...mH`
+  // spreads so users can still add custom themes through CC's UI.
+  const trailingSpreads = locations.objArr.identifiers?.[0] ?? '';
+  const objArrInner = themes
+    .map(theme => JSON.stringify({ label: theme.name, value: theme.id }))
+    .join(',');
+  const objArr = `[${objArrInner}${trailingSpreads}]`;
   newFile =
     newFile.slice(0, locations.objArr.startIndex) +
     objArr +
