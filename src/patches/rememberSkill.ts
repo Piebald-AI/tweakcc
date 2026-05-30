@@ -21,15 +21,47 @@ import { showDiff } from './index';
  */
 
 const findSkillRegistrationFn = (file: string): string | null => {
-  const pattern = /\{([$\w]+)\(\{name:"claude-in-chrome"/;
-  const match = file.match(pattern);
-  if (!match) {
-    console.error(
-      'patch: rememberSkill: failed to find skill registration function'
-    );
-    return null;
+  const ident = '[A-Za-z_$][\\w$]*';
+  const patterns = [
+    new RegExp(
+      `function\\s+(${ident})\\((${ident})\\)\\{let\\{files:(${ident})\\}=\\2,`
+    ), // CC 2.1.150 bundled-skill helper
+    /\{([A-Za-z_$][\w$]*)\(\{name:"claude-in-chrome"/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = file.match(pattern);
+    if (match) return match[1];
   }
-  return match[1];
+
+  console.error(
+    'patch: rememberSkill: failed to find skill registration function'
+  );
+  return null;
+};
+
+const writeBundledRememberSkill = (
+  oldFile: string,
+  skillRegistrationFn: string
+): string | null => {
+  const markerPattern = new RegExp(
+    `function\\s+[$\\w]+\\(\\)\\{${skillRegistrationFn}\\(\\{name:"update-config"`
+  );
+  const match = oldFile.match(markerPattern);
+
+  if (!match || match.index === undefined) return null;
+
+  const openBraceIndex = oldFile.indexOf('{', match.index);
+  if (openBraceIndex === -1) return null;
+
+  const insertIndex = openBraceIndex + 1;
+  const insertCode = `${skillRegistrationFn}({name:"remember",description:"Review session memories and update CLAUDE.local.md with learnings from past sessions.",whenToUse:"When the user asks to remember something, save a learning, or review session memories.",userInvocable:!0,isEnabled:()=>!0,async getPromptForCommand(H){let $="# Remember Skill\\n\\nReview the current conversation and any relevant session memory files, then update CLAUDE.local.md with durable learnings that should carry forward to future sessions. Keep entries concise and actionable.";if(H&&H.trim())$+="\\n\\n## User Request\\n"+H.trim();return[{type:"text",text:$}]}});`;
+
+  const newFile =
+    oldFile.slice(0, insertIndex) + insertCode + oldFile.slice(insertIndex);
+
+  showDiff(oldFile, newFile, insertCode, insertIndex, insertIndex);
+  return newFile;
 };
 
 export const writeRememberSkill = (oldFile: string): string | null => {
@@ -38,6 +70,9 @@ export const writeRememberSkill = (oldFile: string): string | null => {
   if (!skillRegistrationFn) {
     return null;
   }
+
+  const bundledResult = writeBundledRememberSkill(oldFile, skillRegistrationFn);
+  if (bundledResult) return bundledResult;
 
   // Find the injection point pattern
   const pattern =

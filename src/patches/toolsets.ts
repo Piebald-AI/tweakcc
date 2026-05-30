@@ -464,7 +464,90 @@ export const writeComputeToolsFilter = (
 };
 
 /**
- * Sub-patch 2c: Replace "No such tool available" errors with toolset-aware messages.
+ * Sub-patch 2c: Patch the non-interactive --print tool context.
+ *
+ * The interactive app passes tools from computeTools(), patched above. The
+ * print path builds its own tools list from app state and passes it directly
+ * to the query loop, so it needs the same filter at that callsite.
+ */
+export const writePrintToolsFilter = (
+  oldFile: string,
+  toolsets: Toolset[],
+  defaultToolset: string | null
+): string | null => {
+  const toolsetsJSON = JSON.stringify(
+    Object.fromEntries(
+      toolsets.map(ts => [
+        ts.name,
+        ts.allowedTools === '*' ? '*' : ts.allowedTools,
+      ])
+    )
+  );
+  const fallback = defaultToolset
+    ? JSON.stringify(defaultToolset)
+    : 'undefined';
+
+  const toolsPattern =
+    /let ([$\w]+)=([$\w]+)\(([$\w]+)\);(?=[\s\S]{0,2500}tools:\1,refreshTools:\(\)=>\2\(([$\w]+)\(\)\))/;
+  const toolsMatch = oldFile.match(toolsPattern);
+  if (!toolsMatch || toolsMatch.index === undefined) {
+    console.error(
+      'patch: toolsets: printToolsFilter: failed to find print tools initialization'
+    );
+    return null;
+  }
+
+  const toolsVar = toolsMatch[1];
+  const computeFn = toolsMatch[2];
+  const stateVar = toolsMatch[3];
+  const getterFn = toolsMatch[4];
+
+  const filterCode = `let ${toolsVar}=${computeFn}(${stateVar});const __tpts=${toolsetsJSON},__tptf=(t,s)=>{const n=s.toolset??${fallback};globalThis.__tweakcc_toolset={name:n,tools:__tpts[n]};if(__tpts.hasOwnProperty(n)){const a=__tpts[n];if(a==="*")return t;return t.filter(d=>a.includes(d.name))}return t};${toolsVar}=__tptf(${toolsVar},${stateVar});`;
+
+  let newFile =
+    oldFile.slice(0, toolsMatch.index) +
+    filterCode +
+    oldFile.slice(toolsMatch.index + toolsMatch[0].length);
+
+  showDiff(
+    oldFile,
+    newFile,
+    filterCode,
+    toolsMatch.index,
+    toolsMatch.index + toolsMatch[0].length
+  );
+
+  const refreshPattern = new RegExp(
+    `refreshTools:\\(\\)=>${computeFn.replace(/\$/g, '\\$')}\\(${getterFn.replace(/\$/g, '\\$')}\\(\\)\\)`
+  );
+  const refreshMatch = newFile.match(refreshPattern);
+  if (!refreshMatch || refreshMatch.index === undefined) {
+    console.error(
+      'patch: toolsets: printToolsFilter: failed to find print refreshTools'
+    );
+    return null;
+  }
+
+  const refreshReplacement = `refreshTools:()=>{let s=${getterFn}();return __tptf(${computeFn}(s),s)}`;
+  const beforeRefresh = newFile;
+  newFile =
+    newFile.slice(0, refreshMatch.index) +
+    refreshReplacement +
+    newFile.slice(refreshMatch.index + refreshMatch[0].length);
+
+  showDiff(
+    beforeRefresh,
+    newFile,
+    refreshReplacement,
+    refreshMatch.index,
+    refreshMatch.index + refreshMatch[0].length
+  );
+
+  return newFile;
+};
+
+/**
+ * Sub-patch 2d: Replace "No such tool available" errors with toolset-aware messages.
  *
  * When a toolset is active and the model tries to call a filtered-out tool,
  * the generic "No such tool available: X" error wastes output context because
@@ -1077,14 +1160,21 @@ export const writeToolsets = (
     return null;
   }
 
-  // Step 2c: Patch "No such tool available" error messages to be toolset-aware
-  const result2c = writeToolsetAwareErrors(result, toolsets, defaultToolset);
-  if (!result2c) {
+  // Step 2c: Patch the non-interactive --print tool context
+  result = writePrintToolsFilter(result, toolsets, defaultToolset);
+  if (!result) {
+    console.error('patch: toolsets: step 2c failed (writePrintToolsFilter)');
+    return null;
+  }
+
+  // Step 2d: Patch "No such tool available" error messages to be toolset-aware
+  const result2d = writeToolsetAwareErrors(result, toolsets, defaultToolset);
+  if (!result2d) {
     console.error(
-      'patch: toolsets: step 2c failed (writeToolsetAwareErrors) — continuing without friendlier errors'
+      'patch: toolsets: step 2d failed (writeToolsetAwareErrors) — continuing without friendlier errors'
     );
   } else {
-    result = result2c;
+    result = result2d;
   }
 
   // Step 3: Add toolset component definition

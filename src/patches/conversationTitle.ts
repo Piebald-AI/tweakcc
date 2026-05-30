@@ -497,7 +497,65 @@ export const enableRenameConversationCommand = (
 /**
  * Apply all conversation title patches to the file
  */
+const writeModernTitleCommand = (oldFile: string): string | null => {
+  const commandListPattern = /(([$\w]+)=[$\w]+\(\(\)=>\[)/g;
+  let commandListMatch: RegExpExecArray | null = null;
+  for (const match of oldFile.matchAll(commandListPattern)) {
+    const anchorWindow = oldFile.slice(
+      Math.max(0, match.index - 12000),
+      Math.min(oldFile.length, match.index + 12000)
+    );
+    if (/name:"[^"]+"[\s\S]{0,1200}description:/.test(anchorWindow)) {
+      commandListMatch = match;
+      break;
+    }
+  }
+  if (!commandListMatch || commandListMatch.index === undefined) return null;
+
+  const modulePattern =
+    /var ([$\w]+)=\{\};[$\w]+\(\1,\{performSetColor:\(\)=>[$\w]+,call:\(\)=>[$\w]+\}\);async function [$\w]+\(([$\w]+),([$\w]+),([$\w]+)\)\{return \2\(await [$\w]+\(\4,\3\),\{display:"system"\}\),null\}/;
+  const moduleMatch = oldFile.match(modulePattern);
+  if (!moduleMatch || moduleMatch.index === undefined) {
+    console.error(
+      'patch: conversationTitle: failed to find local command module anchor'
+    );
+    return null;
+  }
+
+  const moduleEnd = oldFile.indexOf(
+    'var ',
+    moduleMatch.index + moduleMatch[0].length
+  );
+  if (moduleEnd === -1) {
+    console.error(
+      'patch: conversationTitle: failed to find local command module end'
+    );
+    return null;
+  }
+
+  const exportFn = moduleMatch[0].match(/;([$\w]+)\(/)?.[1] ?? 'P$';
+  const insertion = `var tweakccTitleModule={};${exportFn}(tweakccTitleModule,{call:()=>tweakccTitleCall});async function tweakccTitleCall(args,context){let title=args?.trim?.()??"";if(!title)return{type:"text",value:"Please specify a conversation title."};context.setAppState?.((state)=>({...state,customTitle:title}));process.env.CLAUDE_CODE_DISABLE_TERMINAL_TITLE="1";if(process.platform==="win32")process.title="Claude: "+title;else process.stdout.write("\\x1B]0;Claude: "+title+"\\x07");let message="Conversation title set to "+title;if(context.options?.isNonInteractiveSession){process.stdout.write(message+"\\n");return{type:"skip"}}return{type:"text",value:message}}`;
+  const commandDef = `tweakccTitleCommand={type:"local",name:"title",description:"Set the conversation title",argumentHint:"<title>",supportsNonInteractive:!0,userFacingName(){return"title"},load:()=>Promise.resolve(tweakccTitleModule)},`;
+
+  let newFile =
+    oldFile.slice(0, moduleEnd) + insertion + oldFile.slice(moduleEnd);
+  const adjustedCommandIndex =
+    commandListMatch.index +
+    commandListMatch[1].length +
+    (commandListMatch.index >= moduleEnd ? insertion.length : 0);
+  newFile =
+    newFile.slice(0, adjustedCommandIndex) +
+    commandDef +
+    newFile.slice(adjustedCommandIndex);
+
+  showDiff(oldFile, newFile, insertion + commandDef, moduleEnd, moduleEnd);
+  return newFile;
+};
+
 export const writeConversationTitle = (oldFile: string): string | null => {
+  const modernResult = writeModernTitleCommand(oldFile);
+  if (modernResult) return modernResult;
+
   let result: string | null = oldFile;
 
   // Step 1: Write /title slash command

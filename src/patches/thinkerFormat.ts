@@ -5,7 +5,11 @@ import { LocationResult, showDiff } from './index';
 const getThinkerFormatLocation = (oldFile: string): LocationResult | null => {
   const approxAreaPattern =
     /spinnerTip:[$\w]+,(?:[$\w]+:[$\w]+,)*overrideMessage:[$\w]+,.{300}/;
-  const approxAreaMatch = oldFile.match(approxAreaPattern);
+  const approxAreaMatch =
+    oldFile.match(approxAreaPattern) ??
+    oldFile.match(
+      /function [$\w]+\(\{mode:[$\w]+,[^)]{0,500}overrideMessage:[$\w]+,[^)]{0,800}\}\)\{let .{0,2500}spinnerTip.{0,2500}activeForm.{0,1000}spinnerVerb/
+    );
 
   const searchStart = approxAreaMatch?.index;
 

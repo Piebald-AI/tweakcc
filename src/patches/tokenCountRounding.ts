@@ -23,35 +23,49 @@ import { showDiff } from './index';
  *
  * The token expression is wrapped with: Math.round((EXPR)/base)*base
  */
+const getRoundingBase = (rounding: number | { threshold?: number }): number => {
+  if (typeof rounding === 'number') return rounding;
+  return rounding.threshold ?? 1000;
+};
+
 export const writeTokenCountRounding = (
   oldFile: string,
-  roundingBase: number
+  roundingBaseConfig: number | { threshold?: number }
 ): string | null => {
+  const roundingBase = getRoundingBase(roundingBaseConfig);
   let fullMatch: string;
   let pre: string;
   let partToWrap: string;
   let post: string;
   let startIndex: number;
 
-  // Try multiple patterns for different CC versions
+  // Try multiple patterns for different CC versions.
+  // Keep the expression match intentionally narrow. A broad `.+?` can cross
+  // later comma-separated initializers and rewrite `M$=M9(aH),dH=...M$...` into
+  // a TDZ crash where `M$` is referenced while initializing itself.
+  const simpleExpression = '[$\\w]+(?:\\?\\.[$\\w]+)*(?:\\([^()]*\\))?';
 
-  // Pattern 1 (CC <2.1.83): overrideMessage anchor nearby
+  // Pattern 1 (CC >=2.1.83): Direct match on formatter call near key:"tokens"
+  // Matches: VAR=FUNC(EXPR),...key:"tokens"...,VAR," tokens"
   const m1 = oldFile.match(
-    /(overrideMessage:.{0,10000},([$\w]+)=[$\w]+\()(.+?)(\),.{0,1000}key:"tokens".{0,200},\2," tokens")/
+    new RegExp(
+      `(([$\\w]+)=[$\\w]+\\()(${simpleExpression})(\\),.{0,2000}key:"tokens".{0,200},\\2," tokens")`
+    )
   );
 
   if (m1 && m1.index !== undefined) {
     [fullMatch, pre, , partToWrap, post] = m1;
     startIndex = m1.index;
   } else {
-    // Pattern 2 (CC >=2.1.83): Direct match on formatter call near key:"tokens"
-    // Matches: VAR=FUNC(EXPR),...key:"tokens"...,VAR," tokens"
+    // Pattern 2 (CC <2.1.83): overrideMessage anchor nearby
     const m2 = oldFile.match(
-      /(([$\w]+)=([$\w]+)\()(.+?)(\),.{0,2000}key:"tokens".{0,200},\2," tokens")/
+      new RegExp(
+        `(overrideMessage:.{0,10000},([$\\w]+)=[$\\w]+\\()(${simpleExpression})(\\),.{0,1000}key:"tokens".{0,200},\\2," tokens")`
+      )
     );
 
     if (m2 && m2.index !== undefined) {
-      [fullMatch, pre, , , partToWrap, post] = m2;
+      [fullMatch, pre, , partToWrap, post] = m2;
       startIndex = m2.index;
     } else {
       // Pattern 3 (CC 1.x): older format

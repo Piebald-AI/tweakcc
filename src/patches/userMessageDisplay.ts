@@ -163,7 +163,7 @@ export const writeUserMessageDisplay = (
     console.error(
       'patch: userMessageDisplay: failed to find user message display pattern'
     );
-    return null;
+    return oldFile;
   }
 
   let createElementFn: string;

@@ -64,6 +64,10 @@ const analyzeArrayFromOpenBracket = (
  * identifiers) and 2.1.138+ form where the array uses spread operators for
  * conditionally-included commands, e.g.:
  *   =L8(()=>[AUK,pL4,DX4,y64,...gT4?[gT4]:[],Qj4,lI6,vL4,...,W94(),...])
+ *
+ * The candidate must also sit in slash-command-specific code. The bundle keeps
+ * slash-command definitions near command metadata such as name/userFacingName,
+ * so this rejects unrelated large arrow-return arrays.
  */
 export const findSlashCommandListEndPosition = (
   fileContents: string
@@ -75,6 +79,13 @@ export const findSlashCommandListEndPosition = (
   let best: { closing: number; items: number } | null = null;
   while ((m = arrowPattern.exec(fileContents)) !== null) {
     const bracketIndex = m.index + m[0].length - 1; // position of '['
+    const anchorWindow = fileContents.slice(
+      Math.max(0, m.index - 12000),
+      Math.min(fileContents.length, m.index + 12000)
+    );
+    if (!/name:"[^"]+"[\s\S]{0,1200}description:/.test(anchorWindow)) {
+      continue;
+    }
     const info = analyzeArrayFromOpenBracket(fileContents, bracketIndex);
     if (info && info.itemCount >= 30) {
       if (!best || info.itemCount > best.items) {

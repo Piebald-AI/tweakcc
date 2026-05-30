@@ -47,10 +47,11 @@ const findCustomModelListInsertionPoint = (
   const searchStart = Math.max(0, pushMatch.index - 5000);
   const chunk = fileContents.slice(searchStart, pushMatch.index);
 
-  // Declaration can be emitted as let/var/const depending on minifier output.
-  const declPattern = `(?:let|var|const) ${escapeIdent(modelListVar)}=.+?;`;
+  // Declaration can be emitted as let/var/const depending on minifier output,
+  // or as one variable in a comma-separated declaration list.
+  const declPattern = `(?:(?:let|var|const) |,)${escapeIdent(modelListVar)}=.+?;`;
   const funcPattern = new RegExp(
-    `function [$\\w]+\\([^)]*\\)\\{${declPattern}`,
+    `function [$\\w]+\\([^)]*\\)\\{[\\s\\S]{0,5000}?${declPattern}`,
     'g'
   );
   let lastMatch: RegExpExecArray | null = null;

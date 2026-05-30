@@ -23,8 +23,7 @@ describe('tableFormat patch', () => {
     it('should patch vertical border characters', () => {
       const result = writeTableFormat(testCliCode, 'ascii');
       expect(result).not.toBeNull();
-      // In minified code: let o="|"
-      expect(result).toContain('let o = "|"');
+      expect(result).toContain('o+=" "+MA+" |"');
     });
 
     it('should remove inter-row separators', () => {

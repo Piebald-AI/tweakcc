@@ -350,7 +350,7 @@ const findPatchesListLocation = (
   // emits them as `});function NAME(` (var/IIFE block close + semicolon, then
   // `function`). Allow either `}`, `;`, `)`, or `,` as the boundary char and let
   // arbitrary whitespace sit between the boundary and `function`.
-  const functionPattern = /[};,)]\s*function ([$\w]+)\(/g;
+  const functionPattern = /[};]\s*function ([$\w]+)\(/g;
   const functionMatches = Array.from(
     lookbackSubstring.matchAll(functionPattern)
   );
@@ -506,46 +506,47 @@ export const writePatchesAppliedIndication = (
     );
     const locs = findTweakccVersionLocations(content);
     if (!locs) {
-      console.error('patch: patchesAppliedIndication: patch 2 failed');
-      return null;
+      console.error(
+        'patch: patchesAppliedIndication: patch 2 skipped (header version pattern changed)'
+      );
+    } else {
+      // Step 1: Insert variable declaration after the "Claude Code" bold element
+      const varName = '_tw';
+      const varDecl = `let ${varName}=${locs.reactVar}.createElement(${locs.textComponent},null,${chalkVar}.hex("#FF8400").bold("+ tweakcc v${tweakccVersion}"));`;
+
+      const oldContent2a = content;
+      content =
+        content.slice(0, locs.varInsertIndex) +
+        varDecl +
+        content.slice(locs.varInsertIndex);
+
+      showDiff(
+        oldContent2a,
+        content,
+        varDecl,
+        locs.varInsertIndex,
+        locs.varInsertIndex
+      );
+
+      // Step 2: Insert variable reference as sibling in the parent createElement
+      // (adjust refInsertIndex for the inserted varDecl)
+      const adjustedRefIndex = locs.refInsertIndex + varDecl.length;
+      const refCode = `," ",${varName}`;
+
+      const oldContent2b = content;
+      content =
+        content.slice(0, adjustedRefIndex) +
+        refCode +
+        content.slice(adjustedRefIndex);
+
+      showDiff(
+        oldContent2b,
+        content,
+        refCode,
+        adjustedRefIndex,
+        adjustedRefIndex
+      );
     }
-
-    // Step 1: Insert variable declaration after the "Claude Code" bold element
-    const varName = '_tw';
-    const varDecl = `let ${varName}=${locs.reactVar}.createElement(${locs.textComponent},null,${chalkVar}.hex("#FF8400").bold("+ tweakcc v${tweakccVersion}"));`;
-
-    const oldContent2a = content;
-    content =
-      content.slice(0, locs.varInsertIndex) +
-      varDecl +
-      content.slice(locs.varInsertIndex);
-
-    showDiff(
-      oldContent2a,
-      content,
-      varDecl,
-      locs.varInsertIndex,
-      locs.varInsertIndex
-    );
-
-    // Step 2: Insert variable reference as sibling in the parent createElement
-    // (adjust refInsertIndex for the inserted varDecl)
-    const adjustedRefIndex = locs.refInsertIndex + varDecl.length;
-    const refCode = `," ",${varName}`;
-
-    const oldContent2b = content;
-    content =
-      content.slice(0, adjustedRefIndex) +
-      refCode +
-      content.slice(adjustedRefIndex);
-
-    showDiff(
-      oldContent2b,
-      content,
-      refCode,
-      adjustedRefIndex,
-      adjustedRefIndex
-    );
   }
 
   // PATCH 3: Add patches applied list (if enabled)

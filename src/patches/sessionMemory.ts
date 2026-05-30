@@ -124,6 +124,15 @@ const patchPastSessions = (file: string): string | null => {
     return newFile;
   }
 
+  // CC >= 2.1.152 appears to have removed the old tengu_coral_fern gate while
+  // keeping the session search UI/event path present. Treat this as already enabled.
+  if (
+    file.includes('tengu_session_search_toggled') ||
+    file.includes('tengu_session_all_projects_toggled')
+  ) {
+    return file;
+  }
+
   console.error('patch: sessionMemory: failed to find past sessions gate');
   return null;
 };
@@ -216,8 +225,30 @@ export const writeSessionMemory = (oldFile: string): string | null => {
 
   const usedLegacyExtraction = newFile.includes('tengu_session_memory');
 
-  newFile = patchPastSessions(newFile);
-  if (!newFile) return null;
+  const withPastSessions = patchPastSessions(newFile);
+  if (!withPastSessions) {
+    return null;
+  }
+  newFile = withPastSessions;
+
+  const extractModePattern =
+    /(function [$\w]+\(\))\{if\(![$\w]+\("tengu_passport_quail",!1\)\)return!1;return![$\w]+\(\)\|\|[$\w]+\("tengu_slate_thimble",!1\)\}/;
+  const extractModeMatch = newFile.match(extractModePattern);
+  if (extractModeMatch && extractModeMatch.index !== undefined) {
+    const replacement = `${extractModeMatch[1]}{return!0}`;
+    const beforePatch = newFile;
+    newFile =
+      newFile.slice(0, extractModeMatch.index) +
+      replacement +
+      newFile.slice(extractModeMatch.index + extractModeMatch[0].length);
+    showDiff(
+      beforePatch,
+      newFile,
+      replacement,
+      extractModeMatch.index,
+      extractModeMatch.index + extractModeMatch[0].length
+    );
+  }
 
   const tokenLimitsFile = patchTokenLimits(newFile, usedLegacyExtraction);
   if (tokenLimitsFile) {

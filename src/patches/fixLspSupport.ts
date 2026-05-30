@@ -95,6 +95,16 @@ const getOpenDocumentLocation = (oldFile: string): LocationResult | null => {
 };
 
 export const writeFixLspSupport = (oldFile: string): string | null => {
+  // CC >= 2.1.152 has native open/change/save/close file sync for LSP.
+  if (
+    oldFile.includes('textDocument/didOpen') &&
+    /openFile:[$\w]+,changeFile:[$\w]+,saveFile:[$\w]+,closeFile:[$\w]+/.test(
+      oldFile
+    )
+  ) {
+    return oldFile;
+  }
+
   // Patch 1: Comment out the validation by replacing with nothing
   const validationPattern1 =
     /if\([$\w]+\.restartOnCrash!==void 0\)throw Error\(`LSP server '\$\{[$\w]+\}': restartOnCrash is not yet implemented\. Remove this field from the configuration\.`\);/g;
