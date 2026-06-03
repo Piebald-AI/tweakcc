@@ -39,14 +39,19 @@ const findCustomModelListInsertionPoint = (
   const modelListVar = pushMatch[1];
 
   // The declaration/function head can move farther from the push site across CC builds
-  // and when other patches expand this block, so keep a wider lookback window.
-  const searchStart = Math.max(0, pushMatch.index - 1500);
+  // and when other patches expand this block (notably opusplan1m, which injects ~400
+  // bytes BEFORE the custom-model push inside the same function), so keep a generous
+  // lookback window. On CC 2.1.140 the head sits ~1500 bytes from the push BEFORE
+  // opusplan1m runs and ~1530 bytes after, so 5000 leaves comfortable slack for
+  // future CC builds and additional pre-patches.
+  const searchStart = Math.max(0, pushMatch.index - 5000);
   const chunk = fileContents.slice(searchStart, pushMatch.index);
 
-  // Declaration can be emitted as let/var/const depending on minifier output.
-  const declPattern = `(?:let|var|const) ${escapeIdent(modelListVar)}=.+?;`;
+  // Declaration can be emitted as let/var/const depending on minifier output,
+  // or as one variable in a comma-separated declaration list.
+  const declPattern = `(?:(?:let|var|const) |,)${escapeIdent(modelListVar)}=.+?;`;
   const funcPattern = new RegExp(
-    `function [$\\w]+\\([^)]*\\)\\{${declPattern}`,
+    `function [$\\w]+\\([^)]*\\)\\{[\\s\\S]{0,5000}?${declPattern}`,
     'g'
   );
   let lastMatch: RegExpExecArray | null = null;

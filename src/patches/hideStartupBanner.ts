@@ -29,6 +29,26 @@ export const writeHideStartupBanner = (oldFile: string): string | null => {
     return newFile;
   }
 
+  // CC >=2.1.156: the startup card component contains both the full-logo
+  // branch and the compact/horizontal card branch. Disable the whole component.
+  const modernCardPatterns = [
+    /(function [$\w]+\(\)\{)(?=let [$\w]+=[\w$]+\.c\(\d+\),[$\w]+=[\w$]+\(\)\.oauthAccount\?\.displayName\?\?""|let [$\w]+=[\w$]+\(\),[$\w]+=[\w$]+\?\.displayName\?\?"")/,
+    /(function [$\w]+\(\)\{)(?=let [$\w]+=[\w$]+\.c\(\d+\),[$\w]+=[\w$]+\(\),[$\w]+=[\w$]+\?\.displayName\?\?"")/,
+  ];
+
+  for (const modernCardPattern of modernCardPatterns) {
+    const modernCardMatch = oldFile.match(modernCardPattern);
+    if (modernCardMatch && modernCardMatch.index !== undefined) {
+      const insertIndex = modernCardMatch.index + modernCardMatch[1].length;
+      const insertion = 'return null;';
+      const newFile =
+        oldFile.slice(0, insertIndex) + insertion + oldFile.slice(insertIndex);
+
+      showDiff(oldFile, newFile, insertion, insertIndex, insertIndex);
+      return newFile;
+    }
+  }
+
   // CC >=2.1.83: The startup banner is a standalone zero-arg component function.
   // It contains both "Apple_Terminal" (for theme branching) and "Welcome to Claude Code".
   // Insert `return null;` at the start of its body.
@@ -36,7 +56,6 @@ export const writeHideStartupBanner = (oldFile: string): string | null => {
 
   let funcMatch: RegExpExecArray | null;
   while ((funcMatch = funcPattern.exec(oldFile)) !== null) {
-    // Verify this function also contains "Welcome to Claude Code"
     const bodyStart = funcMatch.index + funcMatch[0].length;
     const bodyPreview = oldFile.slice(bodyStart, bodyStart + 5000);
     if (bodyPreview.includes('Welcome to Claude Code')) {

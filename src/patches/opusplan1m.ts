@@ -109,9 +109,9 @@ const patchModelAliasesList = (oldFile: string): string | null => {
  *   if (A === "opusplan[1m]") return "Opus 4.6 in plan mode, else Sonnet 4.6 (1M context)";
  */
 const patchDescriptionFunction = (oldFile: string): string | null => {
-  // Pattern matches: if (VAR === "opusplan") return "Opus 4.6 in plan mode, else Sonnet 4.6";
+  // Pattern matches old versioned and new generic opusplan descriptions.
   const pattern =
-    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*"Opus .{0,20} in plan mode, else Sonnet .{0,20}";)/;
+    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*"([^"]*Opus[^"]*plan mode[^"]*Sonnet[^"]*)";)/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
@@ -121,12 +121,12 @@ const patchDescriptionFunction = (oldFile: string): string | null => {
     return null;
   }
 
-  const [fullMatch, , varName] = match;
+  const [fullMatch, , varName, description] = match;
 
   // Add the opusplan[1m] case right after the opusplan case
   const replacement =
     fullMatch +
-    `if(${varName}==="opusplan[1m]")return"Opus 4.6 in plan mode, else Sonnet 4.6 (1M context)";`;
+    `if(${varName}==="opusplan[1m]")return"${description} (1M context)";`;
 
   const newFile =
     oldFile.slice(0, match.index) +
@@ -228,7 +228,7 @@ const patchModelSelectorOptions = (oldFile: string): string | null => {
   );
   const wrapFn = wrapperMatch ? wrapperMatch[1] : null;
 
-  const newEntry = `{value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus 4.6 in plan mode, Sonnet 4.6 (1M context) otherwise"}`;
+  const newEntry = `{value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus in plan mode, Sonnet (1M context) otherwise"}`;
   const returnExpr = wrapFn
     ? `${wrapFn}([...${listVar},${newEntry}])`
     : `[...${listVar},${newEntry}]`;
@@ -279,8 +279,8 @@ const patchAlwaysShowInModelSelector = (oldFile: string): string | null => {
   // Inject pushes BEFORE the conditional return
   // This ensures opusplan and opusplan[1m] are always in the list
   const inject =
-    `${listVar}.push({value:"opusplan",label:"Opus Plan Mode",description:"Use Opus 4.6 in plan mode, Sonnet 4.6 otherwise"});` +
-    `${listVar}.push({value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus 4.6 in plan mode, Sonnet 4.6 (1M context) otherwise"});`;
+    `${listVar}.push({value:"opusplan",label:"Opus Plan Mode",description:"Use Opus in plan mode, Sonnet otherwise"});` +
+    `${listVar}.push({value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus in plan mode, Sonnet (1M context) otherwise"});`;
 
   const newFile =
     oldFile.slice(0, match.index) + inject + oldFile.slice(match.index);

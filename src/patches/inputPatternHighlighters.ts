@@ -110,7 +110,10 @@ const writeCustomHighlighterImpl = (oldFile: string): string | null => {
       workingFile.slice(shimmerMatch.index);
   }
 
-  // Now patch the main return (which may have shifted due to shimmer insertion)
+  // Now patch the main return (which may have shifted due to shimmer insertion).
+  // The pristine renderer only reads color/dimColor/inverse from the highlight
+  // object. Extend it to also forward bold/italic/underline/strikethrough/
+  // backgroundColor so the highlighter push entries can express those styles.
   const newMatches2 = workingFile.match(newRegex);
   if (!newMatches2 || newMatches2.index === undefined) {
     console.error(
@@ -119,9 +122,31 @@ const writeCustomHighlighterImpl = (oldFile: string): string | null => {
     return null;
   }
 
+  const reactVar2 = newMatches2[2];
+  const textComp2 = newMatches2[3];
+  const keyVar2 = newMatches2[4];
+  const segVar2 = newMatches2[5];
+  const innerElem2 = newMatches2[6];
+
+  const styledText =
+    `${segVar2}.highlight?.style?` +
+    `${segVar2}.highlight.style(${segVar2}.text):${segVar2}.text`;
+  const styledInnerElem = innerElem2.replace(`${segVar2}.text`, styledText);
+  const augmentedRenderer =
+    `return ${reactVar2}.createElement(${textComp2},{key:${keyVar2}` +
+    `,color:${segVar2}.highlight?.style?void 0:${segVar2}.highlight?.color` +
+    `,backgroundColor:${segVar2}.highlight?.style?void 0:${segVar2}.highlight?.backgroundColor` +
+    `,dimColor:${segVar2}.highlight?.dimColor` +
+    `,inverse:${segVar2}.highlight?.style?void 0:${segVar2}.highlight?.inverse` +
+    `,bold:${segVar2}.highlight?.style?void 0:${segVar2}.highlight?.bold` +
+    `,italic:${segVar2}.highlight?.style?void 0:${segVar2}.highlight?.italic` +
+    `,underline:${segVar2}.highlight?.style?void 0:${segVar2}.highlight?.underline` +
+    `,strikethrough:${segVar2}.highlight?.style?void 0:${segVar2}.highlight?.strikethrough` +
+    `},${styledInnerElem})`;
+
   const newFile =
     workingFile.slice(0, newMatches2.index) +
-    newMatches2[0] +
+    augmentedRenderer +
     workingFile.slice(newMatches2.index + newMatches2[0].length);
 
   showDiff(oldFile, newFile, 'shimmer guard + renderer', 0, 0);
@@ -138,8 +163,11 @@ const writeCustomHighlighterCreation = (
 ): string | null => {
   // CC <2.1.83: ,VAR=REACT.useMemo(()=>{let ARR=[];if(...)ARR.push(...)
   // CC >=2.1.83: ;let VAR=REACT.useMemo(()=>{let ARR=[];for(...)...;if(...)ARR.push(...)
+  // CC >=2.1.140: same shape, but unrelated useMemos earlier in the file
+  // require the inner span to be length-bounded so the regex doesn't span
+  // across functions and latch onto the wrong useMemo opening.
   const regex =
-    /((?:,|;let )[$\w]+=[$\w]+\.useMemo\(\(\)=>\{let [$\w]+=\[\];[\s\S]*?)(if\([$\w]+&&[$\w]+&&![$\w]+\)([$\w]+)\.push\(\{start:[$\w]+,end:[$\w]+\+[$\w]+\.length,color:"warning",priority:\d+\})/;
+    /((?:,|;let )[$\w]+=[$\w]+\.useMemo\(\(\)=>\{let [$\w]+=\[\];[\s\S]{0,2000}?)(if\([$\w]+&&[$\w]+&&![$\w]+\)([$\w]+)\.push\(\{start:[$\w]+,end:[$\w]+\+[$\w]+\.length,color:"warning",priority:\d+\})/;
 
   const match = oldFile.match(regex);
   if (!match || match.index === undefined) {
@@ -161,14 +189,20 @@ const writeCustomHighlighterCreation = (
   }
   const _reactVarFromMemo = reactMemoMatch[1]; // eslint-disable-line @typescript-eslint/no-unused-vars
 
-  const searchStart = Math.max(0, match.index - 10000);
+  const searchStart = Math.max(0, match.index - 15000);
   const searchWindow = oldFile.slice(searchStart, match.index);
-  const inputPattern = /\binput:([$\w]+),/g;
-  const inputMatches = [...searchWindow.matchAll(inputPattern)];
-  const inputMatch = inputMatches.at(-1) ?? null;
+  // CC >=2.1.140: input is destructured from a hook as `inputValue:VAR,`.
+  // CC <2.1.140:  the input variable is passed as a prop named `input:VAR,`.
+  // Prefer the new form when present (the old form may also match unrelated
+  // function parameters in the same lookback window in 2.1.140).
+  const newInputPattern = /\binputValue:([$\w]+),/g;
+  const oldInputPattern = /\binput:([$\w]+),/g;
+  const newInputMatches = [...searchWindow.matchAll(newInputPattern)];
+  const oldInputMatches = [...searchWindow.matchAll(oldInputPattern)];
+  const inputMatch = newInputMatches.at(-1) ?? oldInputMatches.at(-1) ?? null;
   if (!inputMatch) {
     console.error(
-      'patch: inputPatternHighlighters: failed to find input variable pattern'
+      'patch: inputPatternHighlighters: failed to find input variable pattern (looked for inputValue: and input:)'
     );
     return null;
   }
@@ -179,8 +213,9 @@ const writeCustomHighlighterCreation = (
   let genCode = '';
   for (let i = 0; i < highlighters.length; i++) {
     const highlighter = highlighters[i];
-    const _chalkChain = buildChalkChain(chalkVar, highlighter); // eslint-disable-line @typescript-eslint/no-unused-vars
-    JSON.stringify(highlighter.format).replace(/\{MATCH\}/g, '"+x+"'); // preserve legacy side-effect-free transform shape for diff stability
+    const chalkChain = buildChalkChain(chalkVar, highlighter);
+    const formatStr = highlighter.format ?? '{MATCH}';
+    JSON.stringify(formatStr).replace(/\{MATCH\}/g, '"+x+"'); // preserve legacy side-effect-free transform shape for diff stability
 
     // Note: format handling for this branch is currently color/style-only.
 
@@ -193,19 +228,56 @@ const writeCustomHighlighterCreation = (
       }
     }
     const colorValue = colorStr ? JSON.stringify(colorStr) : 'undefined';
-    const _isBold = highlighter.styling.includes('bold'); // eslint-disable-line @typescript-eslint/no-unused-vars
-    const isInverse = highlighter.styling.includes('inverse');
-    const isDim = highlighter.styling.includes('dim');
-    const isStrikethrough = highlighter.styling.includes('strikethrough');
+    let bgColorStr = highlighter.backgroundColor;
+    if (bgColorStr) {
+      const bgRgbMatch = bgColorStr.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+      if (bgRgbMatch) {
+        const [, r, g, b] = bgRgbMatch.map(Number);
+        bgColorStr = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+      }
+    }
+    const bgColorValue = bgColorStr ? JSON.stringify(bgColorStr) : null;
+    const styling = highlighter.styling ?? [];
+    const isBold = styling.includes('bold');
+    const isItalic = styling.includes('italic');
+    const isUnderline = styling.includes('underline');
+    const isInverse = styling.includes('inverse');
+    const isDim = styling.includes('dim');
+    const isStrikethrough = styling.includes('strikethrough');
 
-    let flags = highlighter.regexFlags;
+    const regexSource =
+      highlighter.regex ??
+      (highlighter as unknown as { pattern?: string }).pattern;
+    if (!regexSource) {
+      console.error(
+        `patch: inputPatternHighlighters: highlighter "${highlighter.name}" has no regex/pattern; skipping`
+      );
+      continue;
+    }
+    let flags = highlighter.regexFlags ?? '';
     if (!flags.includes('g')) {
       flags += 'g';
     }
-    const regex = new RegExp(highlighter.regex, flags);
+    let regex: RegExp;
+    try {
+      regex = new RegExp(regexSource, flags);
+    } catch (error) {
+      console.error(
+        `patch: inputPatternHighlighters: highlighter "${highlighter.name}" has invalid regex; skipping`,
+        error
+      );
+      continue;
+    }
     const regexStr = stringifyRegex(regex);
 
-    genCode += `if(typeof ${inputVar}==="string"){for(let m of ${inputVar}.matchAll(${regexStr})){${rangesVar}.push({start:m.index,end:m.index+m[0].length,color:${colorValue}${isInverse ? ',inverse:!0' : ''}${isDim ? ',dimColor:!0' : ''}${isStrikethrough ? ',strikethrough:!0' : ''},priority:100})}}`;
+    genCode += `if(typeof ${inputVar}==="string"){for(let m of ${inputVar}.matchAll(${regexStr})){${rangesVar}.push({start:m.index,end:m.index+m[0].length,color:${colorValue}${bgColorValue ? `,backgroundColor:${bgColorValue}` : ''}${isBold ? ',bold:!0' : ''}${isItalic ? ',italic:!0' : ''}${isUnderline ? ',underline:!0' : ''}${isInverse ? ',inverse:!0' : ''}${isDim ? ',dimColor:!0' : ''}${isStrikethrough ? ',strikethrough:!0' : ''},style:(x)=>${chalkChain}(x),priority:100})}}`;
+  }
+
+  if (!genCode) {
+    console.error(
+      'patch: inputPatternHighlighters: no usable highlighters generated (all skipped)'
+    );
+    return null;
   }
 
   const replacement = match[1] + genCode + match[2];
@@ -271,9 +343,15 @@ export const writeInputPatternHighlighters = (
   oldFile: string,
   highlighters: InputPatternHighlighter[]
 ): string | null => {
-  const enabledHighlighters = highlighters.filter(h => h.enabled);
+  // Treat missing `enabled` as enabled (only `false` disables a highlighter).
+  // Robust against partially-typed callers (e.g. defaults loaded from older
+  // configs or the probe harness).
+  const enabledHighlighters = highlighters.filter(h => h.enabled !== false);
 
   if (enabledHighlighters.length === 0) {
+    console.error(
+      'patch: inputPatternHighlighters: no enabled highlighters provided'
+    );
     return null;
   }
 

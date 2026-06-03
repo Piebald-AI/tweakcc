@@ -39,19 +39,38 @@ const patchExtraction = (file: string): string | null => {
   const pattern = /function [$\w]+\(\)\{return [$\w]+\("tengu_session_memory"/;
   const match = file.match(pattern);
 
-  if (!match || match.index === undefined) {
-    console.error('patch: sessionMemory: failed to find extraction gate');
-    return null;
+  if (match && match.index !== undefined) {
+    const insertIndex = match.index + match[0].indexOf('{') + 1;
+    const insertion = 'return true;';
+
+    const newFile =
+      file.slice(0, insertIndex) + insertion + file.slice(insertIndex);
+
+    showDiff(file, newFile, insertion, insertIndex, insertIndex);
+    return newFile;
   }
 
-  const insertIndex = match.index + match[0].indexOf('{') + 1;
-  const insertion = 'return true;';
+  const anchor = 'querySource:"extract_memories",forkLabel:"extract_memories"';
+  const anchorIndex = file.indexOf(anchor);
 
-  const newFile =
-    file.slice(0, insertIndex) + insertion + file.slice(insertIndex);
+  if (anchorIndex !== -1) {
+    const windowEnd = Math.min(file.length, anchorIndex + 8000);
+    const window = file.slice(anchorIndex, windowEnd);
+    const gatePattern = /if\(![$\w]+\("tengu_passport_quail",!1\)\)return;/;
+    const gateMatch = window.match(gatePattern);
 
-  showDiff(file, newFile, insertion, insertIndex, insertIndex);
-  return newFile;
+    if (gateMatch && gateMatch.index !== undefined) {
+      const startIndex = anchorIndex + gateMatch.index;
+      const endIndex = startIndex + gateMatch[0].length;
+      const newFile = file.slice(0, startIndex) + file.slice(endIndex);
+
+      showDiff(file, newFile, '', startIndex, endIndex);
+      return newFile;
+    }
+  }
+
+  console.error('patch: sessionMemory: failed to find extraction gate');
+  return null;
 };
 
 /**
@@ -105,6 +124,15 @@ const patchPastSessions = (file: string): string | null => {
     return newFile;
   }
 
+  // CC >= 2.1.152 appears to have removed the old tengu_coral_fern gate while
+  // keeping the session search UI/event path present. Treat this as already enabled.
+  if (
+    file.includes('tengu_session_search_toggled') ||
+    file.includes('tengu_session_all_projects_toggled')
+  ) {
+    return file;
+  }
+
   console.error('patch: sessionMemory: failed to find past sessions gate');
   return null;
 };
@@ -112,14 +140,21 @@ const patchPastSessions = (file: string): string | null => {
 /**
  * Patch 3: Make per-section and total file token limits configurable via env vars
  */
-const patchTokenLimits = (file: string): string | null => {
+const patchTokenLimits = (
+  file: string,
+  logFailure: boolean = true
+): string | null => {
   // Pattern matches: =2000 ... =12000 ... # Session Title
   const pattern =
     /(=)2000((?:.|\n){0,15}?=)12000((?:.|\n){0,20}# Session Title)/;
   const match = file.match(pattern);
 
   if (!match || match.index === undefined) {
-    console.error('patch: sessionMemory: failed to find token limits pattern');
+    if (logFailure) {
+      console.error(
+        'patch: sessionMemory: failed to find token limits pattern'
+      );
+    }
     return null;
   }
 
@@ -141,7 +176,10 @@ const patchTokenLimits = (file: string): string | null => {
 /**
  * Patch 4: Make session memory update thresholds configurable via env vars
  */
-const patchUpdateThresholds = (file: string): string | null => {
+const patchUpdateThresholds = (
+  file: string,
+  logFailure: boolean = true
+): string | null => {
   let newFile = file;
 
   // Replace minimumMessageTokensToInit
@@ -167,9 +205,11 @@ const patchUpdateThresholds = (file: string): string | null => {
 
   // Check if any replacements were made
   if (newFile === file) {
-    console.error(
-      'patch: sessionMemory: failed to find update thresholds patterns'
-    );
+    if (logFailure) {
+      console.error(
+        'patch: sessionMemory: failed to find update thresholds patterns'
+      );
+    }
     return null;
   }
 
@@ -183,12 +223,49 @@ export const writeSessionMemory = (oldFile: string): string | null => {
   let newFile = patchExtraction(oldFile);
   if (!newFile) return null;
 
-  newFile = patchPastSessions(newFile);
-  if (!newFile) return null;
+  const usedLegacyExtraction = newFile.includes('tengu_session_memory');
 
-  newFile = patchTokenLimits(newFile);
-  if (!newFile) return null;
+  const withPastSessions = patchPastSessions(newFile);
+  if (!withPastSessions) {
+    return null;
+  }
+  newFile = withPastSessions;
 
-  newFile = patchUpdateThresholds(newFile);
+  const extractModePattern =
+    /(function [$\w]+\(\))\{if\(![$\w]+\("tengu_passport_quail",!1\)\)return!1;return![$\w]+\(\)\|\|[$\w]+\("tengu_slate_thimble",!1\)\}/;
+  const extractModeMatch = newFile.match(extractModePattern);
+  if (extractModeMatch && extractModeMatch.index !== undefined) {
+    const replacement = `${extractModeMatch[1]}{return!0}`;
+    const beforePatch = newFile;
+    newFile =
+      newFile.slice(0, extractModeMatch.index) +
+      replacement +
+      newFile.slice(extractModeMatch.index + extractModeMatch[0].length);
+    showDiff(
+      beforePatch,
+      newFile,
+      replacement,
+      extractModeMatch.index,
+      extractModeMatch.index + extractModeMatch[0].length
+    );
+  }
+
+  const tokenLimitsFile = patchTokenLimits(newFile, usedLegacyExtraction);
+  if (tokenLimitsFile) {
+    newFile = tokenLimitsFile;
+  } else if (usedLegacyExtraction) {
+    return null;
+  }
+
+  const updateThresholdsFile = patchUpdateThresholds(
+    newFile,
+    usedLegacyExtraction
+  );
+  if (updateThresholdsFile) {
+    newFile = updateThresholdsFile;
+  } else if (usedLegacyExtraction) {
+    return null;
+  }
+
   return newFile;
 };

@@ -221,6 +221,12 @@ export const writeTableFormat = (
   oldFile: string,
   tableFormat: TableFormat
 ): string | null => {
+  // Accept 'markdown' as an alias for 'ascii' (the ascii mode produces
+  // markdown-style tables, per the patch's own docs).
+  if ((tableFormat as string) === 'markdown') {
+    tableFormat = 'ascii';
+  }
+
   // If tableFormat is 'default', don't modify anything (keep original box-drawing)
   if (tableFormat === 'default') {
     debug('Table format is "default", no patching needed');
@@ -268,25 +274,26 @@ export const writeTableFormat = (
       );
     }
 
-    // 2. Patch vertical border characters (│ -> |)
+    // 2. Patch compact table vertical separators without touching global UI border constants.
     {
       const before = newFile;
-
-      // Native format: let VAR="\u2502" and " \u2502"
-      newFile = newFile.replace(
-        /let\s+([$\w]+)\s*=\s*"\\u2502";/g,
-        'let $1="|";'
-      );
-      newFile = newFile.replace(/" \\u2502"/g, '" |"');
-      newFile = newFile.replace(/"\\u2502"/g, '"|"');
-
-      // NPM format: let VAR = "│" and " │"
-      newFile = newFile.replace(/let\s+([$\w]+)\s*=\s*"│";/g, 'let $1 = "|";');
-      newFile = newFile.replace(/"\s*│"/g, '" |"');
+      const tableRendererPattern =
+        /function [$\w]+\([^)]*\)\{[\s\S]{0,1600}?let ([$\w]+)="(?:\\u2502|│)";[\s\S]{0,1600}?\1\+=" "\+[$\w]+\+" (?:\\u2502|│)"/;
+      const tableRendererMatch = newFile.match(tableRendererPattern);
+      if (tableRendererMatch && tableRendererMatch.index !== undefined) {
+        const start = tableRendererMatch.index;
+        const end = start + tableRendererMatch[0].length;
+        const patchedRenderer = newFile
+          .slice(start, end)
+          .replace(/" \\u2502"/g, '" |"')
+          .replace(/" │"/g, '" |"');
+        newFile =
+          newFile.slice(0, start) + patchedRenderer + newFile.slice(end);
+      }
 
       if (newFile !== before) {
         patchCount++;
-        debug('Patched vertical border characters');
+        debug('Patched compact table vertical separators');
       }
     }
 
@@ -404,6 +411,9 @@ export const writeTableFormat = (
   // Unknown format
   // ==========================================================================
   else {
+    console.error(
+      `patch: tableFormat: failed to find handler for unknown format "${tableFormat}"`
+    );
     debug(`Unknown table format "${tableFormat}", skipping`);
     return null;
   }
@@ -412,6 +422,9 @@ export const writeTableFormat = (
   // Final reporting
   // ==========================================================================
   if (patchCount === 0) {
+    console.error(
+      `patch: tableFormat: failed to find any table-rendering patterns to patch for format "${tableFormat}" (border-definition object, vertical-border chars, horizontal separator, or inter-row separator)`
+    );
     verbose(
       'No table format patches were applied - patterns may not have matched'
     );

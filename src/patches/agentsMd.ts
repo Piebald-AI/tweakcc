@@ -11,39 +11,6 @@ import { showDiff } from './index';
  * CC <=2.1.69 (sync): Function uses readFileSync/existsSync/statSync directly
  * CC >=2.1.83 (async): File reading is split into jh1 (async reader) and XB9 (processor)
  *   The async reader catches ENOENT/EISDIR errors and returns {info:null,includePaths:[]}
- *
- * CC <=2.1.69:
- * ```diff
- * -function _t7(A, q) {
- * +function _t7(A, q, didReroute) {
- *    try {
- *      let K = x1();
- * -    if (!K.existsSync(A) || !K.statSync(A).isFile()) return null;
- * +    if (!K.existsSync(A) || !K.statSync(A).isFile()) {
- * +      if (!didReroute && (A.endsWith("/CLAUDE.md") || ...)) { ... }
- * +      return null;
- * +    }
- * ```
- *
- * CC >=2.1.83:
- * ```diff
- * -async function jh1(A, q, K) {
- * +async function jh1(A, q, K, didReroute) {
- *    try {
- *      let z = await j8().readFile(A, {encoding:"utf-8"});
- *      return XB9(z, A, q, K)
- * -  } catch(_) { return DB9(_, A), {info:null,includePaths:[]} }
- * +  } catch(_) {
- * +    DB9(_, A);
- * +    if (!didReroute && (A.endsWith("/CLAUDE.md") || ...)) {
- * +      for (let alt of ["AGENTS.md",...]) {
- * +        let altPath = A.slice(0,-9) + alt;
- * +        try { let r = await jh1(altPath, q, K, true); if (r.info) return r; } catch {}
- * +      }
- * +    }
- * +    return {info:null,includePaths:[]}
- * +  }
- * ```
  */
 export const writeAgentsMd = (
   file: string,
@@ -88,13 +55,13 @@ const writeAgentsMdAsync = (
   const altNamesJson = JSON.stringify(altNames);
 
   const replacement =
-    `${funcSig},didReroute){try{let ${readVar}=await ${fsGetter}().readFile(${pathParam},{encoding:"utf-8"});return ${processorFunc}(${readVar},${pathParam},${typeParam},${thirdParam})}catch(${catchVar}){${errorHandler}(${catchVar},${pathParam});` +
+    `${funcSig},didReroute){try{let ${readVar}=await ${fsGetter}().readFile(${pathParam},{encoding:"utf-8"});return ${processorFunc}(${readVar},${pathParam},${typeParam},${thirdParam})}catch(${catchVar}){` +
     `if(!didReroute&&(${pathParam}.endsWith("/CLAUDE.md")||${pathParam}.endsWith("\\\\CLAUDE.md"))){` +
     `for(let alt of ${altNamesJson}){` +
     `let altPath=${pathParam}.slice(0,-9)+alt;` +
     `try{let r=await ${funcName}(altPath,${typeParam},${thirdParam},true);if(r.info)return r}catch{}` +
     `}}` +
-    `return{info:null,includePaths:[]}}}`;
+    `return ${errorHandler}(${catchVar},${pathParam}),{info:null,includePaths:[]}}}`;
 
   const startIndex = funcMatch.index;
   const endIndex = startIndex + fullMatch.length;

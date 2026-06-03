@@ -11,13 +11,24 @@ import { LocationResult, showDiff } from './index';
  * - "tengu_amber_wren" (CC >=2.1.83)
  */
 const getFileReadLimitLocation = (oldFile: string): LocationResult | null => {
+  const newConfigRegion = oldFile.match(
+    /CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS[\s\S]{0,1200}tengu_amber_wren/
+  );
+  if (newConfigRegion && newConfigRegion.index !== undefined) {
+    const tokenLimitMatch = newConfigRegion[0].match(/=25000,/);
+    if (tokenLimitMatch && tokenLimitMatch.index !== undefined) {
+      const startIndex = newConfigRegion.index + tokenLimitMatch.index + 1;
+      return { startIndex, endIndex: startIndex + 5 };
+    }
+  }
+
   // Try anchors in order of preference
   const anchors = ['<system-reminder>', 'tengu_amber_wren'];
 
   let match: RegExpMatchArray | null = null;
   for (const anchor of anchors) {
     const escaped = anchor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const pattern = new RegExp(`=25000,([\\s\\S]{0,200})${escaped}`);
+    const pattern = new RegExp(`=25000,([\\s\\S]{0,700})${escaped}`);
     match = oldFile.match(pattern);
     if (match && match.index !== undefined) break;
   }

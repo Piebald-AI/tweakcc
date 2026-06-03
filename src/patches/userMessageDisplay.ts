@@ -130,10 +130,6 @@ export const writeUserMessageDisplay = (
   }
 
   const boxComponent = findBoxComponent(oldFile);
-  if (!boxComponent) {
-    console.error('patch: userMessageDisplay: failed to find Box component');
-    return null;
-  }
 
   const chalkVar = findChalkVar(oldFile);
   if (!chalkVar) {
@@ -152,27 +148,47 @@ export const writeUserMessageDisplay = (
   const newPattern =
     /(No content found in user prompt message.{0,50}?\b)(([$\w]+(?:\.default)?)\.createElement\([$\w]+,\{flexDirection:"column"[^}]*\},([$\w]+(?:\.default)?\.createElement)\([$\w]+,\{text:([$\w]+)[^}]*\}\)\))/;
 
+  // CC 2.1.138: child display is memoized before the parent Box call.
+  // Replace only the child assignment so React compiler cache bookkeeping remains intact.
+  const memoizedChildPattern =
+    /(No content found in user prompt message.{0,1200}?)([$\w]+)=([$\w]+(?:\.default)?\.createElement)\([$\w]+,\{text:([$\w]+),useBriefLayout:[$\w]+,timestamp:[$\w]+\}\)/;
+
   const oldMatch = oldFile.match(pattern);
-  const match = oldMatch ?? oldFile.match(newPattern);
+  const newMatch = oldMatch ? null : oldFile.match(newPattern);
+  const memoizedChildMatch =
+    oldMatch || newMatch ? null : oldFile.match(memoizedChildPattern);
+  const match = oldMatch ?? newMatch ?? memoizedChildMatch;
 
   if (!match || match.index === undefined) {
     console.error(
       'patch: userMessageDisplay: failed to find user message display pattern'
     );
-    return null;
+    return oldFile;
   }
 
   let createElementFn: string;
   let messageVar: string;
 
+  let localBoxComponent: string | undefined;
+
   if (oldMatch) {
     // Old pattern matches
     createElementFn = match[4];
     messageVar = match[6] ?? match[7];
-  } else {
+  } else if (newMatch) {
     // New pattern (CC ≥2.1.79)
     createElementFn = match[4];
     messageVar = match[5];
+  } else {
+    // Memoized child pattern (CC 2.1.138)
+    createElementFn = match[3];
+    messageVar = match[4];
+  }
+
+  const resolvedBoxComponent = localBoxComponent ?? boxComponent;
+  if (!resolvedBoxComponent) {
+    console.error('patch: userMessageDisplay: failed to find Box component');
+    return null;
   }
 
   // Build box attributes (border and padding)
@@ -252,9 +268,10 @@ export const writeUserMessageDisplay = (
   const chalkFormattedString = `${chalkChain}(${formattedMessage})`;
 
   // Build replacement: match[1] + createElement(Box, boxProps, createElement(Text, null, chalkFormattedString))
+  const replacementPrefix = memoizedChildMatch ? `${match[2]}=` : '';
   const replacement =
     match[1] +
-    `${createElementFn}(${boxComponent},${boxAttrsObjStr},${createElementFn}(${textComponent},null,${chalkFormattedString}))`;
+    `${replacementPrefix}${createElementFn}(${resolvedBoxComponent},${boxAttrsObjStr},${createElementFn}(${textComponent},null,${chalkFormattedString}))`;
 
   const startIndex = match.index;
   const endIndex = startIndex + match[0].length;

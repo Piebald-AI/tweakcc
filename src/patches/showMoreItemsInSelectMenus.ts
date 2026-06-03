@@ -35,27 +35,49 @@ const getShowMoreItemsInSelectMenusLocation = (
  * We replace `Math.floor(VAR/2)` with just `VAR` so the menu uses full height.
  */
 const patchHelpMenuHeight = (file: string): string | null => {
-  // Match: {rows:VAR,columns:VAR}=FUNC(),VAR=Math.floor(VAR/2)
-  // The rows var and the var assigned to Math.floor should reference the same var
-  const pattern =
+  // CC <= 2.1.150: {rows:VAR,columns:VAR}=FUNC(),VAR=Math.floor(VAR/2)
+  const halfHeightPattern =
     /\{rows:([\w$]+),columns:[\w$]+\}=[\w$]+\(\),([\w$]+)=Math\.floor\(\1\/2\)/;
-  const match = file.match(pattern);
+  const halfHeightMatch = file.match(halfHeightPattern);
 
-  if (!match || match.index === undefined) {
-    return null;
+  if (halfHeightMatch && halfHeightMatch.index !== undefined) {
+    const assignStart =
+      halfHeightMatch.index +
+      halfHeightMatch[0].indexOf(halfHeightMatch[2] + '=Math.floor(');
+    const assignEnd = halfHeightMatch.index + halfHeightMatch[0].length;
+    const replacement = `${halfHeightMatch[2]}=${halfHeightMatch[1]}`;
+
+    const newFile =
+      file.slice(0, assignStart) + replacement + file.slice(assignEnd);
+
+    showDiff(file, newFile, replacement, assignStart, assignEnd);
+    return newFile;
   }
 
-  // Replace VAR=Math.floor(ROWSVAR/2) with VAR=ROWSVAR
-  const assignStart = match.index + match[0].indexOf(match[2] + '=Math.floor(');
-  const assignEnd = match.index + match[0].length;
-  const replacement = `${match[2]}=${match[1]}`;
+  // CC >= 2.1.152: function computes Math.max(1,Math.floor((rows-CONST)/modeDivisor)).
+  // Keep the small subtraction for prompt chrome, but remove the mode divisor cap.
+  const modeDivisorPattern =
+    /Math\.max\(1,Math\.floor\(\(([\w$]+)-([\w$]+)\)\/([\w$]+)\)\)/g;
+  let modeDivisorMatch: RegExpExecArray | null;
 
-  const newFile =
-    file.slice(0, assignStart) + replacement + file.slice(assignEnd);
+  while ((modeDivisorMatch = modeDivisorPattern.exec(file)) !== null) {
+    const nearbyStart = Math.max(0, modeDivisorMatch.index - 250);
+    const nearby = file.slice(nearbyStart, modeDivisorMatch.index);
+    if (!nearby.includes('"expanded"?3') || !nearby.includes('"compact"?1:2')) {
+      continue;
+    }
 
-  showDiff(file, newFile, replacement, assignStart, assignEnd);
+    const startIndex = modeDivisorMatch.index;
+    const endIndex = modeDivisorMatch.index + modeDivisorMatch[0].length;
+    const replacement = `Math.max(1,${modeDivisorMatch[1]}-${modeDivisorMatch[2]})`;
+    const newFile =
+      file.slice(0, startIndex) + replacement + file.slice(endIndex);
 
-  return newFile;
+    showDiff(file, newFile, replacement, startIndex, endIndex);
+    return newFile;
+  }
+
+  return null;
 };
 
 /**
@@ -183,16 +205,12 @@ export const writeShowMoreItemsInSelectMenus = (
     );
   }
 
-  // Also patch the slash command autocomplete suggestions cap
+  // Also patch the slash command autocomplete suggestions cap when present.
   // Math.min(6,Math.max(1,rows-3)) → Math.max(1,rows-3)
-  // The Math.min(6,...) hardcaps visible suggestions to 6
+  // CC 2.1.138 removed this obsolete non-overlay fallback, so absence is OK.
   const suggestionsPatched = patchSuggestionsCap(newFile);
   if (suggestionsPatched) {
     newFile = suggestionsPatched;
-  } else {
-    console.error(
-      'patch: writeShowMoreItemsInSelectMenus: failed to find suggestions cap pattern'
-    );
   }
 
   return newFile;

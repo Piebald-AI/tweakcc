@@ -308,6 +308,21 @@ export const findTextComponent = (fileContents: string): string | undefined => {
 /**
  * Find the Box component variable name
  */
+const findThemedBoxWrapper = (
+  fileContents: string,
+  rawBoxComponent: string
+): string | undefined => {
+  const wrapperFactoryIdent = '[A-Za-z_$][\\w$]*(?:\\.[A-Za-z_$][\\w$]*)*';
+  const rawAliasPattern = new RegExp(
+    `var [^;]{0,120};var [$\\w]+=${wrapperFactoryIdent}\\(\\(\\)=>\\{[^}]{0,500}([$\\w]+)=${escapeIdent(rawBoxComponent)}\\}\\)`
+  );
+  const rawAlias = fileContents.match(rawAliasPattern)?.[1] ?? rawBoxComponent;
+  const wrapperPattern = new RegExp(
+    `function ([$\\w]+)\\([^)]+\\)\\{(?=[\\s\\S]{0,2500}createElement\\(${escapeIdent(rawAlias)},\\{\\.\\.\\.[$\\w]+,borderColor:)[\\s\\S]{0,3000}?return [$\\w]+\\}var [^;]{0,160};var [$\\w]+=${wrapperFactoryIdent}\\(\\(\\)=>\\{[^}]{0,600}([$\\w]+)=\\1\\}\\)`
+  );
+  return fileContents.match(wrapperPattern)?.[2];
+};
+
 export const findBoxComponent = (fileContents: string): string | undefined => {
   // Method 1: Find Box by ink-box createElement with local variable (CC ~2.0.x)
   const inkBoxPattern =
@@ -342,6 +357,19 @@ export const findBoxComponent = (fileContents: string): string | undefined => {
   const memoBoxMatch = fileContents.match(memoBoxPattern);
   if (memoBoxMatch) {
     return memoBoxMatch[1];
+  }
+
+  // Method 5: Find Box by rest-style layout defaults (CC 2.1.138+)
+  // Avoid ScrollBox-like wrappers by requiring generic Box layout defaults,
+  // integer style warnings, forwarded children, and no sticky/scroll behavior.
+  const restStyleBoxPattern =
+    /function ([$\w]+)\(\{children:([$\w]+),ref:[$\w]+.{0,600}?\.\.\.([$\w]+)\}\)\{.{0,2500}?"margin".{0,2500}?"padding".{0,1200}?"gap".{0,1200}?\3\.flexWrap\?\?="nowrap",\3\.flexDirection\?\?="row",\3\.flexGrow\?\?=0,\3\.flexShrink\?\?=1,\3\.overflowX=\3\.overflowX\?\?\3\.overflow\?\?"visible",\3\.overflowY=\3\.overflowY\?\?\3\.overflow\?\?"visible",[$\w]+(?:\.default)?\.createElement\("ink-box",\{[^}]*style:\3\},\2\)/;
+  const restStyleBoxMatch = fileContents.match(restStyleBoxPattern);
+  if (restStyleBoxMatch) {
+    return (
+      findThemedBoxWrapper(fileContents, restStyleBoxMatch[1]) ??
+      restStyleBoxMatch[1]
+    );
   }
 
   console.error(
