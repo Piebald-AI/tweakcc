@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v4.0.14](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.14) - 2026-06-03
+
+- Fix patches for Claude Code 2.1.160+ (#761) - @basekevin
+
 ## [v4.0.13](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.13) - 2026-05-10
 
 - Fixed patchesAppliedIndicator patch (#713) - @risenowrise
