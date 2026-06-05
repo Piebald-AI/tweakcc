@@ -146,6 +146,31 @@ function getThemesLocation(oldFile: string): {
   };
 }
 
+function patchThemeSchema(file: string, themes: Theme[]): string {
+  if (themes.length === 0) return file;
+
+  const customStr = themes.map(t => `"${t.id}"`).join(',');
+
+  const anchor = '"dark","light","light-daltonized","dark-daltonized"';
+  const anchorIdx = file.indexOf(anchor);
+  if (anchorIdx === -1) {
+    console.warn(
+      'patch: themes: settings schema enum not found — custom theme IDs may be flagged invalid in settings.json'
+    );
+    return file;
+  }
+
+  const openBracket = file.lastIndexOf('[', anchorIdx);
+  if (openBracket === -1) return file;
+  const closeBracket = file.indexOf(']', anchorIdx);
+  if (closeBracket === -1) return file;
+
+  const original = file.slice(openBracket, closeBracket + 1);
+  const extended = original.slice(0, -1) + ',' + customStr + ']';
+
+  return file.slice(0, openBracket) + extended + file.slice(closeBracket + 1);
+}
+
 export const writeThemes = (
   oldFile: string,
   themes: Theme[]
@@ -223,6 +248,8 @@ export const writeThemes = (
     locations.switchStatement.startIndex,
     locations.switchStatement.endIndex
   );
+
+  newFile = patchThemeSchema(newFile, themes);
 
   return newFile;
 };
