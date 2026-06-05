@@ -75,6 +75,7 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
+import { writeKeybindingCustomization } from './keybindingCustomization';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -175,6 +176,13 @@ const PATCH_DEFINITIONS = [
     name: `Statusline update throttling correction`,
     group: PatchGroup.ALWAYS_APPLIED,
     description: `Statusline updates will be properly throttled instead of queued (or debounced)`,
+  },
+  {
+    id: 'keybinding-customization',
+    name: 'Keybinding customization',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description:
+      'Force-enable custom keybindings when CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1',
   },
   // Misc Configurable
   {
@@ -690,6 +698,9 @@ export const applyCustomization = async (
           config.settings.misc?.statuslineUseFixedInterval ?? false
         ),
       condition: config.settings.misc?.statuslineThrottleMs != null,
+    },
+    'keybinding-customization': {
+      fn: c => writeKeybindingCustomization(c),
     },
     // Misc Configurable
     'patches-applied-indication': {
