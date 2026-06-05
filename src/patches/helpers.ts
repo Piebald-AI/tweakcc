@@ -298,11 +298,19 @@ export const findTextComponent = (fileContents: string): string | undefined => {
   const textComponentPattern =
     /\bfunction ([$\w]+).{0,30}color:[$\w]+,backgroundColor:[$\w]+,dimColor:[$\w]+(?:=![01])?,bold:[$\w]+(?:=![01])?/;
   const match = fileContents.match(textComponentPattern);
-  if (!match) {
-    console.log('patch: findTextComponent: failed to find text component');
-    return undefined;
+  if (match) {
+    return match[1];
   }
-  return match[1];
+
+  const bodyDestructurePattern =
+    /\bfunction ([$\w]+)\(([$\w]+)\)\{(?=[\s\S]{0,700}\{color:[$\w]+,backgroundColor:[$\w]+,dimColor:[$\w]+,bold:[$\w]+,italic:[$\w]+,underline:[$\w]+,strikethrough:[$\w]+,inverse:[$\w]+,wrap:[$\w]+,children:[$\w]+,[\s\S]{0,80}=\2\))(?=[\s\S]{0,1400}children:)[\s\S]{0,1600}?\}/;
+  const bodyDestructureMatch = fileContents.match(bodyDestructurePattern);
+  if (bodyDestructureMatch) {
+    return bodyDestructureMatch[1];
+  }
+
+  console.log('patch: findTextComponent: failed to find text component');
+  return undefined;
 };
 
 /**
