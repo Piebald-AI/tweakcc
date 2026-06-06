@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { writeClearScreen, patchRenderFilter } from './clearScreen';
 
 const cmds = Array.from({ length: 31 }, (_, i) => `c${i}`).join(',');
-const slashCommandArray = `=>[${cmds}]`;
+const slashCommandArray =
+  'var Cmd0={type:"local",name:"clear",description:"Clear"};' +
+  `Cmds=memo9(()=>[${cmds},...Fa?[Fa]:[]])`;
 
 const renderFilter =
   'function g97(H,$){if(H.type!=="user")return!0;if(H.isMeta){if(H.origin?.kind==="channel")return!0;return!1}if(H.isVisibleInTranscriptOnly&&!$)return!1;return!0}';
@@ -11,8 +13,9 @@ const renderFilter =
 const makeInput = (delimiter = ';') =>
   'const x=1;' +
   renderFilter +
+  ';' +
   slashCommandArray +
-  `${delimiter}let Z=G_H.useCallback(()=>{Nw.get(process.stdout)?.forceRedraw()})`;
+  `${delimiter}function cHz(){Nw.get(process.stdout)?.forceRedraw()}`;
 
 describe('clearScreen', () => {
   it('exposes forceRedraw and registers /clear-screen command', () => {
@@ -47,12 +50,12 @@ describe('clearScreen', () => {
     );
   });
 
-  it('preserves original app:redraw callback', () => {
+  it('preserves original forceRedraw function', () => {
     const result = writeClearScreen(makeInput());
 
     expect(result).not.toBeNull();
     expect(result).toContain(
-      'let Z=G_H.useCallback(()=>{Nw.get(process.stdout)?.forceRedraw()})'
+      'function cHz(){Nw.get(process.stdout)?.forceRedraw()}'
     );
   });
 
@@ -63,7 +66,7 @@ describe('clearScreen', () => {
     expect(result).toBe(input);
   });
 
-  it('returns null when app:redraw callback not found', () => {
+  it('returns null when forceRedraw function not found', () => {
     const result = writeClearScreen('const x=1;');
 
     expect(result).toBeNull();
@@ -71,15 +74,15 @@ describe('clearScreen', () => {
 
   it('returns null when render filter not found', () => {
     const input =
-      'const x=1' +
+      'const x=1;' +
       slashCommandArray +
-      ';let Z=G_H.useCallback(()=>{Nw.get(process.stdout)?.forceRedraw()})';
+      ';function cHz(){Nw.get(process.stdout)?.forceRedraw()}';
     const result = writeClearScreen(input);
 
     expect(result).toBeNull();
   });
 
-  it('works with different delimiters before useCallback', () => {
+  it('works with different delimiters before forceRedraw function', () => {
     for (const d of [',', ';', '}', '{']) {
       const result = writeClearScreen(makeInput(d));
       expect(result).not.toBeNull();
