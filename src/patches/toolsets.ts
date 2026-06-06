@@ -61,17 +61,21 @@ export const findSelectComponentName = (
 const getToolsetFallbackExpression = (
   stateExpression: string,
   defaultToolset: string | null,
+  acceptEditsToolset?: string | null,
   planModeToolset?: string | null
 ): string => {
   const defaultValue = defaultToolset
     ? JSON.stringify(defaultToolset)
     : 'undefined';
+  const acceptEditsValue = acceptEditsToolset
+    ? JSON.stringify(acceptEditsToolset)
+    : defaultValue;
   const planValue = planModeToolset
     ? JSON.stringify(planModeToolset)
     : defaultValue;
 
-  if (planModeToolset) {
-    return `${stateExpression}.toolPermissionContext?.mode!=="plan"&&${stateExpression}.toolsetAutoMode==="plan"?${defaultValue}:(${stateExpression}.toolset??(${stateExpression}.toolPermissionContext?.mode==="plan"?${planValue}:${defaultValue}))`;
+  if (acceptEditsToolset || planModeToolset) {
+    return `${stateExpression}.toolPermissionContext?.mode!=="plan"&&${stateExpression}.toolsetAutoMode==="plan"?${defaultValue}:(${stateExpression}.toolset??(${stateExpression}.toolPermissionContext?.mode==="plan"?${planValue}:(${stateExpression}.toolPermissionContext?.mode==="acceptEdits"?${acceptEditsValue}:${defaultValue})))`;
   }
 
   return `${stateExpression}.toolset??${defaultValue}`;
@@ -334,6 +338,7 @@ export const writeToolFetchingUseMemo = (
   oldFile: string,
   toolsets: Toolset[],
   defaultToolset: string | null,
+  acceptEditsToolset?: string | null,
   planModeToolset?: string | null
 ): string | null => {
   const stateInfo = getAppStateSelectorAndUseState(oldFile);
@@ -374,6 +379,7 @@ export const writeToolFetchingUseMemo = (
   const fallback = getToolsetFallbackExpression(
     'state',
     defaultToolset,
+    acceptEditsToolset,
     planModeToolset
   );
 
@@ -424,6 +430,7 @@ export const writeComputeToolsFilter = (
   oldFile: string,
   toolsets: Toolset[],
   defaultToolset: string | null,
+  acceptEditsToolset?: string | null,
   planModeToolset?: string | null
 ): string | null => {
   const stateInfo = getAppStateSelectorAndUseState(oldFile);
@@ -477,6 +484,7 @@ export const writeComputeToolsFilter = (
   const fallback = getToolsetFallbackExpression(
     stateVar,
     defaultToolset,
+    acceptEditsToolset,
     planModeToolset
   );
 
@@ -521,6 +529,7 @@ export const writePrintToolsFilter = (
   oldFile: string,
   toolsets: Toolset[],
   defaultToolset: string | null,
+  acceptEditsToolset?: string | null,
   planModeToolset?: string | null
 ): string | null => {
   const toolsetsJSON = JSON.stringify(
@@ -534,6 +543,7 @@ export const writePrintToolsFilter = (
   const fallback = getToolsetFallbackExpression(
     's',
     defaultToolset,
+    acceptEditsToolset,
     planModeToolset
   );
 
@@ -813,6 +823,7 @@ export const writeToolsetComponentDefinition = (
   oldFile: string,
   toolsets: Toolset[],
   defaultToolset: string | null,
+  acceptEditsToolset?: string | null,
   planModeToolset?: string | null
 ): string | null => {
   const insertionPoint = findTopLevelPositionBeforeSlashCommand(oldFile);
@@ -883,6 +894,7 @@ export const writeToolsetComponentDefinition = (
   const fallback = getToolsetFallbackExpression(
     'state',
     defaultToolset,
+    acceptEditsToolset,
     planModeToolset
   );
 
@@ -1021,6 +1033,7 @@ export const findShiftTabAppStateVarInsertionPoint = (
 export const insertShiftTabAppStateVar = (
   oldFile: string,
   defaultToolset: string | null,
+  acceptEditsToolset?: string | null,
   planModeToolset?: string | null
 ): string | null => {
   const insertionPoint = findShiftTabAppStateVarInsertionPoint(oldFile);
@@ -1043,6 +1056,7 @@ export const insertShiftTabAppStateVar = (
   const fallback = getToolsetFallbackExpression(
     'state',
     defaultToolset,
+    acceptEditsToolset,
     planModeToolset
   );
   const codeToInsert = `let currentToolset=${appStateUseSelectorFn}(state => ${fallback});`;
@@ -1208,6 +1222,7 @@ export const findToolChangeComponentScope = (
 export const addCurrentToolsetAtToolChangeComponentScope = (
   oldFile: string,
   defaultToolset: string | null,
+  acceptEditsToolset?: string | null,
   planModeToolset?: string | null
 ): string | null => {
   const scopeIndex = findToolChangeComponentScope(oldFile);
@@ -1227,6 +1242,7 @@ export const addCurrentToolsetAtToolChangeComponentScope = (
   const fallback = getToolsetFallbackExpression(
     'state',
     defaultToolset,
+    acceptEditsToolset,
     planModeToolset
   );
 
@@ -1274,8 +1290,9 @@ export const findModeChange = (
  */
 export const writeModeChangeUpdateToolset = (
   oldFile: string,
-  planModeToolset: string,
-  defaultToolset: string
+  defaultToolset: string,
+  acceptEditsToolset: string,
+  planModeToolset: string
 ): string | null => {
   const modeChangeResult = findModeChange(oldFile);
   if (!modeChangeResult) {
@@ -1285,7 +1302,7 @@ export const writeModeChangeUpdateToolset = (
   const { index: modeChangeIndex, modeVar, setStateVar } = modeChangeResult;
 
   // Build the injection code using setState directly
-  const injectionCode = `if(${modeVar}==="plan"){${setStateVar}((prev)=>({...prev,toolset:${JSON.stringify(planModeToolset)},toolsetAutoMode:"plan"}));}else{${setStateVar}((prev)=>({...prev,toolset:${JSON.stringify(defaultToolset)},toolsetAutoMode:null}));}`;
+  const injectionCode = `if(${modeVar}==="plan"){${setStateVar}((prev)=>({...prev,toolset:${JSON.stringify(planModeToolset)},toolsetAutoMode:"plan"}));}else if(${modeVar}==="acceptEdits"){${setStateVar}((prev)=>({...prev,toolset:${JSON.stringify(acceptEditsToolset)},toolsetAutoMode:null}));}else{${setStateVar}((prev)=>({...prev,toolset:${JSON.stringify(defaultToolset)},toolsetAutoMode:null}));}`;
 
   // Inject right before the mode change
   const newFile =
@@ -1306,13 +1323,15 @@ export const writeModeChangeUpdateToolset = (
  * Apply all toolset patches to the file
  * @param oldFile - The file content to patch
  * @param toolsets - Array of toolset configurations
- * @param defaultToolset - The default toolset name (or null)
+ * @param defaultToolset - Optional toolset to use in default Shift+Tab mode
+ * @param acceptEditsToolset - Optional toolset to use in accept-edits Shift+Tab mode
  * @param planModeToolset - Optional toolset to switch to when entering plan mode
  */
 export const writeToolsets = (
   oldFile: string,
   toolsets: Toolset[],
   defaultToolset: string | null,
+  acceptEditsToolset?: string | null,
   planModeToolset?: string | null
 ): string | null => {
   // Return if no toolsets are configured
@@ -1336,6 +1355,7 @@ export const writeToolsets = (
     result,
     toolsets,
     defaultToolset,
+    acceptEditsToolset,
     planModeToolset
   );
   if (!result) {
@@ -1348,6 +1368,7 @@ export const writeToolsets = (
     result,
     toolsets,
     defaultToolset,
+    acceptEditsToolset,
     planModeToolset
   );
   if (!result) {
@@ -1360,6 +1381,7 @@ export const writeToolsets = (
     result,
     toolsets,
     defaultToolset,
+    acceptEditsToolset,
     planModeToolset
   );
   if (!result) {
@@ -1385,6 +1407,7 @@ export const writeToolsets = (
     result,
     toolsets,
     defaultToolset,
+    acceptEditsToolset,
     planModeToolset
   );
   if (!result) {
@@ -1404,7 +1427,12 @@ export const writeToolsets = (
   }
 
   // Step 5: Insert state getter in statusline component
-  result = insertShiftTabAppStateVar(result, defaultToolset, planModeToolset);
+  result = insertShiftTabAppStateVar(
+    result,
+    defaultToolset,
+    acceptEditsToolset,
+    planModeToolset
+  );
   if (!result) {
     console.error('patch: toolsets: step 5 failed (insertShiftTabAppStateVar)');
     return null;
@@ -1429,12 +1457,16 @@ export const writeToolsets = (
   }
 
   // Step 8: Mode-change toolset switching (optional)
-  if (planModeToolset && defaultToolset) {
+  if (defaultToolset && (acceptEditsToolset || planModeToolset)) {
+    const effectiveAcceptEditsToolset = acceptEditsToolset ?? defaultToolset;
+    const effectivePlanModeToolset = planModeToolset ?? defaultToolset;
+
     // First, add setState access at the tool change component scope
     result = addCurrentToolsetAtToolChangeComponentScope(
       result,
       defaultToolset,
-      planModeToolset
+      effectiveAcceptEditsToolset,
+      effectivePlanModeToolset
     );
     if (!result) {
       console.error(
@@ -1446,8 +1478,9 @@ export const writeToolsets = (
     // Then, inject the mode change toolset switching code
     result = writeModeChangeUpdateToolset(
       result,
-      planModeToolset,
-      defaultToolset
+      defaultToolset,
+      effectiveAcceptEditsToolset,
+      effectivePlanModeToolset
     );
     if (!result) {
       console.error(

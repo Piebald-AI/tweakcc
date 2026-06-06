@@ -15,7 +15,13 @@ interface ToolsetsViewProps {
 
 export function ToolsetsView({ onBack }: ToolsetsViewProps) {
   const {
-    settings: { toolsets, defaultToolset, planModeToolset, themes },
+    settings: {
+      toolsets,
+      defaultToolset,
+      acceptEditsToolset,
+      planModeToolset,
+      themes,
+    },
     updateSettings,
   } = useContext(SettingsContext);
 
@@ -57,6 +63,10 @@ export function ToolsetsView({ onBack }: ToolsetsViewProps) {
       if (settings.defaultToolset === toolsetToDelete.name) {
         settings.defaultToolset = null;
       }
+      // Clear accept edits if we're deleting the accept edits toolset
+      if (settings.acceptEditsToolset === toolsetToDelete.name) {
+        settings.acceptEditsToolset = null;
+      }
       // Clear plan mode if we're deleting the plan mode toolset
       if (settings.planModeToolset === toolsetToDelete.name) {
         settings.planModeToolset = null;
@@ -72,6 +82,13 @@ export function ToolsetsView({ onBack }: ToolsetsViewProps) {
     const toolset = toolsets[index];
     updateSettings(settings => {
       settings.defaultToolset = toolset.name;
+    });
+  };
+
+  const handleSetAcceptEditsToolset = (index: number) => {
+    const toolset = toolsets[index];
+    updateSettings(settings => {
+      settings.acceptEditsToolset = toolset.name;
     });
   };
 
@@ -99,6 +116,8 @@ export function ToolsetsView({ onBack }: ToolsetsViewProps) {
         handleDeleteToolset(selectedIndex);
       } else if (input === 'd' && toolsets.length > 0) {
         handleSetDefaultToolset(selectedIndex);
+      } else if (input === 'a' && toolsets.length > 0) {
+        handleSetAcceptEditsToolset(selectedIndex);
       } else if (input === 'p' && toolsets.length > 0) {
         handleSetPlanModeToolset(selectedIndex);
       }
@@ -135,7 +154,10 @@ export function ToolsetsView({ onBack }: ToolsetsViewProps) {
       <Box marginBottom={1} flexDirection="column">
         <Text dimColor>n to create a new toolset</Text>
         {toolsets.length > 0 && (
-          <Text dimColor>d to set as default toolset</Text>
+          <Text dimColor>d to set as default mode toolset</Text>
+        )}
+        {toolsets.length > 0 && (
+          <Text dimColor>a to set as accept edits toolset</Text>
         )}
         {toolsets.length > 0 && (
           <Text dimColor>p to set as plan mode toolset</Text>
@@ -151,6 +173,7 @@ export function ToolsetsView({ onBack }: ToolsetsViewProps) {
         <Box flexDirection="column">
           {toolsets.map((toolset, index) => {
             const isDefault = toolset.name === defaultToolset;
+            const isAcceptEdits = toolset.name === acceptEditsToolset;
             const isPlanMode = toolset.name === planModeToolset;
             const isSelected = selectedIndex === index;
 
@@ -171,7 +194,8 @@ export function ToolsetsView({ onBack }: ToolsetsViewProps) {
                   ({getToolsetDescription(toolset)})
                 </Text>
 
-                {isDefault && (
+                {isDefault && <Text color={lineColor}> default</Text>}
+                {isAcceptEdits && (
                   <Text color={autoAcceptColor}> ⏵⏵ accept edits</Text>
                 )}
                 {isPlanMode && <Text color={planModeColor}> ⏸ plan mode</Text>}

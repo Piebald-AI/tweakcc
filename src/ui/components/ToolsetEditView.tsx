@@ -68,6 +68,9 @@ export function ToolsetEditView({
           if (settings.defaultToolset === oldName) {
             settings.defaultToolset = name;
           }
+          if (settings.acceptEditsToolset === oldName) {
+            settings.acceptEditsToolset = name;
+          }
           if (settings.planModeToolset === oldName) {
             settings.planModeToolset = name;
           }

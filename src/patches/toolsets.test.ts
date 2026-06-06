@@ -16,6 +16,7 @@ import { Toolset } from '../types';
 
 const toolsets: Toolset[] = [
   { name: 'default', allowedTools: ['Read'] },
+  { name: 'accept-only', allowedTools: ['Edit'] },
   { name: 'plan-only', allowedTools: ['TodoWrite'] },
 ];
 
@@ -36,10 +37,10 @@ const computeToolsInput =
   `return resolve(agent,${mergedToolsVar},!1,!0).resolvedTools}`;
 
 const modeAwareFallback =
-  'state.toolPermissionContext?.mode!=="plan"&&state.toolsetAutoMode==="plan"?"default":(state.toolset??(state.toolPermissionContext?.mode==="plan"?"plan-only":"default"))';
-const computeModeAwareFallback = `${appStateVar}.toolPermissionContext?.mode!=="plan"&&${appStateVar}.toolsetAutoMode==="plan"?"default":(${appStateVar}.toolset??(${appStateVar}.toolPermissionContext?.mode==="plan"?"plan-only":"default"))`;
+  'state.toolPermissionContext?.mode!=="plan"&&state.toolsetAutoMode==="plan"?"default":(state.toolset??(state.toolPermissionContext?.mode==="plan"?"plan-only":(state.toolPermissionContext?.mode==="acceptEdits"?"accept-only":"default")))';
+const computeModeAwareFallback = `${appStateVar}.toolPermissionContext?.mode!=="plan"&&${appStateVar}.toolsetAutoMode==="plan"?"default":(${appStateVar}.toolset??(${appStateVar}.toolPermissionContext?.mode==="plan"?"plan-only":(${appStateVar}.toolPermissionContext?.mode==="acceptEdits"?"accept-only":"default")))`;
 const printModeAwareFallback =
-  's.toolPermissionContext?.mode!=="plan"&&s.toolsetAutoMode==="plan"?"default":(s.toolset??(s.toolPermissionContext?.mode==="plan"?"plan-only":"default"))';
+  's.toolPermissionContext?.mode!=="plan"&&s.toolsetAutoMode==="plan"?"default":(s.toolset??(s.toolPermissionContext?.mode==="plan"?"plan-only":(s.toolPermissionContext?.mode==="acceptEdits"?"accept-only":"default")))';
 
 describe('toolsets missing state.toolset fallback', () => {
   it('uses the mode-aware fallback in UI tool filtering', () => {
@@ -51,6 +52,7 @@ describe('toolsets missing state.toolset fallback', () => {
       file,
       toolsets,
       'default',
+      'accept-only',
       'plan-only'
     );
 
@@ -63,6 +65,7 @@ describe('toolsets missing state.toolset fallback', () => {
       computeToolsInput,
       toolsets,
       'default',
+      'accept-only',
       'plan-only'
     );
 
@@ -78,6 +81,7 @@ describe('toolsets missing state.toolset fallback', () => {
       file,
       toolsets,
       'default',
+      'accept-only',
       'plan-only'
     );
 
@@ -101,6 +105,7 @@ describe('toolsets missing state.toolset fallback', () => {
       file,
       toolsets,
       'default',
+      'accept-only',
       'plan-only'
     );
 
@@ -123,6 +128,7 @@ describe('toolsets missing state.toolset fallback', () => {
       file,
       toolsets,
       'default',
+      'accept-only',
       'plan-only'
     );
 
@@ -148,6 +154,7 @@ describe('toolsets missing state.toolset fallback', () => {
       file,
       toolsets,
       'default',
+      'accept-only',
       'plan-only'
     );
 
@@ -171,6 +178,7 @@ describe('toolsets missing state.toolset fallback', () => {
       file,
       toolsets,
       'default',
+      'accept-only',
       'plan-only'
     );
 
@@ -188,7 +196,12 @@ describe('toolsets missing state.toolset fallback', () => {
       appStateAccessors +
       'function Status(p){return render({color:"bashBorder"},"! for shell mode")}';
 
-    const result = insertShiftTabAppStateVar(file, 'default', 'plan-only');
+    const result = insertShiftTabAppStateVar(
+      file,
+      'default',
+      'accept-only',
+      'plan-only'
+    );
 
     expect(result).not.toBeNull();
     expect(result).toContain(
@@ -204,6 +217,7 @@ describe('toolsets missing state.toolset fallback', () => {
     const result = addCurrentToolsetAtToolChangeComponentScope(
       file,
       'default',
+      'accept-only',
       'plan-only'
     );
 
@@ -215,14 +229,21 @@ describe('toolsets missing state.toolset fallback', () => {
 });
 
 describe('writeModeChangeUpdateToolset', () => {
-  it('marks plan toolset as auto-selected only on automatic mode changes', () => {
+  it('switches default, accept edits, and plan modes independently', () => {
     const input =
       'if(setState((prev)=>({...prev,toolPermissionContext:{...prev.toolPermissionContext,mode:nextMode}}))){}';
 
-    const result = writeModeChangeUpdateToolset(input, 'plan-only', 'default');
+    const result = writeModeChangeUpdateToolset(
+      input,
+      'default',
+      'accept-only',
+      'plan-only'
+    );
 
     expect(result).not.toBeNull();
     expect(result).toContain('toolset:"plan-only",toolsetAutoMode:"plan"');
+    expect(result).toContain('nextMode==="acceptEdits"');
+    expect(result).toContain('toolset:"accept-only",toolsetAutoMode:null');
     expect(result).toContain('toolset:"default",toolsetAutoMode:null');
   });
 });
@@ -300,6 +321,7 @@ describe('writeComputeToolsFilter', () => {
       computeToolsInput,
       toolsets,
       'default',
+      'accept-only',
       'plan-only'
     );
 
@@ -312,6 +334,7 @@ describe('writeComputeToolsFilter', () => {
       computeToolsInput,
       toolsets,
       'default',
+      'accept-only',
       'plan-only'
     );
 
