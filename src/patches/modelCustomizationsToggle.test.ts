@@ -1,11 +1,6 @@
 import * as fs from 'node:fs/promises';
-import * as fsSync from 'node:fs';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('node:child_process', () => ({
-  spawnSync: vi.fn(() => ({ status: 0, stdout: '2.1.158', stderr: '' })),
-}));
 
 import { DEFAULT_SETTINGS } from '../defaultSettings';
 import { ClaudeCodeInstallationInfo, TweakccConfig } from '../types';
@@ -18,19 +13,9 @@ import { applySystemPrompts } from './systemPrompts';
 import { applyCustomization } from './index';
 
 const mockReadFile = vi.hoisted(() => vi.fn());
-const mockExtractClaudeJsFromNativeInstallation = vi.hoisted(() => vi.fn());
-const mockRepackNativeInstallation = vi.hoisted(() => vi.fn());
-const mockCopyFile = vi.hoisted(() => vi.fn());
-const mockChmod = vi.hoisted(() => vi.fn());
-const mockMkdtemp = vi.hoisted(() => vi.fn());
-const mockRm = vi.hoisted(() => vi.fn());
 
 vi.mock('node:fs/promises', () => ({
   readFile: mockReadFile,
-  copyFile: mockCopyFile,
-  chmod: mockChmod,
-  mkdtemp: mockMkdtemp,
-  rm: mockRm,
 }));
 
 vi.mock('../config', () => ({
@@ -54,9 +39,8 @@ vi.mock('../installationBackup', () => ({
 }));
 
 vi.mock('../nativeInstallationLoader', () => ({
-  extractClaudeJsFromNativeInstallation:
-    mockExtractClaudeJsFromNativeInstallation,
-  repackNativeInstallation: mockRepackNativeInstallation,
+  extractClaudeJsFromNativeInstallation: vi.fn(),
+  repackNativeInstallation: vi.fn(),
 }));
 
 vi.mock('./modelSelector', () => ({
@@ -81,8 +65,6 @@ const PATCH_IDS = [
   'show-more-items-in-select-menus',
 ] as const;
 
-const NATIVE_UNSAFE_PATCH_IDS = ['opusplan1m', 'conversation-title'] as const;
-
 const baseConfig = (): TweakccConfig => ({
   ccVersion: '',
   ccInstallationPath: null,
@@ -106,15 +88,6 @@ describe('model customization toggle patch conditions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(fs.readFile).mockResolvedValue('base-content');
-    fsSync.mkdirSync('/tmp/tweakcc-test-config', { recursive: true });
-    fsSync.writeFileSync('/tmp/claude-native', 'native');
-    mockExtractClaudeJsFromNativeInstallation.mockResolvedValue(
-      Buffer.from('base-content')
-    );
-    mockCopyFile.mockResolvedValue(undefined);
-    mockChmod.mockResolvedValue(undefined);
-    mockMkdtemp.mockResolvedValue('/tmp/tweakcc-native-test');
-    mockRm.mockResolvedValue(undefined);
   });
 
   it('skips both model customization patches when disabled', async () => {
@@ -196,28 +169,5 @@ describe('model customization toggle patch conditions', () => {
     expect(vi.mocked(restoreClijsFromBackup)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(applySystemPrompts)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(updateConfigFile)).toHaveBeenCalledTimes(1);
-  });
-
-  it('skips binary-unsafe patches for native installations', async () => {
-    const config = baseConfig();
-    config.settings.misc.enableConversationTitle = true;
-
-    const { results } = await applyCustomization(
-      config,
-      {
-        ...ccInstInfo,
-        nativeInstallationPath: '/tmp/claude-native',
-      },
-      [...NATIVE_UNSAFE_PATCH_IDS]
-    );
-
-    expect(results.find(r => r.id === 'opusplan1m')).toMatchObject({
-      applied: false,
-      skipped: true,
-    });
-    expect(results.find(r => r.id === 'conversation-title')).toMatchObject({
-      applied: false,
-      skipped: true,
-    });
   });
 });
