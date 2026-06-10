@@ -4,6 +4,7 @@ import {
   addCurrentToolsetAtToolChangeComponentScope,
   findSelectComponentName,
   insertShiftTabAppStateVar,
+  writeToolsetFieldToAppState,
   appendToolsetToModeDisplay,
   writeComputeToolsFilter,
   writePrintToolsFilter,
@@ -37,11 +38,15 @@ const computeToolsInput =
   `if(!agent)return ${mergedToolsVar};` +
   `return resolve(agent,${mergedToolsVar},!1,!0).resolvedTools}`;
 
-const modeAwareFallback =
-  'state.toolPermissionContext?.mode!=="plan"&&state.toolsetAutoMode==="plan"?"default":(state.toolset??(state.toolPermissionContext?.mode==="plan"?"plan-only":(state.toolPermissionContext?.mode==="acceptEdits"?"accept-only":"default")))';
-const computeModeAwareFallback = `${appStateVar}.toolPermissionContext?.mode!=="plan"&&${appStateVar}.toolsetAutoMode==="plan"?"default":(${appStateVar}.toolset??(${appStateVar}.toolPermissionContext?.mode==="plan"?"plan-only":(${appStateVar}.toolPermissionContext?.mode==="acceptEdits"?"accept-only":"default")))`;
-const printModeAwareFallback =
-  's.toolPermissionContext?.mode!=="plan"&&s.toolsetAutoMode==="plan"?"default":(s.toolset??(s.toolPermissionContext?.mode==="plan"?"plan-only":(s.toolPermissionContext?.mode==="acceptEdits"?"accept-only":"default")))';
+const envDefault = '(process.env.TWEAKCC_TOOLSET_DEFAULT||"default")';
+const envAccept = '(process.env.TWEAKCC_TOOLSET_ALLOW_EDITS||"accept-only")';
+const envPlan = '(process.env.TWEAKCC_TOOLSET_PLAN||"plan-only")';
+const envAuto = `(process.env.TWEAKCC_TOOLSET_AUTO||${envDefault})`;
+const fallbackFor = (s: string): string =>
+  `${s}.toolPermissionContext?.mode!=="plan"&&${s}.toolsetAutoMode==="plan"?${envDefault}:(${s}.toolset??(${s}.toolPermissionContext?.mode==="plan"?${envPlan}:(${s}.toolPermissionContext?.mode==="acceptEdits"?${envAccept}:(${s}.toolPermissionContext?.mode==="auto"?${envAuto}:${envDefault}))))`;
+const modeAwareFallback = fallbackFor('state');
+const computeModeAwareFallback = fallbackFor(appStateVar);
+const printModeAwareFallback = fallbackFor('s');
 
 describe('toolsets missing state.toolset fallback', () => {
   it('uses the mode-aware fallback in UI tool filtering', () => {
@@ -219,6 +224,18 @@ describe('toolsets missing state.toolset fallback', () => {
     );
   });
 
+  it('initializes app state toolset as undefined so the mode binding applies at load', () => {
+    const file = 'state={thinkingEnabled:FDH(),promptSuggestionEnabled:rX()}';
+
+    const result = writeToolsetFieldToAppState(file);
+
+    expect(result).not.toBeNull();
+    expect(result).toContain(
+      'thinkingEnabled:FDH(),toolset:undefined,toolsetAutoMode:null'
+    );
+    expect(result).not.toContain('toolset:"');
+  });
+
   it('appends the live toolset to every mode display site', () => {
     const file =
       'let k6=el(y,{},sym(mode)," ",title(mode).toLowerCase()," on",hint);' +
@@ -267,10 +284,20 @@ describe('writeModeChangeUpdateToolset', () => {
     );
 
     expect(result).not.toBeNull();
-    expect(result).toContain('toolset:"plan-only",toolsetAutoMode:"plan"');
+    expect(result).toContain(
+      'toolset:process.env.TWEAKCC_TOOLSET_PLAN||"plan-only",toolsetAutoMode:"plan"'
+    );
     expect(result).toContain('nextMode==="acceptEdits"');
-    expect(result).toContain('toolset:"accept-only",toolsetAutoMode:null');
-    expect(result).toContain('toolset:"default",toolsetAutoMode:null');
+    expect(result).toContain(
+      'toolset:process.env.TWEAKCC_TOOLSET_ALLOW_EDITS||"accept-only",toolsetAutoMode:null'
+    );
+    expect(result).toContain('nextMode==="auto"');
+    expect(result).toContain(
+      'toolset:process.env.TWEAKCC_TOOLSET_AUTO||process.env.TWEAKCC_TOOLSET_DEFAULT||"default",toolsetAutoMode:null'
+    );
+    expect(result).toContain(
+      'toolset:process.env.TWEAKCC_TOOLSET_DEFAULT||"default",toolsetAutoMode:null'
+    );
   });
 });
 
@@ -355,7 +382,7 @@ describe('writeComputeToolsFilter', () => {
     expect(result).toContain(`if(!agent)return __tf(${mergedToolsVar});`);
   });
 
-  it('preserves native resolved tools for active agents', () => {
+  it('preserves declared agent tools but filters undeclared agents', () => {
     const result = writeComputeToolsFilter(
       computeToolsInput,
       toolsets,
@@ -366,7 +393,7 @@ describe('writeComputeToolsFilter', () => {
 
     expect(result).not.toBeNull();
     expect(result).toContain(
-      `return resolve(agent,${mergedToolsVar},!1,!0).resolvedTools`
+      `return resolve(agent,agent.tools?${mergedToolsVar}:__tf(${mergedToolsVar}),!1,!0).resolvedTools`
     );
     expect(result).not.toContain(
       `return __tf(resolve(agent,${mergedToolsVar},!1,!0).resolvedTools)`

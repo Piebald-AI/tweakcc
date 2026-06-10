@@ -64,21 +64,21 @@ const getToolsetFallbackExpression = (
   acceptEditsToolset?: string | null,
   planModeToolset?: string | null
 ): string => {
-  const defaultValue = defaultToolset
-    ? JSON.stringify(defaultToolset)
-    : 'undefined';
-  const acceptEditsValue = acceptEditsToolset
-    ? JSON.stringify(acceptEditsToolset)
-    : defaultValue;
-  const planValue = planModeToolset
-    ? JSON.stringify(planModeToolset)
-    : defaultValue;
+  // Each mode binding can be forced at CC start via runtime environment
+  // variables (read by the patched cli.js, so no re-apply is needed). They
+  // override the bindings configured in the tweakcc menu (#569).
+  const defaultValue = `(process.env.TWEAKCC_TOOLSET_DEFAULT||${
+    defaultToolset ? JSON.stringify(defaultToolset) : 'undefined'
+  })`;
+  const acceptEditsValue = `(process.env.TWEAKCC_TOOLSET_ALLOW_EDITS||${
+    acceptEditsToolset ? JSON.stringify(acceptEditsToolset) : defaultValue
+  })`;
+  const planValue = `(process.env.TWEAKCC_TOOLSET_PLAN||${
+    planModeToolset ? JSON.stringify(planModeToolset) : defaultValue
+  })`;
+  const autoValue = `(process.env.TWEAKCC_TOOLSET_AUTO||${defaultValue})`;
 
-  if (acceptEditsToolset || planModeToolset) {
-    return `${stateExpression}.toolPermissionContext?.mode!=="plan"&&${stateExpression}.toolsetAutoMode==="plan"?${defaultValue}:(${stateExpression}.toolset??(${stateExpression}.toolPermissionContext?.mode==="plan"?${planValue}:(${stateExpression}.toolPermissionContext?.mode==="acceptEdits"?${acceptEditsValue}:${defaultValue})))`;
-  }
-
-  return `${stateExpression}.toolset??${defaultValue}`;
+  return `${stateExpression}.toolPermissionContext?.mode!=="plan"&&${stateExpression}.toolsetAutoMode==="plan"?${defaultValue}:(${stateExpression}.toolset??(${stateExpression}.toolPermissionContext?.mode==="plan"?${planValue}:(${stateExpression}.toolPermissionContext?.mode==="acceptEdits"?${acceptEditsValue}:(${stateExpression}.toolPermissionContext?.mode==="auto"?${autoValue}:${defaultValue}))))`;
 };
 
 /**
@@ -283,10 +283,7 @@ export const findTopLevelPositionBeforeSlashCommand = (
 /**
  * Sub-patch 1: Add toolset field to app state initialization
  */
-export const writeToolsetFieldToAppState = (
-  oldFile: string,
-  defaultToolset: string | null
-): string | null => {
+export const writeToolsetFieldToAppState = (oldFile: string): string | null => {
   // Find all occurrences of thinkingEnabled:SOMETHING()
   const thinkingEnabledPattern = /thinkingEnabled:([$\w]+)\(\)/g;
   const matches = Array.from(oldFile.matchAll(thinkingEnabledPattern));
@@ -310,10 +307,12 @@ export const writeToolsetFieldToAppState = (
 
   // Apply modifications
   let newFile = oldFile;
-  const toolsetValue = defaultToolset
-    ? JSON.stringify(defaultToolset)
-    : 'undefined';
-  const textToInsert = `,toolset:${toolsetValue},toolsetAutoMode:null`;
+  // Initialize toolset to undefined (NOT the default toolset name): every
+  // read site uses `state.toolset ?? <mode-aware fallback>`, so a non-null
+  // initial value would short-circuit the fallback and the toolset bound to
+  // the startup permission mode (e.g. --permission-mode plan) would never
+  // apply at load (#569). Shift+Tab and /toolset set it explicitly later.
+  const textToInsert = `,toolset:undefined,toolsetAutoMode:null`;
   for (const mod of modifications) {
     newFile =
       newFile.slice(0, mod.index) + textToInsert + newFile.slice(mod.index);
@@ -504,8 +503,11 @@ export const writeComputeToolsFilter = (
   }
   const initVar = mergeCallMatch[1];
 
-  // Set globalThis.__tweakcc_toolset so the error message helper can read it
-  const newClosure = `${closureVar}=${useCallbackPrefix}()=>{let ${stateVar}=${storeVar}.getState(),${assembledVar}=${assembleFn}(${stateVar}.toolPermissionContext,${stateVar}.mcp.tools${skillToolsArg}),${mergedVar}=${mergeFn}(${initVar},${assembledVar},${stateVar}.toolPermissionContext.mode);const __ts=${toolsetsJSON},__tc=${fallback},__tf=(t)=>{globalThis.__tweakcc_toolset={name:__tc,tools:__ts[__tc]};if(__ts.hasOwnProperty(__tc)){const a=__ts[__tc];if(a==="*")return t;return t.filter(d=>d.name==="Skill"||a.includes(d.name))}return t};if(!${agentVar})return __tf(${mergedVar});return ${resolveFn}(${agentVar},${mergedVar},!1,!0).resolvedTools}`;
+  // Set globalThis.__tweakcc_toolset so the error message helper can read it.
+  // Agents with an explicit `tools:` frontmatter list get the unfiltered pool
+  // (their declared tools win — #597); agents without one inherit the active
+  // toolset by resolving against the filtered pool instead of everything.
+  const newClosure = `${closureVar}=${useCallbackPrefix}()=>{let ${stateVar}=${storeVar}.getState(),${assembledVar}=${assembleFn}(${stateVar}.toolPermissionContext,${stateVar}.mcp.tools${skillToolsArg}),${mergedVar}=${mergeFn}(${initVar},${assembledVar},${stateVar}.toolPermissionContext.mode);const __ts=${toolsetsJSON},__tc=${fallback},__tf=(t)=>{globalThis.__tweakcc_toolset={name:__tc,tools:__ts[__tc]};if(__ts.hasOwnProperty(__tc)){const a=__ts[__tc];if(a==="*")return t;return t.filter(d=>d.name==="Skill"||a.includes(d.name))}return t};if(!${agentVar})return __tf(${mergedVar});return ${resolveFn}(${agentVar},${agentVar}.tools?${mergedVar}:__tf(${mergedVar}),!1,!0).resolvedTools}`;
 
   const startIndex = match.index;
   const endIndex = startIndex + fullMatch.length;
@@ -1306,8 +1308,9 @@ export const writeModeChangeUpdateToolset = (
 
   const { index: modeChangeIndex, modeVar, setStateVar } = modeChangeResult;
 
-  // Build the injection code using setState directly
-  const injectionCode = `if(${modeVar}==="plan"){${setStateVar}((prev)=>({...prev,toolset:${JSON.stringify(planModeToolset)},toolsetAutoMode:"plan"}));}else if(${modeVar}==="acceptEdits"){${setStateVar}((prev)=>({...prev,toolset:${JSON.stringify(acceptEditsToolset)},toolsetAutoMode:null}));}else{${setStateVar}((prev)=>({...prev,toolset:${JSON.stringify(defaultToolset)},toolsetAutoMode:null}));}`;
+  // Build the injection code using setState directly. Each binding can be
+  // forced at CC start via TWEAKCC_TOOLSET_* env vars (#569).
+  const injectionCode = `if(${modeVar}==="plan"){${setStateVar}((prev)=>({...prev,toolset:process.env.TWEAKCC_TOOLSET_PLAN||${JSON.stringify(planModeToolset)},toolsetAutoMode:"plan"}));}else if(${modeVar}==="acceptEdits"){${setStateVar}((prev)=>({...prev,toolset:process.env.TWEAKCC_TOOLSET_ALLOW_EDITS||${JSON.stringify(acceptEditsToolset)},toolsetAutoMode:null}));}else if(${modeVar}==="auto"){${setStateVar}((prev)=>({...prev,toolset:process.env.TWEAKCC_TOOLSET_AUTO||process.env.TWEAKCC_TOOLSET_DEFAULT||${JSON.stringify(defaultToolset)},toolsetAutoMode:null}));}else{${setStateVar}((prev)=>({...prev,toolset:process.env.TWEAKCC_TOOLSET_DEFAULT||${JSON.stringify(defaultToolset)},toolsetAutoMode:null}));}`;
 
   // Inject right before the mode change
   const newFile =
@@ -1347,7 +1350,7 @@ export const writeToolsets = (
   let result: string | null = oldFile;
 
   // Step 1: Add toolset field to app state
-  result = writeToolsetFieldToAppState(result, defaultToolset);
+  result = writeToolsetFieldToAppState(result);
   if (!result) {
     console.error(
       'patch: toolsets: step 1 failed (writeToolsetFieldToAppState)'
