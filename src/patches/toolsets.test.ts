@@ -4,6 +4,7 @@ import {
   addCurrentToolsetAtToolChangeComponentScope,
   findSelectComponentName,
   insertShiftTabAppStateVar,
+  appendToolsetToModeDisplay,
   writeComputeToolsFilter,
   writePrintToolsFilter,
   writeSubagentResolvedToolContextFix,
@@ -71,6 +72,9 @@ describe('toolsets missing state.toolset fallback', () => {
 
     expect(result).not.toBeNull();
     expect(result).toContain(computeModeAwareFallback);
+    expect(result).toContain(
+      'return t.filter(d=>d.name==="Skill"||a.includes(d.name))'
+    );
   });
 
   it('uses the mode-aware fallback in print-mode tool filtering', () => {
@@ -92,6 +96,12 @@ describe('toolsets missing state.toolset fallback', () => {
     );
     expect(result).toContain(
       'canUseTool:async(...a)=>__tptc(a[0],getState())??await allowTool(...a)'
+    );
+    expect(result).toContain(
+      'return t.filter(d=>d.name==="Skill"||a.includes(d.name))'
+    );
+    expect(result).toContain(
+      'if(tool&&tool.name!=="Skill"&&Array.isArray(a)&&!a.includes(tool.name))'
     );
   });
 
@@ -194,7 +204,7 @@ describe('toolsets missing state.toolset fallback', () => {
   it('uses the mode-aware fallback in the statusline display', () => {
     const file =
       appStateAccessors +
-      'function Status(p){return render({color:"bashBorder"},"! for shell mode")}';
+      'function Status({toolPermissionContext:permission}){return render({color:"bashBorder"},"! for shell mode")}';
 
     const result = insertShiftTabAppStateVar(
       file,
@@ -207,6 +217,22 @@ describe('toolsets missing state.toolset fallback', () => {
     expect(result).toContain(
       `let currentToolset=useAppState(state => ${modeAwareFallback});`
     );
+  });
+
+  it('appends the live toolset to every mode display site', () => {
+    const file =
+      'let k6=el(y,{},sym(mode)," ",title(mode).toLowerCase()," on",hint);' +
+      'let NH=el(y,{},sym(mode)," ",title(mode).toLowerCase()," on",chord);';
+
+    const result = appendToolsetToModeDisplay(file);
+
+    expect(result).not.toBeNull();
+    expect(result).not.toContain('.toLowerCase()," on"');
+    expect(
+      result!.match(
+        /title\(mode\)\.toLowerCase\(\),currentToolset\?` on \[\$\{currentToolset\}\]`:""/g
+      )
+    ).toHaveLength(2);
   });
 
   it('uses the mode-aware fallback in the tool-change component scope', () => {

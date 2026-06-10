@@ -505,7 +505,7 @@ export const writeComputeToolsFilter = (
   const initVar = mergeCallMatch[1];
 
   // Set globalThis.__tweakcc_toolset so the error message helper can read it
-  const newClosure = `${closureVar}=${useCallbackPrefix}()=>{let ${stateVar}=${storeVar}.getState(),${assembledVar}=${assembleFn}(${stateVar}.toolPermissionContext,${stateVar}.mcp.tools${skillToolsArg}),${mergedVar}=${mergeFn}(${initVar},${assembledVar},${stateVar}.toolPermissionContext.mode);const __ts=${toolsetsJSON},__tc=${fallback},__tf=(t)=>{globalThis.__tweakcc_toolset={name:__tc,tools:__ts[__tc]};if(__ts.hasOwnProperty(__tc)){const a=__ts[__tc];if(a==="*")return t;return t.filter(d=>a.includes(d.name))}return t};if(!${agentVar})return __tf(${mergedVar});return ${resolveFn}(${agentVar},${mergedVar},!1,!0).resolvedTools}`;
+  const newClosure = `${closureVar}=${useCallbackPrefix}()=>{let ${stateVar}=${storeVar}.getState(),${assembledVar}=${assembleFn}(${stateVar}.toolPermissionContext,${stateVar}.mcp.tools${skillToolsArg}),${mergedVar}=${mergeFn}(${initVar},${assembledVar},${stateVar}.toolPermissionContext.mode);const __ts=${toolsetsJSON},__tc=${fallback},__tf=(t)=>{globalThis.__tweakcc_toolset={name:__tc,tools:__ts[__tc]};if(__ts.hasOwnProperty(__tc)){const a=__ts[__tc];if(a==="*")return t;return t.filter(d=>d.name==="Skill"||a.includes(d.name))}return t};if(!${agentVar})return __tf(${mergedVar});return ${resolveFn}(${agentVar},${mergedVar},!1,!0).resolvedTools}`;
 
   const startIndex = match.index;
   const endIndex = startIndex + fullMatch.length;
@@ -566,7 +566,7 @@ export const writePrintToolsFilter = (
   const stateVar = match[3];
   const getterFn = resolverMatch ? match[4] : null;
 
-  const filterCode = `let ${toolsVar}=${computeFn}(${stateVar}),__tptu=${toolsVar};const __tpts=${toolsetsJSON},__tptf=(t,s)=>{const n=${fallback};globalThis.__tweakcc_toolset={name:n,tools:__tpts[n]};if(__tpts.hasOwnProperty(n)){const a=__tpts[n];if(a==="*")return t;return t.filter(d=>a.includes(d.name))}return t},__tptc=(tool,s)=>{const n=${fallback};globalThis.__tweakcc_toolset={name:n,tools:__tpts[n]};if(__tpts.hasOwnProperty(n)){const a=__tpts[n];if(a==="*")return null;if(tool&&Array.isArray(a)&&!a.includes(tool.name))return{behavior:"deny",message:__tweakcc_toolErrorMsg(tool.name),decisionReason:{type:"other",reason:"toolset"}}}return null};${toolsVar}=__tptf(${toolsVar},${stateVar});`;
+  const filterCode = `let ${toolsVar}=${computeFn}(${stateVar}),__tptu=${toolsVar};const __tpts=${toolsetsJSON},__tptf=(t,s)=>{const n=${fallback};globalThis.__tweakcc_toolset={name:n,tools:__tpts[n]};if(__tpts.hasOwnProperty(n)){const a=__tpts[n];if(a==="*")return t;return t.filter(d=>d.name==="Skill"||a.includes(d.name))}return t},__tptc=(tool,s)=>{const n=${fallback};globalThis.__tweakcc_toolset={name:n,tools:__tpts[n]};if(__tpts.hasOwnProperty(n)){const a=__tpts[n];if(a==="*")return null;if(tool&&tool.name!=="Skill"&&Array.isArray(a)&&!a.includes(tool.name))return{behavior:"deny",message:__tweakcc_toolErrorMsg(tool.name),decisionReason:{type:"other",reason:"toolset"}}}return null};${toolsVar}=__tptf(${toolsVar},${stateVar});`;
 
   let newFile =
     oldFile.slice(0, match.index) +
@@ -1075,29 +1075,33 @@ export const insertShiftTabAppStateVar = (
  * Append the toolset name to the mode display text
  */
 export const appendToolsetToModeDisplay = (oldFile: string): string | null => {
-  // Find the pattern where mode text is rendered
-  // Looking for: tl(Y).toLowerCase(), " on"
-  // We want to change it to: tl(Y).toLowerCase(), " on: ", currentToolset || "undefined"
+  // Find every site where the mode text is rendered:
+  //   tl(Y).toLowerCase(), " on"
+  // Newer CC versions render the footer mode line from more than one of
+  // these sites (e.g. a variant with the "(shift+tab to cycle)" chord), so
+  // patch all of them. insertShiftTabAppStateVar defines `currentToolset`
+  // (a live app-state selector) in the enclosing component scope.
+  const modeDisplayPattern = /([$\w]+)\(([$\w]+)\)\.toLowerCase\(\)," on"/g;
+  const matches = Array.from(oldFile.matchAll(modeDisplayPattern));
 
-  const modeDisplayPattern = /([$\w]+)\(([$\w]+)\)\.toLowerCase\(\)," on"/;
-  const match = oldFile.match(modeDisplayPattern);
-
-  if (!match || match.index === undefined) {
+  if (matches.length === 0) {
     console.error(
       'patch: toolsets: appendToolsetToModeDisplay: failed to find mode display pattern'
     );
     return null;
   }
 
-  const tlFunction = match[1];
-  const modeVar = match[2];
-
-  // Replace with the new pattern that includes toolset
-  const oldText = match[0];
-  // insertShiftTabAppStateVar provides the definition for currentToolset.
-  const newText = `${tlFunction}(${modeVar}).toLowerCase(),currentToolset?\` on [\${currentToolset}]\`:""`;
-
-  const newFile = oldFile.replace(oldText, newText);
+  let newFile = oldFile;
+  for (const match of [...matches].reverse()) {
+    if (match.index === undefined) continue;
+    const tlFunction = match[1];
+    const modeVar = match[2];
+    const newText = `${tlFunction}(${modeVar}).toLowerCase(),currentToolset?\` on [\${currentToolset}]\`:""`;
+    newFile =
+      newFile.slice(0, match.index) +
+      newText +
+      newFile.slice(match.index + match[0].length);
+  }
 
   if (newFile === oldFile) {
     console.error(
@@ -1106,12 +1110,13 @@ export const appendToolsetToModeDisplay = (oldFile: string): string | null => {
     return null;
   }
 
+  const lastMatch = matches[matches.length - 1];
   showDiff(
     oldFile,
     newFile,
-    newText,
-    match.index,
-    match.index + oldText.length
+    'currentToolset?` on [${currentToolset}]`:""',
+    lastMatch.index ?? 0,
+    (lastMatch.index ?? 0) + lastMatch[0].length
   );
 
   return newFile;
