@@ -42,3 +42,7 @@ debug.log
 *.temp
 
 *.tsbuildinfo
+
+# local-only working copies of the prompt extractor (keep private, never commit)
+tools/promptExtractor.rewrite.local.js
+tools/promptExtractor.js.backup*
