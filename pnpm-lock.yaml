@@ -41,9 +41,6 @@ importers:
       react:
         specifier: ^19.1.1
         version: 19.1.1
-      wasmagic:
-        specifier: ^1.0.7
-        version: 1.0.7
       which:
         specifier: ^6.0.0
         version: 6.0.0
@@ -2210,10 +2207,6 @@ packages:
         optional: true
       jsdom:
         optional: true
-
-  wasmagic@1.0.7:
-    resolution: {integrity: sha512-c16NV8eoHR9cWAKZEfxImVglsT5qO/NBYPMD3KJu/L9XKRrHWW9GENIhwHyGibLBkt/4DSbIP2XmJALRuYW37g==}
-    engines: {node: '>=16.4.0'}
 
   which-boxed-primitive@1.1.1:
     resolution: {integrity: sha512-TbX3mj8n0odCBFVlY8AxkqcHASw3L60jIuF8jFP78az3C2YhmGvqbHBpAjTRH2/xqYunrJ9g1jSyjCjpoWzIAA==}
@@ -4479,8 +4472,6 @@ snapshots:
       - terser
       - tsx
       - yaml
-
-  wasmagic@1.0.7: {}
 
   which-boxed-primitive@1.1.1:
     dependencies:

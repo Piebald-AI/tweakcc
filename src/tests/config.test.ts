@@ -4,8 +4,6 @@ import type { Stats } from 'node:fs';
 import path from 'node:path';
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { WASMagic } from 'wasmagic';
-
 import { ClaudeCodeInstallationInfo } from '../types';
 import * as misc from '../utils';
 import * as systemPromptHashIndex from '../systemPromptHashIndex';
@@ -24,7 +22,6 @@ import {
   warnAboutMultipleConfigs,
 } from '../config';
 
-vi.mock('wasmagic');
 vi.mock('node:fs/promises');
 vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
@@ -40,10 +37,6 @@ vi.mock('which', () => ({
 }));
 
 import whichMock from 'which';
-
-const mockMagicInstance: { detect: ReturnType<typeof vi.fn> } = {
-  detect: vi.fn(),
-};
 
 // Mock the replaceFileBreakingHardLinks function
 vi.spyOn(misc, 'replaceFileBreakingHardLinks').mockImplementation(
@@ -85,11 +78,6 @@ describe('config.ts', () => {
 
     // By default, pretend there is no `claude` executable on PATH.
     vi.mocked(whichMock).mockRejectedValue(new Error('not found'));
-
-    mockMagicInstance.detect.mockReset();
-    (WASMagic.create as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
-      mockMagicInstance
-    );
   });
 
   afterEach(() => {
@@ -330,7 +318,7 @@ describe('config.ts', () => {
       });
     });
 
-    it('should treat PATH claude executable as cli.js when WASMagic detects JS', async () => {
+    it('should treat PATH claude executable as cli.js when heuristic detects JavaScript', async () => {
       const mockConfig = {
         ccInstallationPath: null,
         changesApplied: false,
@@ -364,9 +352,6 @@ describe('config.ts', () => {
         close: async () => {},
       } as unknown as fs.FileHandle);
 
-      // WASMagic reports JavaScript.
-      mockMagicInstance.detect.mockReturnValue('application/javascript');
-
       // Version extraction from the cli.js path.
       vi.spyOn(fs, 'readFile').mockImplementation(async (p, encoding) => {
         if (p === mockExePath && encoding === 'utf8') {
@@ -386,7 +371,7 @@ describe('config.ts', () => {
       });
     });
 
-    it('should treat PATH claude executable as native installation when WASMagic detects binary', async () => {
+    it('should treat PATH claude executable as native installation when heuristic detects binary', async () => {
       const mockConfig = {
         ccInstallationPath: null,
         changesApplied: false,
@@ -415,15 +400,12 @@ describe('config.ts', () => {
       vi.spyOn(fs, 'realpath').mockResolvedValue(mockExePath);
       vi.spyOn(fs, 'open').mockResolvedValue({
         read: async ({ buffer }: { buffer: Buffer }) => {
-          const contentBuffer = Buffer.from('fake binary content');
+          const contentBuffer = Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x00]);
           contentBuffer.copy(buffer);
           return { bytesRead: contentBuffer.length, buffer };
         },
         close: async () => {},
       } as unknown as fs.FileHandle);
-
-      // WASMagic reports a non-text MIME type.
-      mockMagicInstance.detect.mockReturnValue('application/octet-stream');
 
       // Mock extraction from native installation.
       vi.spyOn(
@@ -469,8 +451,6 @@ describe('config.ts', () => {
         close: async () => {},
       } as unknown as fs.FileHandle);
 
-      mockMagicInstance.detect.mockReturnValue('application/javascript');
-
       // Return different versions for explicit path vs PATH to verify which is used
       vi.spyOn(fs, 'readFile').mockImplementation(async (p, encoding) => {
         if (p === mockCliPath && encoding === 'utf8') {
@@ -494,7 +474,7 @@ describe('config.ts', () => {
       });
     });
 
-    it('should use ccInstallationPath as cli.js when WASMagic detects JS', async () => {
+    it('should use ccInstallationPath as cli.js when heuristic detects JavaScript', async () => {
       const mockCliPath = '/custom/path/cli.js';
       const mockConfig = {
         ccInstallationPath: mockCliPath,
@@ -518,8 +498,6 @@ describe('config.ts', () => {
         close: async () => {},
       } as unknown as fs.FileHandle);
 
-      mockMagicInstance.detect.mockReturnValue('application/javascript');
-
       vi.spyOn(fs, 'readFile').mockImplementation(async (p, encoding) => {
         if (p === mockCliPath && encoding === 'utf8') {
           return mockCliContent;
@@ -538,7 +516,7 @@ describe('config.ts', () => {
       });
     });
 
-    it('should use ccInstallationPath as native installation when WASMagic detects binary', async () => {
+    it('should use ccInstallationPath as native installation when heuristic detects binary', async () => {
       const mockNativePath = '/custom/path/claude-native';
       const mockConfig = {
         ccInstallationPath: mockNativePath,
@@ -557,14 +535,12 @@ describe('config.ts', () => {
       vi.spyOn(fs, 'realpath').mockImplementation(async p => p.toString());
       vi.spyOn(fs, 'open').mockResolvedValue({
         read: async ({ buffer }: { buffer: Buffer }) => {
-          const contentBuffer = Buffer.from('fake binary content');
+          const contentBuffer = Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x00]);
           contentBuffer.copy(buffer);
           return { bytesRead: contentBuffer.length, buffer };
         },
         close: async () => {},
       } as unknown as fs.FileHandle);
-
-      mockMagicInstance.detect.mockReturnValue('application/octet-stream');
 
       vi.spyOn(
         nativeInstallation,
@@ -582,7 +558,7 @@ describe('config.ts', () => {
       });
     });
 
-    it('should use fallback detection for JavaScript when WASMagic fails (SIMD unsupported)', async () => {
+    it('should use heuristic detection for JavaScript', async () => {
       const mockConfig = {
         ccInstallationPath: null,
         changesApplied: false,
@@ -594,13 +570,6 @@ describe('config.ts', () => {
       const mockExePath = '/usr/local/bin/claude';
       const mockCliContent =
         'some code VERSION:"5.5.5" more code VERSION:"5.5.5" and VERSION:"5.5.5"';
-
-      // Simulate WASMagic initialization failure (SIMD unsupported)
-      (
-        WASMagic.create as unknown as ReturnType<typeof vi.fn>
-      ).mockRejectedValue(
-        new Error('RuntimeError: Aborted(CompileError: Wasm SIMD unsupported)')
-      );
 
       vi.mocked(whichMock).mockResolvedValue(mockExePath);
 
@@ -641,7 +610,7 @@ describe('config.ts', () => {
       });
     });
 
-    it('should use fallback detection for ELF binary when WASMagic fails', async () => {
+    it('should use heuristic detection for ELF binary', async () => {
       const mockConfig = {
         ccInstallationPath: null,
         changesApplied: false,
@@ -662,13 +631,6 @@ describe('config.ts', () => {
       elfBinary[1] = 0x45; // E
       elfBinary[2] = 0x4c; // L
       elfBinary[3] = 0x46; // F
-
-      // Simulate WASMagic initialization failure
-      (
-        WASMagic.create as unknown as ReturnType<typeof vi.fn>
-      ).mockRejectedValue(
-        new Error('RuntimeError: Aborted(CompileError: Wasm SIMD unsupported)')
-      );
 
       vi.mocked(whichMock).mockResolvedValue(mockExePath);
 
@@ -706,7 +668,7 @@ describe('config.ts', () => {
       });
     });
 
-    it('should use fallback detection for Mach-O binary when WASMagic fails', async () => {
+    it('should use heuristic detection for Mach-O binary', async () => {
       const mockConfig = {
         ccInstallationPath: null,
         changesApplied: false,
@@ -727,13 +689,6 @@ describe('config.ts', () => {
       machoBuffer[1] = 0xfa;
       machoBuffer[2] = 0xed;
       machoBuffer[3] = 0xfe;
-
-      // Simulate WASMagic initialization failure
-      (
-        WASMagic.create as unknown as ReturnType<typeof vi.fn>
-      ).mockRejectedValue(
-        new Error('RuntimeError: Aborted(CompileError: Wasm SIMD unsupported)')
-      );
 
       vi.mocked(whichMock).mockResolvedValue(mockExePath);
 
@@ -974,7 +929,7 @@ describe('config.ts', () => {
       // Mock fs.realpath to resolve symlink
       vi.spyOn(fs, 'realpath').mockResolvedValue(mockResolvedPath);
 
-      // Mock fs.open for WASMagic detection
+      // Mock fs.open for heuristic detection
       vi.spyOn(fs, 'open').mockResolvedValue({
         read: async ({ buffer }: { buffer: Buffer }) => {
           const contentBuffer = Buffer.from('fake js content');
@@ -983,8 +938,6 @@ describe('config.ts', () => {
         },
         close: async () => {},
       } as unknown as fs.FileHandle);
-
-      mockMagicInstance.detect.mockReturnValue('application/javascript');
 
       // Mock cli.js content
       const mockCliContent =
@@ -1047,7 +1000,7 @@ describe('config.ts', () => {
       // Symlink resolves to cli.js (NPM installation)
       vi.spyOn(fs, 'realpath').mockResolvedValue(resolvedCliPath);
 
-      // Mock fs.open for WASMagic detection
+      // Mock fs.open for heuristic detection
       vi.spyOn(fs, 'open').mockResolvedValue({
         read: async ({ buffer }: { buffer: Buffer }) => {
           const contentBuffer = Buffer.from('fake js content');
@@ -1056,8 +1009,6 @@ describe('config.ts', () => {
         },
         close: async () => {},
       } as unknown as fs.FileHandle);
-
-      mockMagicInstance.detect.mockReturnValue('application/javascript');
 
       // Mock VERSION content in cli.js
       const mockCliContent =
@@ -1116,17 +1067,15 @@ describe('config.ts', () => {
       });
       vi.spyOn(fs, 'realpath').mockResolvedValue(resolvedBinaryPath);
 
-      // Mock fs.open for WASMagic detection - return binary content
+      // Mock fs.open for heuristic detection - return binary content
       vi.spyOn(fs, 'open').mockResolvedValue({
         read: async ({ buffer }: { buffer: Buffer }) => {
-          const contentBuffer = Buffer.from('fake binary content');
+          const contentBuffer = Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x00]);
           contentBuffer.copy(buffer);
           return { bytesRead: contentBuffer.length, buffer };
         },
         close: async () => {},
       } as unknown as fs.FileHandle);
-
-      mockMagicInstance.detect.mockReturnValue('application/octet-stream');
 
       vi.spyOn(
         nativeInstallation,
@@ -1163,7 +1112,7 @@ describe('config.ts', () => {
       // Mock realpath to return the .cmd file itself (not a symlink)
       vi.spyOn(fs, 'realpath').mockImplementation(async p => p.toString());
 
-      // Mock fs.open for WASMagic detection - return batch script content
+      // Mock fs.open for heuristic detection - return batch script content
       vi.spyOn(fs, 'open').mockResolvedValue({
         read: async ({ buffer }: { buffer: Buffer }) => {
           // Batch script content - starts with @echo off or similar
@@ -1175,9 +1124,6 @@ describe('config.ts', () => {
         },
         close: async () => {},
       } as unknown as fs.FileHandle);
-
-      // WASMagic reports text/plain for .cmd files (not JavaScript, not binary)
-      mockMagicInstance.detect.mockReturnValue('text/plain');
 
       // Mock fs.stat - .cmd exists, and cli.js in search paths exists
       vi.spyOn(fs, 'stat').mockImplementation(async p => {
@@ -1224,7 +1170,7 @@ describe('config.ts', () => {
       // Mock realpath to return the .cmd file itself
       vi.spyOn(fs, 'realpath').mockImplementation(async p => p.toString());
 
-      // Mock fs.open for WASMagic detection
+      // Mock fs.open for heuristic detection
       vi.spyOn(fs, 'open').mockResolvedValue({
         read: async ({ buffer }: { buffer: Buffer }) => {
           const contentBuffer = Buffer.from(
@@ -1235,9 +1181,6 @@ describe('config.ts', () => {
         },
         close: async () => {},
       } as unknown as fs.FileHandle);
-
-      // WASMagic reports text/plain for .cmd files
-      mockMagicInstance.detect.mockReturnValue('text/plain');
 
       // No files exist (neither .cmd resolves nor hardcoded paths)
       vi.spyOn(fs, 'stat').mockRejectedValue(createEnoent());
@@ -1310,19 +1253,17 @@ describe('config.ts', () => {
       });
       vi.spyOn(fs, 'realpath').mockResolvedValue(resolvedBinaryPath);
 
-      // Mock fs.open for WASMagic detection
+      // Mock fs.open for heuristic detection
       vi.spyOn(fs, 'open').mockResolvedValue({
         read: async ({ buffer }: { buffer: Buffer }) => {
-          const contentBuffer = Buffer.from('fake binary content');
+          const contentBuffer = Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x00]);
           contentBuffer.copy(buffer);
           return { bytesRead: contentBuffer.length, buffer };
         },
         close: async () => {},
       } as unknown as fs.FileHandle);
 
-      // WASMagic reports binary
-      mockMagicInstance.detect.mockReturnValue('application/octet-stream');
-
+      // Heuristic detects binary
       // Mock native extraction to return null (extraction failed)
       vi.spyOn(
         nativeInstallation,
@@ -1361,7 +1302,7 @@ describe('config.ts', () => {
       // Mock fs.realpath
       vi.spyOn(fs, 'realpath').mockImplementation(async p => p.toString());
 
-      // Mock fs.open for WASMagic detection
+      // Mock fs.open for heuristic detection
       vi.spyOn(fs, 'open').mockResolvedValue({
         read: async ({ buffer }: { buffer: Buffer }) => {
           const contentBuffer = Buffer.from('fake js content');
@@ -1371,9 +1312,7 @@ describe('config.ts', () => {
         close: async () => {},
       } as unknown as fs.FileHandle);
 
-      // WASMagic reports JavaScript
-      mockMagicInstance.detect.mockReturnValue('application/javascript');
-
+      // Heuristic detects JavaScript
       vi.spyOn(fs, 'readFile').mockImplementation(async (p, encoding) => {
         if (p === customCliPath && encoding === 'utf8') {
           return mockCliContent;
@@ -1449,17 +1388,15 @@ describe('config.ts', () => {
       });
       vi.spyOn(fs, 'realpath').mockResolvedValue(nativeBinaryPath);
 
-      // Mock fs.open for WASMagic detection
+      // Mock fs.open for heuristic detection
       vi.spyOn(fs, 'open').mockResolvedValue({
         read: async ({ buffer }: { buffer: Buffer }) => {
-          const contentBuffer = Buffer.from('fake binary content');
+          const contentBuffer = Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x00]);
           contentBuffer.copy(buffer);
           return { bytesRead: contentBuffer.length, buffer };
         },
         close: async () => {},
       } as unknown as fs.FileHandle);
-
-      mockMagicInstance.detect.mockReturnValue('application/octet-stream');
 
       // Mock extractClaudeJsFromNativeInstallation to return content without VERSION
       vi.mocked(
@@ -1501,17 +1438,15 @@ describe('config.ts', () => {
       });
       vi.spyOn(fs, 'realpath').mockResolvedValue(nativeBinaryPath);
 
-      // Mock fs.open for WASMagic detection
+      // Mock fs.open for heuristic detection
       vi.spyOn(fs, 'open').mockResolvedValue({
         read: async ({ buffer }: { buffer: Buffer }) => {
-          const contentBuffer = Buffer.from('fake binary content');
+          const contentBuffer = Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x00]);
           contentBuffer.copy(buffer);
           return { bytesRead: contentBuffer.length, buffer };
         },
         close: async () => {},
       } as unknown as fs.FileHandle);
-
-      mockMagicInstance.detect.mockReturnValue('application/octet-stream');
 
       // Mock extractClaudeJsFromNativeInstallation to return null (extraction failed)
       vi.mocked(
