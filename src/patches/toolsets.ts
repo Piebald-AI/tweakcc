@@ -23,18 +23,62 @@ import { Toolset } from '../types';
 export const findSelectComponentName = (
   fileContents: string
 ): string | null => {
-  // Pattern matches the Select component's function signature
-  const selectPattern =
-    /\.createElement\(([$\w]+),.{0,100}"Yes, use recommended settings"/;
-  const match = fileContents.match(selectPattern);
-  if (!match) {
-    console.error(
-      'patch: findSelectComponentName: failed to find selectPattern'
+  const createElementPattern =
+    /\.createElement\(([$\w]+),\{(?=[^}]{0,240}options:)(?=[^}]{0,240}onChange:)[^}]{0,360}\}/g;
+
+  for (const match of fileContents.matchAll(createElementPattern)) {
+    const window = fileContents.slice(
+      match.index,
+      Math.min(fileContents.length, match.index + match[0].length + 180)
     );
-    return null;
+    if (/Yes, use recommended settings|recommended settings/.test(window)) {
+      continue;
+    }
+    return match[1];
   }
 
-  return match[1];
+  const selectDefinitionPatterns = [
+    /function ([$\w]+)\(\{(?=[^}]{0,600}options:)(?=[^}]{0,600}onChange:)(?=[^}]{0,600}onCancel:)[^}]{0,900}\}\)/g,
+    /function ([$\w]+)\(([$\w]+)\)\{(?:(?!function ).){0,900}\{(?=[^}]{0,600}options:)(?=[^}]{0,600}onChange:)(?=[^}]{0,600}onCancel:)[^}]{0,900}\}=\2/g,
+  ];
+
+  for (const selectPattern of selectDefinitionPatterns) {
+    for (const match of fileContents.matchAll(selectPattern)) {
+      const body = fileContents.slice(
+        match.index,
+        Math.min(fileContents.length, match.index + match[0].length + 1200)
+      );
+      if (/\.createElement\(/.test(body) && !/return\s*\{/.test(body)) {
+        return match[1];
+      }
+    }
+  }
+
+  console.error('patch: findSelectComponentName: failed to find selectPattern');
+  return null;
+};
+
+const getToolsetFallbackExpression = (
+  stateExpression: string,
+  defaultToolset: string | null,
+  acceptEditsToolset?: string | null,
+  planModeToolset?: string | null
+): string => {
+  // Each mode binding can be forced at CC start via runtime environment
+  // variables (read by the patched cli.js, so no re-apply is needed). They
+  // override the bindings configured in the tweakcc menu (#569).
+  const defaultValue = `(process.env.TWEAKCC_TOOLSET_DEFAULT||${
+    defaultToolset ? JSON.stringify(defaultToolset) : 'undefined'
+  })`;
+  const acceptEditsValue = `(process.env.TWEAKCC_TOOLSET_ALLOW_EDITS||${
+    acceptEditsToolset ? JSON.stringify(acceptEditsToolset) : defaultValue
+  })`;
+  const planValue = `(process.env.TWEAKCC_TOOLSET_PLAN||${
+    planModeToolset ? JSON.stringify(planModeToolset) : defaultValue
+  })`;
+  const autoValue = `(process.env.TWEAKCC_TOOLSET_AUTO||${defaultValue})`;
+
+  return `${stateExpression}.toolPermissionContext?.mode!=="plan"&&${stateExpression}.toolsetAutoMode==="plan"?${defaultValue}:(${stateExpression}.toolset??(${stateExpression}.toolPermissionContext?.mode==="plan"?${planValue}:(${stateExpression}.toolPermissionContext?.mode==="acceptEdits"?${acceptEditsValue}:(${stateExpression}.toolPermissionContext?.mode==="auto"?${autoValue}:${defaultValue}))))`;
 };
 
 /**
@@ -239,10 +283,7 @@ export const findTopLevelPositionBeforeSlashCommand = (
 /**
  * Sub-patch 1: Add toolset field to app state initialization
  */
-export const writeToolsetFieldToAppState = (
-  oldFile: string,
-  defaultToolset: string | null
-): string | null => {
+export const writeToolsetFieldToAppState = (oldFile: string): string | null => {
   // Find all occurrences of thinkingEnabled:SOMETHING()
   const thinkingEnabledPattern = /thinkingEnabled:([$\w]+)\(\)/g;
   const matches = Array.from(oldFile.matchAll(thinkingEnabledPattern));
@@ -266,10 +307,12 @@ export const writeToolsetFieldToAppState = (
 
   // Apply modifications
   let newFile = oldFile;
-  const toolsetValue = defaultToolset
-    ? JSON.stringify(defaultToolset)
-    : 'undefined';
-  const textToInsert = `,toolset:${toolsetValue}`;
+  // Initialize toolset to undefined (NOT the default toolset name): every
+  // read site uses `state.toolset ?? <mode-aware fallback>`, so a non-null
+  // initial value would short-circuit the fallback and the toolset bound to
+  // the startup permission mode (e.g. --permission-mode plan) would never
+  // apply at load (#569). Shift+Tab and /toolset set it explicitly later.
+  const textToInsert = `,toolset:undefined,toolsetAutoMode:null`;
   for (const mod of modifications) {
     newFile =
       newFile.slice(0, mod.index) + textToInsert + newFile.slice(mod.index);
@@ -293,7 +336,9 @@ export const writeToolsetFieldToAppState = (
 export const writeToolFetchingUseMemo = (
   oldFile: string,
   toolsets: Toolset[],
-  defaultToolset: string | null
+  defaultToolset: string | null,
+  acceptEditsToolset?: string | null,
+  planModeToolset?: string | null
 ): string | null => {
   const stateInfo = getAppStateSelectorAndUseState(oldFile);
   if (!stateInfo) {
@@ -329,13 +374,16 @@ export const writeToolFetchingUseMemo = (
 
   // When persisted app state is loaded it may not have a toolset field (saved before
   // the toolset patch existed), causing currentToolset to be undefined. Fall back to
-  // defaultToolset so the restriction is active from the very first render.
-  const fallback = defaultToolset
-    ? JSON.stringify(defaultToolset)
-    : 'undefined';
+  // the active mode's toolset so restrictions are active from the first render.
+  const fallback = getToolsetFallbackExpression(
+    'state',
+    defaultToolset,
+    acceptEditsToolset,
+    planModeToolset
+  );
 
   // Generate the replacement code
-  const replacement = `let currentToolset = ${appStateUseSelectorFn}(state => state.toolset) ?? ${fallback};
+  const replacement = `let currentToolset = ${appStateUseSelectorFn}(state => ${fallback});
 let ${toolAggregationVar} = undefined;
 const toolsets = ${toolsetsJSON};
 if (toolsets.hasOwnProperty(currentToolset)) {
@@ -374,12 +422,15 @@ if (toolsets.hasOwnProperty(currentToolset)) {
  *     if(!AGENT)return MERGED;
  *     return resolve(AGENT,MERGED,!1,!0).resolvedTools}
  *
- * We wrap both return statements with the toolset filter.
+ * We filter the main/orchestrator tools, but preserve native agent-resolved tools so
+ * custom agent frontmatter `tools:` definitions continue to work.
  */
 export const writeComputeToolsFilter = (
   oldFile: string,
   toolsets: Toolset[],
-  defaultToolset: string | null
+  defaultToolset: string | null,
+  acceptEditsToolset?: string | null,
+  planModeToolset?: string | null
 ): string | null => {
   const stateInfo = getAppStateSelectorAndUseState(oldFile);
   if (!stateInfo) {
@@ -429,9 +480,12 @@ export const writeComputeToolsFilter = (
     )
   );
 
-  const fallback = defaultToolset
-    ? JSON.stringify(defaultToolset)
-    : 'undefined';
+  const fallback = getToolsetFallbackExpression(
+    stateVar,
+    defaultToolset,
+    acceptEditsToolset,
+    planModeToolset
+  );
 
   // Actually let me re-examine the match to get the init tools var
   const fullMatch = match[0];
@@ -449,8 +503,11 @@ export const writeComputeToolsFilter = (
   }
   const initVar = mergeCallMatch[1];
 
-  // Set globalThis.__tweakcc_toolset so the error message helper can read it
-  const newClosure = `${closureVar}=${useCallbackPrefix}()=>{let ${stateVar}=${storeVar}.getState(),${assembledVar}=${assembleFn}(${stateVar}.toolPermissionContext,${stateVar}.mcp.tools${skillToolsArg}),${mergedVar}=${mergeFn}(${initVar},${assembledVar},${stateVar}.toolPermissionContext.mode);const __ts=${toolsetsJSON},__tc=${stateVar}.toolset??${fallback},__tf=(t)=>{globalThis.__tweakcc_toolset={name:__tc,tools:__ts[__tc]};if(__ts.hasOwnProperty(__tc)){const a=__ts[__tc];if(a==="*")return t;return t.filter(d=>a.includes(d.name))}return t};if(!${agentVar})return __tf(${mergedVar});return __tf(${resolveFn}(${agentVar},${mergedVar},!1,!0).resolvedTools)}`;
+  // Set globalThis.__tweakcc_toolset so the error message helper can read it.
+  // Agents with an explicit `tools:` frontmatter list get the unfiltered pool
+  // (their declared tools win — #597); agents without one inherit the active
+  // toolset by resolving against the filtered pool instead of everything.
+  const newClosure = `${closureVar}=${useCallbackPrefix}()=>{let ${stateVar}=${storeVar}.getState(),${assembledVar}=${assembleFn}(${stateVar}.toolPermissionContext,${stateVar}.mcp.tools${skillToolsArg}),${mergedVar}=${mergeFn}(${initVar},${assembledVar},${stateVar}.toolPermissionContext.mode);const __ts=${toolsetsJSON},__tc=${fallback},__tf=(t)=>{globalThis.__tweakcc_toolset={name:__tc,tools:__ts[__tc]};if(__ts.hasOwnProperty(__tc)){const a=__ts[__tc];if(a==="*")return t;return t.filter(d=>d.name==="Skill"||a.includes(d.name))}return t};if(!${agentVar})return __tf(${mergedVar});return ${resolveFn}(${agentVar},${agentVar}.tools?${mergedVar}:__tf(${mergedVar}),!1,!0).resolvedTools}`;
 
   const startIndex = match.index;
   const endIndex = startIndex + fullMatch.length;
@@ -473,7 +530,9 @@ export const writeComputeToolsFilter = (
 export const writePrintToolsFilter = (
   oldFile: string,
   toolsets: Toolset[],
-  defaultToolset: string | null
+  defaultToolset: string | null,
+  acceptEditsToolset?: string | null,
+  planModeToolset?: string | null
 ): string | null => {
   const toolsetsJSON = JSON.stringify(
     Object.fromEntries(
@@ -483,42 +542,51 @@ export const writePrintToolsFilter = (
       ])
     )
   );
-  const fallback = defaultToolset
-    ? JSON.stringify(defaultToolset)
-    : 'undefined';
+  const fallback = getToolsetFallbackExpression(
+    's',
+    defaultToolset,
+    acceptEditsToolset,
+    planModeToolset
+  );
 
-  const toolsPattern =
-    /let ([$\w]+)=([$\w]+)\(([$\w]+)\);(?=[\s\S]{0,2500}tools:\1,refreshTools:\(\)=>\2\(([$\w]+)\(\)\))/;
-  const toolsMatch = oldFile.match(toolsPattern);
-  if (!toolsMatch || toolsMatch.index === undefined) {
+  const resolverPattern =
+    /let ([$\w]+)=([$\w]+)\(([$\w]+)\);(?=[\s\S]{0,8000}tools:\1,refreshTools:\(\)=>\2\(([$\w]+)\(\)\))/;
+  const resolverMatch = oldFile.match(resolverPattern);
+  const directPattern =
+    /let ([$\w]+)=([$\w]+)\(([$\w]+)\);(?=[\s\S]{0,2500}tools:\1,refreshTools:\(\)=>\2\(\3\))/;
+  const directMatch = resolverMatch ? null : oldFile.match(directPattern);
+  const match = resolverMatch ?? directMatch;
+  if (!match || match.index === undefined) {
     console.error(
       'patch: toolsets: printToolsFilter: failed to find print tools initialization'
     );
     return null;
   }
 
-  const toolsVar = toolsMatch[1];
-  const computeFn = toolsMatch[2];
-  const stateVar = toolsMatch[3];
-  const getterFn = toolsMatch[4];
+  const toolsVar = match[1];
+  const computeFn = match[2];
+  const stateVar = match[3];
+  const getterFn = resolverMatch ? match[4] : null;
 
-  const filterCode = `let ${toolsVar}=${computeFn}(${stateVar});const __tpts=${toolsetsJSON},__tptf=(t,s)=>{const n=s.toolset??${fallback};globalThis.__tweakcc_toolset={name:n,tools:__tpts[n]};if(__tpts.hasOwnProperty(n)){const a=__tpts[n];if(a==="*")return t;return t.filter(d=>a.includes(d.name))}return t};${toolsVar}=__tptf(${toolsVar},${stateVar});`;
+  const filterCode = `let ${toolsVar}=${computeFn}(${stateVar}),__tptu=${toolsVar};const __tpts=${toolsetsJSON},__tptf=(t,s)=>{const n=${fallback};globalThis.__tweakcc_toolset={name:n,tools:__tpts[n]};if(__tpts.hasOwnProperty(n)){const a=__tpts[n];if(a==="*")return t;return t.filter(d=>d.name==="Skill"||a.includes(d.name))}return t},__tptc=(tool,s)=>{const n=${fallback};globalThis.__tweakcc_toolset={name:n,tools:__tpts[n]};if(__tpts.hasOwnProperty(n)){const a=__tpts[n];if(a==="*")return null;if(tool&&tool.name!=="Skill"&&Array.isArray(a)&&!a.includes(tool.name))return{behavior:"deny",message:__tweakcc_toolErrorMsg(tool.name),decisionReason:{type:"other",reason:"toolset"}}}return null};${toolsVar}=__tptf(${toolsVar},${stateVar});`;
 
   let newFile =
-    oldFile.slice(0, toolsMatch.index) +
+    oldFile.slice(0, match.index) +
     filterCode +
-    oldFile.slice(toolsMatch.index + toolsMatch[0].length);
+    oldFile.slice(match.index + match[0].length);
 
   showDiff(
     oldFile,
     newFile,
     filterCode,
-    toolsMatch.index,
-    toolsMatch.index + toolsMatch[0].length
+    match.index,
+    match.index + match[0].length
   );
 
   const refreshPattern = new RegExp(
-    `refreshTools:\\(\\)=>${computeFn.replace(/\$/g, '\\$')}\\(${getterFn.replace(/\$/g, '\\$')}\\(\\)\\)`
+    getterFn
+      ? `refreshTools:\\(\\)=>${computeFn.replace(/\$/g, '\\$')}\\(${getterFn.replace(/\$/g, '\\$')}\\(\\)\\)`
+      : `refreshTools:\\(\\)=>${computeFn.replace(/\$/g, '\\$')}\\(${stateVar.replace(/\$/g, '\\$')}\\)`
   );
   const refreshMatch = newFile.match(refreshPattern);
   if (!refreshMatch || refreshMatch.index === undefined) {
@@ -528,7 +596,9 @@ export const writePrintToolsFilter = (
     return null;
   }
 
-  const refreshReplacement = `refreshTools:()=>{let s=${getterFn}();return __tptf(${computeFn}(s),s)}`;
+  const refreshReplacement = getterFn
+    ? `refreshTools:()=>{let s=${getterFn}(),u=${computeFn}(s);__tptu=u;return __tptf(u,s)}`
+    : `refreshTools:()=>{let u=${computeFn}(${stateVar});__tptu=u;return __tptf(u,${stateVar})}`;
   const beforeRefresh = newFile;
   newFile =
     newFile.slice(0, refreshMatch.index) +
@@ -541,6 +611,124 @@ export const writePrintToolsFilter = (
     refreshReplacement,
     refreshMatch.index,
     refreshMatch.index + refreshMatch[0].length
+  );
+
+  const canUseToolSearchStart = refreshMatch.index;
+  const canUseToolSearch = newFile.slice(
+    canUseToolSearchStart,
+    canUseToolSearchStart + 8000
+  );
+  const canUseToolMatch = canUseToolSearch.match(
+    /([,{])canUseTool:([$\w]+)(?=[,}])/
+  );
+  if (!canUseToolMatch || canUseToolMatch.index === undefined) {
+    console.error(
+      'patch: toolsets: printToolsFilter: failed to find print canUseTool'
+    );
+    return null;
+  }
+
+  const canUseToolVar = canUseToolMatch[2];
+  const canUseToolReplacement = getterFn
+    ? `${canUseToolMatch[1]}canUseTool:async(...a)=>__tptc(a[0],${getterFn}())??await ${canUseToolVar}(...a)`
+    : `${canUseToolMatch[1]}canUseTool:async(...a)=>__tptc(a[0],${stateVar})??await ${canUseToolVar}(...a)`;
+  const canUseToolIndex = canUseToolSearchStart + canUseToolMatch.index;
+  const beforeCanUseTool = newFile;
+  newFile =
+    newFile.slice(0, canUseToolIndex) +
+    canUseToolReplacement +
+    newFile.slice(canUseToolIndex + canUseToolMatch[0].length);
+
+  showDiff(
+    beforeCanUseTool,
+    newFile,
+    canUseToolReplacement,
+    canUseToolIndex,
+    canUseToolIndex + canUseToolMatch[0].length
+  );
+
+  const agentToolsSearchStart = canUseToolIndex;
+  const agentToolsSearch = newFile.slice(
+    agentToolsSearchStart,
+    agentToolsSearchStart + 12000
+  );
+  const agentToolsMatch = agentToolsSearch.match(
+    /availableTools:([$\w]+)(?=,[$\w]+:|,\.\.\.)/
+  );
+  if (agentToolsMatch?.index !== undefined) {
+    const agentToolsIndex = agentToolsSearchStart + agentToolsMatch.index;
+    const agentToolsReplacement = 'availableTools:__tptu';
+    const beforeAgentTools = newFile;
+    newFile =
+      newFile.slice(0, agentToolsIndex) +
+      agentToolsReplacement +
+      newFile.slice(agentToolsIndex + agentToolsMatch[0].length);
+
+    showDiff(
+      beforeAgentTools,
+      newFile,
+      agentToolsReplacement,
+      agentToolsIndex,
+      agentToolsIndex + agentToolsMatch[0].length
+    );
+  }
+
+  return newFile;
+};
+
+export const writeSubagentResolvedToolContextFix = (
+  oldFile: string
+): string => {
+  const pattern =
+    /tools:([$\w]+),commands:\[\]([\s\S]{0,4500}?)canUseTool:([$\w]+),toolUseContext:([$\w]+),querySource:([$\w]+),spawnedBySkill:/;
+  const match = oldFile.match(pattern);
+  if (!match || match.index === undefined) return oldFile;
+
+  const replacement = `tools:${match[1]},commands:[]${match[2]}canUseTool:async(...a)=>${match[1]}.some(t=>t.name===a[0]?.name)?{behavior:"allow",decisionReason:{type:"other",reason:"subagent_toolset"}}:await ${match[3]}(...a),toolUseContext:{...${match[4]},options:{...${match[4]}.options,tools:${match[1]}}},querySource:${match[5]},spawnedBySkill:`;
+  const newFile =
+    oldFile.slice(0, match.index) +
+    replacement +
+    oldFile.slice(match.index + match[0].length);
+
+  showDiff(
+    oldFile,
+    newFile,
+    replacement,
+    match.index,
+    match.index + match[0].length
+  );
+
+  return newFile;
+};
+
+export const writeTaskAgentFrontmatterToolsFix = (oldFile: string): string => {
+  const pattern =
+    /([,;])([$\w]+)=([$\w]+)\(([$\w]+),([$\w]+)\(([$\w]+)\.mcp\.tools\.concat\(([$\w]+)\)\),\{skipReplFilter:!0,skillTools:\6\.skillTools\}\)(?=,[$\w]+=)/;
+  const match = oldFile.match(pattern);
+  if (!match || match.index === undefined) return oldFile;
+
+  const prefix = oldFile.slice(Math.max(0, match.index - 1200), match.index);
+  const nativeToolsVar = match[7].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (
+    !new RegExp(`${nativeToolsVar}=.*?\\.options\\.tools\\.filter\\(`).test(
+      prefix
+    )
+  ) {
+    return oldFile;
+  }
+
+  const replacement = `${match[1]}${match[2]}=${match[6]}.mcp.tools.concat(${match[7]})`;
+  const newFile =
+    oldFile.slice(0, match.index) +
+    replacement +
+    oldFile.slice(match.index + match[0].length);
+
+  showDiff(
+    oldFile,
+    newFile,
+    replacement,
+    match.index,
+    match.index + match[0].length
   );
 
   return newFile;
@@ -636,7 +824,9 @@ export const writeToolsetAwareErrors = (
 export const writeToolsetComponentDefinition = (
   oldFile: string,
   toolsets: Toolset[],
-  defaultToolset: string | null
+  defaultToolset: string | null,
+  acceptEditsToolset?: string | null,
+  planModeToolset?: string | null
 ): string | null => {
   const insertionPoint = findTopLevelPositionBeforeSlashCommand(oldFile);
   if (insertionPoint === null) {
@@ -703,13 +893,16 @@ export const writeToolsetComponentDefinition = (
     }))
   );
 
-  const fallback = defaultToolset
-    ? JSON.stringify(defaultToolset)
-    : 'undefined';
+  const fallback = getToolsetFallbackExpression(
+    'state',
+    defaultToolset,
+    acceptEditsToolset,
+    planModeToolset
+  );
 
   // Generate the component code
   const componentCode = `const toolsetComp = ({ onExit, input }) => {
-  const currentToolset = ${appStateUseSelectorFn}(state => state.toolset) ?? ${fallback};
+  const currentToolset = ${appStateUseSelectorFn}(state => ${fallback});
 
   const setState = ${appStateSetState}();
 
@@ -719,7 +912,7 @@ export const writeToolsetComponentDefinition = (
       onExit(${chalkVar}.red(\`\${${chalkVar}.bold(input)} is not a valid toolset. Valid toolsets: ${toolsets.map(t => t.name).join(', ')}\`));
       return;
     } else {
-      setState(prev => ({ ...prev, toolset: input }));
+      setState(prev => ({ ...prev, toolset: input, toolsetAutoMode: null }));
       onExit(\`Toolset changed to \${${chalkVar}.bold(input)}\`);
       return;
     }
@@ -765,7 +958,7 @@ export const writeToolsetComponentDefinition = (
         ${reactVar}.createElement(${selectComponent}, {
           options: ${selectOptions},
           onChange: (input) => {
-            setState(prev => ({ ...prev, toolset: input }));
+            setState(prev => ({ ...prev, toolset: input, toolsetAutoMode: null }));
             onExit(\`Toolset changed to \${${chalkVar}.bold(input)}\`);
           },
           onCancel: () => onExit(\`Toolset not changed (left as \${${chalkVar}.bold(currentToolset)})\`)
@@ -841,7 +1034,9 @@ export const findShiftTabAppStateVarInsertionPoint = (
  */
 export const insertShiftTabAppStateVar = (
   oldFile: string,
-  defaultToolset: string | null
+  defaultToolset: string | null,
+  acceptEditsToolset?: string | null,
+  planModeToolset?: string | null
 ): string | null => {
   const insertionPoint = findShiftTabAppStateVarInsertionPoint(oldFile);
   if (insertionPoint === null) {
@@ -860,10 +1055,13 @@ export const insertShiftTabAppStateVar = (
   }
 
   const { appStateUseSelectorFn } = stateInfo;
-  const fallback = defaultToolset
-    ? JSON.stringify(defaultToolset)
-    : 'undefined';
-  const codeToInsert = `let currentToolset=${appStateUseSelectorFn}(state => state.toolset) ?? ${fallback};`;
+  const fallback = getToolsetFallbackExpression(
+    'state',
+    defaultToolset,
+    acceptEditsToolset,
+    planModeToolset
+  );
+  const codeToInsert = `let currentToolset=${appStateUseSelectorFn}(state => ${fallback});`;
 
   const newFile =
     oldFile.slice(0, insertionPoint) +
@@ -879,29 +1077,33 @@ export const insertShiftTabAppStateVar = (
  * Append the toolset name to the mode display text
  */
 export const appendToolsetToModeDisplay = (oldFile: string): string | null => {
-  // Find the pattern where mode text is rendered
-  // Looking for: tl(Y).toLowerCase(), " on"
-  // We want to change it to: tl(Y).toLowerCase(), " on: ", currentToolset || "undefined"
+  // Find every site where the mode text is rendered:
+  //   tl(Y).toLowerCase(), " on"
+  // Newer CC versions render the footer mode line from more than one of
+  // these sites (e.g. a variant with the "(shift+tab to cycle)" chord), so
+  // patch all of them. insertShiftTabAppStateVar defines `currentToolset`
+  // (a live app-state selector) in the enclosing component scope.
+  const modeDisplayPattern = /([$\w]+)\(([$\w]+)\)\.toLowerCase\(\)," on"/g;
+  const matches = Array.from(oldFile.matchAll(modeDisplayPattern));
 
-  const modeDisplayPattern = /([$\w]+)\(([$\w]+)\)\.toLowerCase\(\)," on"/;
-  const match = oldFile.match(modeDisplayPattern);
-
-  if (!match || match.index === undefined) {
+  if (matches.length === 0) {
     console.error(
       'patch: toolsets: appendToolsetToModeDisplay: failed to find mode display pattern'
     );
     return null;
   }
 
-  const tlFunction = match[1];
-  const modeVar = match[2];
-
-  // Replace with the new pattern that includes toolset
-  const oldText = match[0];
-  // insertShiftTabAppStateVar provides the definition for currentToolset.
-  const newText = `${tlFunction}(${modeVar}).toLowerCase(),currentToolset?\` on [\${currentToolset}]\`:""`;
-
-  const newFile = oldFile.replace(oldText, newText);
+  let newFile = oldFile;
+  for (const match of [...matches].reverse()) {
+    if (match.index === undefined) continue;
+    const tlFunction = match[1];
+    const modeVar = match[2];
+    const newText = `${tlFunction}(${modeVar}).toLowerCase(),currentToolset?\` on [\${currentToolset}]\`:""`;
+    newFile =
+      newFile.slice(0, match.index) +
+      newText +
+      newFile.slice(match.index + match[0].length);
+  }
 
   if (newFile === oldFile) {
     console.error(
@@ -910,12 +1112,13 @@ export const appendToolsetToModeDisplay = (oldFile: string): string | null => {
     return null;
   }
 
+  const lastMatch = matches[matches.length - 1];
   showDiff(
     oldFile,
     newFile,
-    newText,
-    match.index,
-    match.index + oldText.length
+    'currentToolset?` on [${currentToolset}]`:""',
+    lastMatch.index ?? 0,
+    (lastMatch.index ?? 0) + lastMatch[0].length
   );
 
   return newFile;
@@ -1025,7 +1228,9 @@ export const findToolChangeComponentScope = (
  */
 export const addCurrentToolsetAtToolChangeComponentScope = (
   oldFile: string,
-  defaultToolset: string | null
+  defaultToolset: string | null,
+  acceptEditsToolset?: string | null,
+  planModeToolset?: string | null
 ): string | null => {
   const scopeIndex = findToolChangeComponentScope(oldFile);
   if (scopeIndex === null) {
@@ -1041,12 +1246,15 @@ export const addCurrentToolsetAtToolChangeComponentScope = (
   }
 
   const { appStateUseSelectorFn } = stateInfo;
-  const fallback = defaultToolset
-    ? JSON.stringify(defaultToolset)
-    : 'undefined';
+  const fallback = getToolsetFallbackExpression(
+    'state',
+    defaultToolset,
+    acceptEditsToolset,
+    planModeToolset
+  );
 
   // Inject the currentToolset access right at the start of the component scope
-  const injectionCode = `const currentToolset = ${appStateUseSelectorFn}(state => state.toolset) ?? ${fallback};`;
+  const injectionCode = `const currentToolset = ${appStateUseSelectorFn}(state => ${fallback});`;
 
   const newFile =
     oldFile.slice(0, scopeIndex) + injectionCode + oldFile.slice(scopeIndex);
@@ -1089,8 +1297,9 @@ export const findModeChange = (
  */
 export const writeModeChangeUpdateToolset = (
   oldFile: string,
-  planModeToolset: string,
-  defaultToolset: string
+  defaultToolset: string,
+  acceptEditsToolset: string,
+  planModeToolset: string
 ): string | null => {
   const modeChangeResult = findModeChange(oldFile);
   if (!modeChangeResult) {
@@ -1099,8 +1308,9 @@ export const writeModeChangeUpdateToolset = (
 
   const { index: modeChangeIndex, modeVar, setStateVar } = modeChangeResult;
 
-  // Build the injection code using setState directly
-  const injectionCode = `if(${modeVar}==="plan"){${setStateVar}((prev)=>({...prev,toolset:${JSON.stringify(planModeToolset)}}));}else{${setStateVar}((prev)=>({...prev,toolset:${JSON.stringify(defaultToolset)}}));}`;
+  // Build the injection code using setState directly. Each binding can be
+  // forced at CC start via TWEAKCC_TOOLSET_* env vars (#569).
+  const injectionCode = `if(${modeVar}==="plan"){${setStateVar}((prev)=>({...prev,toolset:process.env.TWEAKCC_TOOLSET_PLAN||${JSON.stringify(planModeToolset)},toolsetAutoMode:"plan"}));}else if(${modeVar}==="acceptEdits"){${setStateVar}((prev)=>({...prev,toolset:process.env.TWEAKCC_TOOLSET_ALLOW_EDITS||${JSON.stringify(acceptEditsToolset)},toolsetAutoMode:null}));}else if(${modeVar}==="auto"){${setStateVar}((prev)=>({...prev,toolset:process.env.TWEAKCC_TOOLSET_AUTO||process.env.TWEAKCC_TOOLSET_DEFAULT||${JSON.stringify(defaultToolset)},toolsetAutoMode:null}));}else{${setStateVar}((prev)=>({...prev,toolset:process.env.TWEAKCC_TOOLSET_DEFAULT||${JSON.stringify(defaultToolset)},toolsetAutoMode:null}));}`;
 
   // Inject right before the mode change
   const newFile =
@@ -1121,13 +1331,15 @@ export const writeModeChangeUpdateToolset = (
  * Apply all toolset patches to the file
  * @param oldFile - The file content to patch
  * @param toolsets - Array of toolset configurations
- * @param defaultToolset - The default toolset name (or null)
+ * @param defaultToolset - Optional toolset to use in default Shift+Tab mode
+ * @param acceptEditsToolset - Optional toolset to use in accept-edits Shift+Tab mode
  * @param planModeToolset - Optional toolset to switch to when entering plan mode
  */
 export const writeToolsets = (
   oldFile: string,
   toolsets: Toolset[],
   defaultToolset: string | null,
+  acceptEditsToolset?: string | null,
   planModeToolset?: string | null
 ): string | null => {
   // Return if no toolsets are configured
@@ -1138,7 +1350,7 @@ export const writeToolsets = (
   let result: string | null = oldFile;
 
   // Step 1: Add toolset field to app state
-  result = writeToolsetFieldToAppState(result, defaultToolset);
+  result = writeToolsetFieldToAppState(result);
   if (!result) {
     console.error(
       'patch: toolsets: step 1 failed (writeToolsetFieldToAppState)'
@@ -1147,25 +1359,46 @@ export const writeToolsets = (
   }
 
   // Step 2: Modify tool fetching useMemo
-  result = writeToolFetchingUseMemo(result, toolsets, defaultToolset);
+  result = writeToolFetchingUseMemo(
+    result,
+    toolsets,
+    defaultToolset,
+    acceptEditsToolset,
+    planModeToolset
+  );
   if (!result) {
     console.error('patch: toolsets: step 2 failed (writeToolFetchingUseMemo)');
     return null;
   }
 
   // Step 2b: Patch computeTools() to filter API-bound tools
-  result = writeComputeToolsFilter(result, toolsets, defaultToolset);
+  result = writeComputeToolsFilter(
+    result,
+    toolsets,
+    defaultToolset,
+    acceptEditsToolset,
+    planModeToolset
+  );
   if (!result) {
     console.error('patch: toolsets: step 2b failed (writeComputeToolsFilter)');
     return null;
   }
 
   // Step 2c: Patch the non-interactive --print tool context
-  result = writePrintToolsFilter(result, toolsets, defaultToolset);
+  result = writePrintToolsFilter(
+    result,
+    toolsets,
+    defaultToolset,
+    acceptEditsToolset,
+    planModeToolset
+  );
   if (!result) {
     console.error('patch: toolsets: step 2c failed (writePrintToolsFilter)');
     return null;
   }
+
+  result = writeTaskAgentFrontmatterToolsFix(result);
+  result = writeSubagentResolvedToolContextFix(result);
 
   // Step 2d: Patch "No such tool available" error messages to be toolset-aware
   const result2d = writeToolsetAwareErrors(result, toolsets, defaultToolset);
@@ -1178,7 +1411,13 @@ export const writeToolsets = (
   }
 
   // Step 3: Add toolset component definition
-  result = writeToolsetComponentDefinition(result, toolsets, defaultToolset);
+  result = writeToolsetComponentDefinition(
+    result,
+    toolsets,
+    defaultToolset,
+    acceptEditsToolset,
+    planModeToolset
+  );
   if (!result) {
     console.error(
       'patch: toolsets: step 3 failed (writeToolsetComponentDefinition)'
@@ -1196,7 +1435,12 @@ export const writeToolsets = (
   }
 
   // Step 5: Insert state getter in statusline component
-  result = insertShiftTabAppStateVar(result, defaultToolset);
+  result = insertShiftTabAppStateVar(
+    result,
+    defaultToolset,
+    acceptEditsToolset,
+    planModeToolset
+  );
   if (!result) {
     console.error('patch: toolsets: step 5 failed (insertShiftTabAppStateVar)');
     return null;
@@ -1221,11 +1465,16 @@ export const writeToolsets = (
   }
 
   // Step 8: Mode-change toolset switching (optional)
-  if (planModeToolset && defaultToolset) {
+  if (defaultToolset && (acceptEditsToolset || planModeToolset)) {
+    const effectiveAcceptEditsToolset = acceptEditsToolset ?? defaultToolset;
+    const effectivePlanModeToolset = planModeToolset ?? defaultToolset;
+
     // First, add setState access at the tool change component scope
     result = addCurrentToolsetAtToolChangeComponentScope(
       result,
-      defaultToolset
+      defaultToolset,
+      effectiveAcceptEditsToolset,
+      effectivePlanModeToolset
     );
     if (!result) {
       console.error(
@@ -1237,8 +1486,9 @@ export const writeToolsets = (
     // Then, inject the mode change toolset switching code
     result = writeModeChangeUpdateToolset(
       result,
-      planModeToolset,
-      defaultToolset
+      defaultToolset,
+      effectiveAcceptEditsToolset,
+      effectivePlanModeToolset
     );
     if (!result) {
       console.error(

@@ -852,6 +852,7 @@ export const applyCustomization = async (
           c,
           config.settings.toolsets!,
           config.settings.defaultToolset,
+          config.settings.acceptEditsToolset,
           config.settings.planModeToolset
         ),
       condition: !!(

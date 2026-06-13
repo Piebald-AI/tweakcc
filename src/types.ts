@@ -170,6 +170,7 @@ export interface Settings {
   misc: MiscConfig;
   toolsets: Toolset[];
   defaultToolset: string | null;
+  acceptEditsToolset: string | null;
   planModeToolset: string | null;
   subagentModels: SubagentModelsConfig;
   inputPatternHighlighters: InputPatternHighlighter[];
