@@ -197,7 +197,7 @@ describe('systemPrompts.ts', () => {
       expect(result.newContent).toBe('msg:"Say \\"Hello\\""');
     });
 
-    it('should not double-escape already-escaped double quotes', async () => {
+    it('should escape backslashes before quotes to preserve literal backslash-quotes (#660)', async () => {
       const mockPromptData = buildMockPromptData({
         content: 'Say \\"Hello\\"',
         regex: 'Say \\\\"Hello\\\\"',
@@ -211,7 +211,7 @@ describe('systemPrompts.ts', () => {
 
       const result = await applySystemPrompts(cliContent, '1.0.0', false);
 
-      expect(result.newContent).toBe('msg:"Say \\"Hello\\""');
+      expect(result.newContent).toBe('msg:"Say \\\\\\"Hello\\\\\\""');
     });
 
     it('should auto-escape backticks in template literal context', async () => {
@@ -273,7 +273,7 @@ describe('systemPrompts.ts', () => {
       );
     });
 
-    it('should not double-escape already-escaped backticks', async () => {
+    it('should escape backslashes before backticks to preserve literal backslash-backticks (#660)', async () => {
       const mockPromptData = buildMockPromptData({
         content: 'Use \\`foo\\` for config',
         regex: 'Use \\\\`foo\\\\` for config',
@@ -287,7 +287,7 @@ describe('systemPrompts.ts', () => {
 
       const result = await applySystemPrompts(cliContent, '1.0.0', false);
 
-      expect(result.newContent).toBe('desc:`Use \\`foo\\` for config`');
+      expect(result.newContent).toBe('desc:`Use \\\\\\`foo\\\\\\` for config`');
     });
 
     it('should auto-escape backticks adjacent to template expressions', async () => {
@@ -307,7 +307,7 @@ describe('systemPrompts.ts', () => {
       expect(result.newContent).toBe('desc:`Value: \\`${x}\\``');
     });
 
-    it('should auto-escape only unescaped backticks when mixed with escaped ones', async () => {
+    it('should escape backslashes in already-escaped backticks and also escape bare backticks (#660)', async () => {
       const mockPromptData = buildMockPromptData({
         content: 'Use \\`foo\\` and `bar` for config',
         regex: 'Use \\\\`foo\\\\` and `bar` for config',
@@ -322,7 +322,7 @@ describe('systemPrompts.ts', () => {
       const result = await applySystemPrompts(cliContent, '1.0.0', false);
 
       expect(result.newContent).toBe(
-        'desc:`Use \\`foo\\` and \\`bar\\` for config`'
+        'desc:`Use \\\\\\`foo\\\\\\` and \\`bar\\` for config`'
       );
     });
 
@@ -406,7 +406,7 @@ describe('systemPrompts.ts', () => {
       expect(result.newContent).toBe("msg:'It\\'s working'");
     });
 
-    it('should not double-escape already-escaped single quotes', async () => {
+    it('should escape backslashes before single quotes to preserve literal backslash-quotes (#660)', async () => {
       const mockPromptData = buildMockPromptData({
         content: "It\\'s working",
         regex: "It\\\\'s working",
@@ -420,7 +420,7 @@ describe('systemPrompts.ts', () => {
 
       const result = await applySystemPrompts(cliContent, '1.0.0', false);
 
-      expect(result.newContent).toBe("msg:'It\\'s working'");
+      expect(result.newContent).toBe("msg:'It\\\\\\'s working'");
     });
 
     it('should set applied:true when auto-escape changes content even if char delta is 0', async () => {
