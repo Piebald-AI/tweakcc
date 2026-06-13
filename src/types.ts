@@ -102,6 +102,7 @@ export interface UserMessageDisplayConfig {
 
 export interface InputBoxConfig {
   removeBorder: boolean;
+  chevronIdleThemeColor: string | null;
 }
 
 export type TableFormat = 'default' | 'ascii' | 'clean' | 'clean-top-bottom';
