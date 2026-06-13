@@ -22,9 +22,9 @@
  * await backupFile(installation.path, './backup');
  *
  * // Read, patch, write
- * let content = await readContent(installation);
- * content = content.replace(/something/g, 'something else');
- * await writeContent(installation, content);
+ * const { content, clearBytecode } = await readContent(installation);
+ * const modified = content.replace(/something/g, 'something else');
+ * await writeContent(installation, modified, clearBytecode);
  * ```
  */
 
