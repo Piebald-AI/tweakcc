@@ -32,6 +32,10 @@ const patchModeSwitchingFunction = (oldFile: string): string | null => {
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
+    const nativePattern =
+      /if\s*\(\s*\(?[$\w]+\s*===\s*"opusplan"\s*\|\|\s*[$\w]+\s*===\s*"opusplan\[1m\]"\)?\s*&&\s*[$\w]+\s*===\s*"plan"\s*&&\s*![$\w]+\s*\)/;
+    if (nativePattern.test(oldFile)) return oldFile;
+
     console.error(
       'patch: opusplan1m: patchModeSwitchingFunction: failed to find mode switching pattern'
     );
@@ -69,8 +73,7 @@ const patchModeSwitchingFunction = (oldFile: string): string | null => {
  */
 const patchModelAliasesList = (oldFile: string): string | null => {
   // Pattern matches the model aliases array assignment
-  const pattern =
-    /(\["sonnet","opus","haiku",(?:"best",)?"sonnet\[1m\]",(?:"opus\[1m\]",)?"opusplan")/;
+  const pattern = /(\[(?:"[^"]+",)*"opusplan")/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
