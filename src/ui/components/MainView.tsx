@@ -1,11 +1,11 @@
 import * as os from 'node:os';
 
 import { Box, Text } from 'ink';
-import Link from 'ink-link';
 
 import { MainMenuItem } from '@/types';
 import { CONFIG_DIR } from '@/config';
 
+import Link from './Link';
 import Header from './Header';
 import PiebaldAnnouncement from './PiebaldAnnouncement';
 import MainMenu from './MainMenu';
