@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix toolsets for Claude Code 2.1.167+: separate acceptEdits mode binding, preserve the `Skill` tool, and show the live `[toolset]` in the footer (#778) - @basekevin
 - Apply mode-bound toolsets at program load and add `TWEAKCC_TOOLSET_DEFAULT`, `TWEAKCC_TOOLSET_ALLOW_EDITS`, `TWEAKCC_TOOLSET_PLAN`, and `TWEAKCC_TOOLSET_AUTO` env overrides (#778) - @basekevin
 - Make agents without explicit `tools:` frontmatter respect the active toolset (#778) - @basekevin
+- Fix opusplan1m for Claude Code 2.1.175+ (#798) - @basekevin
 
 ## [v4.0.14](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.14) - 2026-06-03
 
