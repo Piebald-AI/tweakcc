@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-## [v4.1.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.1.0) - 2026-06-15
+## [v4.1.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.1.0) - 2026-06-17
 
 - Fix patch theme settings schema to include custom theme IDs (#702) - @zeshuochen
 - feat: add /clear-screen slash command (#647) - @VitalyOstanin
@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Make agents without explicit `tools:` frontmatter respect the active toolset (#778) - @basekevin
 - Fix opusplan1m for Claude Code 2.1.175+ (#798) - @basekevin
 - Use an in-house Link component instead of ink-link because the latter doesn't declare react in its dep list (#800) - @bl-ue
+- Fix system prompt application on Claude Code 2.1.179: match Latin-1 \xHH escapes (#808) - @bl-ue
 
 ## [v4.0.14](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.0.14) - 2026-06-03
 
