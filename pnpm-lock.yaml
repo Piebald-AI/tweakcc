@@ -28,10 +28,7 @@ importers:
         version: 4.0.3
       ink:
         specifier: ^6.1.0
-        version: 6.1.0(@types/react@18.3.23)(react@19.1.1)
-      ink-link:
-        specifier: ^4.1.0
-        version: 4.1.0(ink@6.1.0(@types/react@18.3.23)(react@19.1.1))
+        version: 6.1.0(@types/react@19.2.17)(react@19.1.1)
       node-lief:
         specifier: ^1.3.0
         version: 1.3.0
@@ -41,6 +38,9 @@ importers:
       react:
         specifier: ^19.1.1
         version: 19.1.1
+      terminal-link:
+        specifier: ^3.0.0
+        version: 3.0.0
       which:
         specifier: ^6.0.0
         version: 6.0.0
@@ -52,8 +52,8 @@ importers:
         specifier: ^20.19.10
         version: 20.19.10
       '@types/react':
-        specifier: ^18.3.23
-        version: 18.3.23
+        specifier: ^19.1.1
+        version: 19.2.17
       '@types/which':
         specifier: ^3.0.4
         version: 3.0.4
@@ -639,11 +639,8 @@ packages:
   '@types/node@20.19.10':
     resolution: {integrity: sha512-iAFpG6DokED3roLSP0K+ybeDdIX6Bc0Vd3mLW5uDqThPWtNos3E+EqOM11mPQHKzfWHqEBuLjIlsBQQ8CsISmQ==}
 
-  '@types/prop-types@15.7.15':
-    resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
-
-  '@types/react@18.3.23':
-    resolution: {integrity: sha512-/LDXMQh55EzZQ0uVAZmKKhfENivEvWz6E+EYzh+/MCjMhNsotd+ZHhBGIjFDTi6+fz0OhQQQLbTgdQIxxCsC0w==}
+  '@types/react@19.2.17':
+    resolution: {integrity: sha512-MXfmqaVPEVgkBT/aY0aGCkRWWtByiYQXo3xdQ8r5RzuFrPiRn8Gar2tQdXSUQ2GKV3bkXckek89V8wQBY2Q/Aw==}
 
   '@types/which@3.0.4':
     resolution: {integrity: sha512-liyfuo/106JdlgSchJzXEQCVArk0CvevqPote8F8HgWgJ3dRCcTHgJIsLDuee0kxk/mhbInzIZk3QWSZJ8R+2w==}
@@ -936,8 +933,8 @@ packages:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
 
-  csstype@3.1.3:
-    resolution: {integrity: sha512-M1uQkMl8rQK/szD0LNhtqxIPLpimGm8sOBwU7lLnCpSbTyY3yeU1Vc7l4KT5zT4s/yOxHH5O7tIuuLOCnLADRw==}
+  csstype@3.2.3:
+    resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
   data-view-buffer@1.0.2:
     resolution: {integrity: sha512-EmKO5V3OLXh1rtK2wgXRansaK1/mtVdTUEiEI0W8RkvgT05kfxaH29PliLnpLP73yYO6142Q72QNa8Wx/A5CqQ==}
@@ -1314,12 +1311,6 @@ packages:
   indent-string@5.0.0:
     resolution: {integrity: sha512-m6FAo/spmsW2Ab2fU35JTYwtOKa2yAwXSwgjSv1TJzh4Mh7mC3lzAOVLBprb72XsTrgkEIsl7YrFNAiDiRhIGg==}
     engines: {node: '>=12'}
-
-  ink-link@4.1.0:
-    resolution: {integrity: sha512-3nNyJXum0FJIKAXBK8qat2jEOM41nJ1J60NRivwgK9Xh92R5UMN/k4vbz0A9xFzhJVrlf4BQEmmxMgXkCE1Jeg==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      ink: '>=4'
 
   ink@6.1.0:
     resolution: {integrity: sha512-YQ+lbMD79y3FBAJXXZnuRajLEgaMFp102361eY5NrBIEVCi9oFo7gNZU4z2LBWlcjZFiTt7jetlkIbKCCH4KJA==}
@@ -2644,12 +2635,9 @@ snapshots:
     dependencies:
       undici-types: 6.21.0
 
-  '@types/prop-types@15.7.15': {}
-
-  '@types/react@18.3.23':
+  '@types/react@19.2.17':
     dependencies:
-      '@types/prop-types': 15.7.15
-      csstype: 3.1.3
+      csstype: 3.2.3
 
   '@types/which@3.0.4': {}
 
@@ -3000,7 +2988,7 @@ snapshots:
       shebang-command: 2.0.0
       which: 2.0.2
 
-  csstype@3.1.3: {}
+  csstype@3.2.3: {}
 
   data-view-buffer@1.0.2:
     dependencies:
@@ -3481,13 +3469,7 @@ snapshots:
 
   indent-string@5.0.0: {}
 
-  ink-link@4.1.0(ink@6.1.0(@types/react@18.3.23)(react@19.1.1)):
-    dependencies:
-      ink: 6.1.0(@types/react@18.3.23)(react@19.1.1)
-      prop-types: 15.8.1
-      terminal-link: 3.0.0
-
-  ink@6.1.0(@types/react@18.3.23)(react@19.1.1):
+  ink@6.1.0(@types/react@19.2.17)(react@19.1.1):
     dependencies:
       '@alcalzone/ansi-tokenize': 0.1.3
       ansi-escapes: 7.0.0
@@ -3515,7 +3497,7 @@ snapshots:
       ws: 8.18.3
       yoga-layout: 3.2.1
     optionalDependencies:
-      '@types/react': 18.3.23
+      '@types/react': 19.2.17
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -4546,5 +4528,3 @@ snapshots:
   yocto-queue@0.1.0: {}
 
   yoga-layout@3.2.1: {}
-
-time: {}
