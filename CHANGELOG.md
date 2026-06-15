@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v4.1.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.1.0) - 2026-06-15
+
+- Fix patch theme settings schema to include custom theme IDs (#702) - @zeshuochen
+- feat: add /clear-screen slash command (#647) - @VitalyOstanin
+- Fix Text component detection for Claude Code 2.1.170 (#785) - @NiekNijland
+- Ungate native patch application (#788) - @basekevin
+- Remove WASMagic and use heuristics to detect native vs. JS installations instead (#601) - @signadou
 - Fix toolsets for Claude Code 2.1.167+: separate acceptEdits mode binding, preserve the `Skill` tool, and show the live `[toolset]` in the footer (#778) - @basekevin
 - Apply mode-bound toolsets at program load and add `TWEAKCC_TOOLSET_DEFAULT`, `TWEAKCC_TOOLSET_ALLOW_EDITS`, `TWEAKCC_TOOLSET_PLAN`, and `TWEAKCC_TOOLSET_AUTO` env overrides (#778) - @basekevin
 - Make agents without explicit `tools:` frontmatter respect the active toolset (#778) - @basekevin
