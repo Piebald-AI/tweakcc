@@ -275,6 +275,37 @@ Content only.`;
     });
   });
 
+  describe('buildSearchRegexFromPieces (cli.js search regex)', () => {
+    // Regression test for the Latin-1 \xHH locator bug: minified Claude Code
+    // bundles store Latin-1 chars (0x80–0xFF) as 2-digit hex escapes (e.g.
+    // "·" -> \xB7, "×" -> \xD7), not as \uXXXX. The search regex must match the
+    // literal char, the \uXXXX form, AND the \xHH form (case-insensitive),
+    // otherwise any prompt containing such a char fails to apply.
+    it('matches Latin-1 chars stored as \\xHH, \\uXXXX, or literal', () => {
+      const pattern = promptSync.buildSearchRegexFromPieces(
+        ['a · b × c'],
+        '2.1.179'
+      );
+      const re = new RegExp(pattern, 'si');
+      // \xB7 / \xD7 as they appear literally in a minified Bun bundle:
+      expect(re.test('a \\xB7 b \\xD7 c')).toBe(true);
+      // · / × form:
+      expect(re.test('a \\u00b7 b \\u00d7 c')).toBe(true);
+      // literal characters (template-literal source):
+      expect(re.test('a · b × c')).toBe(true);
+    });
+
+    it('still matches non-Latin-1 chars via \\uXXXX or literal', () => {
+      const pattern = promptSync.buildSearchRegexFromPieces(
+        ['x — y'],
+        '2.1.179'
+      );
+      const re = new RegExp(pattern, 'si');
+      expect(re.test('x \\u2014 y')).toBe(true); // em dash, escaped
+      expect(re.test('x — y')).toBe(true); // em dash, literal
+    });
+  });
+
   describe('extractUserCustomizations', () => {
     it('should extract what user put in place of minified identifiers', () => {
       const pieces = [

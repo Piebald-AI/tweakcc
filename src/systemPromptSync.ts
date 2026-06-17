@@ -1048,9 +1048,18 @@ const escapeNonAsciiForRegex = (text: string): string => {
   // eslint-disable-next-line no-control-regex
   return text.replace(/[^\x00-\x7F]/g, char => {
     const codePoint = char.charCodeAt(0);
-    const escaped = `\\\\u${codePoint.toString(16).padStart(4, '0')}`;
-    // Match either the literal character OR the escaped version
-    return `(?:${char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${escaped})`;
+    const literal = char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Match the literal char OR its escaped forms. Minified bundles store BMP
+    // non-ASCII as \uXXXX, but Latin-1 chars (0x80–0xFF) are emitted as \xHH
+    // (2-digit hex, e.g. "·" -> \xB7, "×" -> \xD7). The search regex's 'i' flag
+    // handles upper/lowercase hex. Without the \xHH alternative, any prompt
+    // containing such a character (·, ×, °, é, …) fails to match on recent
+    // Claude Code builds, so the whole prompt is skipped.
+    const alts = [literal, `\\\\u${codePoint.toString(16).padStart(4, '0')}`];
+    if (codePoint >= 0x80 && codePoint <= 0xff) {
+      alts.push(`\\\\x${codePoint.toString(16).padStart(2, '0')}`);
+    }
+    return `(?:${alts.join('|')})`;
   });
 };
 
@@ -1066,7 +1075,7 @@ const escapeNonAsciiChars = (text: string): string => {
   });
 };
 
-const buildSearchRegexFromPieces = (
+export const buildSearchRegexFromPieces = (
   pieces: string[],
   ccVersion: string,
   buildTime?: string
