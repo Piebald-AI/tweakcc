@@ -6,7 +6,7 @@ export const writeInputChevronColor = (
   resolvedColor: string
 ): string | null => {
   const pattern =
-    /,\{isLoading:([$\w]+),themeColor:([$\w]+)\}=[$\w]+,([$\w]+)=\2\?\?void 0,[$\w]+;if\([$\w]+\[0\]!==\3\|\|[$\w]+\[1\]!==\1\)[$\w]+=[$\w]+\.createElement\([$\w]+,\{color:\3,dimColor:\1\}/;
+    /,\{isLoading:([$\w]+),themeColor:([$\w]+)\}=[$\w]+,([$\w]+)=\2\?\?void 0,[$\w]+;if\([$\w]+\[0\]!==\3\|\|[$\w]+\[1\]!==\1\)[$\w]+=[$\w]+\.createElement\([$\w]+,\{"aria-label":"input:",color:\3,dimColor:\1\}/;
 
   const match = file.match(pattern);
 
