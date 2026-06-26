@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fix crash when a system prompt's search regex is too complex to compile, which aborted the entire `--apply` on Node <=22 (#753) - @StreamDemon
+
 ## [v4.1.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.1.1) - 2026-06-17
 
 - Fix system prompt application on Claude Code 2.1.179: match Latin-1 \xHH escapes (#808) - @lukehutch

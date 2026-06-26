@@ -474,5 +474,61 @@ describe('systemPrompts.ts', () => {
       expect(result.results[0].skipped).toBe(true);
       expect(result.results[0].applied).toBe(false);
     });
+
+    it('should skip a prompt whose regex fails to compile instead of throwing', async () => {
+      const mockPromptData = buildMockPromptData({
+        promptId: 'uncompilable-prompt',
+        prompt: { name: 'Uncompilable Prompt', content: 'unused' },
+        regex: '(', // invalid pattern: new RegExp('(', 'si') throws (unterminated group)
+        getInterpolatedContent: () => 'unused',
+        pieces: ['unused'],
+      });
+
+      setupMocks(mockPromptData);
+
+      const cliContent = 'desc:"some content"';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe(cliContent);
+      expect(result.results).toHaveLength(1);
+      expect(result.results[0].applied).toBe(false);
+      expect(result.results[0].details).toContain('too complex');
+    });
+
+    it('should continue applying remaining prompts after one regex fails to compile', async () => {
+      const badPrompt = buildMockPromptData({
+        promptId: 'bad-prompt',
+        prompt: { name: 'Bad Prompt', content: 'unused' },
+        regex: '(',
+        getInterpolatedContent: () => 'unused',
+        pieces: ['unused'],
+      });
+      const goodPrompt = buildMockPromptData({
+        promptId: 'good-prompt',
+        prompt: { name: 'Good Prompt', content: 'New content' },
+        regex: 'Original text',
+        getInterpolatedContent: () => 'New content',
+        pieces: ['Original text'],
+      });
+
+      vi.mocked(promptSync.loadSystemPromptsWithRegex).mockResolvedValue([
+        badPrompt,
+        goodPrompt,
+      ]);
+      vi.mocked(systemPromptHashIndex.setAppliedHash).mockResolvedValue();
+
+      const cliContent = 'desc:"Original text"';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe('desc:"New content"');
+      expect(result.results).toHaveLength(2);
+      expect(result.results[0].id).toBe('bad-prompt');
+      expect(result.results[0].applied).toBe(false);
+      expect(result.results[0].details).toContain('too complex');
+      expect(result.results[1].id).toBe('good-prompt');
+      expect(result.results[1].applied).toBe(true);
+    });
   });
 });
