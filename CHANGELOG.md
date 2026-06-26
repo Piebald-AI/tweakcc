@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Add input chevron color patch (#634) - @VitalyOstanin
+
 ## [v4.2.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.2.0) - 2026-06-26
 
 - Fix crash when a system prompt's search regex is too complex to compile, which aborted the entire `--apply` on Node <=22 (#753) - @StreamDemon

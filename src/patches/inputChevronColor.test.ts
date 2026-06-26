@@ -5,7 +5,7 @@ import { writeInputChevronColor } from './inputChevronColor';
 const chevron =
   ',{isLoading:n,themeColor:r}=e,s=r??void 0,i;' +
   'if(t[0]!==s||t[1]!==n)' +
-  'i=Kne.createElement(w,{"aria-label":"input:",color:s,dimColor:n},et.pointer,"\\xA0")';
+  'i=Kne.jsxs(w,{color:s,dimColor:n,children:[et.pointer,"\\xA0"]})';
 
 const makeInput = () => 'var a=1' + chevron + ',t[2]=i;else i=t[2];return i';
 
@@ -35,7 +35,7 @@ describe('writeInputChevronColor', () => {
     const input =
       'var a=1,{isLoading:X$,themeColor:Y$}=Z$,W$=Y$??void 0,V$;' +
       'if(Q$[0]!==W$||Q$[1]!==X$)' +
-      'V$=R$.createElement(T$,{"aria-label":"input:",color:W$,dimColor:X$},U$.pointer,"\\xA0")';
+      'V$=R$.jsxs(T$,{color:W$,dimColor:X$,children:[U$.pointer,"\\xA0"]})';
     const result = writeInputChevronColor(input, 'blue');
 
     expect(result).not.toBeNull();
