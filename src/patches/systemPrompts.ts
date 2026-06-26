@@ -123,8 +123,31 @@ export const applySystemPrompts = async (
     }
 
     debug(`Applying system prompt: ${prompt.name}`);
-    const pattern = new RegExp(regex, 'si'); // 's' flag for dotAll mode, 'i' because of casing inconsistencies in unicode escape sequences (e.g. `\u201c` in the regex vs `\u201C` in the file)
-    const match = content.match(pattern);
+    // 's' = dotAll; 'i' for hex-case differences in unicode escapes. Guard regex
+    // construction + match: an oversized pattern (e.g. the Model Migration Guide) can
+    // overflow V8's regex stack on Node <=22 and abort the whole --apply (#753).
+    let pattern: RegExp;
+    let match: RegExpMatchArray | null;
+    try {
+      pattern = new RegExp(regex, 'si');
+      match = content.match(pattern);
+    } catch (error) {
+      console.log(
+        chalk.yellow(
+          `Skipped "${prompt.name}": regex too complex to compile (${
+            error instanceof Error ? error.message : String(error)
+          })`
+        )
+      );
+      results.push({
+        id: promptId,
+        name: prompt.name,
+        group: PatchGroup.SYSTEM_PROMPTS,
+        applied: false,
+        details: 'regex too complex',
+      });
+      continue;
+    }
 
     if (match && match.index !== undefined) {
       // Generate the interpolated content using the actual variables from the match
