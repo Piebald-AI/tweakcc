@@ -154,10 +154,11 @@ const patchChannelsNotice = (file: string): string | null => {
     /Experimental[^"]*?inbound messages will be pushed into this session, this carries prompt injection risks\. Restart Claude Code without /;
   const match = file.match(pattern);
 
+  // Claude Code removed this "Experimental" banner around 2.1.193, so the
+  // anchor is legitimately absent on newer versions. Treat that as an optional
+  // no-op (the channel gates above are already bypassed) rather than logging a
+  // misleading failure during `--apply`.
   if (!match || match.index === undefined) {
-    console.error(
-      'patch: channelsMode: failed to find ChannelsNotice warning text'
-    );
     return null;
   }
 
