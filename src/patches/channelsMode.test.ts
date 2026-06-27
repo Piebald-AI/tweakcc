@@ -2,10 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { writeChannelsMode } from './channelsMode';
 
-// Minimal synthetic bundle carrying the four anchors the channels-mode patch
-// still relies on (the two flag gates, the gate-function capability check, and
-// the server dev-flag warning). The "Experimental" notice banner is omitted to
-// mirror CC 2.1.193+.
 const GATES =
   'function a(){return F("tengu_harbor",!1)};' +
   'function g(){return{reason:"server did not declare claude/channel capability"}};' +
