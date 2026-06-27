@@ -30,8 +30,7 @@ describe('writeVerboseProperty', () => {
   });
 
   it('handles the legacy spinnerTip/overrideMessage fallback (jsx)', () => {
-    const input =
-      'Q.jsx(Sp,{foo:1,spinnerTip:t,overrideMessage:m,verbose:p})';
+    const input = 'Q.jsx(Sp,{foo:1,spinnerTip:t,overrideMessage:m,verbose:p})';
     const result = writeVerboseProperty(input);
     expect(result).not.toBeNull();
     expect(result).toContain('verbose:true');
