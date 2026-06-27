@@ -33,6 +33,7 @@ import { writeShowMoreItemsInSelectMenus } from './showMoreItemsInSelectMenus';
 import { writeThemes } from './themes';
 import { writeContextLimit } from './contextLimit';
 import { writeInputBoxBorder } from './inputBorderBox';
+import { writeInputChevronColor } from './inputChevronColor';
 import { writeThinkerFormat } from './thinkerFormat';
 import { writeThinkerSymbolMirrorOption } from './thinkerMirrorOption';
 import { writeThinkerSymbolChars } from './thinkerSymbolChars';
@@ -58,6 +59,7 @@ import { writeHideStartupClawd } from './hideStartupClawd';
 import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
 import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
+import { writeSuppressRateLimitWarning } from './suppressRateLimitWarning';
 import { writeSessionMemory } from './sessionMemory';
 import { writeRememberSkill } from './rememberSkill';
 import { writeThinkingBlockStyling } from './thinkingBlockStyling';
@@ -273,6 +275,13 @@ const PATCH_DEFINITIONS = [
       "Your custom styles to the main input box's border will be applied",
   },
   {
+    id: 'input-chevron-color',
+    name: 'Input chevron color',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'The input chevron changes color based on loading state (e.g. green when idle)',
+  },
+  {
     id: 'subagent-models',
     name: 'Subagent models',
     group: PatchGroup.MISC_CONFIGURABLE,
@@ -325,6 +334,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.MISC_CONFIGURABLE,
     description:
       "/rate-limit-options won't be injected when limits are reached",
+  },
+  {
+    id: 'suppress-rate-limit-warning',
+    name: 'Suppress rate limit warning',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Rate limit warning banners will be suppressed (errors still shown)',
   },
   {
     id: 'token-count-rounding',
@@ -777,6 +793,17 @@ export const applyCustomization = async (
           DEFAULT_SETTINGS.inputBox.removeBorder
       ),
     },
+    'input-chevron-color': {
+      fn: c => {
+        const themeColorKey = config.settings.inputBox!.chevronIdleThemeColor!;
+        const theme = config.settings.themes?.[0];
+        const resolved =
+          (theme?.colors as Record<string, string>)?.[themeColorKey] ??
+          themeColorKey;
+        return writeInputChevronColor(c, resolved);
+      },
+      condition: !!config.settings.inputBox?.chevronIdleThemeColor,
+    },
     'subagent-models': {
       fn: c => writeSubagentModels(c, config.settings.subagentModels!),
       condition:
@@ -811,6 +838,10 @@ export const applyCustomization = async (
     'suppress-rate-limit-options': {
       fn: c => writeSuppressRateLimitOptions(c),
       condition: !!config.settings.misc?.suppressRateLimitOptions,
+    },
+    'suppress-rate-limit-warning': {
+      fn: c => writeSuppressRateLimitWarning(c),
+      condition: !!config.settings.misc?.suppressRateLimitWarning,
     },
     'token-count-rounding': {
       fn: c =>

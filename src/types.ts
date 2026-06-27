@@ -102,6 +102,7 @@ export interface UserMessageDisplayConfig {
 
 export interface InputBoxConfig {
   removeBorder: boolean;
+  chevronIdleThemeColor: string | null;
 }
 
 export type TableFormat = 'default' | 'ascii' | 'clean' | 'clean-top-bottom';
@@ -117,6 +118,7 @@ export interface MiscConfig {
   increaseFileReadLimit: boolean;
   suppressLineNumbers: boolean;
   suppressRateLimitOptions: boolean;
+  suppressRateLimitWarning: boolean;
   mcpConnectionNonBlocking: boolean;
   mcpServerBatchSize: number | null;
   statuslineThrottleMs: number | null;

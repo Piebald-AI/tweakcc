@@ -687,6 +687,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   inputBox: {
     removeBorder: false,
+    chevronIdleThemeColor: 'success',
   },
   misc: {
     showTweakccVersion: true,
@@ -699,6 +700,7 @@ export const DEFAULT_SETTINGS: Settings = {
     increaseFileReadLimit: false,
     suppressLineNumbers: false,
     suppressRateLimitOptions: false,
+    suppressRateLimitWarning: false,
     mcpConnectionNonBlocking: true,
     mcpServerBatchSize: null,
     statuslineThrottleMs: null,
