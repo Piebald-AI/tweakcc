@@ -150,8 +150,10 @@ export const writeUserMessageDisplay = (
 
   // CC 2.1.138: child display is memoized before the parent Box call.
   // Replace only the child assignment so React compiler cache bookkeeping remains intact.
+  // CC >=2.1.x renders via the JSX automatic runtime, so the assignment is
+  // `B=X.jsx(SUB,{text:VAR,...})` rather than `B=X.createElement(SUB,{text:VAR,...})`.
   const memoizedChildPattern =
-    /(No content found in user prompt message.{0,1200}?)([$\w]+)=([$\w]+(?:\.default)?\.createElement)\([$\w]+,\{text:([$\w]+),useBriefLayout:[$\w]+,timestamp:[$\w]+\}\)/;
+    /(No content found in user prompt message.{0,1200}?)([$\w]+)=([$\w]+(?:\.default)?\.(?:createElement|jsxs?))\([$\w]+,\{text:([$\w]+),useBriefLayout:[$\w]+,timestamp:[$\w]+\}\)/;
 
   const oldMatch = oldFile.match(pattern);
   const newMatch = oldMatch ? null : oldFile.match(newPattern);
@@ -267,11 +269,26 @@ export const writeUserMessageDisplay = (
 
   const chalkFormattedString = `${chalkChain}(${formattedMessage})`;
 
-  // Build replacement: match[1] + createElement(Box, boxProps, createElement(Text, null, chalkFormattedString))
+  // Build replacement: Box(border/padding) wrapping Text(chalk-formatted message).
   const replacementPrefix = memoizedChildMatch ? `${match[2]}=` : '';
-  const replacement =
-    match[1] +
-    `${replacementPrefix}${createElementFn}(${resolvedBoxComponent},${boxAttrsObjStr},${createElementFn}(${textComponent},null,${chalkFormattedString}))`;
+
+  // CC's JSX automatic runtime (jsx/jsxs) passes children as a prop, and the
+  // captured call var has no `.createElement`, so emit jsx-convention calls
+  // there. Older bundles use the classic createElement(type, props, ...children).
+  const isJsxRuntime = /\.jsxs?$/.test(createElementFn);
+  let elementTree: string;
+  if (isJsxRuntime) {
+    const textEl = `${createElementFn}(${textComponent},{children:${chalkFormattedString}})`;
+    const boxProps =
+      boxAttrsObjStr === 'null'
+        ? `{children:${textEl}}`
+        : `${boxAttrsObjStr.slice(0, -1)},children:${textEl}}`;
+    elementTree = `${createElementFn}(${resolvedBoxComponent},${boxProps})`;
+  } else {
+    elementTree = `${createElementFn}(${resolvedBoxComponent},${boxAttrsObjStr},${createElementFn}(${textComponent},null,${chalkFormattedString}))`;
+  }
+
+  const replacement = match[1] + `${replacementPrefix}${elementTree}`;
 
   const startIndex = match.index;
   const endIndex = startIndex + match[0].length;

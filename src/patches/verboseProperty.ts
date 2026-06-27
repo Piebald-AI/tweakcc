@@ -3,10 +3,13 @@
 import { LocationResult, showDiff } from './index';
 
 const getVerbosePropertyLocation = (oldFile: string): LocationResult | null => {
+  // CC >=2.1.x compiles the UI with the React JSX automatic runtime, so the
+  // spinner element is emitted as `X.jsx(C,{...})` / `X.jsxs(C,{...})` rather
+  // than `X.createElement(C,{...})`. Accept all three call forms.
   const createElementPattern =
-    /(?:[$\w]+\.)?createElement\([$\w]+,\{(?=[^}]*responseLengthRef:)(?=[^}]*spinnerSuffix:)(?=[^}]*thinkingStatus:)(?=[^}]*isCompacting:)[^}]*verbose:[^,}]+[^}]*\}/;
+    /(?:[$\w]+\.)?(?:createElement|jsxs?)\([$\w]+,\{(?=[^}]*responseLengthRef:)(?=[^}]*spinnerSuffix:)(?=[^}]*thinkingStatus:)(?=[^}]*isCompacting:)[^}]*verbose:[^,}]+[^}]*\}/;
   const legacyCreateElementPattern =
-    /createElement\([$\w]+,\{[^}]+spinnerTip[^}]+overrideMessage[^}]+\}/;
+    /(?:createElement|jsxs?)\([$\w]+,\{[^}]+spinnerTip[^}]+overrideMessage[^}]+\}/;
   const createElementMatch =
     oldFile.match(createElementPattern) ??
     oldFile.match(legacyCreateElementPattern);

@@ -37,12 +37,32 @@ export const findVersionOutputLocation = (
  */
 const findTweakccVersionLocations = (
   fileContents: string
-): {
-  varInsertIndex: number;
-  refInsertIndex: number;
-  reactVar: string;
-  textComponent: string;
-} | null => {
+):
+  | { jsx: true; insertIndex: number; jsxVar: string; textComponent: string }
+  | {
+      jsx?: false;
+      varInsertIndex: number;
+      refInsertIndex: number;
+      reactVar: string;
+      textComponent: string;
+    }
+  | null => {
+  // CC >=2.1.x compiles the header with the React JSX automatic runtime:
+  //   _=X.jsxs(TEXT,{children:[BOLD," ",X.jsxs(TEXT,{dimColor:!0,children:["v",VER]})]})
+  // Insert the tweakcc version as a sibling child right after the version element
+  // (before the outer children-array `]`).
+  const jsxVersionPattern =
+    /([$\w]+)\.jsxs?\(([$\w]+),\{dimColor:!0,children:\["v",[$\w]+\]\}\)/;
+  const jsxMatch = fileContents.match(jsxVersionPattern);
+  if (jsxMatch && jsxMatch.index !== undefined) {
+    return {
+      jsx: true,
+      insertIndex: jsxMatch.index + jsxMatch[0].length,
+      jsxVar: jsxMatch[1],
+      textComponent: jsxMatch[2],
+    };
+  }
+
   // Find: createElement(TEXT,{bold:!0},"Claude Code"),CACHE[N]=x;else x=CACHE[N];
   // This gives us the position right after the x assignment block — where we insert our var
   const boldPattern =
@@ -322,6 +342,52 @@ const applyIndicatorPatchesListPatch = (
 const findPatchesListLocation = (
   fileContents: string
 ): LocationResult | null => {
+  // CC >=2.1.x JSX automatic runtime: the header row lives inside a column box
+  //   HDR=X.jsxs(TEXT,{children:[...,X.jsxs(TEXT,{dimColor:!0,children:["v",VER]})...]})
+  //   ...X.jsxs(BOX,{flexDirection:"column",children:[HDR,...]})
+  // Insert the patches list as the last child of that column array. identifiers
+  // carries [jsxVar, boxVar] to signal jsx mode to the codegen.
+  const jsxVerMatch = fileContents.match(
+    /([$\w]+)\.jsxs?\([$\w]+,\{dimColor:!0,children:\["v",[$\w]+\]\}\)/
+  );
+  if (jsxVerMatch && jsxVerMatch.index !== undefined) {
+    const jsxVar = jsxVerMatch[1];
+    // Header row var = nearest `VAR=<jsxVar>.jsxs(TEXT,{children:[` before the version element.
+    const hdrAssignRe = new RegExp(
+      `([$\\w]+)=${escapeIdent(jsxVar)}\\.jsxs\\([$\\w]+,\\{children:\\[`,
+      'g'
+    );
+    let hdrVar: string | undefined;
+    let m: RegExpExecArray | null;
+    while ((m = hdrAssignRe.exec(fileContents)) !== null) {
+      if (m.index > jsxVerMatch.index) break;
+      hdrVar = m[1];
+    }
+    if (hdrVar) {
+      // Match the column box whose FIRST child is exactly the header row var
+      // (require `,`/`]` after it so we don't match a longer var like `_A`).
+      // Scope to a window just after the header so a far-away `[_,...]` column
+      // (e.g. the IDE-warning box) can't be picked instead.
+      const colRe = new RegExp(
+        `${escapeIdent(jsxVar)}\\.jsxs\\(([$\\w]+),\\{flexDirection:"column",children:\\[${escapeIdent(hdrVar)}(?:,[^\\]]*)?\\]`
+      );
+      const windowStart = jsxVerMatch.index;
+      const windowStr = fileContents.slice(windowStart, windowStart + 6000);
+      const colMatch = windowStr.match(colRe);
+      if (colMatch && colMatch.index !== undefined) {
+        const boxVar = colMatch[1];
+        // Insert before the `]` that closes the column children array.
+        const insertIndex =
+          windowStart + colMatch.index + colMatch[0].length - 1;
+        return {
+          startIndex: insertIndex,
+          endIndex: insertIndex,
+          identifiers: [jsxVar, boxVar],
+        };
+      }
+    }
+  }
+
   // 1. Find the version display area (may already be modified by PATCH 2)
   // Find the "Claude Code" that's near dimColor:!0},"v" (the header version display)
   const versionDisplayPattern =
@@ -509,6 +575,24 @@ export const writePatchesAppliedIndication = (
       console.error(
         'patch: patchesAppliedIndication: patch 2 skipped (header version pattern changed)'
       );
+    } else if (locs.jsx) {
+      // JSX runtime: insert the tweakcc version as a sibling child in the header
+      // children array, right after the version element (jsx takes children as a
+      // prop, so we can't reuse the classic createElement(type,props,...children)).
+      const tweakccEl = `${locs.jsxVar}.jsx(${locs.textComponent},{children:${chalkVar}.hex("#FF8400").bold("+ tweakcc v${tweakccVersion}")})`;
+      const refCode = `," ",${tweakccEl}`;
+      const oldContent2 = content;
+      content =
+        content.slice(0, locs.insertIndex) +
+        refCode +
+        content.slice(locs.insertIndex);
+      showDiff(
+        oldContent2,
+        content,
+        refCode,
+        locs.insertIndex,
+        locs.insertIndex
+      );
     } else {
       // Step 1: Insert variable declaration after the "Claude Code" bold element
       const varName = '_tw';
@@ -562,6 +646,39 @@ export const writePatchesAppliedIndication = (
     if (!patchesListLoc) {
       console.error(
         'patch: patchesAppliedIndication: patch 3 skipped (version display pattern changed by PATCH 2)'
+      );
+    } else if (
+      patchesListLoc.identifiers &&
+      patchesListLoc.identifiers.length === 2
+    ) {
+      // JSX automatic runtime: build the list with jsx-convention calls (children
+      // as a prop) using the module's jsx var and the column's box, since the
+      // React var has no `.createElement` on these bundles. Insert as the last
+      // child of the header's column array.
+      const [jsxVar, listBox] = patchesListLoc.identifiers;
+      const rows: string[] = [];
+      rows.push(
+        `${jsxVar}.jsxs(${listBox},{children:[${jsxVar}.jsx(${textComponent},{color:"success",bold:true,children:"┃ "}),${jsxVar}.jsx(${textComponent},{color:"success",bold:true,children:"✓ tweakcc patches are applied"})]})`
+      );
+      for (let item of patchesApplies) {
+        item = item.replace('CHALK_VAR', chalkVar);
+        rows.push(
+          `${jsxVar}.jsxs(${listBox},{children:[${jsxVar}.jsx(${textComponent},{color:"success",bold:true,children:"┃ "}),${jsxVar}.jsx(${textComponent},{dimColor:true,children:\`  * ${item}\`})]})`
+        );
+      }
+      const listEl = `${jsxVar}.jsxs(${listBox},{flexDirection:"column",children:[${rows.join(',')}]})`;
+      const patchesListCode = `,${listEl}`;
+      const oldContent3 = content;
+      content =
+        content.slice(0, patchesListLoc.startIndex) +
+        patchesListCode +
+        content.slice(patchesListLoc.endIndex);
+      showDiff(
+        oldContent3,
+        content,
+        patchesListCode,
+        patchesListLoc.startIndex,
+        patchesListLoc.endIndex
       );
     } else {
       const lines = [];
