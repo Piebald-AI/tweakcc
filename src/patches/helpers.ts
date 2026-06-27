@@ -370,8 +370,12 @@ export const findBoxComponent = (fileContents: string): string | undefined => {
   // Method 5: Find Box by rest-style layout defaults (CC 2.1.138+)
   // Avoid ScrollBox-like wrappers by requiring generic Box layout defaults,
   // integer style warnings, forwarded children, and no sticky/scroll behavior.
+  // CC >=2.1.x renders the element via the React JSX automatic runtime, so the
+  // tail is now `X.jsx("ink-box",{...,style:I,children:T})` (children is a prop,
+  // and `style` is no longer the last prop) rather than the old
+  // `X.createElement("ink-box",{...,style:I},T)`. Accept both forms.
   const restStyleBoxPattern =
-    /function ([$\w]+)\(\{children:([$\w]+),ref:[$\w]+.{0,600}?\.\.\.([$\w]+)\}\)\{.{0,2500}?"margin".{0,2500}?"padding".{0,1200}?"gap".{0,1200}?\3\.flexWrap\?\?="nowrap",\3\.flexDirection\?\?="row",\3\.flexGrow\?\?=0,\3\.flexShrink\?\?=1,\3\.overflowX=\3\.overflowX\?\?\3\.overflow\?\?"visible",\3\.overflowY=\3\.overflowY\?\?\3\.overflow\?\?"visible",[$\w]+(?:\.default)?\.createElement\("ink-box",\{[^}]*style:\3\},\2\)/;
+    /function ([$\w]+)\(\{children:([$\w]+),ref:[$\w]+.{0,600}?\.\.\.([$\w]+)\}\)\{.{0,2500}?"margin".{0,2500}?"padding".{0,1200}?"gap".{0,1200}?\3\.flexWrap\?\?="nowrap",\3\.flexDirection\?\?="row",\3\.flexGrow\?\?=0,\3\.flexShrink\?\?=1,\3\.overflowX=\3\.overflowX\?\?\3\.overflow\?\?"visible",\3\.overflowY=\3\.overflowY\?\?\3\.overflow\?\?"visible",[$\w]+(?:\.default)?\.(?:createElement|jsxs?)\("ink-box",\{[^}]*style:\3[^}]*\}/;
   const restStyleBoxMatch = fileContents.match(restStyleBoxPattern);
   if (restStyleBoxMatch) {
     return (
