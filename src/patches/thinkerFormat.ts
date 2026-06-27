@@ -89,13 +89,25 @@ const getThinkerFormatLocation = (oldFile: string): LocationResult | null => {
   // CC 2.1.195+ no longer renders the spinner props (spinnerTip/overrideMessage)
   // as an adjacent object literal, so `approxAreaMatch` can no longer scope the
   // search and the section-based passes above never fire. The format expression
-  // itself is unchanged and globally unique, e.g.
-  // `$=(a??M?.activeForm??M?.subject??(h||B))+"…"`. Fall back to a global
-  // `formatPatternOld` search restricted to the active-form expression; only act
-  // on a single, unambiguous match.
+  // itself is unchanged, e.g. `$=(a??M?.activeForm??M?.subject??(h||B))+"…"`.
+  // Fall back to a global `formatPatternOld` search, but keep it anchored to the
+  // spinner component (those props still live nearby, just not adjacent) the
+  // same way the `formatPatternNew` global path above does, and only act on a
+  // single, unambiguous match.
   const formatPatternOldGlobal = new RegExp(formatPatternOld.source, 'g');
   const oldFormatMatches = [...oldFile.matchAll(formatPatternOldGlobal)].filter(
-    match => match.index != undefined && match[3]?.includes('.activeForm')
+    match => {
+      if (match.index == undefined || !match[3]?.includes('.activeForm')) {
+        return false;
+      }
+      const context = oldFile.slice(
+        Math.max(0, match.index - 2500),
+        match.index + 1000
+      );
+      return (
+        context.includes('spinnerTip') && context.includes('overrideMessage:')
+      );
+    }
   );
 
   if (oldFormatMatches.length === 1) {

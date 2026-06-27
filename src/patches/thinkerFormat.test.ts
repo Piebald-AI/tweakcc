@@ -4,10 +4,11 @@ import { writeThinkerFormat } from './thinkerFormat';
 
 describe('writeThinkerFormat', () => {
   it('rewrites the format via the global fallback when the spinner props are not adjacent (CC 2.1.195+)', () => {
-    // CC 2.1.195 stopped rendering spinnerTip/overrideMessage as an adjacent
-    // object literal, so the section-scoped passes miss; only the format
-    // expression itself remains, and it is globally unique.
+    // spinnerTip/overrideMessage still live in the component but are no longer
+    // adjacent to the format expression, so the scoped passes miss; the global
+    // fallback must still anchor to that surrounding context.
     const input =
+      'spinnerTipsEnabled:!0,foo:bar,overrideMessage:W,' +
       'let L=y===void 0,M=L?x?.find(E=>E.status!=="pending"):void 0,' +
       '[B]=KJ.useState(()=>HL(zpt())),' +
       '$=(a??M?.activeForm??M?.subject??(h||B))+"\\u2026";KJ.useEffect(()=>{});';
@@ -19,6 +20,19 @@ describe('writeThinkerFormat', () => {
       '$=`${a??M?.activeForm??M?.subject??(h||B)} thinking`'
     );
     expect(result).not.toContain('+"\\u2026"');
+  });
+
+  it('does not act when the spinner context is absent (avoids rewriting unrelated bundle code)', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // A lone `,x=(…activeForm…)+"…"` with no spinnerTip/overrideMessage nearby
+    // must NOT be rewritten — uniqueness alone is not enough.
+    const input = 'q=1,r=(a??b?.activeForm??c)+"\\u2026";s=2;';
+
+    const result = writeThinkerFormat(input, '{} thinking');
+
+    expect(result).toBeNull();
+    spy.mockRestore();
   });
 
   it('still uses the section-scoped path when spinnerTip/overrideMessage are adjacent (older Claude Code)', () => {
@@ -33,11 +47,12 @@ describe('writeThinkerFormat', () => {
     expect(result).toContain('N=`${Y??C?.activeForm??L} working`');
   });
 
-  it('does not act when the active-form expression is ambiguous (multiple matches)', () => {
+  it('does not act when the active-form expression is ambiguous (multiple matches in spinner context)', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const input =
-      ',$=(a??M?.activeForm??x)+"\\u2026";,Y=(b??N?.activeForm??z)+"\\u2026";';
+      'spinnerTipsEnabled:!0,overrideMessage:W,' +
+      'x=1,$=(a??M?.activeForm??x)+"\\u2026",Y=(b??N?.activeForm??z)+"\\u2026";';
 
     const result = writeThinkerFormat(input, '{} thinking');
 
