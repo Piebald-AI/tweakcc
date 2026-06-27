@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add input chevron color patch (#634) - @VitalyOstanin
 - Fix verbose-property patch for Claude Code's JSX automatic runtime (#833) - @StreamDemon
 - Fix `userMessageDisplay` and `patchesAppliedIndication` patches for Claude Code's JSX automatic runtime, and make `findBoxComponent` JSX-aware (#834) - @StreamDemon
+- Make channels-mode tolerate the removed ChannelsNotice "Experimental" warning banner so `--apply` no longer reports a spurious failure (#837) - @StreamDemon
 
 ## [v4.2.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.2.0) - 2026-06-26
 
