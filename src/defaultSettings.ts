@@ -687,6 +687,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   inputBox: {
     removeBorder: false,
+    chevronIdleThemeColor: 'success',
   },
   misc: {
     showTweakccVersion: true,
