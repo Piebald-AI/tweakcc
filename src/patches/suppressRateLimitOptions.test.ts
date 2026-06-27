@@ -35,6 +35,15 @@ describe('writeSuppressRateLimitOptions', () => {
     expect(result).toContain('onOpenRateLimitOptions:()=>{}');
   });
 
+  it('matches minified $-prefixed identifiers', () => {
+    const input =
+      'X.jsx($A,{showAllInTranscript:$vt,agentDefinitions:$oe,onOpenRateLimitOptions:$ne,isLoading:$se})';
+    const result = writeSuppressRateLimitOptions(input);
+    expect(result).not.toBeNull();
+    expect(result).toContain('onOpenRateLimitOptions:()=>{}');
+    expect(result).not.toContain('onOpenRateLimitOptions:$ne');
+  });
+
   it('returns null when no call site is present', () => {
     expect(writeSuppressRateLimitOptions('no relevant content')).toBeNull();
   });

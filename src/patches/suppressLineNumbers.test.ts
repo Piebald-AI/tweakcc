@@ -8,6 +8,8 @@ describe('writeSuppressLineNumbers', () => {
     '"- Results are returned using cat -n format, with line numbers starting at 1"';
   const p2 =
     '`${oYr}. Each line is the line number, a single separator (a tab or \\`:\\`), then the verbatim file content (including any leading whitespace).`';
+  const p2Unescaped =
+    '`${oYr}. Each line is the line number, a single separator (a tab or `:`), then the verbatim file content (including any leading whitespace).`';
 
   it('neutralizes the formatter and rewrites both read-tool prompt lines', () => {
     const result = writeSuppressLineNumbers(
@@ -26,6 +28,14 @@ describe('writeSuppressLineNumbers', () => {
 
   it('rewrites the p2 prompt line whose inner backticks are escaped', () => {
     const result = writeSuppressLineNumbers(formatter + ';var Y=' + p2 + ';');
+    expect(result).not.toBeNull();
+    expect(result).not.toContain('Each line is the line number');
+  });
+
+  it('also rewrites the p2 prompt line with unescaped separator backticks', () => {
+    const result = writeSuppressLineNumbers(
+      formatter + ';var Y=' + p2Unescaped + ';'
+    );
     expect(result).not.toBeNull();
     expect(result).not.toContain('Each line is the line number');
   });
