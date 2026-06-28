@@ -6,8 +6,7 @@ export const writeSuppressRateLimitOptions = (
   oldFile: string
 ): string | null => {
   const patterns = [
-    /\.createElement.{0,500},showAllInTranscript:[$\w]+,agentDefinitions:[$\w]+,onOpenRateLimitOptions:([$\w]+)/g,
-    /\.createElement\([\w$]+,\{messages:[\w$]+,tools:[\w$]+,commands:[\w$]+,verbose:!0,toolJSX:null,inProgressToolUseIDs:[\w$]+,isMessageSelectorVisible:!1,conversationId:[\w$]+,screen:[\w$]+,agentDefinitions:[\w$]+,streamingToolUses:[\w$]+,showAllInTranscript:[\w$]+,onOpenRateLimitOptions:([\w$]+)/g,
+    /showAllInTranscript:[$\w]+,(?:agentDefinitions:[$\w]+,)?onOpenRateLimitOptions:([$\w]+)/g,
   ];
 
   let newFile = oldFile;

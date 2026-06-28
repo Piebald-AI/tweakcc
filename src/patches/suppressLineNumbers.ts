@@ -10,7 +10,7 @@ const patchReadToolPrompt = (file: string): string => {
       '"- Results are returned as raw file content without line-number prefixes"',
     ],
     [
-      /`\$\{[$\w]+\}\. Each line is the line number, a single separator \(a tab or `:`\), then the verbatim file content \(including any leading whitespace\)\.`/g,
+      /`\$\{[$\w]+\}\. Each line is the line number, a single separator \(a tab or \\?`:\\?`\), then the verbatim file content \(including any leading whitespace\)\.`/g,
       '`Results are raw file content without line-number prefixes.`',
     ],
   ];

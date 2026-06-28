@@ -1,11 +1,8 @@
 import { showDiff } from './index';
 
 const WARNING_PATTERNS = [
+  /[$\w]+\.push\(\{message:`Native installation exists but [^`]*`,userActionRequired:!0,type:"path"\}\)/g,
   /Claude Code has switched from npm to native installer\. Run `claude install` or see https:\/\/docs\.anthropic\.com\/en\/docs\/claude-code\/getting-started for more options\./g,
-  /installMethod is native, but directory [^"'`\n;]+/g,
-  /installMethod is native, but claude command (?:is missing or invalid|not found) at [^"'`\n;]+/g,
-  /Native installation exists but ~\/\.local\/bin is not in your PATH(?:\. Run: echo 'export PATH="\$HOME\/\.local\/bin:\$PATH"' >> [^"'`\n;]+ then open a new terminal or run: source [^"'`\n;]+)?/g,
-  /Run: echo 'export PATH="\$HOME\/\.local\/bin:\$PATH"' >> [^"'`\n;]+ then open a new terminal or run: source [^"'`\n;]+/g,
 ];
 
 export const writeSuppressNativeInstallerWarning = (
