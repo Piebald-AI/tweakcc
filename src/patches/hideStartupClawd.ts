@@ -14,7 +14,7 @@ import { showDiff } from './index';
  * Steps:
  * 1. Find the inner component by looking for '▛███▜' (Clawd ASCII art)
  * 2. Trace back to find the inner function name
- * 3. Find the wrapper function that createElement's the inner component
+ * 3. Find the wrapper function that renders the inner component
  * 4. Return the wrapper function body start index
  */
 const findStartupClawdComponents = (oldFile: string): number[] => {
@@ -46,17 +46,26 @@ const findStartupClawdComponents = (oldFile: string): number[] => {
 
   const innerFuncName = lastFunctionMatch[1];
 
-  // Find the wrapper function that directly createElement's the inner component.
-  // Iterate all functions and find one where createElement(INNER,) appears
-  // before any nested function definition.
+  // Find the wrapper function that directly renders the inner component.
+  // Iterate all functions and find one where the inner component is rendered
+  // before any nested function definition. CC 2.1.195+ renders it via the JSX
+  // automatic runtime (`X.jsx(INNER,…)`) rather than `createElement(INNER,…)`,
+  // so accept either shape (innerFuncName may contain `$`, so escape it).
   const wrapperFuncPattern = /function ([$\w]+)\([^)]*\)\{/g;
+  const innerCallPattern = new RegExp(
+    `(?:createElement|jsxs?)\\(${innerFuncName.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      '\\$&'
+    )},`
+  );
   let wrapperExec: RegExpExecArray | null;
   let wrapperMatch: { index: number; length: number } | null = null;
   while ((wrapperExec = wrapperFuncPattern.exec(oldFile)) !== null) {
     const bodyStart = wrapperExec.index + wrapperExec[0].length;
     const body = oldFile.slice(bodyStart, bodyStart + 500);
-    const elemIdx = body.indexOf(`createElement(${innerFuncName},`);
-    if (elemIdx === -1) continue;
+    const innerCallMatch = innerCallPattern.exec(body);
+    if (!innerCallMatch) continue;
+    const elemIdx = innerCallMatch.index;
     const nextFuncIdx = body.indexOf('function ');
     if (nextFuncIdx !== -1 && nextFuncIdx < elemIdx) continue;
     wrapperMatch = { index: wrapperExec.index, length: wrapperExec[0].length };
