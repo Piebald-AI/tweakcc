@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   addCurrentToolsetAtToolChangeComponentScope,
+  findCurrentToolsetInjectionSpan,
   findSelectComponentName,
   insertShiftTabAppStateVar,
   writeToolsetFieldToAppState,
   appendToolsetToModeDisplay,
+  appendToolsetToShortcutsDisplay,
   writeComputeToolsFilter,
   writePrintToolsFilter,
   writeSubagentResolvedToolContextFix,
@@ -224,6 +226,24 @@ describe('toolsets missing state.toolset fallback', () => {
     );
   });
 
+  it('finds the statusline insertion point with the jsx-runtime bash hint', () => {
+    const file =
+      appStateAccessors +
+      'function Status(props){return jsxRT.jsx(w,{color:"bashBorder",children:"! for shell mode"})}';
+
+    const result = insertShiftTabAppStateVar(
+      file,
+      'default',
+      'accept-only',
+      'plan-only'
+    );
+
+    expect(result).not.toBeNull();
+    expect(result).toContain(
+      `let currentToolset=useAppState(state => ${modeAwareFallback});`
+    );
+  });
+
   it('initializes app state toolset as undefined so the mode binding applies at load', () => {
     const file = 'state={thinkingEnabled:FDH(),promptSuggestionEnabled:rX()}';
 
@@ -236,10 +256,12 @@ describe('toolsets missing state.toolset fallback', () => {
     expect(result).not.toContain('toolset:"');
   });
 
-  it('appends the live toolset to every mode display site', () => {
+  it('appends the live toolset to every in-scope mode display site', () => {
     const file =
+      'function Footer(){let currentToolset=getToolset();' +
       'let k6=el(y,{},sym(mode)," ",title(mode).toLowerCase()," on",hint);' +
-      'let NH=el(y,{},sym(mode)," ",title(mode).toLowerCase()," on",chord);';
+      'let NH=el(y,{},sym(mode)," ",title(mode).toLowerCase()," on",chord);' +
+      'return k6}';
 
     const result = appendToolsetToModeDisplay(file);
 
@@ -250,6 +272,38 @@ describe('toolsets missing state.toolset fallback', () => {
         /title\(mode\)\.toLowerCase\(\),currentToolset\?` on \[\$\{currentToolset\}\]`:""/g
       )
     ).toHaveLength(2);
+  });
+
+  it('does not append the toolset to mode sites outside the currentToolset scope', () => {
+    const file =
+      'function Footer(){let currentToolset=getToolset();' +
+      'inside(mode).toLowerCase()," on";return null}' +
+      'outside(mode).toLowerCase()," on";';
+
+    const result = appendToolsetToModeDisplay(file);
+
+    expect(result).not.toBeNull();
+    expect(result).toContain(
+      'inside(mode).toLowerCase(),currentToolset?` on [${currentToolset}]`:""'
+    );
+    expect(result).toContain('outside(mode).toLowerCase()," on"');
+  });
+
+  it('appends the toolset only to in-scope "? for shortcuts" sites', () => {
+    const file =
+      'function Footer(){let currentToolset=getToolset();' +
+      'jsxRT.jsx(w,{children:"? for shortcuts"});return null}' +
+      'jsxRT.jsx(w,{children:"? for shortcuts"});';
+
+    const result = appendToolsetToShortcutsDisplay(file);
+
+    expect(result).not.toBeNull();
+    expect(
+      result!.match(
+        /currentToolset\?`\? for shortcuts \[\$\{currentToolset\}\]`:"\? for shortcuts"/g
+      )
+    ).toHaveLength(1);
+    expect(result).toContain('jsxRT.jsx(w,{children:"? for shortcuts"})');
   });
 
   it('uses the mode-aware fallback in the tool-change component scope', () => {
@@ -268,6 +322,68 @@ describe('toolsets missing state.toolset fallback', () => {
     expect(result).toContain(
       `const currentToolset = useAppState(state => ${modeAwareFallback});`
     );
+  });
+
+  it('finds the tool-change scope when the analytics call is comma-sequenced', () => {
+    const file =
+      appStateAccessors +
+      'wrap(arg,function(evt){track("tengu_ext_at_mentioned",{}),next(evt)})';
+
+    const result = addCurrentToolsetAtToolChangeComponentScope(
+      file,
+      'default',
+      'accept-only',
+      'plan-only'
+    );
+
+    expect(result).not.toBeNull();
+    expect(result).toContain(
+      `const currentToolset = useAppState(state => ${modeAwareFallback});`
+    );
+  });
+});
+
+describe('findCurrentToolsetInjectionSpan', () => {
+  it('returns the enclosing function body span of the marker', () => {
+    const file =
+      'a();function F(){let currentToolset=x;body({k:1});return 0}tail();';
+
+    const span = findCurrentToolsetInjectionSpan(file);
+
+    expect(span).not.toBeNull();
+    expect(span!.start).toBe(file.indexOf('let currentToolset='));
+    expect(file.slice(span!.start, span!.end + 1)).toBe(
+      'let currentToolset=x;body({k:1});return 0}'
+    );
+  });
+
+  it('ignores braces inside string literals when walking out of the function', () => {
+    const file = 'function F(){let currentToolset=g("}{}");return 1}after();';
+
+    const span = findCurrentToolsetInjectionSpan(file);
+
+    expect(span).not.toBeNull();
+    expect(file.slice(span!.start, span!.end + 1)).toBe(
+      'let currentToolset=g("}{}");return 1}'
+    );
+  });
+
+  it('ignores braces inside template literals when walking out of the function', () => {
+    const file =
+      'function F(){let currentToolset=x;let label=` on [${currentToolset}]`;return label}after();';
+
+    const span = findCurrentToolsetInjectionSpan(file);
+
+    expect(span).not.toBeNull();
+    expect(file.slice(span!.start, span!.end + 1)).toBe(
+      'let currentToolset=x;let label=` on [${currentToolset}]`;return label}'
+    );
+  });
+
+  it('returns null when no marker is present', () => {
+    expect(
+      findCurrentToolsetInjectionSpan('function F(){return 1}')
+    ).toBeNull();
   });
 });
 
@@ -438,5 +554,28 @@ describe('findSelectComponentName', () => {
       'return R.createElement(Box,{children:items.map(option=>option.label)})}';
 
     expect(findSelectComponentName(input)).toBe('MenuSelect');
+  });
+
+  it('finds a Select rendered via the jsx runtime', () => {
+    const input =
+      'jsxRT.jsx(GenericSelect,{options:selectOptions,onChange:onSelect,onCancel:onCancel,isDisabled:!1});';
+
+    expect(findSelectComponentName(input)).toBe('GenericSelect');
+  });
+
+  it('finds a jsx-bodied Select from its signature when no createElement is present', () => {
+    const input =
+      'function MenuSelect({options:items,onChange:onPick,onCancel:onClose,placeholder:hint}){' +
+      'return jsxRT.jsx(Box,{children:items.map(option=>option.label)})}';
+
+    expect(findSelectComponentName(input)).toBe('MenuSelect');
+  });
+
+  it('skips the recommended-settings prompt rendered via jsx', () => {
+    const input =
+      'jsxRT.jsx(YesNoPrompt,{options:yesNoOptions,onChange:onYes,onCancel:onNo,children:"Yes, use recommended settings"});' +
+      'jsxRT.jsx(GenericSelect,{options:selectOptions,onChange:onSelect,onCancel:onCancel});';
+
+    expect(findSelectComponentName(input)).toBe('GenericSelect');
   });
 });

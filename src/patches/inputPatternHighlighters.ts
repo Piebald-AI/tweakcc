@@ -36,6 +36,69 @@ const buildChalkChain = (
 // ======================================================================
 
 const writeCustomHighlighterImpl = (oldFile: string): string | null => {
+  const jsxRenderRegex =
+    /return ([$\w]+)\.jsx\(([$\w]+),\{color:([$\w]+)\.highlight\?\.color,dimColor:\3\.highlight\?\.dimColor,inverse:\3\.highlight\?\.inverse,children:\1\.jsx\(([$\w]+),\{children:\3\.text\}\)\},([$\w]+)\)/;
+  const jsxMatch = oldFile.match(jsxRenderRegex);
+  if (jsxMatch && jsxMatch.index !== undefined) {
+    const jsxVar = jsxMatch[1];
+    const outerText = jsxMatch[2];
+    const segVar = jsxMatch[3];
+    const innerText = jsxMatch[4];
+    const keyVar = jsxMatch[5];
+    const esc = (s: string) => s.replace(/\$/g, '\\$');
+
+    const shimmerPattern = new RegExp(
+      `if\\(${esc(segVar)}\\.highlight\\?\\.shimmerColor&&${esc(segVar)}\\.highlight\\.color\\)return ${esc(jsxVar)}\\.jsx\\(`
+    );
+
+    let workingFile = oldFile;
+    const shimmerMatch = workingFile.match(shimmerPattern);
+    if (shimmerMatch && shimmerMatch.index !== undefined) {
+      const shimmerGuard =
+        `if(typeof ${segVar}.highlight?.color==='function')` +
+        `return ${jsxVar}.jsx(${outerText},{children:` +
+        `${jsxVar}.jsx(${innerText},{children:${segVar}.highlight.color(${segVar}.text)})},${keyVar});`;
+      workingFile =
+        workingFile.slice(0, shimmerMatch.index) +
+        shimmerGuard +
+        workingFile.slice(shimmerMatch.index);
+    }
+
+    const m2 = workingFile.match(jsxRenderRegex);
+    if (!m2 || m2.index === undefined) {
+      console.error(
+        'patch: inputPatternHighlighters: failed to re-find JSX renderer after shimmer patch'
+      );
+      return null;
+    }
+    const jv = m2[1];
+    const ot = m2[2];
+    const sv = m2[3];
+    const it = m2[4];
+    const kv = m2[5];
+
+    const augmentedRenderer =
+      `return ${jv}.jsx(${ot},{` +
+      `color:${sv}.highlight?.style?void 0:${sv}.highlight?.color,` +
+      `backgroundColor:${sv}.highlight?.style?void 0:${sv}.highlight?.backgroundColor,` +
+      `dimColor:${sv}.highlight?.dimColor,` +
+      `inverse:${sv}.highlight?.style?void 0:${sv}.highlight?.inverse,` +
+      `bold:${sv}.highlight?.style?void 0:${sv}.highlight?.bold,` +
+      `italic:${sv}.highlight?.style?void 0:${sv}.highlight?.italic,` +
+      `underline:${sv}.highlight?.style?void 0:${sv}.highlight?.underline,` +
+      `strikethrough:${sv}.highlight?.style?void 0:${sv}.highlight?.strikethrough,` +
+      `children:${jv}.jsx(${it},{children:${sv}.highlight?.style?${sv}.highlight.style(${sv}.text):${sv}.text})` +
+      `},${kv})`;
+
+    const newFile =
+      workingFile.slice(0, m2.index) +
+      augmentedRenderer +
+      workingFile.slice(m2.index + m2[0].length);
+
+    showDiff(oldFile, newFile, 'JSX shimmer guard + renderer', 0, 0);
+    return newFile;
+  }
+
   // CC <2.1.83: if(N.highlight?.color)return createElement(T,{key:E},color:N.highlight.color,...)
   const oldRegex =
     /(if\(([$\w]+)\.highlight\?\.color\))((return [$\w]+\.createElement\([$\w]+,\{key:[$\w]+),color:[$\w]+\.highlight\.color(\},[$\w]+\.createElement\([$\w]+,null,)([$\w]+\.text)(\)\)));/;

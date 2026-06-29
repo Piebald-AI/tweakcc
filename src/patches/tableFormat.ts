@@ -278,7 +278,7 @@ export const writeTableFormat = (
     {
       const before = newFile;
       const tableRendererPattern =
-        /function [$\w]+\([^)]*\)\{[\s\S]{0,1600}?let ([$\w]+)="(?:\\u2502|│)";[\s\S]{0,1600}?\1\+=" "\+[$\w]+\+" (?:\\u2502|│)"/;
+        /function [$\w]+\([^)]*\)\{[\s\S]{0,1600}?let ([$\w]+)="(?:\\u2502|│)";[\s\S]{0,1600}?\1\+=" "\+[$\w]+(?:\((?:[^()]|\([^()]*\))*\))?\+" (?:\\u2502|│)"/;
       const tableRendererMatch = newFile.match(tableRendererPattern);
       if (tableRendererMatch && tableRendererMatch.index !== undefined) {
         const start = tableRendererMatch.index;

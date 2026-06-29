@@ -23,10 +23,10 @@ import { Toolset } from '../types';
 export const findSelectComponentName = (
   fileContents: string
 ): string | null => {
-  const createElementPattern =
-    /\.createElement\(([$\w]+),\{(?=[^}]{0,240}options:)(?=[^}]{0,240}onChange:)[^}]{0,360}\}/g;
+  const selectRenderPattern =
+    /\.(?:createElement|jsxs?)\(([$\w]+),\{(?=[^}]{0,240}options:)(?=[^}]{0,240}onChange:)[^}]{0,360}\}/g;
 
-  for (const match of fileContents.matchAll(createElementPattern)) {
+  for (const match of fileContents.matchAll(selectRenderPattern)) {
     const window = fileContents.slice(
       match.index,
       Math.min(fileContents.length, match.index + match[0].length + 180)
@@ -48,7 +48,10 @@ export const findSelectComponentName = (
         match.index,
         Math.min(fileContents.length, match.index + match[0].length + 1200)
       );
-      if (/\.createElement\(/.test(body) && !/return\s*\{/.test(body)) {
+      if (
+        /\.createElement\(|\.jsxs?\(/.test(body) &&
+        !/return\s*\{/.test(body)
+      ) {
         return match[1];
       }
     }
@@ -987,7 +990,8 @@ export const findShiftTabAppStateVarInsertionPoint = (
 ): number | null => {
   // Search for the bash mode indicator.
   // CC <2.1.140 used "! for bash mode"; CC >=2.1.140 renamed it to "! for shell mode".
-  const bashModePattern = /\{color:"bashBorder"\},"! for (?:bash|shell) mode"/;
+  const bashModePattern =
+    /\{color:"bashBorder"(?:\},|,children:)"! for (?:bash|shell) mode"/;
   const match = oldFile.match(bashModePattern);
 
   if (!match || match.index === undefined) {
@@ -1074,15 +1078,44 @@ export const insertShiftTabAppStateVar = (
 };
 
 /**
+ * Find the function-body span holding the injected `let currentToolset=` marker.
+ */
+export const findCurrentToolsetInjectionSpan = (
+  fileContents: string
+): { start: number; end: number } | null => {
+  const start = fileContents.indexOf('let currentToolset=');
+  if (start === -1) {
+    return null;
+  }
+
+  let depth = 1;
+  let inString: string | null = null;
+  let escape = false;
+  for (let i = start; i < fileContents.length; i++) {
+    const c = fileContents[i];
+    if (inString) {
+      if (escape) escape = false;
+      else if (c === '\\') escape = true;
+      else if (c === inString) inString = null;
+    } else if (c === '"' || c === "'" || c === '`') {
+      inString = c;
+    } else if (c === '{') {
+      depth++;
+    } else if (c === '}') {
+      depth--;
+      if (depth === 0) {
+        return { start, end: i };
+      }
+    }
+  }
+
+  return null;
+};
+
+/**
  * Append the toolset name to the mode display text
  */
 export const appendToolsetToModeDisplay = (oldFile: string): string | null => {
-  // Find every site where the mode text is rendered:
-  //   tl(Y).toLowerCase(), " on"
-  // Newer CC versions render the footer mode line from more than one of
-  // these sites (e.g. a variant with the "(shift+tab to cycle)" chord), so
-  // patch all of them. insertShiftTabAppStateVar defines `currentToolset`
-  // (a live app-state selector) in the enclosing component scope.
   const modeDisplayPattern = /([$\w]+)\(([$\w]+)\)\.toLowerCase\(\)," on"/g;
   const matches = Array.from(oldFile.matchAll(modeDisplayPattern));
 
@@ -1093,8 +1126,26 @@ export const appendToolsetToModeDisplay = (oldFile: string): string | null => {
     return null;
   }
 
+  const span = findCurrentToolsetInjectionSpan(oldFile);
+  if (!span) {
+    console.error(
+      'patch: toolsets: appendToolsetToModeDisplay: failed to find currentToolset injection span'
+    );
+    return oldFile;
+  }
+
+  const inScope = matches.filter(
+    m => m.index !== undefined && m.index >= span.start && m.index < span.end
+  );
+  if (inScope.length === 0) {
+    console.error(
+      'patch: toolsets: appendToolsetToModeDisplay: no mode display site within currentToolset scope; skipping'
+    );
+    return oldFile;
+  }
+
   let newFile = oldFile;
-  for (const match of [...matches].reverse()) {
+  for (const match of [...inScope].reverse()) {
     if (match.index === undefined) continue;
     const tlFunction = match[1];
     const modeVar = match[2];
@@ -1105,14 +1156,7 @@ export const appendToolsetToModeDisplay = (oldFile: string): string | null => {
       newFile.slice(match.index + match[0].length);
   }
 
-  if (newFile === oldFile) {
-    console.error(
-      'patch: toolsets: appendToolsetToModeDisplay: failed to modify mode display'
-    );
-    return null;
-  }
-
-  const lastMatch = matches[matches.length - 1];
+  const lastMatch = inScope[inScope.length - 1];
   showDiff(
     oldFile,
     newFile,
@@ -1132,34 +1176,48 @@ export const appendToolsetToShortcutsDisplay = (
 ): string | null => {
   const shortcutsPattern = /"\? for shortcuts"/g;
   const matches = Array.from(oldFile.matchAll(shortcutsPattern));
-
-  // Use the last match (there are two in 2.0.37, 1 in .41).
-  const match = matches.at(-1);
-  if (!match || match.index === undefined) {
+  if (matches.length === 0) {
     console.error(
       "patch: toolsets: appendToolsetToShortcutsDisplay: could not find '? for shortcuts'"
     );
     return null;
   }
 
-  // Replace with the new pattern that includes toolset
-  const oldText = match[0];
-  const newText = `currentToolset?\`? for shortcuts [\${currentToolset}]\`:"? for shortcuts"`;
-
-  const newFile = oldFile.replace(oldText, newText);
-  if (newFile === oldFile) {
+  const span = findCurrentToolsetInjectionSpan(oldFile);
+  if (!span) {
     console.error(
-      'patch: toolsets: appendToolsetToShortcutsDisplay: failed to modify shortcuts display'
+      'patch: toolsets: appendToolsetToShortcutsDisplay: failed to find currentToolset injection span'
     );
-    return null;
+    return oldFile;
   }
 
+  const inScope = matches.filter(
+    m => m.index !== undefined && m.index >= span.start && m.index < span.end
+  );
+  if (inScope.length === 0) {
+    console.error(
+      'patch: toolsets: appendToolsetToShortcutsDisplay: no shortcuts site within currentToolset scope; skipping'
+    );
+    return oldFile;
+  }
+
+  const newText = `currentToolset?\`? for shortcuts [\${currentToolset}]\`:"? for shortcuts"`;
+  let newFile = oldFile;
+  for (const match of [...inScope].reverse()) {
+    if (match.index === undefined) continue;
+    newFile =
+      newFile.slice(0, match.index) +
+      newText +
+      newFile.slice(match.index + match[0].length);
+  }
+
+  const firstMatch = inScope[0];
   showDiff(
     oldFile,
     newFile,
     newText,
-    match.index,
-    match.index + oldText.length
+    firstMatch.index ?? 0,
+    (firstMatch.index ?? 0) + firstMatch[0].length
   );
 
   return newFile;
@@ -1209,7 +1267,7 @@ export const findToolChangeComponentScope = (
   fileContents: string
 ): number | null => {
   const pattern =
-    /[\w$]+\([\w$]+,function\([\w$]+\)\{[\w$]+\("tengu_ext_at_mentioned",\{\}\);/;
+    /[\w$]+\([\w$]+,function\([\w$]+\)\{[\w$]+\("tengu_ext_at_mentioned",\{\}\)[;,]/;
   const match = fileContents.match(pattern);
 
   if (!match || match.index === undefined) {
