@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v4.3.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.0) - 2026-06-29
+
 - Add input chevron color patch (#634) - @VitalyOstanin
+- fix: bypass keybinding customization gate for nonessential traffic mode (#658) - @VitalyOstanin
+- Add suppress-rate-limit-warning patch (#662) - @VitalyOstanin
 - Fix verbose-property patch for Claude Code's JSX automatic runtime (#833) - @StreamDemon
 - Fix `userMessageDisplay` and `patchesAppliedIndication` patches for Claude Code's JSX automatic runtime, and make `findBoxComponent` JSX-aware (#834) - @StreamDemon
 - Fix thinker-symbol-width and thinker-format patches for Claude Code's JSX automatic runtime (#835) - @StreamDemon
