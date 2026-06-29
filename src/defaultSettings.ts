@@ -726,6 +726,7 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultToolset: null,
   acceptEditsToolset: null,
   planModeToolset: null,
+  customTools: [],
   subagentModels: {
     plan: null,
     explore: null,
