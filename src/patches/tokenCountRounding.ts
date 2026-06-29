@@ -45,42 +45,56 @@ export const writeTokenCountRounding = (
   // a TDZ crash where `M$` is referenced while initializing itself.
   const simpleExpression = '[$\\w]+(?:\\?\\.[$\\w]+)*(?:\\([^()]*\\))?';
 
-  // Pattern 1 (CC >=2.1.83): Direct match on formatter call near key:"tokens"
-  // Matches: VAR=FUNC(EXPR),...key:"tokens"...,VAR," tokens"
-  const m1 = oldFile.match(
+  // Pattern 0 (CC >=2.1.195, JSX automatic runtime): the token display no longer
+  // carries a key:"tokens" prop; the count moved into a JSX children array.
+  // Matches: VAR=FUNC(EXPR),...children:[VAR," tokens"]
+  const m0 = oldFile.match(
     new RegExp(
-      `(([$\\w]+)=[$\\w]+\\()(${simpleExpression})(\\),.{0,2000}key:"tokens".{0,200},\\2," tokens")`
+      `(([$\\w]+)=[$\\w]+\\()(${simpleExpression})(\\),.{0,2000}children:\\[\\2," tokens"\\])`
     )
   );
 
-  if (m1 && m1.index !== undefined) {
-    [fullMatch, pre, , partToWrap, post] = m1;
-    startIndex = m1.index;
+  if (m0 && m0.index !== undefined) {
+    [fullMatch, pre, , partToWrap, post] = m0;
+    startIndex = m0.index;
   } else {
-    // Pattern 2 (CC <2.1.83): overrideMessage anchor nearby
-    const m2 = oldFile.match(
+    // Pattern 1 (CC >=2.1.83): Direct match on formatter call near key:"tokens"
+    // Matches: VAR=FUNC(EXPR),...key:"tokens"...,VAR," tokens"
+    const m1 = oldFile.match(
       new RegExp(
-        `(overrideMessage:.{0,10000},([$\\w]+)=[$\\w]+\\()(${simpleExpression})(\\),.{0,1000}key:"tokens".{0,200},\\2," tokens")`
+        `(([$\\w]+)=[$\\w]+\\()(${simpleExpression})(\\),.{0,2000}key:"tokens".{0,200},\\2," tokens")`
       )
     );
 
-    if (m2 && m2.index !== undefined) {
-      [fullMatch, pre, , partToWrap, post] = m2;
-      startIndex = m2.index;
+    if (m1 && m1.index !== undefined) {
+      [fullMatch, pre, , partToWrap, post] = m1;
+      startIndex = m1.index;
     } else {
-      // Pattern 3 (CC 1.x): older format
-      const m3 = oldFile.match(
-        /(overrideMessage:.{0,10000},key:"tokens".{0,200}[$\w]+\()(Math\.round\(.+?\))(\))/
+      // Pattern 2 (CC <2.1.83): overrideMessage anchor nearby
+      const m2 = oldFile.match(
+        new RegExp(
+          `(overrideMessage:.{0,10000},([$\\w]+)=[$\\w]+\\()(${simpleExpression})(\\),.{0,1000}key:"tokens".{0,200},\\2," tokens")`
+        )
       );
 
-      if (m3 && m3.index !== undefined) {
-        [fullMatch, pre, partToWrap, post] = m3;
-        startIndex = m3.index;
+      if (m2 && m2.index !== undefined) {
+        [fullMatch, pre, , partToWrap, post] = m2;
+        startIndex = m2.index;
       } else {
-        console.error(
-          'patch: tokenCountRounding: cannot find token count pattern in any CC format'
+        // Pattern 3 (CC 1.x): older format
+        const m3 = oldFile.match(
+          /(overrideMessage:.{0,10000},key:"tokens".{0,200}[$\w]+\()(Math\.round\(.+?\))(\))/
         );
-        return null;
+
+        if (m3 && m3.index !== undefined) {
+          [fullMatch, pre, partToWrap, post] = m3;
+          startIndex = m3.index;
+        } else {
+          console.error(
+            'patch: tokenCountRounding: cannot find token count pattern in any CC format'
+          );
+          return null;
+        }
       }
     }
   }

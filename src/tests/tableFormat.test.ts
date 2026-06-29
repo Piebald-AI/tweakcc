@@ -87,4 +87,24 @@ describe('tableFormat patch', () => {
       expect(result).not.toContain('g<A.rows.length-1');
     });
   });
+
+  // CC 2.1.195 refactored the compact-table renderer: the cell value became a
+  // call expression with nested parens, and the vertical bar uses │
+  // escapes. This mirrors the real bundle so the widened locator is exercised.
+  describe('ascii format — 2.1.195 compact renderer (call-form cell value)', () => {
+    const jsxRendererCode = `function Wq6(I,A){let N=[];for(let B=0;B<L;B++){let $="\\u2502";for(let q=0;q<D.length;q++){let W=O[q],V=M[q],Y=B-V,z=Y>=0&&Y<W.length?W[Y]:"",K=_[q],Z=P?"center":e.align?.[q]??"left";$+=" "+_6n(z,rn(z),K,Z)+" \\u2502"}N.push($)}return N}`;
+
+    it('converts the call-form cell separator to ASCII while preserving the call', () => {
+      const result = writeTableFormat(jsxRendererCode, 'ascii');
+      expect(result).not.toBeNull();
+      expect(result).toContain('+_6n(z,rn(z),K,Z)+" |"');
+      expect(result).not.toContain('+_6n(z,rn(z),K,Z)+" \\u2502"');
+    });
+
+    it('leaves the row-leading bar untouched (out of scope)', () => {
+      const result = writeTableFormat(jsxRendererCode, 'ascii');
+      expect(result).not.toBeNull();
+      expect(result).toContain('let $="\\u2502"');
+    });
+  });
 });
