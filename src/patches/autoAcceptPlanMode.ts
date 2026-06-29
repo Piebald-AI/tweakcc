@@ -14,7 +14,10 @@
 
 import { showDiff } from './index';
 
-const findEnclosingFunctionReturn = (
+// Fallback for layouts with no createElement anchor: walk the function enclosing the
+// "Ready to code?" title and return the offset of its last top-level `return`.
+// String-aware so braces inside strings/template literals don't skew the depth count.
+const findComponentReturnInjectionPoint = (
   oldFile: string,
   readyIdx: number
 ): number | null => {
@@ -25,25 +28,31 @@ const findEnclosingFunctionReturn = (
   if (openBrace === -1 || openBrace > readyIdx) return null;
 
   let depth = 0;
+  let inString: string | null = null;
+  let escape = false;
+  let lastTopLevelReturn = -1;
   for (let index = openBrace; index < oldFile.length; index++) {
     const char = oldFile[index];
+    if (inString) {
+      if (escape) escape = false;
+      else if (char === '\\') escape = true;
+      else if (char === inString) inString = null;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      inString = char;
+      continue;
+    }
     if (char === '{') depth++;
     else if (char === '}') {
       depth--;
-      if (depth === 0) {
-        const functionTail = oldFile.slice(openBrace, index + 1);
-        const returnPattern = /return [$\w]+(?:\.default)?\.createElement/g;
-        let match: RegExpExecArray | null;
-        let lastMatch: RegExpExecArray | null = null;
-        while ((match = returnPattern.exec(functionTail)) !== null) {
-          lastMatch = match;
-        }
-        return lastMatch ? openBrace + lastMatch.index : null;
-      }
+      if (depth === 0) break;
+    } else if (depth === 1 && oldFile.startsWith('return ', index)) {
+      lastTopLevelReturn = index;
     }
   }
 
-  return null;
+  return lastTopLevelReturn === -1 ? null : lastTopLevelReturn;
 };
 
 const patchPlanModePrompts = (file: string): string => {
@@ -194,89 +203,27 @@ export const writeAutoAcceptPlanMode = (oldFile: string): string | null => {
     return null;
   }
 
-  // Find the injection point: just before the return that renders "Ready to code?"
-  // Look for the return statement with createElement containing title:"Ready to code?"
-  //
-  // CC <=2.1.69: }}}))))});return React.createElement(Fragment,null,React.createElement(COMP,{color:"planMode",title:"Ready to code?"
-  // CC >=2.1.83: return React.createElement(Box,{...},React.createElement(COMP,{color:"planMode",title:"Ready to code?"
+  // Inject just before the component's top-level return. Primary: the
+  // React-Compiler-memoized tail `else <v>=t[<n>];return <v>}` (backreference avoids
+  // an unrelated memo slot); fallback: the enclosing function's last top-level return.
+  const memoTailMatch = afterReady.match(/else ([$\w]+)=t\[\d+\];return \1\}/);
 
-  // Try the legacy pattern (after Exit plan mode conditional)
-  const legacyReturnPattern =
-    /(\}\}\)\)\)\);)(return [$\w]+\.default\.createElement\([$\w]+\.default\.Fragment,null,[$\w]+\.default\.createElement\([$\w]+,\{color:"planMode",title:"Ready to code\?")/;
+  const injectionIdx =
+    memoTailMatch && memoTailMatch.index !== undefined
+      ? readyIdx + memoTailMatch.index + memoTailMatch[0].indexOf('return ')
+      : findComponentReturnInjectionPoint(oldFile, readyIdx);
 
-  const legacyMatch = oldFile.match(legacyReturnPattern);
-
-  if (legacyMatch && legacyMatch.index !== undefined) {
-    const insertion = `${acceptFuncName}("yes-accept-edits-keep-context");return null;`;
-    const replacement = legacyMatch[1] + insertion + legacyMatch[2];
-    const startIndex = legacyMatch.index;
-    const endIndex = startIndex + legacyMatch[0].length;
-
-    const newFile =
-      oldFile.slice(0, startIndex) + replacement + oldFile.slice(endIndex);
-
-    showDiff(oldFile, newFile, replacement, startIndex, endIndex);
-    return patchPlanModePrompts(newFile);
+  if (injectionIdx === null) {
+    console.error(
+      'patch: autoAcceptPlanMode: failed to find component return before "Ready to code?"'
+    );
+    return null;
   }
 
-  // CC >=2.1.83: Find "return React.createElement(Box,{...title:"Ready to code?"
-  // The return is preceded by various patterns, find it by searching backwards from readyIdx.
-  // Newer bundles can place a long prop list before the title, so keep this
-  // wider than the old 500-byte window and fall back to function-level search.
-  const returnSearchStart = Math.max(0, readyIdx - 2500);
-  const beforeReady = oldFile.slice(returnSearchStart, readyIdx);
-
-  // Look for the return statement start
-  const returnMatch = beforeReady.match(
-    /(return [$\w]+\.default\.createElement\([$\w]+,\{flexDirection:"column",tabIndex:0,autoFocus:!0.{0,200}[$\w]+\.default\.createElement\([$\w]+,\{color:"planMode",title:")$/
-  );
-
-  if (!returnMatch) {
-    // Simpler approach: find "return" before "Ready to code?" that starts the component tree
-    const simpleReturnIdx = beforeReady.lastIndexOf('return ');
-    if (simpleReturnIdx === -1) {
-      const enclosingReturnIdx = findEnclosingFunctionReturn(oldFile, readyIdx);
-      if (enclosingReturnIdx === null) {
-        console.error(
-          'patch: autoAcceptPlanMode: failed to find return before "Ready to code?"'
-        );
-        return null;
-      }
-
-      const insertion = `${acceptFuncName}("yes-accept-edits-keep-context");return null;`;
-      const newFile =
-        oldFile.slice(0, enclosingReturnIdx) +
-        insertion +
-        oldFile.slice(enclosingReturnIdx);
-
-      showDiff(
-        oldFile,
-        newFile,
-        insertion,
-        enclosingReturnIdx,
-        enclosingReturnIdx
-      );
-      return patchPlanModePrompts(newFile);
-    }
-
-    const absoluteReturnIdx = returnSearchStart + simpleReturnIdx;
-    const insertion = `${acceptFuncName}("yes-accept-edits-keep-context");return null;`;
-
-    const newFile =
-      oldFile.slice(0, absoluteReturnIdx) +
-      insertion +
-      oldFile.slice(absoluteReturnIdx);
-
-    showDiff(oldFile, newFile, insertion, absoluteReturnIdx, absoluteReturnIdx);
-    return patchPlanModePrompts(newFile);
-  }
-
-  const absoluteStart = Math.max(0, readyIdx - 500) + returnMatch.index!;
   const insertion = `${acceptFuncName}("yes-accept-edits-keep-context");return null;`;
-
   const newFile =
-    oldFile.slice(0, absoluteStart) + insertion + oldFile.slice(absoluteStart);
+    oldFile.slice(0, injectionIdx) + insertion + oldFile.slice(injectionIdx);
 
-  showDiff(oldFile, newFile, insertion, absoluteStart, absoluteStart);
+  showDiff(oldFile, newFile, insertion, injectionIdx, injectionIdx);
   return patchPlanModePrompts(newFile);
 };
