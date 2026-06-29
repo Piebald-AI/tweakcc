@@ -44,9 +44,6 @@ describe('writeInputPatternHighlighters', () => {
   });
 
   it('rewrites the JSX automatic-runtime renderer and shimmer (CC >=2.1.195)', () => {
-    // Real 2.1.195 shape: shimmer branch precedes the main renderer; both use
-    // JSXVAR.jsx(...) with key as the 3rd arg. The useMemo/warning-push block
-    // is included so writeCustomHighlighterCreation also runs.
     const input =
       'let props={inputValue:inputText,other:1};' +
       'if(x.highlight?.shimmerColor&&x.highlight.color)return M0e.jsx(w,{children:x.text.split("").map((k,D)=>M0e.jsx(OGe,{char:k,index:x.start+D,glimmerIndex:b,messageColor:x.highlight.color,shimmerColor:x.highlight.shimmerColor},D))},I);' +
@@ -58,18 +55,15 @@ describe('writeInputPatternHighlighters', () => {
     ]);
 
     expect(result).not.toBeNull();
-    // Augmented jsx renderer: forwards bold + applies the chalk `style` fn.
     expect(result).toContain(
       'bold:x.highlight?.style?void 0:x.highlight?.bold'
     );
     expect(result).toContain(
       'children:M0e.jsx(bd,{children:x.highlight?.style?x.highlight.style(x.text):x.text})'
     );
-    // Function-color guard inserted before the shimmer branch, in jsx form.
     expect(result).toContain(
       "if(typeof x.highlight?.color==='function')return M0e.jsx(w,{children:M0e.jsx(bd,{children:x.highlight.color(x.text)})},I);"
     );
-    // Creation codegen still wired, and nothing emitted via createElement.
     expect(result).toContain('matchAll(new RegExp("todo", "g"))');
     expect(result).toContain('style:(x)=>chalk(x),priority:100');
     expect(result).not.toContain('.createElement(');

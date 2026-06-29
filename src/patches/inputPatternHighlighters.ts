@@ -36,11 +36,6 @@ const buildChalkChain = (
 // ======================================================================
 
 const writeCustomHighlighterImpl = (oldFile: string): string | null => {
-  // CC >=2.1.193 (JSX automatic runtime): the renderer is
-  //   return JSXVAR.jsx(TEXT,{color:SEG.highlight?.color,dimColor:SEG.highlight?.dimColor,
-  //     inverse:SEG.highlight?.inverse,children:JSXVAR.jsx(INNER,{children:SEG.text})},KEY)
-  // (key is the 3rd positional arg, not a prop). Try this first; on no match we
-  // fall through to the older createElement paths below.
   const jsxRenderRegex =
     /return ([$\w]+)\.jsx\(([$\w]+),\{color:([$\w]+)\.highlight\?\.color,dimColor:\3\.highlight\?\.dimColor,inverse:\3\.highlight\?\.inverse,children:\1\.jsx\(([$\w]+),\{children:\3\.text\}\)\},([$\w]+)\)/;
   const jsxMatch = oldFile.match(jsxRenderRegex);
@@ -52,9 +47,6 @@ const writeCustomHighlighterImpl = (oldFile: string): string | null => {
     const keyVar = jsxMatch[5];
     const esc = (s: string) => s.replace(/\$/g, '\\$');
 
-    // Insert a function-color guard BEFORE the shimmer branch (source order:
-    // shimmer precedes the main renderer) so function colors aren't swallowed
-    // by shimmer. The shimmer branch is now gated on shimmerColor&&color.
     const shimmerPattern = new RegExp(
       `if\\(${esc(segVar)}\\.highlight\\?\\.shimmerColor&&${esc(segVar)}\\.highlight\\.color\\)return ${esc(jsxVar)}\\.jsx\\(`
     );
@@ -72,9 +64,6 @@ const writeCustomHighlighterImpl = (oldFile: string): string | null => {
         workingFile.slice(shimmerMatch.index);
     }
 
-    // Re-find the renderer (index shifted by the guard insertion). The guard's
-    // jsx uses {children:...} not {color:...}, so jsxRenderRegex can only match
-    // the real renderer, never the inserted guard.
     const m2 = workingFile.match(jsxRenderRegex);
     if (!m2 || m2.index === undefined) {
       console.error(
@@ -88,9 +77,6 @@ const writeCustomHighlighterImpl = (oldFile: string): string | null => {
     const it = m2[4];
     const kv = m2[5];
 
-    // Mirror the createElement augmentedRenderer below, in jsx form: forward
-    // bold/italic/underline/strikethrough/backgroundColor and apply the chalk
-    // `style` function (pushed by writeCustomHighlighterCreation) when present.
     const augmentedRenderer =
       `return ${jv}.jsx(${ot},{` +
       `color:${sv}.highlight?.style?void 0:${sv}.highlight?.color,` +
