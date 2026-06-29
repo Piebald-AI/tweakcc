@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix `userMessageDisplay` and `patchesAppliedIndication` patches for Claude Code's JSX automatic runtime, and make `findBoxComponent` JSX-aware (#834) - @StreamDemon
 - Fix thinker-symbol-width and thinker-format patches for Claude Code's JSX automatic runtime (#835) - @StreamDemon
 - Fix hide-startup-clawd patch for Claude Code's JSX automatic runtime (#836) - @StreamDemon
+- Make channels-mode tolerate the removed ChannelsNotice "Experimental" warning banner so `--apply` no longer reports a spurious failure (#837) - @StreamDemon
 - Fix suppress-rate-limit-options, suppress-line-numbers, and suppress-native-installer-warning patches for Claude Code 2.1.195 (#838) - @StreamDemon
 - Fix table-format, token-count-rounding, and context-limit patches for Claude Code 2.1.195 (#839) - @StreamDemon
 - Fix input-box-border and input-pattern-highlighters patches for Claude Code 2.1.195 (#840) - @StreamDemon
