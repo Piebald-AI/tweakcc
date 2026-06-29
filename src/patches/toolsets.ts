@@ -1078,13 +1078,7 @@ export const insertShiftTabAppStateVar = (
 };
 
 /**
- * Find the [start, end] span of the function body that contains the injected
- * `let currentToolset=` marker (placed by insertShiftTabAppStateVar). The
- * mode/shortcuts display rewrites are scoped to this span so every
- * `currentToolset` read stays lexically inside the function that defines it:
- * CC's JSX automatic-runtime refactor split the footer across functions, so a
- * global rewrite could otherwise emit an out-of-scope read (ReferenceError at
- * render). The walk skips braces inside string/template literals.
+ * Find the function-body span holding the injected `let currentToolset=` marker.
  */
 export const findCurrentToolsetInjectionSpan = (
   fileContents: string
@@ -1122,10 +1116,6 @@ export const findCurrentToolsetInjectionSpan = (
  * Append the toolset name to the mode display text
  */
 export const appendToolsetToModeDisplay = (oldFile: string): string | null => {
-  // Find every site where the mode text is rendered: tl(Y).toLowerCase(), " on"
-  // Newer CC versions render the footer mode line from more than one of these
-  // sites, but only those inside the function where insertShiftTabAppStateVar
-  // defined `currentToolset` may read it.
   const modeDisplayPattern = /([$\w]+)\(([$\w]+)\)\.toLowerCase\(\)," on"/g;
   const matches = Array.from(oldFile.matchAll(modeDisplayPattern));
 
@@ -1193,9 +1183,6 @@ export const appendToolsetToShortcutsDisplay = (
     return null;
   }
 
-  // Only rewrite occurrences inside the function where insertShiftTabAppStateVar
-  // defined `currentToolset` (the footer is split across functions on CC's JSX
-  // runtime); a rewrite outside that scope would ReferenceError at render.
   const span = findCurrentToolsetInjectionSpan(oldFile);
   if (!span) {
     console.error(

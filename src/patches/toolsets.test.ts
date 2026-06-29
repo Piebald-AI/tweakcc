@@ -368,6 +368,18 @@ describe('findCurrentToolsetInjectionSpan', () => {
     );
   });
 
+  it('ignores braces inside template literals when walking out of the function', () => {
+    const file =
+      'function F(){let currentToolset=x;let label=` on [${currentToolset}]`;return label}after();';
+
+    const span = findCurrentToolsetInjectionSpan(file);
+
+    expect(span).not.toBeNull();
+    expect(file.slice(span!.start, span!.end + 1)).toBe(
+      'let currentToolset=x;let label=` on [${currentToolset}]`;return label}'
+    );
+  });
+
   it('returns null when no marker is present', () => {
     expect(
       findCurrentToolsetInjectionSpan('function F(){return 1}')
