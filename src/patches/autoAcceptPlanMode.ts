@@ -206,9 +206,7 @@ export const writeAutoAcceptPlanMode = (oldFile: string): string | null => {
   // Inject just before the component's top-level return. Primary: the
   // React-Compiler-memoized tail `else <v>=t[<n>];return <v>}` (backreference avoids
   // an unrelated memo slot); fallback: the enclosing function's last top-level return.
-  const memoTailMatch = oldFile
-    .slice(readyIdx, readyIdx + 3000)
-    .match(/else ([$\w]+)=t\[\d+\];return \1\}/);
+  const memoTailMatch = afterReady.match(/else ([$\w]+)=t\[\d+\];return \1\}/);
 
   const injectionIdx =
     memoTailMatch && memoTailMatch.index !== undefined
