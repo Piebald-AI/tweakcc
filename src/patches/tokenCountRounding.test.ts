@@ -46,4 +46,26 @@ describe('writeTokenCountRounding', () => {
     expect(result).not.toContain('D$=fr_(OH)/1000)*1000)');
     expect(result).toContain('D$=fr_(OH)');
   });
+
+  it('wraps the token expression for the JSX children-array form (CC >=2.1.195)', () => {
+    // CC 2.1.195 dropped key:"tokens" and moved the count into a JSX children array.
+    const input =
+      'let Ee=t?O:ae.current,me=Yi(I),pe=rn(me),ge=ce,he=ou(ge),ie=`${nt.arrowDown} ${he} tokens`,le=rn(ie),B$=Mf.jsxs(w,{dimColor:!0,children:[he," tokens"]});';
+
+    const result = writeTokenCountRounding(input, 1000);
+
+    expect(result).toContain('he=ou(Math.round((ge)/1000)*1000)');
+    expect(result).toContain('children:[he," tokens"]');
+  });
+
+  it('children-array form: wraps only the backreferenced token decl', () => {
+    const input =
+      'let pe=rn(me),xe=ze(ye),ge=ce,he=ou(ge),ie=`${nt.arrowDown} ${he} tokens`,B$=Mf.jsxs(w,{dimColor:!0,children:[he," tokens"]});';
+
+    const result = writeTokenCountRounding(input, 1000);
+
+    expect(result).toContain('he=ou(Math.round((ge)/1000)*1000)');
+    expect(result).toContain('xe=ze(ye)');
+    expect(result).not.toContain('xe=ze(Math.round');
+  });
 });
