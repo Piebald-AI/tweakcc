@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix suppress-rate-limit-options, suppress-line-numbers, and suppress-native-installer-warning patches for Claude Code 2.1.195 (#838) - @StreamDemon
 - Fix table-format, token-count-rounding, and context-limit patches for Claude Code 2.1.195 (#839) - @StreamDemon
 - Fix input-box-border and input-pattern-highlighters patches for Claude Code 2.1.195 (#840) - @StreamDemon
+- Fix toolsets patch for Claude Code's JSX automatic runtime (#841) - @StreamDemon
 
 ## [v4.2.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.2.0) - 2026-06-26
 
