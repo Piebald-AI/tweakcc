@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fix input-chevron-color patch for Claude Code 2.1.199 (chevron component gained an `isScreenReader` field and a third guard term) (#855) - @StreamDemon
+
 ## [v4.3.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.0) - 2026-06-29
 
 - Add input chevron color patch (#634) - @VitalyOstanin
