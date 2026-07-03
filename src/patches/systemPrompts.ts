@@ -172,11 +172,15 @@ export const applySystemPrompts = async (
 
       let replacementContent = interpolatedContent;
 
-      // Escape literal backslashes FIRST so they survive JS string
-      // embedding. Without this, a markdown `\"user\"` ends up as `"user"`
-      // because the backslash is consumed as an escape character. (#660)
       if (delimiter === '"' || delimiter === "'" || delimiter === '`') {
         replacementContent = replacementContent.replace(/\\/g, '\\\\');
+      }
+
+      if (delimiter === '`') {
+        replacementContent = replacementContent.replace(
+          /\\\\\$\{/g,
+          '\\\\\\${'
+        );
       }
 
       if (delimiter === '"') {

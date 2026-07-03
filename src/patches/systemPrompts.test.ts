@@ -307,6 +307,30 @@ describe('systemPrompts.ts', () => {
       expect(result.newContent).toBe('desc:`Value: \\`${x}\\``');
     });
 
+    it('should preserve escaped interpolation markers in template literal context', async () => {
+      const mockPromptData = buildMockPromptData({
+        content: 'Use \\${name} literally',
+        regex: 'Use \\\\\\$\\{name\\} literally',
+        getInterpolatedContent: () => 'Use \\${name} literally',
+        pieces: ['Use \\${name} literally'],
+      });
+
+      setupMocks(mockPromptData);
+
+      const cliContent = 'desc:`Use \\${name} literally`';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe('desc:`Use \\\\\\${name} literally`');
+      expect(
+        new Function(
+          'const name = "expanded"; return { ' + result.newContent + ' };'
+        )()
+      ).toEqual({
+        desc: 'Use \\${name} literally',
+      });
+    });
+
     it('should escape backslashes in already-escaped backticks and also escape bare backticks (#660)', async () => {
       const mockPromptData = buildMockPromptData({
         content: 'Use \\`foo\\` and `bar` for config',
