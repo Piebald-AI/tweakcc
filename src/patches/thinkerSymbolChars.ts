@@ -1,6 +1,6 @@
 // Please see the note about writing patches in ./index
 
-import { LocationResult, showDiff } from './index';
+import { LocationResult, escapeNonAscii, showDiff } from './index';
 
 export const writeThinkerSymbolChars = (
   oldFile: string,
@@ -25,7 +25,10 @@ export const writeThinkerSymbolChars = (
     return null;
   }
 
-  const symbolsJson = JSON.stringify(symbols);
+  // Emit non-ASCII code points as `\uXXXX` escapes. Native installs store cli.js
+  // as a Latin-1 Bun module, so literal UTF-8 would mojibake at runtime. See
+  // escapeNonAscii in ./helpers.
+  const symbolsJson = escapeNonAscii(JSON.stringify(symbols));
 
   // Sort locations by start index in descending order to apply from end to beginning.
   const sortedLocations = locations.sort((a, b) => b.startIndex - a.startIndex);
