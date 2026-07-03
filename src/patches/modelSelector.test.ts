@@ -32,9 +32,6 @@ describe('writeModelCustomizations', () => {
   });
 
   it('fails closed on a member-expression push (does not capture a property as the list var)', () => {
-    // `.`-preceded pushes are member expressions — `t` there is a property of `e`,
-    // not a standalone binding, so injecting `t.push(...)` would target the wrong
-    // object. The anchor must not capture it even when a `t` decl exists nearby.
     const memberExpr =
       'function F(e){let t=[];return e.t.push({value:c,label:c,description:"Custom model"})}';
     const out = writeModelCustomizations(memberExpr);
