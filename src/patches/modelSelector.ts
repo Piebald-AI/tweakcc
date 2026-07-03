@@ -24,9 +24,12 @@ export const CUSTOM_MODELS: { value: string; label: string; description: string 
 const findCustomModelListInsertionPoint = (
   fileContents: string
 ): { insertionIndex: number; modelListVar: string } | null => {
-  // 1. Find the custom model push pattern
+  // 1. Find the custom model push pattern. The push site is preceded by a
+  // non-identifier char that varies across CC builds — a space on older builds,
+  // but `{` on CC 2.1.199 (the push sits directly inside an `if(...){...}`
+  // block), so anchor on `[^$\w]` rather than a literal space.
   const pushPattern =
-    / ([$\w]+)\.push\(\{value:[$\w]+,label:[$\w]+,description:"Custom model"\}\)/;
+    /[^$\w]([$\w]+)\.push\(\{value:[$\w]+,label:[$\w]+,description:"Custom model"\}\)/;
   const pushMatch = fileContents.match(pushPattern);
   if (!pushMatch || pushMatch.index === undefined) {
     console.error(
