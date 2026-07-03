@@ -16,12 +16,71 @@ export const writeAgentsMd = (
   file: string,
   altNames: string[]
 ): string | null => {
-  // Try the new async pattern first (CC >=2.1.83)
+  // Try the CC >=2.1.199 async pattern first (reader refactored into a stat+read
+  // helper with a regular-file/size guard).
+  const async2199 = writeAgentsMdAsync2199(file, altNames);
+  if (async2199) return async2199;
+
+  // Then the CC 2.1.83–2.1.198 async pattern (inline readFile).
   const asyncResult = writeAgentsMdAsync(file, altNames);
   if (asyncResult) return asyncResult;
 
   // Fall back to the old sync pattern (CC <=2.1.69)
   return writeAgentsMdSync(file, altNames);
+};
+
+/**
+ * CC >=2.1.199 async reader. The read moved into a helper (`aN`, which stats the
+ * path then readFiles) and a regular-file/size guard was added:
+ *
+ *   async function aya(e,t,n){try{let r=Vt(),o=await aN(r,e,Ypo);
+ *     if(o===null)return T(`[CLAUDE.md] ...`),{info:null,includePaths:[]};
+ *     return FHp(o,e,t,n)}catch(r){return jHp(r,e),{info:null,includePaths:[]}}}
+ *
+ * A missing CLAUDE.md makes `aN`'s `stat` throw ENOENT, which propagates to this
+ * catch — so that's where the AGENTS.md reroute is injected. The `o===null`
+ * branch (not a regular file / too big) is intentionally left untouched.
+ */
+const writeAgentsMdAsync2199 = (
+  file: string,
+  altNames: string[]
+): string | null => {
+  const pattern =
+    /async function ([$\w]+)\(([$\w]+),([$\w]+),([$\w]+)\)\{try\{let [$\w]+=[$\w]+\(\),([$\w]+)=await [$\w]+\(([$\w]+),\2,[$\w]+\);if\(\5===null\)return [$\w]+\(`\[CLAUDE\.md\][^`]*`\),\{info:null,includePaths:\[\]\};return [$\w]+\(\5,\2,\3,\4\)\}catch\(([$\w]+)\)\{return ([$\w]+)\(\7,\2\),\{info:null,includePaths:\[\]\}\}\}/;
+
+  const m = file.match(pattern);
+  if (!m || m.index === undefined) return null;
+
+  const funcName = m[1]; // aya
+  const pathParam = m[2]; // e (the CLAUDE.md path)
+  const p2 = m[3]; // t
+  const p3 = m[4]; // n
+  const catchVar = m[7]; // r
+  const errorHandler = m[8]; // jHp
+
+  const altNamesJson = JSON.stringify(altNames);
+
+  const oldSig = `async function ${funcName}(${pathParam},${p2},${p3})`;
+  const newSig = `async function ${funcName}(${pathParam},${p2},${p3},didReroute)`;
+
+  const oldCatch = `catch(${catchVar}){return ${errorHandler}(${catchVar},${pathParam}),{info:null,includePaths:[]}}`;
+  const reroute =
+    `if(!didReroute&&(${pathParam}.endsWith("/CLAUDE.md")||${pathParam}.endsWith("\\\\CLAUDE.md"))){` +
+    `for(let alt of ${altNamesJson}){let altPath=${pathParam}.slice(0,-9)+alt;` +
+    `try{let _r=await ${funcName}(altPath,${p2},${p3},true);if(_r.info)return _r}catch{}}}`;
+  const newCatch = `catch(${catchVar}){${reroute}return ${errorHandler}(${catchVar},${pathParam}),{info:null,includePaths:[]}}`;
+
+  let fn = m[0];
+  fn = fn.replace(oldSig, newSig);
+  fn = fn.replace(oldCatch, newCatch);
+
+  const startIndex = m.index;
+  const endIndex = startIndex + m[0].length;
+  const newFile = file.slice(0, startIndex) + fn + file.slice(endIndex);
+
+  showDiff(file, newFile, fn, startIndex, endIndex);
+
+  return newFile;
 };
 
 const writeAgentsMdAsync = (
