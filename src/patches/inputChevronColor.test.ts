@@ -32,8 +32,6 @@ describe('writeInputChevronColor', () => {
   });
 
   it('handles the CC 2.1.199 shape (isScreenReader field + extra pointer var + 3-term guard)', () => {
-    // 2.1.199 inserts `isScreenReader:r` into the destructure, an extra
-    // `a=r?"$":ct.pointer` assignment, and a third `||t[2]!==a` guard term.
     const input =
       'var z=1,{isLoading:n,isScreenReader:r,themeColor:o}=e,i=o??void 0,a=r?"$":ct.pointer,l;' +
       'if(t[0]!==i||t[1]!==n||t[2]!==a)' +
