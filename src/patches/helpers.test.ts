@@ -1,6 +1,25 @@
 import { describe, expect, it } from 'vitest';
 
-import { findBoxComponent } from './helpers';
+import { escapeNonAscii, findBoxComponent } from './helpers';
+
+describe('escapeNonAscii', () => {
+  it('escapes non-ASCII code points as \\uXXXX and leaves ASCII untouched', () => {
+    expect(escapeNonAscii('·✢*')).toBe('\\u00b7\\u2722*');
+    expect(escapeNonAscii('plain ascii 123')).toBe('plain ascii 123');
+  });
+
+  it('produces output with no bytes > 127', () => {
+    const out = escapeNonAscii(JSON.stringify(['·', '✽', 'x']));
+    // eslint-disable-next-line no-control-regex
+    expect(/[^\x00-\x7f]/.test(out)).toBe(false);
+  });
+
+  it('escapes each surrogate half of an astral code point', () => {
+    // 🎉 (U+1F389) is a surrogate pair; both halves become \uXXXX and still
+    // reconstruct the emoji when the JS source is parsed.
+    expect(escapeNonAscii('🎉')).toBe('\\ud83c\\udf89');
+  });
+});
 
 describe('findBoxComponent', () => {
   it('finds the Box component rendered via the JSX runtime (jsx("ink-box"))', () => {
