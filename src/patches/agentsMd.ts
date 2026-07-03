@@ -16,12 +16,55 @@ export const writeAgentsMd = (
   file: string,
   altNames: string[]
 ): string | null => {
-  // Try the new async pattern first (CC >=2.1.83)
+  const async2199 = writeAgentsMdAsync2199(file, altNames);
+  if (async2199) return async2199;
+
   const asyncResult = writeAgentsMdAsync(file, altNames);
   if (asyncResult) return asyncResult;
 
-  // Fall back to the old sync pattern (CC <=2.1.69)
   return writeAgentsMdSync(file, altNames);
+};
+
+const writeAgentsMdAsync2199 = (
+  file: string,
+  altNames: string[]
+): string | null => {
+  const pattern =
+    /async function ([$\w]+)\(([$\w]+),([$\w]+),([$\w]+)\)\{try\{let [$\w]+=[$\w]+\(\),([$\w]+)=await [$\w]+\(([$\w]+),\2,[$\w]+\);if\(\5===null\)return [$\w]+\(`\[CLAUDE\.md\][^`]*`\),\{info:null,includePaths:\[\]\};return [$\w]+\(\5,\2,\3,\4\)\}catch\(([$\w]+)\)\{return ([$\w]+)\(\7,\2\),\{info:null,includePaths:\[\]\}\}\}/;
+
+  const m = file.match(pattern);
+  if (!m || m.index === undefined) return null;
+
+  const funcName = m[1];
+  const pathParam = m[2];
+  const p2 = m[3];
+  const p3 = m[4];
+  const catchVar = m[7];
+  const errorHandler = m[8];
+
+  const altNamesJson = JSON.stringify(altNames);
+
+  const oldSig = `async function ${funcName}(${pathParam},${p2},${p3})`;
+  const newSig = `async function ${funcName}(${pathParam},${p2},${p3},didReroute)`;
+
+  const oldCatch = `catch(${catchVar}){return ${errorHandler}(${catchVar},${pathParam}),{info:null,includePaths:[]}}`;
+  const reroute =
+    `if(!didReroute&&(${pathParam}.endsWith("/CLAUDE.md")||${pathParam}.endsWith("\\\\CLAUDE.md"))){` +
+    `for(let alt of ${altNamesJson}){let altPath=${pathParam}.slice(0,-9)+alt;` +
+    `try{let _r=await ${funcName}(altPath,${p2},${p3},true);if(_r.info)return _r}catch{}}}`;
+  const newCatch = `catch(${catchVar}){${reroute}return ${errorHandler}(${catchVar},${pathParam}),{info:null,includePaths:[]}}`;
+
+  let fn = m[0];
+  fn = fn.replace(oldSig, newSig);
+  fn = fn.replace(oldCatch, newCatch);
+
+  const startIndex = m.index;
+  const endIndex = startIndex + m[0].length;
+  const newFile = file.slice(0, startIndex) + fn + file.slice(endIndex);
+
+  showDiff(file, newFile, fn, startIndex, endIndex);
+
+  return newFile;
 };
 
 const writeAgentsMdAsync = (

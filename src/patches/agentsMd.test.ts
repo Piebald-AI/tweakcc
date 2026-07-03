@@ -61,5 +61,29 @@ describe('agentsMd', () => {
       const result = writeAgentsMd('not a valid file', altNames);
       expect(result).toBeNull();
     });
+
+    const asyncReader199 =
+      'async function aya(e,t,n){try{let r=Vt(),o=await aN(r,e,Ypo);' +
+      'if(o===null)return T(`[CLAUDE.md] skipping ${e}: not a regular file or exceeds ${Ypo} byte limit`),{info:null,includePaths:[]};' +
+      'return FHp(o,e,t,n)}catch(r){return jHp(r,e),{info:null,includePaths:[]}}}';
+
+    it('handles the CC 2.1.199 async reader (reroute injected into catch)', () => {
+      const result = writeAgentsMd(asyncReader199, altNames);
+      expect(result).not.toBeNull();
+      expect(result).toContain('async function aya(e,t,n,didReroute)');
+      expect(result).toContain('endsWith("/CLAUDE.md")');
+      expect(result).toContain('AGENTS.md');
+      // recursion passes the extra params through + didReroute=true
+      expect(result).toContain('await aya(altPath,t,n,true)');
+      // original success + skip branches are preserved
+      expect(result).toContain('return FHp(o,e,t,n)');
+      expect(result).toContain('if(o===null)return T(');
+      // reroute sits before the original error-handler return in the catch
+      const catchIdx = result!.indexOf('catch(r){');
+      const rerouteIdx = result!.indexOf('!didReroute', catchIdx);
+      const errReturnIdx = result!.indexOf('return jHp(r,e)', catchIdx);
+      expect(rerouteIdx).toBeGreaterThan(catchIdx);
+      expect(rerouteIdx).toBeLessThan(errReturnIdx);
+    });
   });
 });
