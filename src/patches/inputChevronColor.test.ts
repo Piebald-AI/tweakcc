@@ -31,6 +31,18 @@ describe('writeInputChevronColor', () => {
     expect(result).toBeNull();
   });
 
+  it('handles the CC 2.1.199 shape (isScreenReader field + extra pointer var + 3-term guard)', () => {
+    const input =
+      'var z=1,{isLoading:n,isScreenReader:r,themeColor:o}=e,i=o??void 0,a=r?"$":ct.pointer,l;' +
+      'if(t[0]!==i||t[1]!==n||t[2]!==a)' +
+      'l=yQe.jsxs(w,{color:i,dimColor:n,children:[a,"\\xA0"]}),t[0]=i;else l=t[3]';
+    const result = writeInputChevronColor(input, 'red');
+
+    expect(result).not.toBeNull();
+    expect(result).toContain('color:n?i:"red",dimColor:!1');
+    expect(result).not.toContain('color:i,dimColor:n');
+  });
+
   it('works with different identifier names', () => {
     const input =
       'var a=1,{isLoading:X$,themeColor:Y$}=Z$,W$=Y$??void 0,V$;' +
