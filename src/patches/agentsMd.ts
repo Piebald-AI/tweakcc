@@ -16,31 +16,15 @@ export const writeAgentsMd = (
   file: string,
   altNames: string[]
 ): string | null => {
-  // Try the CC >=2.1.199 async pattern first (reader refactored into a stat+read
-  // helper with a regular-file/size guard).
   const async2199 = writeAgentsMdAsync2199(file, altNames);
   if (async2199) return async2199;
 
-  // Then the CC 2.1.83–2.1.198 async pattern (inline readFile).
   const asyncResult = writeAgentsMdAsync(file, altNames);
   if (asyncResult) return asyncResult;
 
-  // Fall back to the old sync pattern (CC <=2.1.69)
   return writeAgentsMdSync(file, altNames);
 };
 
-/**
- * CC >=2.1.199 async reader. The read moved into a helper (`aN`, which stats the
- * path then readFiles) and a regular-file/size guard was added:
- *
- *   async function aya(e,t,n){try{let r=Vt(),o=await aN(r,e,Ypo);
- *     if(o===null)return T(`[CLAUDE.md] ...`),{info:null,includePaths:[]};
- *     return FHp(o,e,t,n)}catch(r){return jHp(r,e),{info:null,includePaths:[]}}}
- *
- * A missing CLAUDE.md makes `aN`'s `stat` throw ENOENT, which propagates to this
- * catch — so that's where the AGENTS.md reroute is injected. The `o===null`
- * branch (not a regular file / too big) is intentionally left untouched.
- */
 const writeAgentsMdAsync2199 = (
   file: string,
   altNames: string[]
@@ -51,12 +35,12 @@ const writeAgentsMdAsync2199 = (
   const m = file.match(pattern);
   if (!m || m.index === undefined) return null;
 
-  const funcName = m[1]; // aya
-  const pathParam = m[2]; // e (the CLAUDE.md path)
-  const p2 = m[3]; // t
-  const p3 = m[4]; // n
-  const catchVar = m[7]; // r
-  const errorHandler = m[8]; // jHp
+  const funcName = m[1];
+  const pathParam = m[2];
+  const p2 = m[3];
+  const p3 = m[4];
+  const catchVar = m[7];
+  const errorHandler = m[8];
 
   const altNamesJson = JSON.stringify(altNames);
 

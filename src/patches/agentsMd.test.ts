@@ -62,10 +62,6 @@ describe('agentsMd', () => {
       expect(result).toBeNull();
     });
 
-    // CC 2.1.199 refactored the async reader: the read moved into a helper
-    // (aN, which stats then readFiles) and a regular-file/size guard was added.
-    // A missing CLAUDE.md makes aN's stat throw ENOENT → the reader's catch, so
-    // the AGENTS.md reroute must be injected there.
     const asyncReader199 =
       'async function aya(e,t,n){try{let r=Vt(),o=await aN(r,e,Ypo);' +
       'if(o===null)return T(`[CLAUDE.md] skipping ${e}: not a regular file or exceeds ${Ypo} byte limit`),{info:null,includePaths:[]};' +
