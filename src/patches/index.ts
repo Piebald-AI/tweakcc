@@ -86,6 +86,7 @@ import { compareVersions } from '../systemPromptSync';
 
 export { showDiff, showPositionalDiff, globalReplace } from './patchDiffing';
 export {
+  escapeNonAscii,
   findChalkVar,
   getModuleLoaderFunction,
   getReactModuleNameNonBun,
