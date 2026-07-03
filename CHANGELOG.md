@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 - Escape non-ASCII thinker symbols as `\uXXXX` to fix custom spinner mojibake on native binary installs (#853) - @StreamDemon
+- Fix model-customizations patch for Claude Code 2.1.199 (custom-model push anchor no longer requires a leading space) (#854) - @StreamDemon
 
 ## [v4.3.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.0) - 2026-06-29
 

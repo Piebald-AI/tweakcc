@@ -26,7 +26,7 @@ const findCustomModelListInsertionPoint = (
 ): { insertionIndex: number; modelListVar: string } | null => {
   // 1. Find the custom model push pattern
   const pushPattern =
-    / ([$\w]+)\.push\(\{value:[$\w]+,label:[$\w]+,description:"Custom model"\}\)/;
+    /[,;{} ]([$\w]+)\.push\(\{value:[$\w]+,label:[$\w]+,description:"Custom model"\}\)/;
   const pushMatch = fileContents.match(pushPattern);
   if (!pushMatch || pushMatch.index === undefined) {
     console.error(
