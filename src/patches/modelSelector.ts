@@ -25,11 +25,14 @@ const findCustomModelListInsertionPoint = (
   fileContents: string
 ): { insertionIndex: number; modelListVar: string } | null => {
   // 1. Find the custom model push pattern. The push site is preceded by a
-  // non-identifier char that varies across CC builds — a space on older builds,
-  // but `{` on CC 2.1.199 (the push sits directly inside an `if(...){...}`
-  // block), so anchor on `[^$\w]` rather than a literal space.
+  // statement/expression separator that varies across CC builds — a space on
+  // older builds, but `{` on CC 2.1.199 (the push sits directly inside an
+  // `if(...){...}` block). Anchor on the specific separators we expect
+  // (`,` `;` `{` `}` space) rather than `[^$\w]`, which would also match `.`
+  // and capture a property from a member expression like `e.t.push(...)` —
+  // injecting against the wrong binding. Unexpected shapes now fail closed.
   const pushPattern =
-    /[^$\w]([$\w]+)\.push\(\{value:[$\w]+,label:[$\w]+,description:"Custom model"\}\)/;
+    /[,;{} ]([$\w]+)\.push\(\{value:[$\w]+,label:[$\w]+,description:"Custom model"\}\)/;
   const pushMatch = fileContents.match(pushPattern);
   if (!pushMatch || pushMatch.index === undefined) {
     console.error(
