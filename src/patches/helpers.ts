@@ -1,5 +1,21 @@
 import { escapeIdent } from '.';
 
+/**
+ * Escapes every non-ASCII code unit as a `\uXXXX` sequence so injected source
+ * stays pure ASCII. Native Claude Code installs embed cli.js as a Latin-1 Bun
+ * module (the clean module has zero bytes > 127); injecting literal UTF-8 there
+ * is decoded one byte per code point at runtime → mojibake (e.g. "✢" → "â").
+ * `\uXXXX` escapes produce the same string in JS regardless of module encoding.
+ */
+export const escapeNonAscii = (text: string): string => {
+  // eslint-disable-next-line no-control-regex
+  const nonAscii = /[^\x00-\x7f]/g;
+  return text.replace(
+    nonAscii,
+    c => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`
+  );
+};
+
 export const findChalkVar = (fileContents: string): string | undefined => {
   // Find chalk variable using the counting method
   const chalkPattern =
