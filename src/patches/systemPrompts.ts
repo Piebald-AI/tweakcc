@@ -172,6 +172,17 @@ export const applySystemPrompts = async (
 
       let replacementContent = interpolatedContent;
 
+      if (delimiter === '"' || delimiter === "'" || delimiter === '`') {
+        replacementContent = replacementContent.replace(/\\/g, '\\\\');
+      }
+
+      if (delimiter === '`') {
+        replacementContent = replacementContent.replace(
+          /\\\\\$\{/g,
+          '\\\\\\${'
+        );
+      }
+
       if (delimiter === '"') {
         replacementContent = replacementContent.replace(/\n/g, '\\n');
         replacementContent = escapeUnescapedChar(replacementContent, '"');
@@ -180,7 +191,7 @@ export const applySystemPrompts = async (
         replacementContent = escapeUnescapedChar(replacementContent, "'");
       } else if (delimiter === '`') {
         const { content: escaped, incomplete } =
-          escapeDepthZeroBackticks(interpolatedContent);
+          escapeDepthZeroBackticks(replacementContent);
         if (incomplete) {
           console.log(
             chalk.red(
@@ -196,7 +207,7 @@ export const applySystemPrompts = async (
           });
           continue;
         }
-        if (escaped !== interpolatedContent) {
+        if (escaped !== replacementContent) {
           console.log(
             chalk.yellow(`Auto-escaped unescaped backticks in "${prompt.name}"`)
           );

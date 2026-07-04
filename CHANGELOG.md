@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Preserve literal backslashes when applying system prompts to JavaScript string literals (#664) - @mike1858
 - Escape non-ASCII thinker symbols as `\uXXXX` to fix custom spinner mojibake on native binary installs (#853) - @StreamDemon
 - Fix model-customizations patch for Claude Code 2.1.199 (custom-model push anchor no longer requires a leading space) (#854) - @StreamDemon
 - Fix input-chevron-color patch for Claude Code 2.1.199 (chevron component gained an `isScreenReader` field and a third guard term) (#855) - @StreamDemon
