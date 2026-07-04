@@ -81,7 +81,7 @@ export const patchSaveAgentColor = (oldFile: string): string | null => {
       '(async function ([$\\w]+)' +
       '\\(([$\\w]+),([$\\w]+),([$\\w]+)\\)' +
       '\\{let [$\\w]+=\\6\\?\\?[$\\w]+\\(\\4\\);' +
-      'if\\([$\\w]+\\([$\\w]+,' +
+      'if\\((?:await )?[$\\w]+\\([$\\w]+,' +
       '\\{type:"agent-color",agentColor:\\5,sessionId:\\4\\}\\),' +
       '\\4===([$\\w]+)\\(\\)\\))'
   );

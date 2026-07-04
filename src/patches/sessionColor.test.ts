@@ -6,6 +6,11 @@ const makeSaveAgentColor = () =>
   'if(Hv(K,{type:"agent-color",agentColor:$,sessionId:H}),H===V$())' +
   'WA().currentSessionAgentColor=$;c("tengu_agent_color_set",{})}';
 
+const makeAsyncSaveAgentColor = () =>
+  ';async function Mr$(H,$,q){let K=q??sT(H);' +
+  'if(await Hv(K,{type:"agent-color",agentColor:$,sessionId:H}),H===V$())' +
+  'WA().currentSessionAgentColor=$;c("tengu_agent_color_set",{})}';
+
 const makeCLIState = () =>
   'effortValue:oR(w.effort),' +
   'activeOverlays:new Set,fastMode:cP8(N5),' +
@@ -19,6 +24,8 @@ const makeBoth = () =>
 
 const makeFullFile = () => makeBoth() + makeSaveAgentColor();
 
+const makeFullFileAsync = () => makeBoth() + makeAsyncSaveAgentColor();
+
 describe('sessionColor', () => {
   describe('writeSessionColor', () => {
     it('should inject into CLI initialState and patch saveAgentColor', () => {
@@ -27,6 +34,14 @@ describe('sessionColor', () => {
       expect(result).toContain('TWEAKCC_SESSION_COLOR');
       expect(result).toContain('{name:"",color:__c}');
       expect(result).toContain('__tweakccSaveAgentColor');
+    });
+
+    it('should inject and patch async saveAgentColor', () => {
+      const result = writeSessionColor(makeFullFileAsync());
+      expect(result).not.toBeNull();
+      expect(result).toContain('TWEAKCC_SESSION_COLOR');
+      expect(result).toContain('__tweakccSaveAgentColor');
+      expect(result).toContain('if(await Hv(K,');
     });
 
     it('should inject into default app state', () => {
@@ -80,6 +95,13 @@ describe('sessionColor', () => {
       const result = patchSaveAgentColor(makeSaveAgentColor());
       expect(result).not.toBeNull();
       expect(result).toContain('globalThis.__tweakccSaveAgentColor');
+    });
+
+    it('should patch async saveAgentColor with awaited write', () => {
+      const result = patchSaveAgentColor(makeAsyncSaveAgentColor());
+      expect(result).not.toBeNull();
+      expect(result).toContain('globalThis.__tweakccSaveAgentColor');
+      expect(result).toContain('if(await Hv(K,');
     });
 
     it('should return null when pattern not found', () => {
