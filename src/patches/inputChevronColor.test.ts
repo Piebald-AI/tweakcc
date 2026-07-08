@@ -43,6 +43,19 @@ describe('writeInputChevronColor', () => {
     expect(result).not.toContain('color:i,dimColor:n');
   });
 
+  it('handles the CC 2.1.204 shape (semicolon after void 0 + const/let between init and guard)', () => {
+    const input =
+      'var z=1,{isLoading:QFp,isScreenReader:MOC,themeColor:$OC}=POC,' +
+      'ZFp=$OC??void 0;const e2p=MOC?"$":Oe.pointer;let w9_;' +
+      'if(OOC[0]!==ZFp||OOC[1]!==QFp||OOC[2]!==e2p)' +
+      'w9_=I_e.jsxs(h,{color:ZFp,dimColor:QFp,children:[e2p,"\\xA0"]}),OOC[0]=ZFp';
+    const result = writeInputChevronColor(input, 'red');
+
+    expect(result).not.toBeNull();
+    expect(result).toContain('color:QFp?ZFp:"red",dimColor:!1');
+    expect(result).not.toContain('color:ZFp,dimColor:QFp');
+  });
+
   it('works with different identifier names', () => {
     const input =
       'var a=1,{isLoading:X$,themeColor:Y$}=Z$,W$=Y$??void 0,V$;' +
