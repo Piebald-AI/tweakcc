@@ -76,21 +76,21 @@ export const writeSessionColor = (oldFile: string): string | null => {
 };
 
 export const patchSaveAgentColor = (oldFile: string): string | null => {
+  const prefix =
+    '([,;{}])' +
+    '(async function ([$\\w]+)' +
+    '\\(([$\\w]+),([$\\w]+),([$\\w]+)\\)' +
+    '\\{let [$\\w]+=\\6\\?\\?[$\\w]+\\(\\4\\);';
+
   const patterns = [
     new RegExp(
-      '([,;{}])' +
-        '(async function ([$\\w]+)' +
-        '\\(([$\\w]+),([$\\w]+),([$\\w]+)\\)' +
-        '\\{let [$\\w]+=\\6\\?\\?[$\\w]+\\(\\4\\);' +
+      prefix +
         'if\\((?:await )?[$\\w]+\\([$\\w]+,' +
         '\\{type:"agent-color",agentColor:\\5,sessionId:\\4\\}\\),' +
         '\\4===([$\\w]+)\\(\\)\\))'
     ),
     new RegExp(
-      '([,;{}])' +
-        '(async function ([$\\w]+)' +
-        '\\(([$\\w]+),([$\\w]+),([$\\w]+)\\)' +
-        '\\{let [$\\w]+=\\6\\?\\?[$\\w]+\\(\\4\\);' +
+      prefix +
         'try\\{await [$\\w]+\\([$\\w]+,' +
         '\\{type:"agent-color",agentColor:\\5,sessionId:\\4\\}\\)\\}' +
         'catch\\([$\\w]+\\)\\{[\\s\\S]*?\\}' +
