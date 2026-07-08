@@ -76,16 +76,34 @@ export const writeSessionColor = (oldFile: string): string | null => {
 };
 
 export const patchSaveAgentColor = (oldFile: string): string | null => {
-  const pattern = new RegExp(
+  const prefix =
     '([,;{}])' +
-      '(async function ([$\\w]+)' +
-      '\\(([$\\w]+),([$\\w]+),([$\\w]+)\\)' +
-      '\\{let [$\\w]+=\\6\\?\\?[$\\w]+\\(\\4\\);' +
-      'if\\((?:await )?[$\\w]+\\([$\\w]+,' +
-      '\\{type:"agent-color",agentColor:\\5,sessionId:\\4\\}\\),' +
-      '\\4===([$\\w]+)\\(\\)\\))'
-  );
-  const match = oldFile.match(pattern);
+    '(async function ([$\\w]+)' +
+    '\\(([$\\w]+),([$\\w]+),([$\\w]+)\\)' +
+    '\\{let [$\\w]+=\\6\\?\\?[$\\w]+\\(\\4\\);';
+
+  const patterns = [
+    new RegExp(
+      prefix +
+        'if\\((?:await )?[$\\w]+\\([$\\w]+,' +
+        '\\{type:"agent-color",agentColor:\\5,sessionId:\\4\\}\\),' +
+        '\\4===([$\\w]+)\\(\\)\\))'
+    ),
+    new RegExp(
+      prefix +
+        'try\\{await [$\\w]+\\([$\\w]+,' +
+        '\\{type:"agent-color",agentColor:\\5,sessionId:\\4\\}\\)\\}' +
+        'catch\\([$\\w]+\\)\\{[\\s\\S]*?\\}' +
+        'if\\(\\4===([$\\w]+)\\(\\)\\))'
+    ),
+  ];
+
+  let match: RegExpMatchArray | null = null;
+  for (const pattern of patterns) {
+    match = oldFile.match(pattern);
+    if (match && match.index !== undefined) break;
+    match = null;
+  }
   if (!match || match.index === undefined) {
     return null;
   }
