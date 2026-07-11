@@ -172,15 +172,8 @@ export const applySystemPrompts = async (
 
       let replacementContent = interpolatedContent;
 
-      if (delimiter === '"' || delimiter === "'" || delimiter === '`') {
+      if (delimiter === '"' || delimiter === "'") {
         replacementContent = replacementContent.replace(/\\/g, '\\\\');
-      }
-
-      if (delimiter === '`') {
-        replacementContent = replacementContent.replace(
-          /\\\\\$\{/g,
-          '\\\\\\${'
-        );
       }
 
       if (delimiter === '"') {
