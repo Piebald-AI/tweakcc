@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fix over-escaping of backslashes in backtick-delimited system prompts that produced invalid JS and crashed Claude Code at startup (#870) - @StreamDemon
+
 ## [v4.3.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.1) - 2026-07-06
 
 - Preserve literal backslashes when applying system prompts to JavaScript string literals (#664) - @mike1858

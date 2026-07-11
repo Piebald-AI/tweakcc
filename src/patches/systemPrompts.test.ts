@@ -273,7 +273,7 @@ describe('systemPrompts.ts', () => {
       );
     });
 
-    it('should escape backslashes before backticks to preserve literal backslash-backticks (#660)', async () => {
+    it('should preserve already-escaped backticks in template literals (round-trips to vanilla)', async () => {
       const mockPromptData = buildMockPromptData({
         content: 'Use \\`foo\\` for config',
         regex: 'Use \\\\`foo\\\\` for config',
@@ -287,7 +287,7 @@ describe('systemPrompts.ts', () => {
 
       const result = await applySystemPrompts(cliContent, '1.0.0', false);
 
-      expect(result.newContent).toBe('desc:`Use \\\\\\`foo\\\\\\` for config`');
+      expect(result.newContent).toBe('desc:`Use \\`foo\\` for config`');
     });
 
     it('should auto-escape backticks adjacent to template expressions', async () => {
@@ -321,17 +321,17 @@ describe('systemPrompts.ts', () => {
 
       const result = await applySystemPrompts(cliContent, '1.0.0', false);
 
-      expect(result.newContent).toBe('desc:`Use \\\\\\${name} literally`');
+      expect(result.newContent).toBe('desc:`Use \\${name} literally`');
       expect(
         new Function(
           'const name = "expanded"; return { ' + result.newContent + ' };'
         )()
       ).toEqual({
-        desc: 'Use \\${name} literally',
+        desc: 'Use ${name} literally',
       });
     });
 
-    it('should escape backslashes in already-escaped backticks and also escape bare backticks (#660)', async () => {
+    it('should preserve already-escaped backticks and auto-escape bare backticks in template literals', async () => {
       const mockPromptData = buildMockPromptData({
         content: 'Use \\`foo\\` and `bar` for config',
         regex: 'Use \\\\`foo\\\\` and `bar` for config',
@@ -346,7 +346,7 @@ describe('systemPrompts.ts', () => {
       const result = await applySystemPrompts(cliContent, '1.0.0', false);
 
       expect(result.newContent).toBe(
-        'desc:`Use \\\\\\`foo\\\\\\` and \\`bar\\` for config`'
+        'desc:`Use \\`foo\\` and \\`bar\\` for config`'
       );
     });
 
@@ -553,6 +553,141 @@ describe('systemPrompts.ts', () => {
       expect(result.results[0].details).toContain('too complex');
       expect(result.results[1].id).toBe('good-prompt');
       expect(result.results[1].applied).toBe(true);
+    });
+  });
+
+  describe('backtick round-trip byte-identity (#869)', () => {
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    const applyBacktick = async (source: string) => {
+      setupMocks(
+        buildMockPromptData({
+          content: source,
+          regex: escapeRegex(source),
+          getInterpolatedContent: () => source,
+          pieces: [source],
+        })
+      );
+      const cliContent = 'x:`' + source + '`';
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+      expect(result.results[0].details ?? '').not.toContain('incomplete');
+      return { newContent: result.newContent, cliContent };
+    };
+
+    it('preserves an escaped backtick inside a ${...} interpolation (the fatal case)', async () => {
+      const { newContent, cliContent } = await applyBacktick(
+        '${l?`\\`${y}\\``:y}'
+      );
+      expect(newContent).toBe(cliContent);
+    });
+
+    it('preserves an escaped backtick at depth 0 (the cosmetic case)', async () => {
+      const { newContent, cliContent } = await applyBacktick('\\`${MC}\\`');
+      expect(newContent).toBe(cliContent);
+    });
+
+    it('preserves nested template literals inside an interpolation', async () => {
+      const { newContent, cliContent } = await applyBacktick(
+        '${a?`${b?`deep`:`also`}`:`flat`}'
+      );
+      expect(newContent).toBe(cliContent);
+    });
+
+    it('preserves an escaped interpolation marker', async () => {
+      const { newContent, cliContent } = await applyBacktick(
+        'Use \\${name} literally'
+      );
+      expect(newContent).toBe(cliContent);
+    });
+
+    it('preserves an escaped non-ASCII sequence without doubling its backslash', async () => {
+      const { newContent, cliContent } = await applyBacktick(
+        'em dash \\u2014 here'
+      );
+      expect(newContent).toBe(cliContent);
+    });
+
+    it('still auto-escapes a genuinely raw backtick in prose', async () => {
+      const { newContent } = await applyBacktick('Use `foo`');
+      expect(newContent).toBe('x:`Use \\`foo\\``');
+    });
+
+    it('still doubles backslashes for single-quoted (#660) prompts', async () => {
+      setupMocks(
+        buildMockPromptData({
+          content: "It\\'s working",
+          regex: "It\\\\'s working",
+          getInterpolatedContent: () => "It\\'s working",
+          pieces: ["It\\'s working"],
+        })
+      );
+      const result = await applySystemPrompts(
+        "msg:'It\\'s working'",
+        '1.0.0',
+        false
+      );
+      expect(result.newContent).toBe("msg:'It\\\\\\'s working'");
+    });
+
+    it('emits a template literal that evaluates back to the intended prompt text', async () => {
+      const { newContent: n1 } = await applyBacktick('${l?`\\`${y}\\``:y}');
+      expect(
+        new Function('const l = true, y = "IDX"; return { ' + n1 + ' };')()
+      ).toEqual({ x: '`IDX`' });
+
+      const { newContent: n2 } = await applyBacktick('\\`${MC}\\`');
+      expect(new Function('const MC = "F"; return { ' + n2 + ' };')()).toEqual({
+        x: '`F`',
+      });
+
+      const { newContent: n3 } = await applyBacktick('Use \\${name} literally');
+      expect(
+        new Function('const name = "X"; return { ' + n3 + ' };')()
+      ).toEqual({ x: 'Use ${name} literally' });
+    });
+
+    it('escapeDepthZeroBackticks is byte-identity on template-literal prompts in the recent snapshots', async () => {
+      const fs = await import('node:fs');
+      const path = await import('node:path');
+      const dir = 'data/prompts';
+      const files = fs
+        .readdirSync(dir)
+        .filter(f => /^prompts-\d+\.\d+\.\d+\.json$/.test(f))
+        .sort((a, b) => {
+          const pa = a
+            .match(/(\d+)\.(\d+)\.(\d+)/)!
+            .slice(1)
+            .map(Number);
+          const pb = b
+            .match(/(\d+)\.(\d+)\.(\d+)/)!
+            .slice(1)
+            .map(Number);
+          return pb[0] - pa[0] || pb[1] - pa[1] || pb[2] - pa[2];
+        })
+        .slice(0, 15);
+      const failures: string[] = [];
+      let checked = 0;
+      for (const file of files) {
+        const parsed = JSON.parse(
+          fs.readFileSync(path.join(dir, file), 'utf8')
+        );
+        for (const p of parsed.prompts ?? []) {
+          const recon = promptSync.reconstructContentFromPieces(
+            p.pieces,
+            p.identifiers,
+            p.identifierMap
+          );
+          if (!recon.includes('\\`')) continue;
+          checked++;
+          const { content, incomplete } =
+            promptSync.escapeDepthZeroBackticks(recon);
+          if (content !== recon || incomplete) {
+            failures.push(`${parsed.version}:${p.id}`);
+          }
+        }
+      }
+      expect(checked).toBeGreaterThan(0);
+      expect(failures).toEqual([]);
     });
   });
 });
