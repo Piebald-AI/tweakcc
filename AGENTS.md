@@ -29,14 +29,6 @@ node dist/index.mjs  # Alternative run command
 
 Whenever you make a logical change that belongs in one commit, update the changelog at the bottom of the "Unreleased" section. It should follow the format `Change description (#PR) - @author`. The change description should usually be the PR title unless there are multiple logical changes in the same PR that each deserve their own item.
 
-## Code Style
-
-### Formatting
-
-- **Prettier**: 80 char width, single quotes, 2 spaces, semicolons required
-- **No comments**: Do not add comments unless explicitly requested
-- **Section dividers**: Use `// ======` lines for major code sections
-
 ### Imports
 
 ```typescript
