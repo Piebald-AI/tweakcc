@@ -34,7 +34,7 @@ Download it and try it out for free! **https://piebald.ai/**
 [![Mentioned in Awesome Claude Code](https://awesome.re/mentioned-badge.svg)](https://github.com/hesreallyhim/awesome-claude-code)
 [![ClaudeLog - A comprehensive knowledge base for Claude.](https://claudelog.com/img/claude_log_badge.svg)](https://claudelog.com/)
 
-**tweakcc is a CLI tool that upgrades your Claude Code experience.** Customize its system prompts, add custom themes, create toolsets, and personalize the UI. From the team behind [<img src="https://github.com/Piebald-AI/piebald/raw/main/assets/logo.svg" width="15"> **Piebald.**](https://piebald.ai/)
+**tweakcc is a CLI tool that upgrades your Claude Code experience.** Customize its system prompts, add custom themes, create toolsets, and personalize the UI. From the team behind [<img src="https://github.com/Piebald-AI/piebald-issues/raw/main/assets/logo.svg" width="15"> **Piebald.**](https://piebald.ai/)
 
 <!--
 > [!note]
