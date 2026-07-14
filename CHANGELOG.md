@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 - Fix over-escaping of backslashes in backtick-delimited system prompts that produced invalid JS and crashed Claude Code at startup (#870) - @StreamDemon
+- Fix thinking-block-visibility patch for Claude Code 2.1.209 and later (the early return is now `if(...){return null}`, so an unbounded `.+?` spanned ~7.6KB into an unrelated function and the replacement deleted it, crashing Claude Code at startup) (#TBD) - @StreamDemon
 
 ## [v4.3.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.1) - 2026-07-06
 

@@ -42,7 +42,7 @@ export const writeThinkingVisibility = (oldFile: string): string | null => {
   // - Group 3: Everything from `{` or return up to `isTranscriptMode:`
   // - Then the variable name followed by comma (replaced with `true,`)
   const pattern =
-    /(case"thinking":\{?)(if\(.+?\)return null;)(.{0,400}isTranscriptMode:).+?,/;
+    /(case"thinking":\{?)(if\(.{0,80}?\)\s*(?:\{\s*return null\s*;?\s*\}|return null\s*;?))(.{0,400}?isTranscriptMode:)([$\w]+)\s*,/;
 
   const match = oldFile.match(pattern);
 
