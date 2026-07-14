@@ -86,7 +86,7 @@ export const getReactModuleNameNonBun = (
 ): string | undefined => {
   // Pattern: var X=Y((Z)=>{var W=Symbol.for("react.element") or "react.transitional.element"
   const pattern =
-    /var ([$\w]+)=[$\w]+\(\([$\w]+\)=>\{var [$\w]+=Symbol\.for\("react\.(transitional\.)?element"\)/;
+    /var ([$\w]+)=[$\w]+\((?:\([$\w]+\)=>|function\([$\w]+\))\{var [$\w]+=Symbol\.for\("react\.(transitional\.)?element"\)/;
   const match = fileContents.match(pattern);
   if (!match) {
     console.log(
@@ -126,7 +126,7 @@ export const getReactModuleFunctionBun = (
 
   // Pattern: var X=Y((Z,W)=>{W.exports=reactModuleNameNonBun()
   const pattern = new RegExp(
-    `var ([$\\w]+)=[$\\w]+\\(\\([$\\w]+,[$\\w]+\\)=>\\{[$\\w]+\\.exports=${escapeIdent(reactModuleNameNonBun)}\\(\\)`
+    `var ([$\\w]+)=[$\\w]+\\((?:\\([$\\w]+,[$\\w]+\\)=>|function\\([$\\w]+,[$\\w]+\\))\\{[$\\w]+\\.exports=${escapeIdent(reactModuleNameNonBun)}\\(\\)`
   );
   const match = fileContents.match(pattern);
   if (!match) {

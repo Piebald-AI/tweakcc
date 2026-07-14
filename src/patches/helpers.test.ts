@@ -1,6 +1,27 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
-import { escapeNonAscii, findBoxComponent } from './helpers';
+import {
+  clearReactVarCache,
+  escapeNonAscii,
+  findBoxComponent,
+  getReactModuleFunctionBun,
+  getReactModuleNameNonBun,
+  getReactVar,
+} from './helpers';
+
+const LOADER = 'var Zq=1,H=(e,t,r)=>{r=e!=null?Xq(Zq(e)):{};return r};';
+
+const ARROW_BUNDLE =
+  LOADER +
+  'var n7L=X((yg)=>{var s2i=Symbol.for("react.element");yg.version="19.2.0"});' +
+  'var fH=X((pBE,N8c)=>{N8c.exports=n7L()});' +
+  'var qwd=H(fH(),1),up=H(ne(),1);';
+
+const FN_EXPR_BUNDLE =
+  LOADER +
+  'var $8c=X(function(yg){var s2i=Symbol.for("react.transitional.element");yg.version="19.2.0"});' +
+  'var tt=X(function(pBE,N8c){N8c.exports=$8c()});' +
+  'var G8c=H(tt(),1),W8c=G8c.createContext({stdin:process.stdin});';
 
 describe('escapeNonAscii', () => {
   it('escapes non-ASCII code points as \\uXXXX and leaves ASCII untouched', () => {
@@ -18,6 +39,46 @@ describe('escapeNonAscii', () => {
     // 🎉 (U+1F389) is a surrogate pair; both halves become \uXXXX and still
     // reconstruct the emoji when the JS source is parsed.
     expect(escapeNonAscii('🎉')).toBe('\\ud83c\\udf89');
+  });
+});
+
+describe('React module resolution', () => {
+  beforeEach(() => {
+    clearReactVarCache();
+  });
+
+  describe('getReactModuleNameNonBun', () => {
+    it('finds the React module wrapped in an arrow function', () => {
+      expect(getReactModuleNameNonBun(ARROW_BUNDLE)).toBe('n7L');
+    });
+
+    it('finds the React module wrapped in a function expression (CC 2.1.209)', () => {
+      expect(getReactModuleNameNonBun(FN_EXPR_BUNDLE)).toBe('$8c');
+    });
+  });
+
+  describe('getReactModuleFunctionBun', () => {
+    it('finds the re-exporting module wrapped in an arrow function', () => {
+      expect(getReactModuleFunctionBun(ARROW_BUNDLE)).toBe('fH');
+    });
+
+    it('finds the re-exporting module wrapped in a function expression (CC 2.1.209)', () => {
+      expect(getReactModuleFunctionBun(FN_EXPR_BUNDLE)).toBe('tt');
+    });
+  });
+
+  describe('getReactVar', () => {
+    it('resolves the React variable on arrow-wrapped bundles', () => {
+      expect(getReactVar(ARROW_BUNDLE)).toBe('qwd');
+    });
+
+    it('resolves the React variable on function-expression bundles (CC 2.1.209)', () => {
+      expect(getReactVar(FN_EXPR_BUNDLE)).toBe('G8c');
+    });
+
+    it('returns undefined when React is absent', () => {
+      expect(getReactVar(LOADER + 'var a=1;')).toBeUndefined();
+    });
   });
 });
 
