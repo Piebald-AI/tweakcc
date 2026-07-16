@@ -54,6 +54,9 @@ function askYesNo(prompt: string): Promise<boolean> {
   });
 }
 
+/** Exported for --apply consent (and adhoc-patch). */
+export { askYesNo };
+
 function renderDiffToConsole(
   hunks: { oldStart: number; newStart: number; lines: string[] }[]
 ): void {

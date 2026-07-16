@@ -39,7 +39,13 @@ import {
   StartupCheckInfo,
   TweakccConfig,
 } from './types';
-import { handleUnpack, handleRepack, handleAdhocPatch } from './commands';
+import {
+  handleUnpack,
+  handleRepack,
+  handleAdhocPatch,
+  askYesNo,
+} from './commands';
+import { getPlannedPatches, printApplyPlan } from './applyPlan';
 import {
   restoreClijsFromBackup,
   restoreNativeBinaryFromBackup,
@@ -163,6 +169,10 @@ const main = async () => {
     .option('-v, --verbose', 'enable verbose debug mode (includes diffs)')
     .option('--show-unchanged', 'show unchanged diffs (requires --verbose)')
     .option('-a, --apply', 'apply saved customizations without interactive UI')
+    .option(
+      '-y, --yes',
+      'skip the --apply confirmation prompt (for scripts / CI)'
+    )
     .option('--restore', 'restore Claude Code to its original state')
     .option(
       '--revert',
@@ -232,7 +242,7 @@ const main = async () => {
               .split(',')
               .map((id: string) => id.trim())
           : null;
-        await handleApplyMode(patchFilter, options.configUrl);
+        await handleApplyMode(patchFilter, options.configUrl, !!options.yes);
         return;
       }
 
@@ -339,20 +349,24 @@ const main = async () => {
  * All errors in detection will throw with detailed messages.
  * @param patchFilter - Optional list of patch IDs to apply (if null, apply all)
  * @param configUrl - Optional URL to fetch configuration from
+ * @param skipConfirmation - When true (--yes), skip the pre-apply consent prompt
  */
 async function handleApplyMode(
   patchFilter: string[] | null,
-  configUrl?: string
+  configUrl?: string,
+  skipConfirmation = false
 ): Promise<void> {
   console.log('Applying saved customizations to Claude Code...');
 
   // Read the configuration (from URL or local file)
   let config;
+  let configSource: string;
   if (configUrl) {
     console.log(`Fetching configuration from: ${configUrl}`);
     try {
       config = await fetchConfigFromUrl(configUrl);
       console.log('Configuration fetched successfully.');
+      configSource = configUrl;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(chalk.red(`Error: ${message}`));
@@ -361,6 +375,7 @@ async function handleApplyMode(
   } else {
     console.log(`Configuration saved at: ${CONFIG_FILE}`);
     config = await readConfigFile();
+    configSource = CONFIG_FILE;
   }
 
   if (!config.settings || Object.keys(config.settings).length === 0) {
@@ -390,6 +405,40 @@ async function handleApplyMode(
       console.log(`Found Claude Code at: ${ccInstInfo.cliPath}`);
     }
     console.log(`Version: ${ccInstInfo.version}`);
+
+    // Pre-apply summary + consent (adhoc-patch already confirms; --apply should too)
+    const planned = getPlannedPatches(config, ccInstInfo.version, patchFilter);
+    printApplyPlan(planned, {
+      configSource,
+      patchFilter,
+      ccVersion: ccInstInfo.version,
+    });
+
+    if (!skipConfirmation) {
+      if (!process.stdin.isTTY) {
+        console.error(
+          chalk.red(
+            'Error: --apply requires confirmation before rewriting Claude Code.'
+          )
+        );
+        console.error(
+          chalk.gray(
+            'Re-run with --yes / -y to apply non-interactively (scripts / CI).'
+          )
+        );
+        process.exit(1);
+      }
+
+      const approved = await askYesNo(
+        chalk.bold(
+          'Apply these customizations to your Claude Code install? [Y/n] '
+        )
+      );
+      if (!approved) {
+        console.log(chalk.yellow('Aborted. No changes were made.'));
+        process.exit(0);
+      }
+    }
 
     // Preload strings file for system prompts
     console.log('Loading system prompts...');
