@@ -214,6 +214,42 @@ describe('systemPrompts.ts', () => {
       expect(result.newContent).toBe('msg:"Say \\\\\\"Hello\\\\\\""');
     });
 
+    it('should escape carriage returns in double-quoted string literals (CRLF-edited prompts)', async () => {
+      const mockPromptData = buildMockPromptData({
+        content: 'ORIGINAL',
+        regex: 'ORIGINAL',
+        getInterpolatedContent: () => 'line one\r\nfind\\ blocked',
+        pieces: ['ORIGINAL'],
+      });
+
+      setupMocks(mockPromptData);
+
+      const cliContent = 'var x="ORIGINAL";';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe('var x="line one\\r\\nfind\\\\ blocked";');
+      expect(() => new Function(result.newContent)).not.toThrow();
+    });
+
+    it('should escape carriage returns in single-quoted string literals (CRLF-edited prompts)', async () => {
+      const mockPromptData = buildMockPromptData({
+        content: 'ORIGINAL',
+        regex: 'ORIGINAL',
+        getInterpolatedContent: () => 'line one\r\nfind\\ blocked',
+        pieces: ['ORIGINAL'],
+      });
+
+      setupMocks(mockPromptData);
+
+      const cliContent = "var x='ORIGINAL';";
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe("var x='line one\\r\\nfind\\\\ blocked';");
+      expect(() => new Function(result.newContent)).not.toThrow();
+    });
+
     it('should auto-escape backticks in template literal context', async () => {
       const mockPromptData = buildMockPromptData({
         content: 'Choose the `subagent_type` based on needs',
