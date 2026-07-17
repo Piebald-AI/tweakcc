@@ -237,6 +237,37 @@ Content only.`;
       const matches = result.match(/^ {2}- SETTINGS$/gm);
       expect(matches?.length).toBe(1); // Should only appear once in variables list
     });
+
+    it('should not crash when content itself starts with an HTML comment', () => {
+      // Regression: a prompt whose content is an HTML document that begins with
+      // "<!--" collides with the "<!--"/"-->" frontmatter delimiters. Passing the
+      // content as a string made matter.stringify re-parse the body as YAML and
+      // throw "bad indentation of a mapping entry" (this is exactly what
+      // data-plan-artifact-html-template did, aborting the whole prompt sync).
+      // The content below reproduces that YAML shape: a folded value followed by
+      // an indented colon-bearing prose line.
+      const prompt: StringsPrompt = {
+        id: 'html-template',
+        name: 'HTML Template',
+        description: 'Template whose content starts with a comment',
+        version: '2.1.212',
+        pieces: [
+          '<!--\nstyle: tokens come from the vanilla export, embedded verbatim\n  Dark mode keys off both theme axes: prefers-color-scheme, and the\n  data-theme attribute set by the theme toggle\n-->\n<html><body>hi</body></html>',
+        ],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      const result = promptSync.generateMarkdownFromPrompt(prompt);
+
+      // The tweakcc metadata is the frontmatter; the HTML comment stays in content
+      expect(result).toContain('name: HTML Template');
+      const parsed = promptSync.parseMarkdownPrompt(result);
+      expect(parsed.content).toContain(
+        'Dark mode keys off both theme axes: prefers-color-scheme'
+      );
+      expect(parsed.content.trimStart().startsWith('<!--')).toBe(true);
+    });
   });
 
   describe('buildRegexFromPieces', () => {
@@ -601,6 +632,36 @@ Content`;
       expect(writtenContent).not.toContain('variables:');
       expect(writtenContent).not.toContain('OLD_VAR');
     });
+
+    it('should not crash when prompt content starts with an HTML comment', async () => {
+      // Regression: updateVariables re-stringifies parsed.content. When that
+      // content begins with "<!--" (an HTML template body), matter.stringify
+      // re-parsed it as YAML and threw, aborting the whole prompt sync.
+      const mockContent = `<!--
+name: Test
+description: Test
+ccVersion: 1.0.0
+-->
+<!--
+theme notes:
+    Dark mode keys off both theme axes: prefers-color-scheme, and the data-theme attribute.
+-->
+<html></html>`;
+
+      vi.spyOn(fs, 'readFile').mockResolvedValue(mockContent);
+      const writeFileSpy = vi
+        .spyOn(fs, 'writeFile')
+        .mockResolvedValue(undefined);
+
+      await promptSync.updateVariables('test-prompt', { '1': 'SETTINGS' });
+
+      expect(writeFileSpy).toHaveBeenCalled();
+      const writtenContent = writeFileSpy.mock.calls[0][1] as string;
+      expect(writtenContent).toContain('SETTINGS');
+      expect(writtenContent).toContain(
+        'Dark mode keys off both theme axes: prefers-color-scheme'
+      );
+    });
   });
 
   describe('generateDiffHtml', () => {
@@ -816,6 +877,70 @@ Greet user as \${SETTINGS.preferredName}!`;
       expect(result.results).toHaveLength(2);
       expect(result.results[0].action).toBe('created');
       expect(result.results[1].action).toBe('created');
+    });
+
+    it('should not let one HTML-comment prompt abort the whole sync', async () => {
+      // Symptom regression: the sync loop rethrows on any prompt failure, so a
+      // single prompt whose content begins with "<!--" (and crashed the markdown
+      // generator) aborted the entire sync — every prompt ordered AFTER it never
+      // got its .md file written, surfacing later as ENOENT on --apply. With the
+      // generator fixed, the middle prompt no longer throws and the prompts after
+      // it are still created.
+      const mockStringsFile: StringsFile = {
+        version: '2.0.0',
+        prompts: [
+          {
+            id: 'prompt-before',
+            name: 'Before',
+            description: 'Ordered before the HTML-comment prompt',
+            version: '2.0.0',
+            pieces: ['Content before'],
+            identifiers: [],
+            identifierMap: {},
+          },
+          {
+            id: 'html-template',
+            name: 'HTML Template',
+            description: 'Content begins with an HTML comment (used to crash)',
+            version: '2.0.0',
+            pieces: [
+              '<!--\nstyle: tokens come from the vanilla export, embedded verbatim\n  Dark mode keys off both theme axes: prefers-color-scheme, and the\n  data-theme attribute set by the theme toggle\n-->\n<html></html>',
+            ],
+            identifiers: [],
+            identifierMap: {},
+          },
+          {
+            id: 'prompt-after',
+            name: 'After',
+            description: 'Ordered after the HTML-comment prompt',
+            version: '2.0.0',
+            pieces: ['Content after'],
+            identifiers: [],
+            identifierMap: {},
+          },
+        ],
+      };
+
+      const { downloadStringsFile } = await import('../systemPromptDownload');
+      const hashIndexModule = await import('../systemPromptHashIndex');
+
+      vi.mocked(downloadStringsFile).mockResolvedValue(
+        mockStringsFile as StringsFile
+      );
+      vi.spyOn(hashIndexModule, 'storeHashes').mockResolvedValue(0);
+      vi.spyOn(fs, 'mkdir').mockResolvedValue(undefined);
+      vi.spyOn(fs, 'access').mockRejectedValue(createEnoent());
+      const writeFileSpy = vi
+        .spyOn(fs, 'writeFile')
+        .mockResolvedValue(undefined);
+
+      const result = await promptSync.syncSystemPrompts('2.0.0');
+
+      // All three prompts synced — crucially the one ordered AFTER the template
+      expect(result.results).toHaveLength(3);
+      expect(result.results.every(r => r.action === 'created')).toBe(true);
+      const writtenPaths = writeFileSpy.mock.calls.map(c => String(c[0]));
+      expect(writtenPaths.some(p => p.includes('prompt-after'))).toBe(true);
     });
 
     it('should throw error for failed prompt syncs', async () => {
