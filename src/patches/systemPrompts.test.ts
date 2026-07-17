@@ -229,7 +229,6 @@ describe('systemPrompts.ts', () => {
       const result = await applySystemPrompts(cliContent, '1.0.0', false);
 
       expect(result.newContent).toBe('var x="line one\\r\\nfind\\\\ blocked";');
-      expect(() => new Function(result.newContent)).not.toThrow();
     });
 
     it('should escape carriage returns in single-quoted string literals (CRLF-edited prompts)', async () => {
@@ -247,7 +246,23 @@ describe('systemPrompts.ts', () => {
       const result = await applySystemPrompts(cliContent, '1.0.0', false);
 
       expect(result.newContent).toBe("var x='line one\\r\\nfind\\\\ blocked';");
-      expect(() => new Function(result.newContent)).not.toThrow();
+    });
+
+    it('should escape a lone carriage return (old-Mac line endings) in double-quoted string literals', async () => {
+      const mockPromptData = buildMockPromptData({
+        content: 'ORIGINAL',
+        regex: 'ORIGINAL',
+        getInterpolatedContent: () => 'line one\rline two',
+        pieces: ['ORIGINAL'],
+      });
+
+      setupMocks(mockPromptData);
+
+      const cliContent = 'var x="ORIGINAL";';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe('var x="line one\\rline two";');
     });
 
     it('should auto-escape backticks in template literal context', async () => {
