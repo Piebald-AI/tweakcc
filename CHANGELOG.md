@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix over-escaping of backslashes in backtick-delimited system prompts that produced invalid JS and crashed Claude Code at startup (#870) - @StreamDemon
 - Fix thinking-block-visibility patch for Claude Code 2.1.209 and later (the early return is now `if(...){return null}`, so an unbounded `.+?` spanned ~7.6KB into an unrelated function and the replacement deleted it, crashing Claude Code at startup) (#882) - @StreamDemon
 - Fix React variable resolution for Claude Code 2.1.209 and later, restoring the patches-applied indication, conversation-title, and toolsets patches (modules are now wrapped in function expressions rather than arrow functions) (#882) - @StreamDemon
+- Fix agents-md patch for Claude Code 2.1.212 and later (verified on 2.1.212 and 2.1.214; the async CLAUDE.md reader gained an `isDirectory` callback and an oversize-telemetry branch, so none of the existing matchers applied and AGENTS.md fallback silently stopped working) (#893) - @StreamDemon
 
 ## [v4.3.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.1) - 2026-07-06
 
