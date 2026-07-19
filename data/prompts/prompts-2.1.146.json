@@ -192,7 +192,13 @@
         "3": "WEBSEARCH_TOOL_NAME",
         "4": "SEARCH_TOOL_NAMES"
       },
-      "version": "2.1.84"
+      "version": "2.1.84",
+      "agentMetadata": {
+        "model": "haiku",
+        "permissionMode": "dontAsk",
+        "whenToUse": "Use this agent when the user asks questions (\"Can Claude...\", \"Does Claude...\", \"How do I...\") about: (1) Claude Code (the CLI tool) - features, hooks, slash commands, MCP servers, settings, IDE integrations, keyboard shortcuts; (2) Claude Agent SDK - building custom agents; (3) Claude API (formerly Anthropic API) - API usage, tool use, Anthropic SDK usage. **IMPORTANT:** Before spawning a new agent, check if there is already a running or recently completed claude-code-guide agent that you can continue via ${SEND_MESSAGE_TOOL_NAME}.",
+        "agentType": "claude-code-guide"
+      }
     },
     {
       "name": "Agent Prompt: CLAUDE.md creation",
@@ -533,7 +539,19 @@
         "4": "SHELL_TOOL_NAME",
         "5": "IS_BASH_ENV_FN"
       },
-      "version": "2.1.118"
+      "version": "2.1.118",
+      "agentMetadata": {
+        "model": "inherit",
+        "whenToUse": "Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs.",
+        "disallowedTools": [
+          "Agent",
+          "ExitPlanMode",
+          "Edit",
+          "Write",
+          "NotebookEdit"
+        ],
+        "agentType": "Plan"
+      }
     },
     {
       "name": "Agent Prompt: PR follow-up cron",
@@ -2693,13 +2711,7 @@
       ],
       "identifiers": [],
       "identifierMap": {},
-      "version": "2.1.38",
-      "agentMetadata": {
-        "model": "haiku",
-        "permissionMode": "dontAsk",
-        "whenToUse": "Use this agent when the user asks questions (\"Can Claude...\", \"Does Claude...\", \"How do I...\") about: (1) Claude Code (the CLI tool) - features, hooks, slash commands, MCP servers, settings, IDE integrations, keyboard shortcuts; (2) Claude Agent SDK - building custom agents; (3) Claude API (formerly Anthropic API) - API usage, tool use, Anthropic SDK usage. **IMPORTANT:** Before spawning a new agent, check if there is already a running or recently completed claude-code-guide agent that you can continue via ${SEND_MESSAGE_TOOL_NAME}.",
-        "agentType": "claude-code-guide"
-      }
+      "version": "2.1.38"
     },
     {
       "name": "System Prompt: Deny rule circumvention classifier guidance",
@@ -3568,19 +3580,7 @@
       ],
       "identifiers": [],
       "identifierMap": {},
-      "version": "2.1.146",
-      "agentMetadata": {
-        "model": "inherit",
-        "whenToUse": "Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs.",
-        "disallowedTools": [
-          "Agent",
-          "ExitPlanMode",
-          "Edit",
-          "Write",
-          "NotebookEdit"
-        ],
-        "agentType": "Plan"
-      }
+      "version": "2.1.146"
     },
     {
       "name": "System Prompt: PowerShell edition for 5.1",
@@ -4882,7 +4882,7 @@
         1
       ],
       "identifierMap": {
-        "0": "DIAGNOSTICS_SUMMARY",
+        "0": "DIAGNOSTICS_TRACKER_CLASS",
         "1": "DIAGNOSTICS_LIST"
       },
       "version": "2.1.122"
@@ -5158,8 +5158,8 @@
         3
       ],
       "identifierMap": {
-        "0": "QUESTION_CONTEXT",
-        "1": "CONTEXT_ENTRY_LIMIT",
+        "0": "OBJECT_CONSTRUCTOR",
+        "1": "QUESTION_CONTEXT",
         "2": "CONTEXT_ENTRY_TITLE",
         "3": "CONTEXT_ENTRY_CONTENT"
       },

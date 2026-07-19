@@ -196,7 +196,13 @@
         "3": "WEBSEARCH_TOOL_NAME",
         "4": "SEARCH_TOOL_NAMES"
       },
-      "version": "2.1.154"
+      "version": "2.1.154",
+      "agentMetadata": {
+        "model": "haiku",
+        "permissionMode": "dontAsk",
+        "whenToUse": "Use this agent when the user asks questions (\"Can Claude...\", \"Does Claude...\", \"How do I...\") about: (1) Claude Code (the CLI tool) - features, hooks, slash commands, MCP servers, settings, IDE integrations, keyboard shortcuts; (2) Claude Agent SDK - building custom agents; (3) Claude API (formerly Anthropic API) - API usage, tool use, Anthropic SDK usage. **IMPORTANT:** Before spawning a new agent, check if there is already a running or recently completed claude-code-guide agent that you can continue via ${SEND_MESSAGE_TOOL_NAME}.",
+        "agentType": "claude-code-guide"
+      }
     },
     {
       "name": "Agent Prompt: CLAUDE.md creation",
@@ -750,7 +756,19 @@
         "4": "SHELL_TOOL_NAME",
         "5": "IS_BASH_ENV_FN"
       },
-      "version": "2.1.118"
+      "version": "2.1.118",
+      "agentMetadata": {
+        "model": "inherit",
+        "whenToUse": "Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs.",
+        "disallowedTools": [
+          "Agent",
+          "ExitPlanMode",
+          "Edit",
+          "Write",
+          "NotebookEdit"
+        ],
+        "agentType": "Plan"
+      }
     },
     {
       "name": "Agent Prompt: PR follow-up cron",
@@ -1221,7 +1239,7 @@
     {
       "name": "Agent Prompt: Worker fork",
       "id": "agent-prompt-worker-fork",
-      "description": "System prompt for a forked worker sub-agent that executes a single directive from the parent agent and reports back concisely",
+      "description": "Directive injected into a forked child agent, telling it to treat the inherited transcript as reference, execute one directive directly, and report once",
       "pieces": [
         "<${",
         "}>\nYou are a worker fork. The transcript above is the parent's history — inherited reference, not your situation. You are NOT a continuation of that agent. Execute ONE directive, then stop.\n\nHard rules:\n- Do NOT spawn subagents. The \"default to forking\" guidance is for the parent; you ARE the fork, execute directly.\n- One shot: report once and stop. No follow-up questions, no proposed next steps, no waiting for the user.\n\nGuidelines (your directive may override any of these):\n- Stay in scope. Other forks may be handling adjacent work; if you spot something outside your directive, note it in a sentence and move on.\n- Open with one line restating your task, so the parent can spot scope drift at a glance.\n- Be concise — as short as the answer allows, no shorter. Plain text, no preamble, no meta-commentary.\n- If you committed changes, list the paths and commit hashes in your report.\n</${",
@@ -1242,13 +1260,14 @@
       },
       "version": "2.1.161",
       "agentMetadata": {
+        "model": "inherit",
         "permissionMode": "bubble",
         "maxTurns": 200,
-        "whenToUse": "For executing tasks autonomously — research, implementation, or verification.",
+        "whenToUse": "Implicit fork — inherits full conversation context. Not selectable via subagent_type; triggered by omitting subagent_type when the fork experiment is active.",
         "tools": [
           "*"
         ],
-        "agentType": "worker"
+        "agentType": "fork"
       }
     },
     {
@@ -3016,8 +3035,8 @@
         2
       ],
       "identifierMap": {
-        "0": "CLAUDE_JOB_DIR",
-        "1": "PATH_MODULE",
+        "0": "PATH_MODULE",
+        "1": "CLAUDE_JOB_DIR",
         "2": "WORKTREE_ISOLATION_INSTRUCTIONS"
       },
       "version": "2.1.154"
@@ -3138,13 +3157,7 @@
       ],
       "identifiers": [],
       "identifierMap": {},
-      "version": "2.1.38",
-      "agentMetadata": {
-        "model": "haiku",
-        "permissionMode": "dontAsk",
-        "whenToUse": "Use this agent when the user asks questions (\"Can Claude...\", \"Does Claude...\", \"How do I...\") about: (1) Claude Code (the CLI tool) - features, hooks, slash commands, MCP servers, settings, IDE integrations, keyboard shortcuts; (2) Claude Agent SDK - building custom agents; (3) Claude API (formerly Anthropic API) - API usage, tool use, Anthropic SDK usage. **IMPORTANT:** Before spawning a new agent, check if there is already a running or recently completed claude-code-guide agent that you can continue via ${SEND_MESSAGE_TOOL_NAME}.",
-        "agentType": "claude-code-guide"
-      }
+      "version": "2.1.38"
     },
     {
       "name": "System Prompt: Coordinator mode orchestration",
@@ -4112,19 +4125,7 @@
       ],
       "identifiers": [],
       "identifierMap": {},
-      "version": "2.1.161",
-      "agentMetadata": {
-        "model": "inherit",
-        "whenToUse": "Software architect agent for designing implementation plans. Use this when you need to plan the implementation strategy for a task. Returns step-by-step plans, identifies critical files, and considers architectural trade-offs.",
-        "disallowedTools": [
-          "Agent",
-          "ExitPlanMode",
-          "Edit",
-          "Write",
-          "NotebookEdit"
-        ],
-        "agentType": "Plan"
-      }
+      "version": "2.1.161"
     },
     {
       "name": "System Prompt: PowerShell edition for 5.1",
@@ -5426,7 +5427,7 @@
         1
       ],
       "identifierMap": {
-        "0": "DIAGNOSTICS_SUMMARY",
+        "0": "DIAGNOSTICS_TRACKER_CLASS",
         "1": "DIAGNOSTICS_LIST"
       },
       "version": "2.1.122"
@@ -5713,8 +5714,8 @@
         3
       ],
       "identifierMap": {
-        "0": "QUESTION_CONTEXT",
-        "1": "CONTEXT_ENTRY_LIMIT",
+        "0": "OBJECT_CONSTRUCTOR",
+        "1": "QUESTION_CONTEXT",
         "2": "CONTEXT_ENTRY_TITLE",
         "3": "CONTEXT_ENTRY_CONTENT"
       },

@@ -3079,7 +3079,7 @@
         1
       ],
       "identifierMap": {
-        "0": "DIAGNOSTICS_SUMMARY",
+        "0": "DIAGNOSTICS_TRACKER_CLASS",
         "1": "DIAGNOSTICS_LIST"
       },
       "version": "2.1.122"
