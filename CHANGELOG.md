@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Backfill source-grounded prompt metadata, names, IDs, and descriptions across Claude Code 2.1.20–2.1.212 snapshots (#895) - @mike1858
 - Require confirmation before `--apply` rewrites Claude Code; print a pre-apply patch summary and add `--yes`/`-y` to skip for scripts/CI (#817)
 - Fix over-escaping of backslashes in backtick-delimited system prompts that produced invalid JS and crashed Claude Code at startup (#870) - @StreamDemon
 - Fix thinking-block-visibility patch for Claude Code 2.1.209 and later (the early return is now `if(...){return null}`, so an unbounded `.+?` spanned ~7.6KB into an unrelated function and the replacement deleted it, crashing Claude Code at startup) (#882) - @StreamDemon
