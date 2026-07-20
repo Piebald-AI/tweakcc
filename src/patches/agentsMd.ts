@@ -16,6 +16,9 @@ export const writeAgentsMd = (
   file: string,
   altNames: string[]
 ): string | null => {
+  const async2214 = writeAgentsMdAsync2214(file, altNames);
+  if (async2214) return async2214;
+
   const async2199 = writeAgentsMdAsync2199(file, altNames);
   if (async2199) return async2199;
 
@@ -25,16 +28,21 @@ export const writeAgentsMd = (
   return writeAgentsMdSync(file, altNames);
 };
 
-const writeAgentsMdAsync2199 = (
+/**
+ * Shared reroute injection for the async readers (CC 2.1.199 and 2.1.212+). Both
+ * matchers capture the same group layout — [1]=funcName, [2]=pathParam, [3],[4]=the
+ * two trailing params, [7]=catchVar, [8]=errorHandler — so the edit itself is
+ * identical: add a `didReroute` guard param, then inject the AGENTS.md fallback loop
+ * into the reader's catch. A missing CLAUDE.md throws ENOENT from the read path and
+ * lands in the catch, which is why the reroute goes there and not the
+ * not-a-regular-file branch.
+ */
+const injectRerouteIntoCatch = (
   file: string,
+  m: RegExpMatchArray,
+  startIndex: number,
   altNames: string[]
-): string | null => {
-  const pattern =
-    /async function ([$\w]+)\(([$\w]+),([$\w]+),([$\w]+)\)\{try\{let [$\w]+=[$\w]+\(\),([$\w]+)=await [$\w]+\(([$\w]+),\2,[$\w]+\);if\(\5===null\)return [$\w]+\(`\[CLAUDE\.md\][^`]*`\),\{info:null,includePaths:\[\]\};return [$\w]+\(\5,\2,\3,\4\)\}catch\(([$\w]+)\)\{return ([$\w]+)\(\7,\2\),\{info:null,includePaths:\[\]\}\}\}/;
-
-  const m = file.match(pattern);
-  if (!m || m.index === undefined) return null;
-
+): string => {
   const funcName = m[1];
   const pathParam = m[2];
   const p2 = m[3];
@@ -58,13 +66,49 @@ const writeAgentsMdAsync2199 = (
   fn = fn.replace(oldSig, newSig);
   fn = fn.replace(oldCatch, newCatch);
 
-  const startIndex = m.index;
   const endIndex = startIndex + m[0].length;
   const newFile = file.slice(0, startIndex) + fn + file.slice(endIndex);
 
   showDiff(file, newFile, fn, startIndex, endIndex);
 
   return newFile;
+};
+
+/**
+ * CC >=2.1.212 (verified on 2.1.212 and 2.1.214): the reader delegates stat/isFile/
+ * size/readFile to a helper, so the older matchers (which expect an inline readFile or
+ * a two-declaration `let X=FN(),Y=await FN2(...)` header) no longer match. The reader
+ * now reads:
+ *   async function W(e,t,r){try{let n=Yt(),o=!1,i=await Yq(n,e,Mlu,(s)=>{o=s.isDirectory()});
+ *     if(i===null){...telemetry...return{info:null,includePaths:[]}}
+ *     return TAg(i,e,t,r)}catch(n){return CAg(n,e),{info:null,includePaths:[]}}}
+ * A missing CLAUDE.md throws ENOENT from the helper's stat() and lands in the catch,
+ * so the reroute is injected there (same strategy as writeAgentsMdAsync2199).
+ */
+const writeAgentsMdAsync2214 = (
+  file: string,
+  altNames: string[]
+): string | null => {
+  const pattern =
+    /async function ([$\w]+)\(([$\w]+),([$\w]+),([$\w]+)\)\{try\{let [$\w]+=[$\w]+\(\),([$\w]+)=!1,([$\w]+)=await [$\w]+\([$\w]+,\2,[$\w]+,\([$\w]+\)=>\{\5=[$\w]+\.isDirectory\(\)\}\);if\(\6===null\)\{[\s\S]*?return\{info:null,includePaths:\[\]\}\}return [$\w]+\(\6,\2,\3,\4\)\}catch\(([$\w]+)\)\{return ([$\w]+)\(\7,\2\),\{info:null,includePaths:\[\]\}\}\}/;
+
+  const m = file.match(pattern);
+  if (!m || m.index === undefined) return null;
+
+  return injectRerouteIntoCatch(file, m, m.index, altNames);
+};
+
+const writeAgentsMdAsync2199 = (
+  file: string,
+  altNames: string[]
+): string | null => {
+  const pattern =
+    /async function ([$\w]+)\(([$\w]+),([$\w]+),([$\w]+)\)\{try\{let [$\w]+=[$\w]+\(\),([$\w]+)=await [$\w]+\(([$\w]+),\2,[$\w]+\);if\(\5===null\)return [$\w]+\(`\[CLAUDE\.md\][^`]*`\),\{info:null,includePaths:\[\]\};return [$\w]+\(\5,\2,\3,\4\)\}catch\(([$\w]+)\)\{return ([$\w]+)\(\7,\2\),\{info:null,includePaths:\[\]\}\}\}/;
+
+  const m = file.match(pattern);
+  if (!m || m.index === undefined) return null;
+
+  return injectRerouteIntoCatch(file, m, m.index, altNames);
 };
 
 const writeAgentsMdAsync = (

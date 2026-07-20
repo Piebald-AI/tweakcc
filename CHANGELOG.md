@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix React variable resolution for Claude Code 2.1.209 and later, restoring the patches-applied indication, conversation-title, and toolsets patches (modules are now wrapped in function expressions rather than arrow functions) (#882) - @StreamDemon
 - Fix carriage returns not being escaped when applying double- or single-quoted system prompts, so a prompt edited with CRLF line endings no longer leaves a raw carriage return in the string literal and crashes Claude Code at startup (#887) - @StreamDemon
 - Fix system-prompt sync crashing on prompts whose content begins with an HTML comment (`<!--`), which collided with the `<!--`/`-->` front-matter delimiters so `matter.stringify` re-parsed the body as YAML; the throw aborted the whole sync and left every later prompt's markdown file uncreated, surfacing as `ENOENT` "Failed to read markdown file" errors on `--apply` (#889) - @StreamDemon
+- Fix agents-md patch for Claude Code 2.1.212 and later (verified on 2.1.212 and 2.1.214; the async CLAUDE.md reader gained an `isDirectory` callback and an oversize-telemetry branch, so none of the existing matchers applied and AGENTS.md fallback silently stopped working) (#893) - @StreamDemon
 
 ## [v4.3.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.1) - 2026-07-06
 
