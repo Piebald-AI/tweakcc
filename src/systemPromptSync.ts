@@ -137,7 +137,12 @@ export const generateMarkdownFromPrompt = (
     frontmatterData.variables = variables;
   }
 
-  return matter.stringify(content, frontmatterData, {
+  // Pass the content as a file object rather than a raw string. matter.stringify
+  // re-parses a string argument as front matter first, so content that itself
+  // begins with "<!--" (e.g. an HTML template) collides with the "<!--"/"-->"
+  // delimiters and is mis-parsed as YAML — either throwing or corrupting the
+  // body. A file object skips that re-parse and stringifies the content verbatim.
+  return matter.stringify({ content }, frontmatterData, {
     delimiters: ['<!--', '-->'],
   });
 };
@@ -363,9 +368,15 @@ export const updateVariables = async (
     updatedData.variables = variables;
   }
 
-  const updatedMarkdown = matter.stringify(parsed.content, updatedData, {
-    delimiters: ['<!--', '-->'],
-  });
+  // Wrap in a file object so matter.stringify does not re-parse content that
+  // begins with "<!--" as front matter (see generateMarkdownFromPrompt).
+  const updatedMarkdown = matter.stringify(
+    { content: parsed.content },
+    updatedData,
+    {
+      delimiters: ['<!--', '-->'],
+    }
+  );
   await writePromptFile(promptId, updatedMarkdown);
 };
 
