@@ -70,17 +70,20 @@ const TABLE_BORDERS_PATTERN_SPACED =
 // Pattern for inter-row separator logic
 // The minified code looks like:
 //   A.rows.forEach((S,g)=>{if(R.push(...N(S,!1)),g<A.rows.length-1)R.push(T("middle"))})
+// Since Claude Code 2.1.212 the rows array is hoisted into a local first, so
+// the guard loses the `.rows` member access:
+//   a.forEach((R,G)=>{if(N.push(...D(R,!1)),G<a.length-1)N.push(M("middle"))})
 // The formatted code looks like:
 //   if ((R.push(...N(S, !1)), g < A.rows.length - 1)) R.push(T("middle"));
 // We need to remove the condition and the push of T("middle") to remove inter-row separators
 
-// Minified pattern (no extra parens, no spaces)
+// Minified pattern (no extra parens, no spaces; `.rows` optional for hoisted-array form)
 const INTER_ROW_SEP_PATTERN_MINIFIED =
-  /if\(([$\w]+)\.push\(\.\.\.([$\w]+)\(([$\w]+),!1\)\),([$\w]+)<([$\w]+)\.rows\.length-1\)([$\w]+)\.push\(([$\w]+)\("middle"\)\)/g;
+  /if\(([$\w]+)\.push\(\.\.\.([$\w]+)\(([$\w]+),!1\)\),([$\w]+)<([$\w]+)(?:\.rows)?\.length-1\)([$\w]+)\.push\(([$\w]+)\("middle"\)\)/g;
 
-// Formatted pattern (extra parens, spaces, optional semicolon)
+// Formatted pattern (extra parens, spaces, optional semicolon; `.rows` optional for hoisted-array form)
 const INTER_ROW_SEP_PATTERN_FORMATTED =
-  /if\s*\(\s*\(\s*([$\w]+)\.push\(\.\.\.([$\w]+)\(([$\w]+)\s*,\s*!1\)\)\s*,\s*([$\w]+)\s*<\s*([$\w]+)\.rows\.length\s*-\s*1\s*\)\s*\)\s*([$\w]+)\.push\(([$\w]+)\("middle"\)\)\s*;?/g;
+  /if\s*\(\s*\(\s*([$\w]+)\.push\(\.\.\.([$\w]+)\(([$\w]+)\s*,\s*!1\)\)\s*,\s*([$\w]+)\s*<\s*([$\w]+)(?:\.rows)?\.length\s*-\s*1\s*\)\s*\)\s*([$\w]+)\.push\(([$\w]+)\("middle"\)\)\s*;?/g;
 
 // Patterns to remove T("top") and T("bottom") pushes for clean format
 // Minified: R.push(T("top")),R.push(...  ->  R.push(...

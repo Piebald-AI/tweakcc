@@ -178,9 +178,11 @@ export const applySystemPrompts = async (
 
       if (delimiter === '"') {
         replacementContent = replacementContent.replace(/\n/g, '\\n');
+        replacementContent = replacementContent.replace(/\r/g, '\\r');
         replacementContent = escapeUnescapedChar(replacementContent, '"');
       } else if (delimiter === "'") {
         replacementContent = replacementContent.replace(/\n/g, '\\n');
+        replacementContent = replacementContent.replace(/\r/g, '\\r');
         replacementContent = escapeUnescapedChar(replacementContent, "'");
       } else if (delimiter === '`') {
         const { content: escaped, incomplete } =
