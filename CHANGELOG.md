@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Clarify that `--apply --patches` restores from backup then applies only the listed patch IDs (not additive); prefer `tweakcc --apply` with no filter (#699)
+
 ## [v4.3.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.2) - 2026-07-20
 
 - fix: match try/catch agent-color write in session-color patch (#864) - @VitalyOstanin
