@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Detect identifier drift during system-prompt sync: when the extractor renames a prompt's interpolation identifiers without bumping the per-prompt version, the version stamps match but the stored markdown still uses the old names, so sync now regenerates such a file (or flags a conflict if the user modified it) instead of skipping it as up to date (#TBD) - @StreamDemon
 - Clarify that `--apply --patches` restores from backup then applies only the listed patch IDs (not additive); prefer `tweakcc --apply` with no filter (#699)
 
 ## [v4.3.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.2) - 2026-07-20
