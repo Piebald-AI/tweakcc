@@ -180,7 +180,7 @@ const main = async () => {
     )
     .option(
       '--patches <ids>',
-      'comma-separated list of patch IDs to apply (use with --apply)'
+      'restore from backup, then apply only these patch IDs (not additive; use with --apply). Prefer tweakcc --apply with no filter.'
     )
     .option('--list-patches', 'list all available patches with their IDs')
     .option(
@@ -609,11 +609,16 @@ function handleListPatches(): void {
 
   console.log(
     chalk.gray(
-      'Use --patches <ids> with --apply to apply specific patches, e.g.:'
+      'Use --patches <ids> with --apply to restore from backup and apply only the listed patches (not additive), e.g.:'
     )
   );
   console.log();
   console.log(chalk.gray('  tweakcc --apply --patches "themes,toolsets"'));
+  console.log(
+    chalk.gray(
+      '  Prefer tweakcc --apply with no filter to apply all enabled patches.'
+    )
+  );
   console.log();
   console.log(chalk.blue.bold('Available patches'));
   console.log();
@@ -721,11 +726,16 @@ async function handleListSystemPrompts(
 
   console.log(
     chalk.gray(
-      'Use --patches <ids> with --apply to apply specific prompts, e.g.:'
+      'Use --patches <ids> with --apply to restore from backup and apply only the listed prompts (not additive), e.g.:'
     )
   );
   console.log();
   console.log(chalk.gray('  tweakcc --apply --patches "identity,environment"'));
+  console.log(
+    chalk.gray(
+      '  Prefer tweakcc --apply with no filter to apply all enabled patches.'
+    )
+  );
   console.log();
   console.log(chalk.blue.bold(`System prompts for CC ${version}`));
   console.log();

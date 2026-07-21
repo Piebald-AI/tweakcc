@@ -182,6 +182,19 @@ Your local config will **not** be overwritten; the remote config will be copied 
 In addition to the interactive TUI (`npx tweakcc`) and the `--apply` flag, tweakcc provides three subcommands for advanced use: `unpack`, `repack`, and `adhoc-patch`.
 
 <details>
+<summary><code>--apply</code> and <code>--patches</code></summary>
+
+`npx tweakcc --apply` reads your saved customizations from `config.json` and patches Claude Code. Before applying, tweakcc **restores Claude Code from its backup** so patching always starts from a clean slate (see [Troubleshooting](#troubleshooting)).
+
+Use `tweakcc --apply` with **no filter** as the default way to apply all enabled patches from your config.
+
+`--patches <ids>` limits which patches are applied, but it is **not additive**: tweakcc still restores from backup first, then applies **only** the listed patch IDs. Any previously applied patches that are not in the list are removed from the binary. For example, if you have both `themes` and `user-message-display` enabled and run `tweakcc --apply --patches themes`, only the themes patch remains in Claude Code.
+
+List available patch IDs with `tweakcc --list-patches` (or `tweakcc --list-system-prompts [version]` for system prompt IDs).
+
+</details>
+
+<details>
 <summary><code>unpack</code></summary>
 
 Extract the embedded JavaScript from a native Claude Code binary and write it to a file. This is useful for inspecting Claude Code's source, writing custom patches, or making manual edits before repacking. Note that `unpack` only works with native/binary installations; it will error if pointed at an npm-based installation (`cli.js`), because it can already be read directly from disk. `unpack` takes the path to the JS file to write to, and an optional path to a native binary, which if omitted will default to the current installation.
