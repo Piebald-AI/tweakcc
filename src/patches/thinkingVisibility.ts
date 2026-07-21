@@ -36,13 +36,13 @@ import { showDiff } from './index';
  */
 
 export const writeThinkingVisibility = (oldFile: string): string | null => {
-  // Unified pattern that matches both formats:
-  // - Group 1: `case"thinking":` (+/- `{`)
-  // - Group 2: `if(...) return null;` (the early return we want to remove)
-  // - Group 3: Everything from `{` or return up to `isTranscriptMode:`
-  // - Then the variable name followed by comma (replaced with `true,`)
+  // Match the case"thinking" block's early return and isTranscriptMode property.
+  // Group 1: `case"thinking":{`
+  // Group 2: `if(!VAR&&!VAR){return null}` (the early return to remove)
+  // Group 3: everything up to `isTranscriptMode:`
+  // Group 4: the variable name to replace with `true`
   const pattern =
-    /(case"thinking":\{?)(if\(.+?\)return null;)(.{0,400}isTranscriptMode:).+?,/;
+    /(case"thinking":\{?)(if\(![$\w]+&&![$\w]+\)\{?return null;?\}?)(.{0,400}?isTranscriptMode:)([$\w]+)(,)/;
 
   const match = oldFile.match(pattern);
 
@@ -53,7 +53,6 @@ export const writeThinkingVisibility = (oldFile: string): string | null => {
     return null;
   }
 
-  // Replacement: skip match[2] (removes the if-return-null), set isTranscriptMode to true
   const replacement = match[1] + match[3] + 'true,';
 
   const startIndex = match.index;
