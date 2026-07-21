@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Skip a system prompt instead of corrupting `cli.js` when a stale prompt file would inject an identifier the current bundle does not define; an interpolation identifier renamed upstream without a per-prompt version bump left the old human-name unmapped, so `--apply` wrote an undefined variable that `node --check` could not catch and that crashed Claude Code on the first turn (#TBD) - @StreamDemon
 - Clarify that `--apply --patches` restores from backup then applies only the listed patch IDs (not additive); prefer `tweakcc --apply` with no filter (#699)
 
 ## [v4.3.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.2) - 2026-07-20

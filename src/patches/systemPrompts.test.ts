@@ -308,6 +308,162 @@ describe('systemPrompts.ts', () => {
       spy.mockRestore();
     });
 
+    it('should skip a prompt whose replacement injects an identifier absent from the bundle (stale .md drift, #900)', async () => {
+      // A stale .md (whose interpolation identifier was renamed upstream without a
+      // per-prompt version bump) leaves an old human-name unmapped, so the
+      // interpolated content references an identifier the bundle never defines.
+      // Injecting it would throw ReferenceError at runtime (node --check cannot
+      // catch it). The apply must refuse the injection rather than corrupt cli.js.
+      const mockPromptData = buildMockPromptData({
+        promptId: 'stale-memory-instructions',
+        prompt: { content: 'Memory ${HAS_UPKEEP_FN} tail' },
+        regex: 'Memory \\$\\{([\\w$]+)\\} tail',
+        // Q1 is the real captured bundle var; STALE_UPKEEP_FLAG is a leftover
+        // human-name that applyIdentifierMapping could not map.
+        getInterpolatedContent: () => 'Memory ${Q1} ${STALE_UPKEEP_FLAG} tail',
+        pieces: ['Memory ${', '} tail'],
+        identifiers: [1],
+        identifierMap: { '1': 'HAS_UPKEEP_FN' },
+      });
+
+      setupMocks(mockPromptData);
+
+      // Bundle template literal: Q1 is defined, STALE_UPKEEP_FLAG is not.
+      const cliContent = 'desc:`Memory ${Q1} tail`';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe(cliContent); // bundle left untouched
+      expect(result.newContent).not.toContain('STALE_UPKEEP_FLAG');
+      expect(result.results).toHaveLength(1);
+      expect(result.results[0].applied).toBe(false);
+      expect(result.results[0].details).toMatch(/stale identifier/i);
+      expect(result.results[0].details).toContain('STALE_UPKEEP_FLAG');
+    });
+
+    it('should flag a single-word (no-underscore) stale identifier in a backtick interpolation (#900)', async () => {
+      // Human identifier names are often single-word (PREAMBLE, INTERVAL, TOOLS).
+      // The guard must catch these too, not just multi-segment UPPER_SNAKE names.
+      const mockPromptData = buildMockPromptData({
+        promptId: 'stale-single-word',
+        regex: 'Cron \\$\\{([\\w$]+)\\} run',
+        getInterpolatedContent: () => 'Cron ${INTERVAL} run',
+        pieces: ['Cron ${', '} run'],
+        identifiers: [1],
+        identifierMap: { '1': 'x' },
+      });
+
+      setupMocks(mockPromptData);
+      const cliContent = 'desc:`Cron ${x} run`'; // x captured; INTERVAL absent
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe(cliContent);
+      expect(result.results[0].applied).toBe(false);
+      expect(result.results[0].details).toContain('INTERVAL');
+    });
+
+    it('should reproduce the real drift shape ${Q1}${HAS_X()...} where a bare name survives the _FN mapping (#900)', async () => {
+      const mockPromptData = buildMockPromptData({
+        promptId: 'stale-has-x',
+        regex: 'Mode \\$\\{([\\w$]+)\\} end',
+        // HAS_X_FN maps to Q1; the adjacent bare HAS_X() survives unmapped.
+        getInterpolatedContent: () => 'Mode ${Q1}${HAS_X()?" yes":" no"} end',
+        pieces: ['Mode ${', '} end'],
+        identifiers: [1],
+        identifierMap: { '1': 'HAS_X_FN' },
+      });
+
+      setupMocks(mockPromptData);
+      const cliContent = 'desc:`Mode ${Q1} end`';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe(cliContent);
+      expect(result.results[0].applied).toBe(false);
+      expect(result.results[0].details).toContain('HAS_X');
+    });
+
+    it('should flag a drifted interpolation identifier even when the same name also appears in the match prose (#900)', async () => {
+      // The guard compares interpolation-token sets, not the whole match text, so
+      // a `## TOOLS` heading in prose must not mask a genuinely drifted ${TOOLS}.
+      const mockPromptData = buildMockPromptData({
+        promptId: 'drift-name-in-prose',
+        regex: '## TOOLS\\n\\$\\{([\\w$]+)\\} x',
+        getInterpolatedContent: () => '## TOOLS\n${TOOLS} x',
+        pieces: ['## TOOLS\n${', '} x'],
+        identifiers: [1],
+        identifierMap: { '1': 'q' },
+      });
+
+      setupMocks(mockPromptData);
+      const cliContent = 'desc:`## TOOLS\n${q} x`'; // q is live; TOOLS only in prose
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe(cliContent);
+      expect(result.results[0].applied).toBe(false);
+      expect(result.results[0].details).toContain('TOOLS');
+    });
+
+    it('should apply normally when an ALL-CAPS interpolation identifier is present in the bundle match (no false positive)', async () => {
+      // Negative control: a genuine ALL-CAPS bundle reference must NOT be flagged.
+      const mockPromptData = buildMockPromptData({
+        promptId: 'legit-caps-present',
+        regex: 'Limit \\$\\{MAX_TOKENS\\} (\\w+)',
+        getInterpolatedContent: () => 'Limit ${MAX_TOKENS} refreshed',
+        pieces: ['Limit ${MAX_TOKENS} ', ''],
+        identifiers: [],
+        identifierMap: {},
+      });
+
+      setupMocks(mockPromptData);
+      const cliContent = 'desc:`Limit ${MAX_TOKENS} stale`';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe('desc:`Limit ${MAX_TOKENS} refreshed`');
+      expect(result.results[0].applied).toBe(true);
+    });
+
+    it('should not flag an ALL-CAPS token that appears only in prose, not inside ${...}', async () => {
+      const mockPromptData = buildMockPromptData({
+        promptId: 'prose-caps-token',
+        regex: 'Doc \\$\\{([\\w$]+)\\} (\\w+)',
+        getInterpolatedContent: () => 'Doc ${x} see CLAUDE_LOCAL_MD',
+        pieces: ['Doc ${', '} '],
+        identifiers: [1],
+        identifierMap: { '1': 'x' },
+      });
+
+      setupMocks(mockPromptData);
+      const cliContent = 'desc:`Doc ${x} old`';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.results[0].applied).toBe(true);
+      expect(result.newContent).toContain('CLAUDE_LOCAL_MD');
+    });
+
+    it('should not guard quoted/JSON prompts where ${...} is inert text (delimiter is not a backtick)', async () => {
+      const mockPromptData = buildMockPromptData({
+        promptId: 'quoted-inert',
+        regex: 'Cfg \\$\\{INERT_TOKEN\\} (\\w+)',
+        getInterpolatedContent: () => 'Cfg ${INERT_TOKEN} refreshed',
+        pieces: ['Cfg ${INERT_TOKEN} ', ''],
+        identifiers: [],
+        identifierMap: {},
+      });
+
+      setupMocks(mockPromptData);
+      const cliContent = 'desc:"Cfg ${INERT_TOKEN} stale"'; // double-quoted -> inert
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.results[0].applied).toBe(true);
+      expect(result.newContent).toContain('INERT_TOKEN');
+    });
+
     it('should auto-escape multiple backticks in template literal context', async () => {
       const mockPromptData = buildMockPromptData({
         content: 'Use `foo` and `bar` for config',
