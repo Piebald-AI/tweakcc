@@ -831,6 +831,187 @@ Greet user as \${SETTINGS.preferredName}!`;
       // Should have called writeFile for updating variables
       expect(writeFileSpy).toHaveBeenCalled();
     });
+
+    it('should regenerate an unmodified file whose identifiers drifted despite a matching version (#899)', async () => {
+      // Same version stamp, but the body still uses the old identifier CONFIG
+      // where the current snapshot expects SETTINGS.
+      const staleContent = `<!--
+name: test-prompt
+description: Test prompt
+ccVersion: 2.0.0
+-->
+
+Greet user as \${CONFIG.preferredName}!`;
+
+      const hashIndexModule = await import('../systemPromptHashIndex');
+      const parsed = promptSync.parseMarkdownPrompt(staleContent);
+      vi.spyOn(hashIndexModule, 'getPromptHash').mockResolvedValue(
+        hashIndexModule.computeMD5Hash(parsed.content)
+      ); // unmodified
+
+      vi.spyOn(fs, 'access').mockResolvedValue(undefined);
+      vi.spyOn(fs, 'readFile').mockResolvedValue(staleContent);
+      const writeFileSpy = vi
+        .spyOn(fs, 'writeFile')
+        .mockResolvedValue(undefined);
+
+      const result = await promptSync.syncPrompt(mockPrompt);
+
+      expect(result.action).toBe('updated');
+      // The regeneration is the last write and uses the current identifier name,
+      // not the stale one.
+      const lastWrite = String(writeFileSpy.mock.calls.at(-1)?.[1]);
+      expect(lastWrite).toContain('${SETTINGS.preferredName}');
+      expect(lastWrite).not.toContain('${CONFIG');
+    });
+
+    it('should flag a conflict when a modified file has drifted identifiers (#899)', async () => {
+      const staleContent = `<!--
+name: test-prompt
+description: Test prompt
+ccVersion: 2.0.0
+-->
+
+Greet user as \${CONFIG.preferredName}! (user note)`;
+
+      const mockStringsFile = {
+        version: '2.0.0',
+        prompts: [
+          {
+            id: 'test-id',
+            name: 'test-prompt',
+            description: 'Test prompt',
+            pieces: ['Greet user as ${', '.preferredName}!'],
+            identifiers: [1],
+            identifierMap: { '1': 'SETTINGS' },
+            version: '2.0.0',
+          },
+        ],
+      };
+
+      const { downloadStringsFile } = await import('../systemPromptDownload');
+      const hashIndexModule = await import('../systemPromptHashIndex');
+      vi.mocked(downloadStringsFile).mockResolvedValue(
+        mockStringsFile as StringsFile
+      );
+      vi.spyOn(hashIndexModule, 'getPromptHash').mockResolvedValue(
+        'different-hash'
+      ); // modified
+
+      vi.spyOn(fs, 'access').mockResolvedValue(undefined);
+      vi.spyOn(fs, 'readFile').mockResolvedValue(staleContent);
+      vi.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
+
+      const result = await promptSync.syncPrompt(mockPrompt);
+
+      expect(result.action).toBe('conflict');
+      expect(result.diffHtmlPath).toBeDefined();
+    });
+
+    it('should still skip a matching-version file that has no interpolations (no false drift)', async () => {
+      const noInterpPrompt: StringsPrompt = {
+        ...mockPrompt,
+        pieces: ['Static content only'],
+        identifiers: [],
+        identifierMap: {},
+      };
+      const mockContent = `<!--
+name: test-prompt
+description: Test prompt
+ccVersion: 2.0.0
+-->
+
+Static content only`;
+
+      vi.spyOn(fs, 'access').mockResolvedValue(undefined);
+      vi.spyOn(fs, 'readFile').mockResolvedValue(mockContent);
+      vi.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
+
+      const result = await promptSync.syncPrompt(noInterpPrompt);
+
+      expect(result.action).toBe('skipped');
+    });
+  });
+
+  describe('hasIdentifierDrift', () => {
+    it('returns false when every current identifier is referenced in an interpolation', () => {
+      expect(
+        promptSync.hasIdentifierDrift('Hi ${SETTINGS.preferredName}!', {
+          '1': 'SETTINGS',
+        })
+      ).toBe(false);
+    });
+
+    it('returns true when a current identifier was renamed away', () => {
+      expect(
+        promptSync.hasIdentifierDrift('Hi ${CONFIG.preferredName}!', {
+          '1': 'SETTINGS',
+        })
+      ).toBe(true);
+    });
+
+    it('returns false for a prompt with no interpolation identifiers', () => {
+      expect(promptSync.hasIdentifierDrift('Just prose, no vars', {})).toBe(
+        false
+      );
+    });
+
+    it('does not treat a substring occurrence as present (bounded match)', () => {
+      // Expects PROJECT_SKILL_UPKEEP_INSTRUCTIONS, but the body only carries the
+      // longer HAS_PROJECT_SKILL_UPKEEP_INSTRUCTIONS token.
+      expect(
+        promptSync.hasIdentifierDrift(
+          'x ${HAS_PROJECT_SKILL_UPKEEP_INSTRUCTIONS()} y',
+          { '1': 'PROJECT_SKILL_UPKEEP_INSTRUCTIONS' }
+        )
+      ).toBe(true);
+    });
+
+    it('is not masked by the identifier also appearing in prose', () => {
+      expect(
+        promptSync.hasIdentifierDrift('## TOOLS\n${x}', { '1': 'TOOLS' })
+      ).toBe(true);
+    });
+
+    it('ignores escaped \\${...} literal interpolations', () => {
+      expect(
+        promptSync.hasIdentifierDrift('literal \\${TOKEN} here', {
+          '1': 'TOKEN',
+        })
+      ).toBe(true);
+    });
+
+    it('returns false when every one of multiple identifiers is present', () => {
+      expect(
+        promptSync.hasIdentifierDrift('a ${SETTINGS.x} b ${CONFIG.y}', {
+          '1': 'SETTINGS',
+          '2': 'CONFIG',
+        })
+      ).toBe(false);
+    });
+
+    it('returns true when one of multiple identifiers drifted', () => {
+      expect(
+        promptSync.hasIdentifierDrift('a ${SETTINGS.x} b ${OLDNAME.y}', {
+          '1': 'SETTINGS',
+          '2': 'CONFIG',
+        })
+      ).toBe(true);
+    });
+
+    it('recognizes an identifier used in call form ${NAME()} as present', () => {
+      expect(
+        promptSync.hasIdentifierDrift('Hi ${SETTINGS()}!', { '1': 'SETTINGS' })
+      ).toBe(false);
+    });
+
+    it('is not desynced by a literal brace inside a string within an interpolation', () => {
+      // The `}` inside "}" must not be read as closing the interpolation, or
+      // TOOLS after it would be missed and wrongly flagged as drifted.
+      expect(
+        promptSync.hasIdentifierDrift('${"}" + TOOLS}', { '1': 'TOOLS' })
+      ).toBe(false);
+    });
   });
 
   describe('syncSystemPrompts', () => {

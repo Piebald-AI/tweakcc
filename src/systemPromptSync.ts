@@ -828,6 +828,78 @@ ${upstreamDiffHtml}      </div>
 };
 
 /**
+ * Collects the inner text of each unescaped `${...}` interpolation in a prompt
+ * markdown body. Escaped interpolations (`\${...}`) are literal text, not real
+ * placeholders, so they are skipped. Braces inside a string or template literal
+ * within the interpolation (e.g. `${"}" + X}`) do not close it — the walker
+ * tracks the enclosing quote so a literal `}` cannot desync the brace depth.
+ */
+const interpolationRegions = (content: string): string[] => {
+  const regions: string[] = [];
+  for (let i = 0; i < content.length - 1; i++) {
+    if (
+      content[i] === '$' &&
+      content[i + 1] === '{' &&
+      countPrecedingBackslashes(content, i) % 2 === 0
+    ) {
+      let depth = 1;
+      let inString = ''; // '', or the open quote char: ' " `
+      let j = i + 2;
+      const start = j;
+      while (j < content.length && depth > 0) {
+        const ch = content[j];
+        if (inString) {
+          if (
+            ch === inString &&
+            countPrecedingBackslashes(content, j) % 2 === 0
+          )
+            inString = '';
+        } else if (ch === '"' || ch === "'" || ch === '`') {
+          inString = ch;
+        } else if (ch === '{') {
+          depth++;
+        } else if (ch === '}') {
+          depth--;
+        }
+        j++;
+      }
+      regions.push(content.slice(start, j - 1));
+      i = j - 1;
+    }
+  }
+  return regions;
+};
+
+/**
+ * Detects whether a prompt markdown file has drifted from the current identifier
+ * map: an interpolation identifier the current snapshot expects is no longer
+ * referenced in the file's `${...}` interpolations. The extractor sometimes
+ * renames a prompt's identifiers without bumping the per-prompt version (#899),
+ * so the version stamps match while the body still uses the old name. Applying
+ * such a file would inject an undefined identifier into cli.js (#900).
+ *
+ * Identifier names are matched with word boundaries against the interpolation
+ * text only (not the whole body), so a name that also appears in ALL-CAPS prose
+ * (e.g. a "## TOOLS" heading) does not mask a drifted `${TOOLS}`, and a shorter
+ * expected name is not spuriously matched inside a longer surviving token.
+ */
+export const hasIdentifierDrift = (
+  content: string,
+  identifierMap: Record<string, string>
+): boolean => {
+  const expectedNames = Object.values(identifierMap);
+  if (expectedNames.length === 0) return false;
+
+  const interpolationText = interpolationRegions(content).join('\n');
+  return expectedNames.some(name => {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return !new RegExp(`(?<![\\w$])${escaped}(?![\\w$])`).test(
+      interpolationText
+    );
+  });
+};
+
+/**
  * Syncs a single prompt file with the current CC version
  * Similar to ensurePromptFile in config.ts but with version tracking
  */
@@ -866,15 +938,24 @@ export const syncPrompt = async (
       prompt.version
     );
 
-    if (versionComparison === 0) {
-      // Same version - already updated above
+    // A matching version stamp usually means the file is up to date. But the
+    // extractor sometimes renames a prompt's interpolation identifiers without
+    // bumping the per-prompt version (#899), so also check for that drift and
+    // treat it like an upgrade; otherwise the stale identifiers get applied and
+    // inject an undefined variable into cli.js (#900).
+    const drifted =
+      versionComparison === 0 &&
+      hasIdentifierDrift(existingFile.content, prompt.identifierMap);
+
+    if (versionComparison === 0 && !drifted) {
+      // Same version and no drift - already updated above
       result.action = 'skipped';
       return result;
     }
 
-    if (versionComparison != 0) {
-      // User's file is based on an older version
-      // Check if the user has modified the content
+    {
+      // The file is out of date: based on an older version, or on the same
+      // version but with drifted identifiers. Check if the user has modified it.
       const oldHash = await getPromptHash(prompt.id, existingFile.ccVersion);
       const currentHash = computeMD5Hash(existingFile.content);
       const isModified = !oldHash || oldHash !== currentHash;
