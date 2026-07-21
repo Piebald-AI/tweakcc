@@ -39,13 +39,73 @@ const extractBuildTime = (content: string): string | undefined => {
 };
 
 /**
- * Apply system prompt customizations to cli.js content
- * @param content - The current content of cli.js
- * @param version - The Claude Code version
- * @param escapeNonAscii - Whether to escape non-ASCII characters (auto-detected if not specified)
- * @param patchFilter - Optional list of patch/prompt IDs to apply (if provided, only matching prompts are applied)
- * @returns SystemPromptsResult with modified content and per-prompt results
+ * Collects the ALL-CAPS identifier tokens used inside `${...}` interpolations of
+ * a string. Escaped interpolations (`\${...}`) are inert (even in a backtick
+ * literal) and skipped; only ALL-CAPS tokens are collected because Claude Code's
+ * minified variables are lowercase while its prompt identifiers are ALL-CAPS, so
+ * ordinary lowercase code and method names inside an interpolation are ignored.
  */
+const capsTokensInInterpolations = (s: string): Set<string> => {
+  const found = new Set<string>();
+  const capsToken = /\b[A-Z][A-Z0-9_]*\b/g;
+
+  for (let i = 0; i < s.length - 1; i++) {
+    if (s[i] === '$' && s[i + 1] === '{') {
+      // Skip escaped interpolations (\${...}); inert even in a backtick literal.
+      let backslashes = 0;
+      let k = i - 1;
+      while (k >= 0 && s[k] === '\\') {
+        backslashes++;
+        k--;
+      }
+      if (backslashes % 2 === 1) continue;
+
+      // Walk to the matching close brace, tracking nested braces.
+      let depth = 1;
+      let j = i + 2;
+      const start = j;
+      while (j < s.length && depth > 0) {
+        if (s[j] === '{') depth++;
+        else if (s[j] === '}') depth--;
+        j++;
+      }
+      for (const m of s.slice(start, j - 1).matchAll(capsToken))
+        found.add(m[0]);
+      i = j - 1;
+    }
+  }
+
+  return found;
+};
+
+/**
+ * Detects identifiers a prompt's interpolated replacement would introduce into a
+ * live `${...}` interpolation that the original matched bundle text never
+ * defined.
+ *
+ * This catches a stale prompt .md whose interpolation identifier was renamed
+ * upstream without a per-prompt version bump (#899): applyIdentifierMapping
+ * leaves the old human-name unmapped, so the replacement references a variable
+ * that does not exist. That is a runtime ReferenceError which `node --check`
+ * cannot catch (it parses fine) and which crashes Claude Code on the first turn
+ * (#900).
+ *
+ * Callers must invoke this only for backtick-delimited prompts, where `${...}`
+ * is real interpolation; in quoted/JSON string literals `${...}` is inert text.
+ * Interpolation-identifier sets are compared like-for-like, so a name that also
+ * appears in the prompt's ALL-CAPS prose (e.g. a "## TOOLS" heading) does not
+ * mask a genuinely drifted `${TOOLS}` interpolation.
+ */
+const findIntroducedInterpolationIdentifiers = (
+  replacement: string,
+  originalMatch: string
+): string[] => {
+  const inMatch = capsTokensInInterpolations(originalMatch);
+  return [...capsTokensInInterpolations(replacement)].filter(
+    tok => !inMatch.has(tok)
+  );
+};
+
 const escapeUnescapedChar = (str: string, char: string): string => {
   let result = '';
   for (let i = 0; i < str.length; i++) {
@@ -68,6 +128,14 @@ const escapeUnescapedChar = (str: string, char: string): string => {
   return result;
 };
 
+/**
+ * Apply system prompt customizations to cli.js content
+ * @param content - The current content of cli.js
+ * @param version - The Claude Code version
+ * @param escapeNonAscii - Whether to escape non-ASCII characters (auto-detected if not specified)
+ * @param patchFilter - Optional list of patch/prompt IDs to apply (if provided, only matching prompts are applied)
+ * @returns SystemPromptsResult with modified content and per-prompt results
+ */
 export const applySystemPrompts = async (
   content: string,
   version: string,
@@ -156,6 +224,37 @@ export const applySystemPrompts = async (
       // Check the delimiter character before the match to determine string type
       const matchIndex = match.index;
       const delimiter = matchIndex > 0 ? content[matchIndex - 1] : '';
+
+      // For backtick-delimited prompts, `${...}` is live interpolation. A stale
+      // .md (identifier renamed upstream without a version bump, #899) leaves an
+      // old human-name unmapped in applyIdentifierMapping, so the replacement
+      // references a variable the bundle never defines; writing it would throw
+      // ReferenceError at runtime, which node --check cannot catch (#900). Skip
+      // the prompt rather than corrupt cli.js. Quoted/JSON prompts are inert
+      // here and are left to the escaping paths below.
+      if (delimiter === '`') {
+        const introduced = findIntroducedInterpolationIdentifiers(
+          interpolatedContent,
+          match[0]
+        );
+        if (introduced.length > 0) {
+          console.log(
+            chalk.yellow(
+              `Skipped "${prompt.name}": replacement references ${introduced.join(
+                ', '
+              )} not found in cli.js (stale prompt file — re-sync it, e.g. delete the prompt's .md in your system-prompts directory and re-run --apply)`
+            )
+          );
+          results.push({
+            id: promptId,
+            name: prompt.name,
+            group: PatchGroup.SYSTEM_PROMPTS,
+            applied: false,
+            details: `stale identifier: ${introduced.join(', ')}`,
+          });
+          continue;
+        }
+      }
 
       // Calculate character counts for this prompt (both with human-readable placeholders)
       // Note: trim() to match how markdown files are parsed and how whitespace is applied
