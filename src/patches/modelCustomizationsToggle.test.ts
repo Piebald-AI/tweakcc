@@ -10,6 +10,10 @@ import { restoreClijsFromBackup } from '../installationBackup';
 import { writeModelCustomizations } from './modelSelector';
 import { writeShowMoreItemsInSelectMenus } from './showMoreItemsInSelectMenus';
 import { applySystemPrompts } from './systemPrompts';
+import {
+  assertPatchedBundleParses,
+  PatchedBundleParseError,
+} from './parseGate';
 import { applyCustomization } from './index';
 
 const mockReadFile = vi.hoisted(() => vi.fn());
@@ -59,6 +63,16 @@ vi.mock('./systemPrompts', () => ({
     results: [],
   })),
 }));
+
+// Keep the real PatchedBundleParseError class but stub the check so these unit
+// tests do not spawn `node --check`. The real gate is covered in parseGate.test.ts.
+vi.mock('./parseGate', async importActual => {
+  const actual = await importActual<typeof import('./parseGate')>();
+  return {
+    ...actual,
+    assertPatchedBundleParses: vi.fn(),
+  };
+});
 
 const PATCH_IDS = [
   'model-customizations',
@@ -169,5 +183,46 @@ describe('model customization toggle patch conditions', () => {
     expect(vi.mocked(restoreClijsFromBackup)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(applySystemPrompts)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(updateConfigFile)).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs the parse gate on the patched bundle before writing', async () => {
+    await applyCustomization(baseConfig(), ccInstInfo, [...PATCH_IDS]);
+
+    expect(vi.mocked(assertPatchedBundleParses)).toHaveBeenCalledTimes(1);
+  });
+
+  it('aborts the write and marks changes not applied when the bundle fails to parse', async () => {
+    vi.mocked(assertPatchedBundleParses).mockImplementationOnce(() => {
+      throw new PatchedBundleParseError('SyntaxError: Unexpected token');
+    });
+
+    await expect(
+      applyCustomization(baseConfig(), ccInstInfo, [...PATCH_IDS])
+    ).rejects.toBeInstanceOf(PatchedBundleParseError);
+
+    // The broken bundle is never written.
+    expect(vi.mocked(replaceFileBreakingHardLinks)).not.toHaveBeenCalled();
+
+    // changesApplied is set to false (the binary was restored to pristine at
+    // the start of apply and never re-written), not left/marked true.
+    expect(vi.mocked(updateConfigFile)).toHaveBeenCalledTimes(1);
+    const mutator = vi.mocked(updateConfigFile).mock.calls[0][0];
+    const probe = { changesApplied: true } as TweakccConfig;
+    mutator(probe);
+    expect(probe.changesApplied).toBe(false);
+  });
+
+  it('rethrows an unexpected gate error without marking changes not applied', async () => {
+    vi.mocked(assertPatchedBundleParses).mockImplementationOnce(() => {
+      throw new Error('unexpected temp-file failure');
+    });
+
+    await expect(
+      applyCustomization(baseConfig(), ccInstInfo, [...PATCH_IDS])
+    ).rejects.toThrow('unexpected temp-file failure');
+
+    // Not a parse failure: config is left untouched and nothing is written.
+    expect(vi.mocked(updateConfigFile)).not.toHaveBeenCalled();
+    expect(vi.mocked(replaceFileBreakingHardLinks)).not.toHaveBeenCalled();
   });
 });
