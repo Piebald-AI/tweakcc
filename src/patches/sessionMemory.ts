@@ -32,12 +32,14 @@
 
 import { showDiff, globalReplace } from './index';
 
+const LEGACY_EXTRACTION_GATE =
+  /function [$\w]+\(\)\{return [$\w]+\("tengu_session_memory"/;
+
 /**
  * Patch 1: Bypass tengu_session_memory flag check for extraction
  */
 const patchExtraction = (file: string): string | null => {
-  const pattern = /function [$\w]+\(\)\{return [$\w]+\("tengu_session_memory"/;
-  const match = file.match(pattern);
+  const match = file.match(LEGACY_EXTRACTION_GATE);
 
   if (match && match.index !== undefined) {
     const insertIndex = match.index + match[0].indexOf('{') + 1;
@@ -223,7 +225,7 @@ export const writeSessionMemory = (oldFile: string): string | null => {
   let newFile = patchExtraction(oldFile);
   if (!newFile) return null;
 
-  const usedLegacyExtraction = newFile.includes('tengu_session_memory');
+  const usedLegacyExtraction = LEGACY_EXTRACTION_GATE.test(oldFile);
 
   const withPastSessions = patchPastSessions(newFile);
   if (!withPastSessions) {
