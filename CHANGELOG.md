@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clarify that `--apply --patches` restores from backup then applies only the listed patch IDs (not additive); prefer `tweakcc --apply` with no filter (#699)
 - Skip a system prompt instead of corrupting `cli.js` when a stale prompt file would inject an identifier the current bundle does not define; an interpolation identifier renamed upstream without a per-prompt version bump left the old human-name unmapped, so `--apply` wrote an undefined variable that `node --check` could not catch and that crashed Claude Code on the first turn (#901) - @StreamDemon
 - Detect identifier drift during system-prompt sync: when the extractor renames a prompt's interpolation identifiers without bumping the per-prompt version, the version stamps match but the stored markdown still uses the old names, so sync now regenerates such a file (or flags a conflict if the user modified it) instead of skipping it as up to date (#902) - @StreamDemon
+- Fix the session-memory total-file-limit knob reading `CM_SM_TOTAL_FILE_LIMIT` instead of `CC_SM_TOTAL_FILE_LIMIT`; it was the only `CM_SM_*` name among four `CC_SM_*` siblings, so the total-file-limit env var never took effect (#TBD) - @StreamDemon
 
 ## [v4.3.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.2) - 2026-07-20
 
