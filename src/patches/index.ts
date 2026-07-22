@@ -14,6 +14,7 @@ import {
   repackNativeInstallation,
 } from '../nativeInstallationLoader';
 import { DEFAULT_SETTINGS } from '../defaultSettings';
+import { assertPatchedBundleParses } from './parseGate';
 
 // Notes to patch-writers:
 //
@@ -966,6 +967,18 @@ export const applyCustomization = async (
     applyPatchImplementations(content, patchImplementations, patchFilter);
   content = patchedContent;
   allResults.push(...patchResults);
+
+  // ==========================================================================
+  // Verify the patched bundle parses before writing it
+  // ==========================================================================
+  try {
+    assertPatchedBundleParses(content);
+  } catch (err) {
+    await updateConfigFile(cfg => {
+      cfg.changesApplied = false;
+    });
+    throw err;
+  }
 
   // ==========================================================================
   // Write the modified content back

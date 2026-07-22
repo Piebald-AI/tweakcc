@@ -22,6 +22,7 @@ import {
   PatchGroup,
   getAllPatchDefinitions,
 } from './patches/index';
+import { PatchedBundleParseError } from './patches/parseGate';
 import {
   preloadStringsFile,
   getSystemPromptDefinitions,
@@ -501,6 +502,15 @@ async function handleApplyMode(
   } catch (error) {
     if (error instanceof InstallationDetectionError) {
       console.error(chalk.red(`Error: ${error.message}`));
+      process.exit(1);
+    }
+    if (error instanceof PatchedBundleParseError) {
+      console.error(
+        chalk.red(
+          '\n✖ The patched bundle failed to parse. Your customizations were not applied; Claude Code is running the original unmodified version.'
+        )
+      );
+      console.error(chalk.dim(error.message));
       process.exit(1);
     }
     throw error;
