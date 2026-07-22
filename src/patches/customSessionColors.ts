@@ -7,8 +7,10 @@ export const writeCustomSessionColors = (
   let content = oldFile;
 
   // Step 1: Remove the validation that rejects unknown colors.
+  // Matches both old (`if(!LIST.includes(ARG))`) and new (`if(!FLAG&&!LIST.includes(ARG))`) forms.
+  // Uses [\s\S]+? because the block may contain `}` inside template literals.
   const rejectPattern =
-    /if\(!([$\w]+)\.includes\(([$\w]+)\)\)\{let ([$\w]+)=\1\.join\(", "\);return [$\w]+\(`Invalid color "\$\{\2\}"[^`]+`,[^)]+\),null\}/;
+    /if\((?:![$\w]+&&)?!([$\w]+)\.includes\(([$\w]+)\)\)\{let ([$\w]+)=\1\.join\(", "\);return[\s\S]+?(?:null\}|`\})/;
   const rejectMatch = content.match(rejectPattern);
   if (!rejectMatch || rejectMatch.index === undefined) {
     console.error(
@@ -96,16 +98,8 @@ export const writeCustomSessionColors = (
 
   prevContent = content;
   content =
-    content.slice(0, bgAbsIdx) +
-    newBg +
-    content.slice(bgAbsIdx + oldBg.length);
-  showDiff(
-    prevContent,
-    content,
-    newBg,
-    bgAbsIdx,
-    bgAbsIdx + oldBg.length
-  );
+    content.slice(0, bgAbsIdx) + newBg + content.slice(bgAbsIdx + oldBg.length);
+  showDiff(prevContent, content, newBg, bgAbsIdx, bgAbsIdx + oldBg.length);
 
   // Step 4: Remove "gray" and "grey" from the reset/default aliases array.
   // In CC 2.1.90+ these were already removed upstream, so this is optional.

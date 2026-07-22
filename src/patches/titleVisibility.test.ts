@@ -2,17 +2,15 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { writeTitleVisibilityToggle } from './titleVisibility';
 
-const cmds = Array.from({ length: 32 }, (_, i) => `c${i}`).join(',');
-const MOCK_SLASH_COMMANDS = `var commands=()=>[${cmds}]`;
+const ids = Array.from({ length: 6 }, (_, i) => `c${i}`).join(',');
+const rest = Array.from({ length: 10 }, (_, i) => `d${i}`).join(',');
+const MOCK_SLASH_COMMANDS = `var commands=()=>[${ids},...x?[y]:[],${rest}]`;
 
 const MOCK_NAME_EXTRACT =
   'function Yy9(_){if(_$())return;return _.standaloneAgentContext?.name}';
 
 const buildMockFile = (opts?: { noNameExtract?: boolean }) => {
-  return (
-    MOCK_SLASH_COMMANDS +
-    (opts?.noNameExtract ? '' : MOCK_NAME_EXTRACT)
-  );
+  return MOCK_SLASH_COMMANDS + (opts?.noNameExtract ? '' : MOCK_NAME_EXTRACT);
 };
 
 describe('titleVisibility', () => {
