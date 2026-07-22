@@ -8,6 +8,7 @@ import { UserMessageDisplayView } from './components/UserMessageDisplayView';
 import { InputPatternHighlightersView } from './components/InputPatternHighlightersView';
 import { MiscView } from './components/MiscView';
 import { ToolsetsView } from './components/ToolsetsView';
+import { CustomToolsView } from './components/CustomToolsView';
 import { SubagentModelsView } from './components/SubagentModelsView';
 import { ClaudeMdAltNamesView } from './components/ClaudeMdAltNamesView';
 import {
@@ -124,6 +125,7 @@ Please reapply your changes by running \`${invocationCommand} --apply\`.`,
       case MainMenuItem.INPUT_PATTERN_HIGHLIGHTERS:
       case MainMenuItem.MISC:
       case MainMenuItem.TOOLSETS:
+      case MainMenuItem.CUSTOM_TOOLS:
       case MainMenuItem.SUBAGENT_MODELS:
       case MainMenuItem.CLAUDE_MD_ALT_NAMES:
         setCurrentView(item);
@@ -198,6 +200,8 @@ Please reapply your changes by running \`${invocationCommand} --apply\`.`,
           <MiscView onSubmit={handleBack} />
         ) : currentView === MainMenuItem.TOOLSETS ? (
           <ToolsetsView onBack={handleBack} />
+        ) : currentView === MainMenuItem.CUSTOM_TOOLS ? (
+          <CustomToolsView onBack={handleBack} />
         ) : currentView === MainMenuItem.SUBAGENT_MODELS ? (
           <SubagentModelsView onBack={handleBack} />
         ) : currentView === MainMenuItem.CLAUDE_MD_ALT_NAMES ? (

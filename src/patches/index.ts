@@ -55,6 +55,7 @@ import { writePatchesAppliedIndication } from './patchesAppliedIndication';
 import { applySystemPrompts } from './systemPrompts';
 import { writeFixLspSupport } from './fixLspSupport';
 import { writeToolsets } from './toolsets';
+import { writeCustomTools } from './customTools';
 import { writeTableFormat } from './tableFormat';
 import { writeConversationTitle } from './conversationTitle';
 import { writeHideStartupBanner } from './hideStartupBanner';
@@ -102,6 +103,8 @@ export {
   clearRequireFuncNameCache,
   findTextComponent,
   findBoxComponent,
+  getCwdFuncName,
+  findBuildToolFunc,
 } from './helpers';
 
 export interface LocationResult {
@@ -429,6 +432,13 @@ const PATCH_DEFINITIONS = [
     name: 'Toolsets',
     group: PatchGroup.FEATURES,
     description: 'Custom toolsets will be registered',
+  },
+  {
+    id: 'custom-tools',
+    name: 'Custom tools',
+    group: PatchGroup.FEATURES,
+    description:
+      'User-defined shell-command tools will be injected into the tool list',
   },
   {
     id: 'mcp-non-blocking',
@@ -915,6 +925,12 @@ export const applyCustomization = async (
         ),
       condition: !!(
         config.settings.toolsets && config.settings.toolsets.length > 0
+      ),
+    },
+    'custom-tools': {
+      fn: c => writeCustomTools(c, config.settings.customTools!),
+      condition: !!(
+        config.settings.customTools && config.settings.customTools.length > 0
       ),
     },
     'mcp-non-blocking': {
