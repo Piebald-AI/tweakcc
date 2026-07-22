@@ -30,6 +30,23 @@ describe('writeSessionMemory', () => {
     expect(result).not.toContain('tengu_slate_thimble');
   });
 
+  it('does not treat a telemetry event wrapped in a returning function as the legacy extraction gate', () => {
+    const input =
+      // near-match: a returning fn whose string is tengu_session_memory_RATED,
+      // not the real gate `("tengu_session_memory",!1)`
+      'function zz(){return O("tengu_session_memory_rated",{rating:1})}' +
+      'D8({querySource:"extract_memories",forkLabel:"extract_memories"});' +
+      'if(!Qz("tengu_passport_quail",!1))return;' +
+      'if(Wf("tengu_session_search_toggled",!1)){}';
+
+    const result = writeSessionMemory(input);
+
+    // The near-match must not flip usedLegacyExtraction, so the missing
+    // token-limit pattern stays non-fatal and the feature still applies.
+    expect(result).not.toBeNull();
+    expect(result).not.toContain('tengu_passport_quail');
+  });
+
   // Legacy fixture (CC <= ~2.1.158 shapes): synthesized to satisfy the token-limit
   // and update-threshold regexes, which no longer exist in current bundles.
   it('injects the configurable env-var limits on legacy CC where the patterns are present', () => {
