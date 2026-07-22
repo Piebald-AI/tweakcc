@@ -211,4 +211,18 @@ describe('model customization toggle patch conditions', () => {
     mutator(probe);
     expect(probe.changesApplied).toBe(false);
   });
+
+  it('rethrows an unexpected gate error without marking changes not applied', async () => {
+    vi.mocked(assertPatchedBundleParses).mockImplementationOnce(() => {
+      throw new Error('unexpected temp-file failure');
+    });
+
+    await expect(
+      applyCustomization(baseConfig(), ccInstInfo, [...PATCH_IDS])
+    ).rejects.toThrow('unexpected temp-file failure');
+
+    // Not a parse failure: config is left untouched and nothing is written.
+    expect(vi.mocked(updateConfigFile)).not.toHaveBeenCalled();
+    expect(vi.mocked(replaceFileBreakingHardLinks)).not.toHaveBeenCalled();
+  });
 });

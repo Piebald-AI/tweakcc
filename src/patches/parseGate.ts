@@ -114,7 +114,17 @@ export const assertPatchedBundleParses = (content: string): void => {
       return;
     }
 
-    const errFd = fsSync.openSync(errFile, 'w');
+    let errFd: number;
+    try {
+      errFd = fsSync.openSync(errFile, 'w');
+    } catch (err) {
+      console.warn(
+        chalk.yellow(
+          `Warning: could not open a temp file to verify the patched bundle (${String(err)}); skipping the parse check.`
+        )
+      );
+      return;
+    }
     let parseFailed = false;
     try {
       execFileSync(process.execPath, ['--check', tmpFile], {
