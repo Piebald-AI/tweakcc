@@ -76,6 +76,14 @@ export const sanitizeParseError = (stderr: string, tmpFile: string): string => {
 };
 
 /**
+ * Distinguishes a genuine `node --check` parse failure (the process ran and
+ * exited with a non-zero status) from an operational failure (timeout, signal
+ * kill, or spawn failure), which leave `status` null.
+ */
+export const isParseFailureExit = (err: unknown): boolean =>
+  err != null && typeof (err as { status?: unknown }).status === 'number';
+
+/**
  * Parses the fully-patched bundle with `node --check` and throws
  * PatchedBundleParseError if it does not parse. The bundle is CommonJS
  * (`@bun-cjs`), so the temp file uses a `.cjs` extension to pin CommonJS parsing
@@ -83,9 +91,10 @@ export const sanitizeParseError = (stderr: string, tmpFile: string): string => {
  * than `new Function` / `vm.compileFunction`, which impose a bare function-body
  * context that diverges from module parsing. `node --check` writes its
  * diagnostic to stderr and then exits, which truncates a piped stderr on long
- * lines, so stderr is captured to a file. If the temp file cannot be created or
- * written the check is skipped: the gate only adds safety, so an unusable
- * tmpdir must not block an otherwise-valid apply.
+ * lines, so stderr is captured to a file. The check is bounded by a timeout.
+ * Only a genuine non-zero exit is treated as a parse failure; a timeout, signal,
+ * spawn failure, or an unwritable temp file warns and skips the check, so an
+ * operational problem never blocks an otherwise-valid apply.
  */
 export const assertPatchedBundleParses = (content: string): void => {
   let dir: string;
@@ -126,15 +135,29 @@ export const assertPatchedBundleParses = (content: string): void => {
       return;
     }
     let parseFailed = false;
+    let operationalFailure: string | null = null;
     try {
       execFileSync(process.execPath, ['--check', tmpFile], {
         stdio: ['ignore', 'ignore', errFd],
         timeout: PARSE_CHECK_TIMEOUT_MS,
       });
-    } catch {
-      parseFailed = true;
+    } catch (err) {
+      if (isParseFailureExit(err)) {
+        parseFailed = true;
+      } else {
+        operationalFailure = String(err);
+      }
     } finally {
       fsSync.closeSync(errFd);
+    }
+
+    if (operationalFailure !== null) {
+      console.warn(
+        chalk.yellow(
+          `Warning: the parse check could not run to completion (${operationalFailure}); skipping it.`
+        )
+      );
+      return;
     }
 
     if (parseFailed) {

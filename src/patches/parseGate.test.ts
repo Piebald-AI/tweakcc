@@ -6,6 +6,7 @@ import {
   assertPatchedBundleParses,
   PatchedBundleParseError,
   sanitizeParseError,
+  isParseFailureExit,
 } from './parseGate';
 
 // The exact over-escaped template/ternary that shipped in #869 (fixed by #870).
@@ -84,6 +85,26 @@ describe('assertPatchedBundleParses', () => {
     const message = (caught as Error).message;
     expect(message).toContain('SyntaxError');
     expect(message.length).toBeLessThan(4000);
+  });
+});
+
+describe('isParseFailureExit', () => {
+  it('is true when node --check exits with a non-zero status (real parse failure)', () => {
+    expect(isParseFailureExit({ status: 1, signal: null })).toBe(true);
+  });
+
+  it('is false for a timeout (killed by signal, no exit status)', () => {
+    expect(
+      isParseFailureExit({ status: null, signal: 'SIGTERM', code: 'ETIMEDOUT' })
+    ).toBe(false);
+  });
+
+  it('is false for a spawn failure (node could not run)', () => {
+    expect(isParseFailureExit({ status: null, code: 'ENOENT' })).toBe(false);
+  });
+
+  it('is false for an error without an exit status', () => {
+    expect(isParseFailureExit(new Error('boom'))).toBe(false);
   });
 });
 
