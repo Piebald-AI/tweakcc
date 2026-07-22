@@ -161,7 +161,7 @@ const patchTokenLimits = (
   }
 
   const perSectionCode = 'Number(process.env.CC_SM_PER_SECTION_TOKENS??2000)';
-  const totalFileCode = 'Number(process.env.CM_SM_TOTAL_FILE_LIMIT??12000)';
+  const totalFileCode = 'Number(process.env.CC_SM_TOTAL_FILE_LIMIT??12000)';
 
   const replacement =
     match[1] + perSectionCode + match[2] + totalFileCode + match[3];
