@@ -14,6 +14,7 @@ export class PatchedBundleParseError extends Error {
 
 const MAX_MESSAGE = 2000;
 const EXCERPT_RADIUS = 160;
+const PARSE_CHECK_TIMEOUT_MS = 30_000;
 
 /**
  * Reduces `node --check` stderr to the error summary and a bounded,
@@ -118,6 +119,7 @@ export const assertPatchedBundleParses = (content: string): void => {
     try {
       execFileSync(process.execPath, ['--check', tmpFile], {
         stdio: ['ignore', 'ignore', errFd],
+        timeout: PARSE_CHECK_TIMEOUT_MS,
       });
     } catch {
       parseFailed = true;

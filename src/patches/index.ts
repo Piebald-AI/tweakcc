@@ -974,6 +974,7 @@ export const applyCustomization = async (
   try {
     assertPatchedBundleParses(content);
   } catch (err) {
+    debug(`Patched bundle failed to parse: ${String(err)}`);
     await updateConfigFile(cfg => {
       cfg.changesApplied = false;
     });
