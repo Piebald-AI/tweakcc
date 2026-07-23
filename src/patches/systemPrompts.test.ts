@@ -763,6 +763,61 @@ describe('systemPrompts.ts', () => {
     });
   });
 
+  describe('patching all occurrences of a repeated prompt (#678)', () => {
+    it('should patch every occurrence when the vanilla text appears more than once, not just the first', async () => {
+      const mockPromptData = buildMockPromptData({
+        prompt: { content: 'Customized text' },
+        regex: 'Original vanilla text',
+        getInterpolatedContent: () => 'Customized text',
+        pieces: ['Original vanilla text'],
+      });
+
+      setupMocks(mockPromptData);
+
+      // Mimics Claude Code's full-mode vs. compact-mode prompt arrays, where the
+      // same vanilla string is repeated in more than one place in cli.js.
+      const cliContent =
+        'full:"Original vanilla text";compact:"Original vanilla text";';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe(
+        'full:"Customized text";compact:"Customized text";'
+      );
+      expect(result.newContent).not.toContain('Original vanilla text');
+      expect(result.results[0].applied).toBe(true);
+      expect(result.results[0].details).toContain('2 occurrences');
+    });
+
+    it('should interpolate each occurrence with its own captured variable rather than reusing the first match', async () => {
+      const mockPromptData = buildMockPromptData({
+        prompt: {
+          variables: ['MAX_TIMEOUT'],
+          content: 'Timeout: ${MAX_TIMEOUT()} ms',
+        },
+        regex: 'Timeout: ([\\w$]+)\\(\\) ms',
+        getInterpolatedContent: (match: RegExpMatchArray) => {
+          const capturedVar = match[1];
+          return `Timeout(patched): \${${capturedVar}()} ms`;
+        },
+        pieces: ['Timeout: ${', '()} ms'],
+        identifiers: [1],
+        identifierMap: { '1': 'MAX_TIMEOUT' },
+      });
+
+      setupMocks(mockPromptData);
+
+      // The two code paths minify the same prompt's variable to different names.
+      const cliContent = 'full:Timeout: a() ms;compact:Timeout: b() ms;';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe(
+        'full:Timeout(patched): ${a()} ms;compact:Timeout(patched): ${b()} ms;'
+      );
+    });
+  });
+
   describe('backtick round-trip byte-identity (#869)', () => {
     const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
