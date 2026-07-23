@@ -1209,6 +1209,67 @@ function alignBigInt(value: bigint, alignment: bigint): bigint {
   return ((value + alignment - 1n) / alignment) * alignment;
 }
 
+export interface BunSectionPlacement {
+  newVaddr: bigint;
+  newFileOffset: bigint;
+  alignedNewSize: bigint;
+  extensionSize: bigint;
+  /** true = placed directly after the writable segment (gap-free); false = fell back to nextVirtualAddress. */
+  compact: boolean;
+}
+
+/**
+ * Compute where to place the rebuilt `.bun` section inside the writable PT_LOAD.
+ *
+ * The writable segment is extended to cover the new section, and a PT_LOAD maps a
+ * contiguous file->vaddr range, so any distance between the segment's current end
+ * and the new section's vaddr becomes real (zero) bytes in the file. LIEF's
+ * `nextVirtualAddress()` rounds up to a coarse boundary (e.g. the next 256MB),
+ * which on a ~273MB Claude Code binary left a ~262MB zero-padding gap.
+ *
+ * When the writable segment is the topmost LOAD segment we can instead place the
+ * section immediately after it (page-aligned), which is gap-free. That is only
+ * safe when nothing is mapped above the writable segment; otherwise extending it
+ * would overlap a higher segment, so we fall back to the nextVirtualAddress
+ * placement. `topmostLoadEnd` must be max(vaddr + memsz) across all LOAD segments,
+ * and `rwVirtualSize` must be the memory size (memsz) so a BSS tail is skipped.
+ */
+export function computeBunSectionPlacement(params: {
+  rwVirtualAddress: bigint;
+  rwVirtualSize: bigint;
+  rwFileOffset: bigint;
+  rwFileSize: bigint;
+  topmostLoadEnd: bigint;
+  nextVirtualAddress: bigint;
+  newContentSize: bigint;
+  pageSize: bigint;
+}): BunSectionPlacement {
+  const {
+    rwVirtualAddress,
+    rwVirtualSize,
+    rwFileOffset,
+    rwFileSize,
+    topmostLoadEnd,
+    nextVirtualAddress,
+    newContentSize,
+    pageSize,
+  } = params;
+
+  const alignedNewSize = alignBigInt(newContentSize, pageSize);
+  const rwMemEnd = rwVirtualAddress + rwVirtualSize;
+  const compact = rwMemEnd >= topmostLoadEnd;
+  const newVaddr = compact
+    ? alignBigInt(rwMemEnd, pageSize)
+    : alignBigInt(nextVirtualAddress, pageSize);
+
+  const offsetInSegment = newVaddr - rwVirtualAddress;
+  const newFileOffset = rwFileOffset + offsetInSegment;
+  const oldRwFileEnd = rwFileOffset + rwFileSize;
+  const extensionSize = newFileOffset + alignedNewSize - oldRwFileEnd;
+
+  return { newVaddr, newFileOffset, alignedNewSize, extensionSize, compact };
+}
+
 /**
  * Repack an ELF binary that uses Bun's new .bun section format (post-PR#26923).
  * Current Bun extends the existing writable PT_LOAD and leaves PT_GNU_STACK
@@ -1268,12 +1329,28 @@ function repackELFSection(
 
     const pageSize = elfBinary.pageSize();
     const newContentSize = BigInt(newSectionData.length);
-    const alignedNewSize = alignBigInt(newContentSize, pageSize);
-    const newVaddr = alignBigInt(elfBinary.nextVirtualAddress(), pageSize);
-    const offsetInSegment = newVaddr - rwSegment.virtualAddress;
-    const newFileOffset = rwSegment.fileOffset + offsetInSegment;
-    const oldRwFileEnd = rwSegment.fileOffset + rwSegment.fileSize;
-    const extensionSize = newFileOffset + alignedNewSize - oldRwFileEnd;
+
+    // Place the new .bun right after the writable segment when it is the topmost
+    // LOAD segment, instead of at LIEF's nextVirtualAddress() (which rounds up to
+    // a coarse boundary and leaves a large zero-padding gap in the file). See
+    // computeBunSectionPlacement.
+    const loadSegments = elfBinary.segments().filter(s => s.type === 'LOAD');
+    const topmostLoadEnd = loadSegments.reduce((max, s) => {
+      const end = BigInt(s.virtualAddress) + BigInt(s.virtualSize);
+      return end > max ? end : max;
+    }, 0n);
+
+    const placement = computeBunSectionPlacement({
+      rwVirtualAddress: rwSegment.virtualAddress,
+      rwVirtualSize: BigInt(rwSegment.virtualSize),
+      rwFileOffset: rwSegment.fileOffset,
+      rwFileSize: rwSegment.fileSize,
+      topmostLoadEnd,
+      nextVirtualAddress: elfBinary.nextVirtualAddress(),
+      newContentSize,
+      pageSize,
+    });
+    const { newVaddr, newFileOffset, extensionSize } = placement;
 
     if (extensionSize < 0n) {
       throw new Error(
@@ -1282,7 +1359,7 @@ function repackELFSection(
     }
 
     debug(
-      `repackELFSection: moving .bun to offset=0x${newFileOffset.toString(16)}, vaddr=0x${newVaddr.toString(16)}, size=0x${newContentSize.toString(16)}`
+      `repackELFSection: moving .bun to offset=0x${newFileOffset.toString(16)}, vaddr=0x${newVaddr.toString(16)}, size=0x${newContentSize.toString(16)}, compact=${placement.compact}`
     );
 
     if (extensionSize > 0n) {
