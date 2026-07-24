@@ -191,14 +191,17 @@ export const applySystemPrompts = async (
     }
 
     debug(`Applying system prompt: ${prompt.name}`);
-    // 's' = dotAll; 'i' for hex-case differences in unicode escapes. Guard regex
+    // 's' = dotAll; 'i' for hex-case differences in unicode escapes; 'g' because
+    // cli.js sometimes repeats the same prompt text in more than one code path
+    // (e.g. Claude Code's full-mode vs. compact-mode prompt arrays, see #678) and
+    // every occurrence needs to be patched, not just the first. Guard regex
     // construction + match: an oversized pattern (e.g. the Model Migration Guide) can
     // overflow V8's regex stack on Node <=22 and abort the whole --apply (#753).
     let pattern: RegExp;
-    let match: RegExpMatchArray | null;
+    let matches: RegExpMatchArray[];
     try {
-      pattern = new RegExp(regex, 'si');
-      match = content.match(pattern);
+      pattern = new RegExp(regex, 'gsi');
+      matches = [...content.matchAll(pattern)];
     } catch (error) {
       console.log(
         chalk.yellow(
@@ -217,43 +220,101 @@ export const applySystemPrompts = async (
       continue;
     }
 
-    if (match && match.index !== undefined) {
-      // Generate the interpolated content using the actual variables from the match
-      const interpolatedContent = getInterpolatedContent(match);
+    if (matches.length > 0) {
+      const firstMatch = matches[0];
+      const matchIndex = firstMatch.index!;
 
-      // Check the delimiter character before the match to determine string type
-      const matchIndex = match.index;
-      const delimiter = matchIndex > 0 ? content[matchIndex - 1] : '';
+      // cli.js sometimes repeats the exact same prompt text at more than one
+      // location (e.g. Claude Code's full-mode vs. compact-mode "Doing tasks"
+      // arrays, see #678). Each occurrence is interpolated and validated
+      // independently below because the minified variable names captured at
+      // each site — and therefore the delimiter/escaping rules that apply —
+      // can differ between occurrences even though the surrounding prompt
+      // text is identical.
+      const replacements: string[] = [];
+      let abortDetails: string | undefined;
 
-      // For backtick-delimited prompts, `${...}` is live interpolation. A stale
-      // .md (identifier renamed upstream without a version bump, #899) leaves an
-      // old human-name unmapped in applyIdentifierMapping, so the replacement
-      // references a variable the bundle never defines; writing it would throw
-      // ReferenceError at runtime, which node --check cannot catch (#900). Skip
-      // the prompt rather than corrupt cli.js. Quoted/JSON prompts are inert
-      // here and are left to the escaping paths below.
-      if (delimiter === '`') {
-        const introduced = findIntroducedInterpolationIdentifiers(
-          interpolatedContent,
-          match[0]
-        );
-        if (introduced.length > 0) {
-          console.log(
-            chalk.yellow(
-              `Skipped "${prompt.name}": replacement references ${introduced.join(
-                ', '
-              )} not found in cli.js (stale prompt file — re-sync it, e.g. delete the prompt's .md in your system-prompts directory and re-run --apply)`
-            )
+      for (const m of matches) {
+        const interpolatedContent = getInterpolatedContent(m);
+
+        // Check the delimiter character before this match to determine string type
+        const mIndex = m.index!;
+        const delimiter = mIndex > 0 ? content[mIndex - 1] : '';
+
+        // For backtick-delimited prompts, `${...}` is live interpolation. A stale
+        // .md (identifier renamed upstream without a version bump, #899) leaves an
+        // old human-name unmapped in applyIdentifierMapping, so the replacement
+        // references a variable the bundle never defines; writing it would throw
+        // ReferenceError at runtime, which node --check cannot catch (#900). Skip
+        // the prompt rather than corrupt cli.js. Quoted/JSON prompts are inert
+        // here and are left to the escaping paths below.
+        if (delimiter === '`') {
+          const introduced = findIntroducedInterpolationIdentifiers(
+            interpolatedContent,
+            m[0]
           );
-          results.push({
-            id: promptId,
-            name: prompt.name,
-            group: PatchGroup.SYSTEM_PROMPTS,
-            applied: false,
-            details: `stale identifier: ${introduced.join(', ')}`,
-          });
-          continue;
+          if (introduced.length > 0) {
+            console.log(
+              chalk.yellow(
+                `Skipped "${prompt.name}": replacement references ${introduced.join(
+                  ', '
+                )} not found in cli.js (stale prompt file — re-sync it, e.g. delete the prompt's .md in your system-prompts directory and re-run --apply)`
+              )
+            );
+            abortDetails = `stale identifier: ${introduced.join(', ')}`;
+            break;
+          }
         }
+
+        let replacementContent = interpolatedContent;
+
+        if (delimiter === '"' || delimiter === "'") {
+          replacementContent = replacementContent.replace(/\\/g, '\\\\');
+        }
+
+        if (delimiter === '"') {
+          replacementContent = replacementContent.replace(/\n/g, '\\n');
+          replacementContent = replacementContent.replace(/\r/g, '\\r');
+          replacementContent = escapeUnescapedChar(replacementContent, '"');
+        } else if (delimiter === "'") {
+          replacementContent = replacementContent.replace(/\n/g, '\\n');
+          replacementContent = replacementContent.replace(/\r/g, '\\r');
+          replacementContent = escapeUnescapedChar(replacementContent, "'");
+        } else if (delimiter === '`') {
+          const { content: escaped, incomplete } =
+            escapeDepthZeroBackticks(replacementContent);
+          if (incomplete) {
+            console.log(
+              chalk.red(
+                `Incomplete backtick escaping for "${prompt.name}" (unclosed interpolation) - skipping`
+              )
+            );
+            abortDetails =
+              'incomplete escaping: unclosed interpolation detected';
+            break;
+          }
+          if (escaped !== replacementContent) {
+            console.log(
+              chalk.yellow(
+                `Auto-escaped unescaped backticks in "${prompt.name}"`
+              )
+            );
+          }
+          replacementContent = escaped;
+        }
+
+        replacements.push(replacementContent);
+      }
+
+      if (abortDetails) {
+        results.push({
+          id: promptId,
+          name: prompt.name,
+          group: PatchGroup.SYSTEM_PROMPTS,
+          applied: false,
+          details: abortDetails,
+        });
+        continue;
       }
 
       // Calculate character counts for this prompt (both with human-readable placeholders)
@@ -267,51 +328,17 @@ export const applySystemPrompts = async (
       const newLength = prompt.content.trim().length;
 
       const oldContent = content;
-      const matchLength = match[0].length;
+      const matchLength = firstMatch[0].length;
 
-      let replacementContent = interpolatedContent;
-
-      if (delimiter === '"' || delimiter === "'") {
-        replacementContent = replacementContent.replace(/\\/g, '\\\\');
-      }
-
-      if (delimiter === '"') {
-        replacementContent = replacementContent.replace(/\n/g, '\\n');
-        replacementContent = replacementContent.replace(/\r/g, '\\r');
-        replacementContent = escapeUnescapedChar(replacementContent, '"');
-      } else if (delimiter === "'") {
-        replacementContent = replacementContent.replace(/\n/g, '\\n');
-        replacementContent = replacementContent.replace(/\r/g, '\\r');
-        replacementContent = escapeUnescapedChar(replacementContent, "'");
-      } else if (delimiter === '`') {
-        const { content: escaped, incomplete } =
-          escapeDepthZeroBackticks(replacementContent);
-        if (incomplete) {
-          console.log(
-            chalk.red(
-              `Incomplete backtick escaping for "${prompt.name}" (unclosed interpolation) - skipping`
-            )
-          );
-          results.push({
-            id: promptId,
-            name: prompt.name,
-            group: PatchGroup.SYSTEM_PROMPTS,
-            applied: false,
-            details: 'incomplete escaping: unclosed interpolation detected',
-          });
-          continue;
-        }
-        if (escaped !== replacementContent) {
-          console.log(
-            chalk.yellow(`Auto-escaped unescaped backticks in "${prompt.name}"`)
-          );
-        }
-        replacementContent = escaped;
-      }
-
-      // Replace the matched content with the interpolated content from the markdown file
-      // Use a replacer function to avoid special replacement pattern interpretation (e.g., $$ -> $), see #237
-      content = content.replace(pattern, () => replacementContent);
+      // Replace every occurrence with its own interpolated content — not the
+      // same string reused for all of them — using a replacer function both to
+      // consume `replacements` in match order and to avoid special replacement
+      // pattern interpretation (e.g., $$ -> $), see #237.
+      let replacementIndex = 0;
+      content = content.replace(
+        pattern,
+        () => replacements[replacementIndex++]
+      );
 
       // Store the hash of the applied prompt content
       const appliedHash = computeMD5Hash(prompt.content);
@@ -327,7 +354,7 @@ export const applySystemPrompts = async (
       showDiff(
         oldContent,
         content,
-        replacementContent,
+        replacements[0],
         matchIndex,
         matchIndex + matchLength
       );
@@ -343,6 +370,10 @@ export const applySystemPrompts = async (
         details = chalk.red(`${Math.abs(charDiff)} more chars`);
       } else {
         details = 'unchanged';
+      }
+
+      if (matches.length > 1) {
+        details += ` (${matches.length} occurrences)`;
       }
 
       if (hashFailed) {
