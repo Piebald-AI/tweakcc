@@ -21,7 +21,7 @@ export const writeInputChevronColor = (
   const oldColorPart = `color:${resolvedColorVar},dimColor:${isLoadingVar}`;
   const newColorPart = `color:${isLoadingVar}?${resolvedColorVar}:${JSON.stringify(resolvedColor)},dimColor:!1`;
 
-  const colorPartIndex = match[0].indexOf(oldColorPart);
+  const colorPartIndex = match[0].lastIndexOf(oldColorPart);
   const startIndex = match.index + colorPartIndex;
   const endIndex = startIndex + oldColorPart.length;
 
