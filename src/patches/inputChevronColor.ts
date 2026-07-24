@@ -6,7 +6,7 @@ export const writeInputChevronColor = (
   resolvedColor: string
 ): string | null => {
   const pattern =
-    /,\{isLoading:([$\w]+),(?:[$\w]+:[$\w]+,)*themeColor:([$\w]+)\}=[$\w]+,([$\w]+)=\2\?\?void 0[,;][^{}]*?if\([^)]*\[0\]!==\3[^)]*\|\|[^)]*\[1\]!==\1[^)]*\)[$\w]+=[$\w]+\.jsxs\([$\w]+,\{color:\3,dimColor:\1,children:/;
+    /,\{isLoading:([$\w]+),(?:[$\w]+:[$\w]+,)*themeColor:([$\w]+)\}=[$\w]+,([$\w]+)=\2\?\?void 0[,;][\s\S]*?if\([^)]*!==\3[^)]*\|\|[^)]*!==\1[^)]*\)[$\w]+=[$\w]+\.jsxs?\([$\w]+,\{color:\3,dimColor:\1,children:/;
 
   const match = file.match(pattern);
 
@@ -21,7 +21,7 @@ export const writeInputChevronColor = (
   const oldColorPart = `color:${resolvedColorVar},dimColor:${isLoadingVar}`;
   const newColorPart = `color:${isLoadingVar}?${resolvedColorVar}:${JSON.stringify(resolvedColor)},dimColor:!1`;
 
-  const colorPartIndex = match[0].indexOf(oldColorPart);
+  const colorPartIndex = match[0].lastIndexOf(oldColorPart);
   const startIndex = match.index + colorPartIndex;
   const endIndex = startIndex + oldColorPart.length;
 
