@@ -148,7 +148,79 @@ export const generateMarkdownFromPrompt = (
 };
 
 /**
+ * Decodes the JavaScript string-literal escapes that mean the same thing in
+ * every literal type: `\"` and `\'`. Both evaluate to the bare quote whether the
+ * prompt lives in a double-quoted, single-quoted or template literal, so they
+ * can be decoded without knowing the delimiter (which is only discoverable at
+ * apply time, from the bundle).
+ *
+ * Deliberately NOT decoded, because re-escaping them IS delimiter-dependent:
+ * - `\\`  applySystemPrompts doubles backslashes for `"`/`'` prompts but not for
+ *         backtick ones (#870). 36 of the 2.1.220 prompts are template literals
+ *         carrying `\\` that has to reach the bundle untouched.
+ * - `` \` `` only meaningful in a template literal, and re-escaped by a separate
+ *         delimiter-specific pass (escapeDepthZeroBackticks).
+ * - `\${` an escaped interpolation is inert on purpose; decoding it would turn
+ *         inert text into a live interpolation.
+ *
+ * Single left-to-right walk rather than sequential replaces, so `\\"` reads as
+ * an escaped backslash followed by a quote, not a backslash followed by an
+ * escaped quote.
+ */
+const decodeQuoteEscapes = (text: string): string => {
+  let out = '';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (ch === '\\' && next !== undefined) {
+      if (next === '\\') {
+        // Keep the pair intact so a quote after it is not misread as escaped.
+        out += '\\\\';
+        i++;
+        continue;
+      }
+      if (next === '"' || next === "'") {
+        out += next;
+        i++;
+        continue;
+      }
+      // Any other escape (including `` \` ``) is copied verbatim.
+      out += ch + next;
+      i++;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+};
+
+/**
+ * True when a prompt is plain text end to end: no interpolation slots between
+ * pieces and no `${` inside them.
+ *
+ * Quote decoding is only applied to these. Once a prompt contains `${...}`, the
+ * text inside it is JavaScript source where `\'` is genuine escaping for a
+ * nested string literal, and decoding it leaves escapeDepthZeroBackticks with
+ * an unclosed string. That makes it report the prompt as incomplete, and
+ * applySystemPrompts then skips the prompt entirely - silently dropping a
+ * customization to fix a cosmetic one. Deciding "am I inside an interpolation"
+ * correctly means running that parser's exact state machine, so prompts with
+ * interpolations are left alone here rather than tracked by a second,
+ * divergent copy of it.
+ */
+const isPlainTextPrompt = (
+  pieces: string[],
+  identifiers: (number | string)[]
+): boolean => identifiers.length === 0 && !pieces.some(p => p.includes('${'));
+
+/**
  * Reconstructs full content string from pieces array with ${HUMAN_NAME} placeholders
+ *
+ * Pieces are raw JavaScript string-literal source. Quote escapes are decoded
+ * here so that every representation derived from them (the generated markdown,
+ * the diff baselines, and the content hashes used for conflict detection) shows
+ * the prompt text rather than JS syntax (#921). The raw `pieces` are untouched,
+ * so buildSearchRegexFromPieces still matches the bundle's escaped form.
  */
 export const reconstructContentFromPieces = (
   pieces: string[],
@@ -156,9 +228,10 @@ export const reconstructContentFromPieces = (
   identifierMap: Record<string, string>
 ): string => {
   let result = '';
+  const decode = isPlainTextPrompt(pieces, identifiers);
 
   for (let i = 0; i < pieces.length; i++) {
-    result += pieces[i];
+    result += decode ? decodeQuoteEscapes(pieces[i]) : pieces[i];
 
     // Add the identifier placeholder if there's a corresponding identifier
     if (i < identifiers.length) {
@@ -1159,7 +1232,16 @@ const escapeNonAsciiForRegex = (text: string): string => {
  * Converts non-ASCII characters to Unicode escape sequences (\uXXXX).
  * Used when writing prompts back to cli.js for environments that only support ASCII.
  */
-const escapeNonAsciiChars = (text: string): string => {
+/**
+ * Encode non-ASCII as `\uXXXX` for Bun native executables, whose embedded
+ * module is Latin-1 (#853).
+ *
+ * This emits JavaScript *syntax*, so it has to run after any pass that escapes
+ * literal backslashes in the prompt's own text. Running it first lets the
+ * backslash-doubling from #664 turn `—` into `\\u2014`, which is a literal
+ * backslash followed by `u2014` rather than an em dash (#920).
+ */
+export const escapeNonAsciiChars = (text: string): string => {
   // eslint-disable-next-line no-control-regex
   return text.replace(/[^\x00-\x7F]/g, char => {
     const codePoint = char.charCodeAt(0);
@@ -1356,7 +1438,6 @@ const applyIdentifierMapping = (
   identifierMap: Record<string, string>,
   extractedVars: string[],
   ccVersion: string,
-  escapeNonAscii = false,
   buildTime?: string,
   pieces?: string[]
 ): string => {
@@ -1395,10 +1476,9 @@ const applyIdentifierMapping = (
     result = result.replace(/<<BUILD_TIME>>/g, buildTime);
   }
 
-  // Escape non-ASCII characters if requested (for Bun native executables)
-  if (escapeNonAscii) {
-    result = escapeNonAsciiChars(result);
-  }
+  // Non-ASCII encoding deliberately does NOT happen here. It emits JS syntax
+  // and must run after the string-literal escaping in applySystemPrompts, or
+  // the backslash-doubling pass corrupts the escapes it produces (#920).
 
   // Apply original whitespace structure from pieces if provided
   if (pieces && pieces.length > 0) {
@@ -1424,7 +1504,6 @@ const applyIdentifierMapping = (
  */
 export const loadSystemPromptsWithRegex = async (
   ccVersion: string,
-  escapeNonAscii = false,
   buildTime?: string
 ): Promise<
   Array<{
@@ -1487,7 +1566,6 @@ export const loadSystemPromptsWithRegex = async (
         jsonPrompt.identifierMap,
         extractedVars,
         ccVersion,
-        escapeNonAscii,
         buildTime,
         jsonPrompt.pieces
       );
