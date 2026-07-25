@@ -258,6 +258,27 @@ describe('systemPrompts.ts', () => {
       expect(result.newContent).toBe('msg:"Path C:\\\\temp \\u2014 done"');
     });
 
+    it('should double a literal backslash AND encode non-ASCII once for single-quoted prompts too (#664 + #920)', async () => {
+      // Single quotes take their own escaping branch (escapeUnescapedChar with
+      // "'"), so the ordering fix has to hold there independently of the
+      // double-quoted path above.
+      const mockPromptData = buildMockPromptData({
+        content: 'Path C:\\temp — done',
+        regex: 'Path C:\\\\\\\\temp \\\\u2014 done',
+        getInterpolatedContent: () => 'Path C:\\temp — done',
+        pieces: ['Path C:\\temp — done'],
+      });
+
+      setupMocks(mockPromptData);
+
+      const cliContent = "msg:'Path C:\\\\temp \\u2014 done'";
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', true);
+
+      expect(result.newContent).toBe("msg:'Path C:\\\\temp \\u2014 done'");
+      expect(result.newContent).not.toContain('\\\\u2014');
+    });
+
     it('should escape carriage returns in double-quoted string literals (CRLF-edited prompts)', async () => {
       const mockPromptData = buildMockPromptData({
         content: 'ORIGINAL',
