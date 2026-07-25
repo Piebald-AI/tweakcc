@@ -216,6 +216,108 @@ Content only.`;
       expect(result).not.toContain('Original');
     });
 
+    it('should decode escaped quotes so the markdown shows the prompt text, not JS syntax (#921)', () => {
+      // Pieces are raw JavaScript string-literal source, so a double-quoted
+      // prompt arrives with \" where the text just has ". Rendering that
+      // verbatim shows the user escape syntax they never wrote, and the
+      // backslash-doubling on the way back then embeds a real backslash.
+      const prompt: StringsPrompt = {
+        id: 'test-id',
+        name: 'Quoted',
+        description: 'Has escaped quotes',
+        version: '1.0.0',
+        pieces: ['Betas = [\\"code-execution\\", \\"skills\\"]'],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      const result = promptSync.generateMarkdownFromPrompt(prompt);
+
+      expect(result).toContain('Betas = ["code-execution", "skills"]');
+      expect(result).not.toContain('\\"');
+    });
+
+    it('should NOT decode escaped backslashes, which backtick prompts rely on (#921)', () => {
+      // applySystemPrompts doubles backslashes for "/' prompts but not for
+      // backtick ones (#870), and sync cannot see the delimiter. Decoding \\
+      // here would write a bare backslash into the bundle for every template
+      // literal that carries one.
+      const prompt: StringsPrompt = {
+        id: 'test-id',
+        name: 'Backslash',
+        description: 'Has escaped backslash',
+        version: '1.0.0',
+        pieces: [String.raw`Windows path C:\\Users\\me`],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      const result = promptSync.generateMarkdownFromPrompt(prompt);
+
+      expect(result).toContain(String.raw`C:\\Users\\me`);
+    });
+
+    it('should NOT decode an escaped interpolation, which is inert on purpose (#921)', () => {
+      // \${ is deliberately inert in a template literal. Decoding it would turn
+      // literal text into a live interpolation at runtime.
+      const prompt: StringsPrompt = {
+        id: 'test-id',
+        name: 'Inert',
+        description: 'Has escaped interpolation',
+        version: '1.0.0',
+        pieces: [String.raw`Write \${VALUE} to show the syntax`],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      const result = promptSync.generateMarkdownFromPrompt(prompt);
+
+      expect(result).toContain(String.raw`\${VALUE}`);
+    });
+
+    it('should read an escaped backslash before a bare quote as a pair, not as an escaped quote (#921)', () => {
+      // Single-pass requirement. In a template literal `a\\"b` is an escaped
+      // backslash followed by an ordinary quote. A naive /\\"/g replace scans
+      // from the second backslash, treats it as an escaped quote, and silently
+      // drops one backslash.
+      const prompt: StringsPrompt = {
+        id: 'test-id',
+        name: 'Pair',
+        description: 'Backslash then bare quote',
+        version: '1.0.0',
+        pieces: [String.raw`a\\"b`],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      const result = promptSync.generateMarkdownFromPrompt(prompt);
+
+      expect(result).toContain(String.raw`a\\"b`);
+    });
+
+    it('should NOT decode quotes in a prompt that has interpolations (#921)', () => {
+      // Inside `${...}` the text is JavaScript, where \' escapes a nested
+      // string literal. Decoding it leaves escapeDepthZeroBackticks with an
+      // unclosed string, which makes it report the prompt incomplete and
+      // applySystemPrompts skip it outright.
+      const prompt: StringsPrompt = {
+        id: 'test-id',
+        name: 'Interpolated',
+        description: 'Has an interpolation',
+        version: '1.0.0',
+        pieces: [
+          String.raw`Run ${'${'}x.replaceAll(\'a\', \'b\')} then say \"hi\"`,
+        ],
+        identifiers: [],
+        identifierMap: {},
+      };
+
+      const result = promptSync.generateMarkdownFromPrompt(prompt);
+
+      expect(result).toContain(String.raw`\'a\'`);
+      expect(result).toContain(String.raw`\"hi\"`);
+    });
+
     it('should deduplicate variables in frontmatter', () => {
       const prompt: StringsPrompt = {
         id: 'test-id',
