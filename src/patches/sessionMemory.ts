@@ -29,6 +29,21 @@
 //    let M=wX(YL());E.push("## Searching past context",...
 //  }
 // ```
+//
+// Env-var tuning knobs (CC_SM_*):
+// CC ~2.1.217 replaced the single-session-memory-file model (a fixed
+// `# Session Title` file with per-section / total token budgets and a declarative
+// update-threshold config object) with the multi-file memory system. That removed
+// most of the constructs these knobs targeted, so they split by Claude Code era:
+//   - LEGACY-ONLY (pre-refactor bundles): CC_SM_PER_SECTION_TOKENS,
+//     CC_SM_TOTAL_FILE_LIMIT (patchTokenLimits), CC_SM_MINIMUM_MESSAGE_TOKENS_TO_INIT,
+//     CC_SM_MINIMUM_TOKENS_BETWEEN_UPDATE (patchUpdateThresholds). Their anchors no
+//     longer exist on current CC; the sub-patches no-op non-fatally there.
+//   - CURRENT: CC_SM_TOOL_CALLS_BETWEEN_UPDATES. The update-cadence role is now
+//     served by the GrowthBook flag `tengu_bramble_lintel`; patchUpdateThresholds
+//     re-anchors the same env var onto it (see below). The name is retained for
+//     continuity with the legacy knob; the flag gates an extraction-cycle cadence,
+//     not a literal tool-call count.
 
 import { showDiff, globalReplace } from './index';
 
@@ -140,7 +155,10 @@ const patchPastSessions = (file: string): string | null => {
 };
 
 /**
- * Patch 3: Make per-section and total file token limits configurable via env vars
+ * Patch 3 (LEGACY-ONLY): Make per-section and total file token limits configurable
+ * via env vars. The `# Session Title`-anchored budget constants were removed in the
+ * ~2.1.217 multi-file memory refactor, so this no-ops on current bundles (non-fatal
+ * unless the legacy extraction gate was used). See the CC_SM_* note at the top.
  */
 const patchTokenLimits = (
   file: string,
@@ -176,7 +194,10 @@ const patchTokenLimits = (
 };
 
 /**
- * Patch 4: Make session memory update thresholds configurable via env vars
+ * Patch 4: Make session memory update thresholds configurable via env vars.
+ * Handles both the legacy declarative config object (pre-refactor CC) and the
+ * current CC >= 2.1.218 `tengu_bramble_lintel` cadence flag. Succeeds if any of
+ * them matched (current bundles match only the cadence).
  */
 const patchUpdateThresholds = (
   file: string,
@@ -184,25 +205,39 @@ const patchUpdateThresholds = (
 ): string | null => {
   let newFile = file;
 
-  // Replace minimumMessageTokensToInit
+  // LEGACY (CC before the ~2.1.217 memory-model refactor): the declarative
+  // `{minimumMessageTokensToInit, minimumTokensBetweenUpdate, toolCallsBetweenUpdates}`
+  // config object. These fields were removed upstream when session memory moved
+  // to the multi-file model, so on current bundles the three replacements below
+  // no-op and only the tengu_bramble_lintel cadence re-anchor (further down)
+  // matches. Kept for older bundles that still carry the declarative object.
   newFile = globalReplace(
     newFile,
-    /minimumMessageTokensToInit:1e4\b/g,
-    'minimumMessageTokensToInit:Number(process.env.CC_SM_MINIMUM_MESSAGE_TOKENS_TO_INIT??1e4)'
+    /([,{;])minimumMessageTokensToInit:1e4([,;}])/g,
+    '$1minimumMessageTokensToInit:Number(process.env.CC_SM_MINIMUM_MESSAGE_TOKENS_TO_INIT??1e4)$2'
   );
 
-  // Replace minimumTokensBetweenUpdate
   newFile = globalReplace(
     newFile,
-    /minimumTokensBetweenUpdate:5000\b/g,
-    'minimumTokensBetweenUpdate:Number(process.env.CC_SM_MINIMUM_TOKENS_BETWEEN_UPDATE??5000)'
+    /([,{;])minimumTokensBetweenUpdate:5000([,;}])/g,
+    '$1minimumTokensBetweenUpdate:Number(process.env.CC_SM_MINIMUM_TOKENS_BETWEEN_UPDATE??5000)$2'
   );
 
-  // Replace toolCallsBetweenUpdates
   newFile = globalReplace(
     newFile,
-    /toolCallsBetweenUpdates:3\b/g,
-    'toolCallsBetweenUpdates:Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES??3)'
+    /([,{;])toolCallsBetweenUpdates:3([,;}])/g,
+    '$1toolCallsBetweenUpdates:Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES??3)$2'
+  );
+
+  // CC >= 2.1.218: the update-cadence role is served by a GrowthBook-gated flag
+  // `getFlag("tengu_bramble_lintel",null)??<n>` (the one update-cadence knob that
+  // remains after the memory-model refactor removed the declarative object above).
+  // Re-anchor the same env var onto it, keeping the flag's precedence and carrying
+  // the upstream numeric default ($2) through rather than hard-coding it.
+  newFile = globalReplace(
+    newFile,
+    /([$\w]+\("tengu_bramble_lintel",null\)\?\?)(\d+)(?![\d.eExX])/g,
+    '$1Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES??$2)'
   );
 
   // Check if any replacements were made
