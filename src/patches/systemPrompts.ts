@@ -5,6 +5,7 @@ import {
   loadSystemPromptsWithRegex,
   reconstructContentFromPieces,
   escapeDepthZeroBackticks,
+  escapeNonAsciiChars,
 } from '../systemPromptSync';
 import { setAppliedHash, computeMD5Hash } from '../systemPromptHashIndex';
 
@@ -158,11 +159,7 @@ export const applySystemPrompts = async (
   }
 
   // Load system prompts and generate regexes
-  const systemPrompts = await loadSystemPromptsWithRegex(
-    version,
-    shouldEscapeNonAscii,
-    buildTime
-  );
+  const systemPrompts = await loadSystemPromptsWithRegex(version, buildTime);
   debug(`Loaded ${systemPrompts.length} system prompts with regexes`);
 
   // Track per-prompt results
@@ -307,6 +304,15 @@ export const applySystemPrompts = async (
           );
         }
         replacementContent = escaped;
+      }
+
+      // Encode non-ASCII LAST, for Bun native executables whose embedded module
+      // is Latin-1 (#853). This emits JS syntax (`\uXXXX`), so it has to run
+      // after the passes above that escape the prompt's own literal
+      // backslashes: doing it earlier lets the #664 doubling turn `—` into
+      // `\\u2014`, a literal backslash plus "u2014" instead of an em dash (#920).
+      if (shouldEscapeNonAscii) {
+        replacementContent = escapeNonAsciiChars(replacementContent);
       }
 
       // Replace the matched content with the interpolated content from the markdown file

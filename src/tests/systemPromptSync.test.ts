@@ -1319,7 +1319,6 @@ Version: <<CCVERSION>>, BUILD_TIME:"<<BUILD_TIME>>"`;
       const buildTime = '2025-12-09T19:43:43Z';
       const results = await promptSync.loadSystemPromptsWithRegex(
         '1.0.0',
-        false,
         buildTime
       );
       expect(results).toHaveLength(1);
