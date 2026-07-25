@@ -1232,7 +1232,16 @@ const escapeNonAsciiForRegex = (text: string): string => {
  * Converts non-ASCII characters to Unicode escape sequences (\uXXXX).
  * Used when writing prompts back to cli.js for environments that only support ASCII.
  */
-const escapeNonAsciiChars = (text: string): string => {
+/**
+ * Encode non-ASCII as `\uXXXX` for Bun native executables, whose embedded
+ * module is Latin-1 (#853).
+ *
+ * This emits JavaScript *syntax*, so it has to run after any pass that escapes
+ * literal backslashes in the prompt's own text. Running it first lets the
+ * backslash-doubling from #664 turn `—` into `\\u2014`, which is a literal
+ * backslash followed by `u2014` rather than an em dash (#920).
+ */
+export const escapeNonAsciiChars = (text: string): string => {
   // eslint-disable-next-line no-control-regex
   return text.replace(/[^\x00-\x7F]/g, char => {
     const codePoint = char.charCodeAt(0);
@@ -1429,7 +1438,6 @@ const applyIdentifierMapping = (
   identifierMap: Record<string, string>,
   extractedVars: string[],
   ccVersion: string,
-  escapeNonAscii = false,
   buildTime?: string,
   pieces?: string[]
 ): string => {
@@ -1468,10 +1476,9 @@ const applyIdentifierMapping = (
     result = result.replace(/<<BUILD_TIME>>/g, buildTime);
   }
 
-  // Escape non-ASCII characters if requested (for Bun native executables)
-  if (escapeNonAscii) {
-    result = escapeNonAsciiChars(result);
-  }
+  // Non-ASCII encoding deliberately does NOT happen here. It emits JS syntax
+  // and must run after the string-literal escaping in applySystemPrompts, or
+  // the backslash-doubling pass corrupts the escapes it produces (#920).
 
   // Apply original whitespace structure from pieces if provided
   if (pieces && pieces.length > 0) {
@@ -1497,7 +1504,6 @@ const applyIdentifierMapping = (
  */
 export const loadSystemPromptsWithRegex = async (
   ccVersion: string,
-  escapeNonAscii = false,
   buildTime?: string
 ): Promise<
   Array<{
@@ -1560,7 +1566,6 @@ export const loadSystemPromptsWithRegex = async (
         jsonPrompt.identifierMap,
         extractedVars,
         ccVersion,
-        escapeNonAscii,
         buildTime,
         jsonPrompt.pieces
       );
