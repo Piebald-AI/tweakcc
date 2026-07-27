@@ -67,6 +67,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     suppressLineNumbers: false,
     suppressRateLimitOptions: false,
     suppressRateLimitWarning: false,
+    disableServerManagedSettings: false,
     mcpConnectionNonBlocking: true,
     mcpServerBatchSize: null as number | null,
     statuslineThrottleMs: null as number | null,
@@ -337,6 +338,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.suppressRateLimitWarning =
               !settings.misc!.suppressRateLimitWarning;
+          });
+        },
+      },
+      {
+        id: 'disableServerManagedSettings',
+        title: 'Disable server-managed settings',
+        description:
+          'Prevents Claude Code from downloading enterprise settings from Anthropic or a gateway. Local managed settings still apply.',
+        getValue: () => settings.misc?.disableServerManagedSettings ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.disableServerManagedSettings =
+              !settings.misc!.disableServerManagedSettings;
           });
         },
       },

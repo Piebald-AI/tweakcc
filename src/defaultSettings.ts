@@ -701,6 +701,7 @@ export const DEFAULT_SETTINGS: Settings = {
     suppressLineNumbers: false,
     suppressRateLimitOptions: false,
     suppressRateLimitWarning: false,
+    disableServerManagedSettings: false,
     mcpConnectionNonBlocking: true,
     mcpServerBatchSize: null,
     statuslineThrottleMs: null,
