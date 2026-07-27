@@ -58,6 +58,41 @@ describe('applyPlan', () => {
     ).toBe(false);
   });
 
+  it('includes server-managed settings patch only when enabled', () => {
+    const disabled = configWithDefaults();
+    const enabled = configWithDefaults({
+      misc: {
+        ...DEFAULT_SETTINGS.misc,
+        disableServerManagedSettings: true,
+      },
+    });
+
+    expect(
+      isPatchEnabledByConfig(
+        'disable-server-managed-settings',
+        disabled,
+        '2.1.220'
+      )
+    ).toBe(false);
+    expect(
+      isPatchEnabledByConfig(
+        'disable-server-managed-settings',
+        enabled,
+        '2.1.220'
+      )
+    ).toBe(true);
+    expect(
+      getPlannedPatches(disabled, '2.1.220', [
+        'disable-server-managed-settings',
+      ])
+    ).toEqual([]);
+    expect(
+      getPlannedPatches(enabled, '2.1.220', [
+        'disable-server-managed-settings',
+      ]).map(p => p.id)
+    ).toEqual(['disable-server-managed-settings']);
+  });
+
   it('respects --patches filter', () => {
     const planned = getPlannedPatches(configWithDefaults(), '2.1.200', [
       'session-memory',

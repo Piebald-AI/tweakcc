@@ -145,6 +145,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.suppressRateLimitOptions;
     case 'suppress-rate-limit-warning':
       return !!misc?.suppressRateLimitWarning;
+    case 'disable-server-managed-settings':
+      return !!misc?.disableServerManagedSettings;
     case 'token-count-rounding':
       return !!misc?.tokenCountRounding;
     case 'remember-skill':
