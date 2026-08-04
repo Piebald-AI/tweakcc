@@ -901,14 +901,22 @@ ${upstreamDiffHtml}      </div>
 };
 
 /**
- * Collects the inner text of each unescaped `${...}` interpolation in a prompt
- * markdown body. Escaped interpolations (`\${...}`) are literal text, not real
- * placeholders, so they are skipped. Braces inside a string or template literal
- * within the interpolation (e.g. `${"}" + X}`) do not close it — the walker
- * tracks the enclosing quote so a literal `}` cannot desync the brace depth.
+ * Locates each unescaped `${...}` interpolation in a prompt markdown body and
+ * returns the half-open bounds of its inner text. Escaped interpolations
+ * (`\${...}`) are literal text, not real placeholders, so they are skipped.
+ * Braces inside a string or template literal within the interpolation (e.g.
+ * `${"}" + X}`) do not close it — the walker tracks the enclosing quote so a
+ * literal `}` cannot desync the brace depth. A nested interpolation is part of
+ * its enclosing span rather than a span of its own.
+ *
+ * This is the single walker behind both the drift check and the identifier
+ * substitution; #922 records three attempts at a second, divergent copy, all of
+ * which desynchronised against this one.
  */
-const interpolationRegions = (content: string): string[] => {
-  const regions: string[] = [];
+const interpolationSpans = (
+  content: string
+): { start: number; end: number }[] => {
+  const spans: { start: number; end: number }[] = [];
   for (let i = 0; i < content.length - 1; i++) {
     if (
       content[i] === '$' &&
@@ -936,12 +944,29 @@ const interpolationRegions = (content: string): string[] => {
         }
         j++;
       }
-      regions.push(content.slice(start, j - 1));
+      // When the loop stops because depth reached 0, `j` is one past the closing
+      // brace, so the inner text ends at j - 1. When it stops because `j` ran off
+      // the end, the interpolation is unterminated and content[j - 1] is real
+      // text, not a delimiter: ending at j - 1 there would drop the last
+      // character and expose a word boundary that does not exist, so a name
+      // ending the content would be substituted when it should not be.
+      // Both cases keep end >= start, so a caller walking spans in order can
+      // never rewind its cursor.
+      spans.push({ start, end: depth === 0 ? j - 1 : j });
       i = j - 1;
     }
   }
-  return regions;
+  return spans;
 };
+
+/**
+ * Collects the inner text of each unescaped `${...}` interpolation in a prompt
+ * markdown body.
+ */
+const interpolationRegions = (content: string): string[] =>
+  interpolationSpans(content).map(({ start, end }) =>
+    content.slice(start, end)
+  );
 
 /**
  * Detects whether a prompt markdown file has drifted from the current identifier
@@ -1432,7 +1457,7 @@ export const applyOriginalWhitespace = (
  *     - extractedVars[1] maps to identifierMap["0"]
  *     - extractedVars[2] maps to identifierMap["1"]
  */
-const applyIdentifierMapping = (
+export const applyIdentifierMapping = (
   content: string,
   identifiers: (number | string)[],
   identifierMap: Record<string, string>,
@@ -1457,16 +1482,49 @@ const applyIdentifierMapping = (
   }
 
   // Replace ${HUMAN_NAME} with ${actualVar} - sort by length descending to avoid partial replacements
-  let result = content;
   const sortedEntries = Object.entries(reverseMap).sort(
     (a, b) => b[0].length - a[0].length
   );
 
-  for (const [humanName, actualVar] of sortedEntries) {
-    const pattern = new RegExp(`\\b${humanName}\\b`, 'g');
-    // Use a replacer function to avoid special replacement pattern interpretation (e.g., $$ -> $), see #237
-    result = result.replace(pattern, () => actualVar);
+  // Only substitute inside a live `${...}` interpolation. A prompt's prose can
+  // legitimately contain one of its own placeholder names: the background-session
+  // prompt documents the environment variable `$CLAUDE_JOB_DIR/tmp` while
+  // CLAUDE_JOB_DIR is also its placeholder for a minified variable, and a
+  // whole-body replace shipped that sentence to Claude Code as `$e/tmp` (#930).
+  // The same name still has to be substituted where it IS an identifier, so this
+  // is scoped by position rather than skipped by name.
+  // Compile once rather than per span: a prompt can carry hundreds of
+  // interpolations, and rebuilding every pattern inside the loop is measurably
+  // slower for no benefit.
+  const patterns = sortedEntries.map(
+    ([humanName, actualVar]) =>
+      [new RegExp(`\\b${humanName}\\b`, 'g'), actualVar] as const
+  );
+
+  // Scoping relies on every identifier slot landing inside an interpolation.
+  // That holds because the pieces themselves carry the `${` and `}` around each
+  // slot, not because anything here enforces it: across every snapshot in
+  // data/prompts, all 105218 insertion points in the 24863 prompts that carry
+  // identifiers fall inside a span. A prompt assembled by concatenation instead
+  // (`"before" + x + "after"`) would put the name outside every span and its
+  // mapping would be skipped, so re-check that if the extractor's output shape
+  // ever changes.
+  let result = '';
+  let cursor = 0;
+
+  for (const { start, end } of interpolationSpans(content)) {
+    let region = content.slice(start, end);
+
+    for (const [pattern, actualVar] of patterns) {
+      // Use a replacer function to avoid special replacement pattern interpretation (e.g., $$ -> $), see #237
+      region = region.replace(pattern, () => actualVar);
+    }
+
+    result += content.slice(cursor, start) + region;
+    cursor = end;
   }
+
+  result += content.slice(cursor);
 
   // Replace <<CCVERSION>> with the actual Claude Code version
   result = result.replace(/<<CCVERSION>>/g, ccVersion);

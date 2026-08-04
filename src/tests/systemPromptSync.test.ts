@@ -593,6 +593,122 @@ Content only.`;
     });
   });
 
+  describe('applyIdentifierMapping', () => {
+    // Shape taken from system-prompt-background-session-instructions, which uses
+    // CLAUDE_JOB_DIR both as an interpolation identifier and as literal prose
+    // documenting the environment variable of that name (#930).
+    const IDENTIFIERS = [0, 1];
+    const IDENTIFIER_MAP = { '0': 'PATH_MODULE', '1': 'CLAUDE_JOB_DIR' };
+    const EXTRACTED_VARS = ['U2p', 'e'];
+
+    const apply = (content: string) =>
+      promptSync.applyIdentifierMapping(
+        content,
+        IDENTIFIERS,
+        IDENTIFIER_MAP,
+        EXTRACTED_VARS,
+        '2.1.221'
+      );
+
+    it('should not rewrite an identifier name that appears in prose', () => {
+      const content =
+        'Use `$CLAUDE_JOB_DIR/tmp` (`${PATH_MODULE.join(CLAUDE_JOB_DIR,"tmp")}`) for temp files.';
+
+      expect(apply(content)).toBe(
+        'Use `$CLAUDE_JOB_DIR/tmp` (`${U2p.join(e,"tmp")}`) for temp files.'
+      );
+    });
+
+    it('should substitute every identifier nested in one interpolation', () => {
+      expect(apply('${PATH_MODULE.resolve(CLAUDE_JOB_DIR)}')).toBe(
+        '${U2p.resolve(e)}'
+      );
+    });
+
+    it('should substitute the same identifier in separate interpolations', () => {
+      expect(
+        apply('${CLAUDE_JOB_DIR} and ${PATH_MODULE.join(CLAUDE_JOB_DIR)}')
+      ).toBe('${e} and ${U2p.join(e)}');
+    });
+
+    it('should leave an identifier name inside an escaped interpolation alone', () => {
+      // `\${...}` is literal text in the bundle, not a live interpolation.
+      expect(apply('Literal \\${CLAUDE_JOB_DIR} stays put.')).toBe(
+        'Literal \\${CLAUDE_JOB_DIR} stays put.'
+      );
+    });
+
+    it('should leave prose alone when the prompt has no interpolations at all', () => {
+      expect(apply('Set CLAUDE_JOB_DIR before running PATH_MODULE.')).toBe(
+        'Set CLAUDE_JOB_DIR before running PATH_MODULE.'
+      );
+    });
+
+    it('should not duplicate text when an unterminated ${ ends the content', () => {
+      // A hand-edited .md can leave `${` dangling. The span is empty there, and
+      // an empty span must not rewind the write cursor.
+      expect(apply('text ${')).toBe('text ${');
+      expect(apply('${')).toBe('${');
+      expect(apply('a ${ b ${')).toBe('a ${ b ${');
+    });
+
+    it('should not invent a word boundary at the end of an unterminated interpolation', () => {
+      // An unterminated interpolation runs to the end of the content, so the
+      // last character is prompt text rather than a closing brace. Cutting it
+      // off would leave the name flush against the end and match \b, replacing
+      // a token that is not the identifier at all.
+      expect(apply('x${CLAUDE_JOB_DIRX')).toBe('x${CLAUDE_JOB_DIRX');
+      expect(apply('Run ${CLAUDE_JOB_DIRS')).toBe('Run ${CLAUDE_JOB_DIRS');
+      expect(apply('${CLAUDE_JOB_DIR_')).toBe('${CLAUDE_JOB_DIR_');
+      // The name really does end the content here, so it is still substituted.
+      expect(apply('${CLAUDE_JOB_DIR')).toBe('${e');
+    });
+
+    it('should substitute every occurrence of a name within one interpolation', () => {
+      // The per-name patterns are compiled once and reused across spans, so the
+      // global flag is the only thing making a repeated name inside a single
+      // interpolation replace more than its first occurrence.
+      expect(apply('${PATH_MODULE.join(CLAUDE_JOB_DIR, CLAUDE_JOB_DIR)}')).toBe(
+        '${U2p.join(e, e)}'
+      );
+    });
+
+    it('should treat a nested interpolation as part of its enclosing span', () => {
+      // The outer scan resumes past the whole span. Re-entering it would produce
+      // overlapping spans, which rewinds the write cursor and duplicates text.
+      expect(
+        apply('${PATH_MODULE.has(x)?`use the ${CLAUDE_JOB_DIR} dir`:""}')
+      ).toBe('${U2p.has(x)?`use the ${e} dir`:""}');
+    });
+
+    it('should not skip an interpolation that starts immediately after one ends', () => {
+      expect(apply('${CLAUDE_JOB_DIR}${PATH_MODULE}')).toBe('${e}${U2p}');
+    });
+
+    it('should count nested braces so an inner block does not end the span early', () => {
+      expect(
+        apply('${PATH_MODULE.map(v=>{return v}).filter(CLAUDE_JOB_DIR)}')
+      ).toBe('${U2p.map(v=>{return v}).filter(e)}');
+    });
+
+    it('should still map an identifier after a nested template literal containing a raw brace', () => {
+      // The walker tracks one quote character, so a raw `}` inside a nested
+      // template expression can end the enclosing span early. The following
+      // `${` then opens a span of its own, so the identifier stays covered and
+      // is still mapped. Pinned because the walker is deliberately not a full
+      // template-literal parser (see #922).
+      expect(apply('${`x ${ok ? `}` : ""} ${CLAUDE_JOB_DIR}`}')).toBe(
+        '${`x ${ok ? `}` : ""} ${e}`}'
+      );
+    });
+
+    it('should not let a literal brace inside an interpolation string desync the walker', () => {
+      expect(
+        apply('${PATH_MODULE.join("}", CLAUDE_JOB_DIR)} CLAUDE_JOB_DIR')
+      ).toBe('${U2p.join("}", e)} CLAUDE_JOB_DIR');
+    });
+  });
+
   describe('compareVersions', () => {
     it('should return -1 when v1 < v2', () => {
       expect(promptSync.compareVersions('1.0.0', '2.0.0')).toBe(-1);
