@@ -60,6 +60,25 @@ describe('writeThinkerSymbolWidthLocation', () => {
     expect(result!.match(/flexWrap:"wrap",height:1,width:5/g)).toHaveLength(2);
   });
 
+  it('scopes correctly when the frame array is minified to `$`', () => {
+    // `$` is a valid identifier and minifiers emit it. Interpolated raw into an
+    // alternation it becomes the end-of-input anchor, so the frame reference is
+    // never found and every box falls back to being resized.
+    const input =
+      'var q=cet(),$=[...q,...[...q].reverse()];' +
+      'function bMe(a){let I=$[a%$.length];' +
+      'return K4.jsx(U,{"aria-hidden":!0,flexWrap:"wrap",height:1,width:2,children:I})}' +
+      'function vkn(b){' +
+      'return $f.jsx(U,{"aria-hidden":!0,flexWrap:"wrap",height:1,width:2,children:$f.jsx(w,{color:"error",children:m5})})}';
+
+    const result = writeThinkerSymbolWidthLocation(input, 4);
+
+    expect(result!.match(/flexWrap:"wrap",height:1,width:4/g)).toHaveLength(1);
+    expect(result).toContain(
+      'flexWrap:"wrap",height:1,width:2,children:$f.jsx(w,{color:"error"'
+    );
+  });
+
   it('returns null when no spinner symbol box is present', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
 

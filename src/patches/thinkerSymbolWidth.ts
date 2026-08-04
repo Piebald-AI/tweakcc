@@ -84,8 +84,13 @@ export const writeThinkerSymbolWidthLocation = (
   const frameVars = spinnerFrameVars(oldFile);
   let targets = boxes;
   if (frameVars.length > 0) {
+    // `$` is a valid identifier and minifiers do emit it. Interpolated raw into
+    // the alternation it would become the end-of-input anchor, so no reference
+    // would be found and every box would fall through to the fallback.
     const framePattern = new RegExp(
-      `(?<![$\\w])(?:${frameVars.join('|')})(?![$\\w])`,
+      `(?<![$\\w])(?:${frameVars
+        .map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('|')})(?![$\\w])`,
       'g'
     );
     const frameRefs = [...oldFile.matchAll(framePattern)].map(m => m.index);
