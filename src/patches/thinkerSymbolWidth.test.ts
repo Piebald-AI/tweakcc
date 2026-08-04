@@ -1,6 +1,47 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { writeThinkerSymbolWidthLocation } from './thinkerSymbolWidth';
+import {
+  thinkerSymbolBoxWidth,
+  writeThinkerSymbolWidthLocation,
+} from './thinkerSymbolWidth';
+
+describe('thinkerSymbolBoxWidth', () => {
+  // All three branches of the shipped default in defaultSettings.ts. These must
+  // stay at Claude Code's vanilla width:2, so the box is not silently widened
+  // for users who never customized their symbols. `✳` (U+2733) is the one that
+  // catches a naive display-width implementation: it is a text-presentation
+  // dingbat that some width libraries count as an emoji, and therefore 2 cells.
+  it.each([
+    ['xterm-ghostty', ['·', '✢', '✳', '✶', '✻', '*']],
+    ['darwin', ['·', '✢', '✳', '✶', '✻', '✽']],
+    ['other', ['·', '✢', '*', '✶', '✻', '✽']],
+  ])(
+    'leaves the shipped default symbol set (%s) at the vanilla width',
+    (_name, phases) => {
+      expect(thinkerSymbolBoxWidth(phases as string[])).toBe(2);
+    }
+  );
+
+  it('sizes a wide symbol by display width, not UTF-16 code units', () => {
+    // A regional-indicator flag is 2 surrogate pairs plus the trailing space:
+    // 5 code units but 3 terminal cells.
+    expect('🇦🇩 '.length).toBe(5);
+    expect(thinkerSymbolBoxWidth(['🇦🇩 '])).toBe(4);
+  });
+
+  it('sizes an astral symbol by display width', () => {
+    expect('🌍'.length).toBe(2);
+    expect(thinkerSymbolBoxWidth(['🌍'])).toBe(3);
+  });
+
+  it('uses the widest phase in the set', () => {
+    expect(thinkerSymbolBoxWidth(['·', '🇦🇩 ', '✻'])).toBe(4);
+  });
+
+  it('handles a combining sequence as one cell', () => {
+    expect(thinkerSymbolBoxWidth(['é'])).toBe(2);
+  });
+});
 
 describe('writeThinkerSymbolWidthLocation', () => {
   it('rewrites every memoized JSX-runtime spinner symbol box (CC 2.1.195+)', () => {
