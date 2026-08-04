@@ -691,6 +691,17 @@ Content only.`;
       ).toBe('${U2p.map(v=>{return v}).filter(e)}');
     });
 
+    it('should still map an identifier after a nested template literal containing a raw brace', () => {
+      // The walker tracks one quote character, so a raw `}` inside a nested
+      // template expression can end the enclosing span early. The following
+      // `${` then opens a span of its own, so the identifier stays covered and
+      // is still mapped. Pinned because the walker is deliberately not a full
+      // template-literal parser (see #922).
+      expect(apply('${`x ${ok ? `}` : ""} ${CLAUDE_JOB_DIR}`}')).toBe(
+        '${`x ${ok ? `}` : ""} ${e}`}'
+      );
+    });
+
     it('should not let a literal brace inside an interpolation string desync the walker', () => {
       expect(
         apply('${PATH_MODULE.join("}", CLAUDE_JOB_DIR)} CLAUDE_JOB_DIR')
