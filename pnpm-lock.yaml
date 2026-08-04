@@ -38,6 +38,9 @@ importers:
       react:
         specifier: ^19.1.1
         version: 19.1.1
+      string-width:
+        specifier: ^8.1.0
+        version: 8.1.0
       terminal-link:
         specifier: ^3.0.0
         version: 3.0.0

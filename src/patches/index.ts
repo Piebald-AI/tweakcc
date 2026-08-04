@@ -42,7 +42,10 @@ import { writeThinkerFormat } from './thinkerFormat';
 import { writeThinkerSymbolMirrorOption } from './thinkerMirrorOption';
 import { writeThinkerSymbolChars } from './thinkerSymbolChars';
 import { writeThinkerSymbolSpeed } from './thinkerSymbolSpeed';
-import { writeThinkerSymbolWidthLocation } from './thinkerSymbolWidth';
+import {
+  thinkerSymbolBoxWidth,
+  writeThinkerSymbolWidthLocation,
+} from './thinkerSymbolWidth';
 import { writeThinkingVerbs } from './thinkingVerbs';
 import { writeUserMessageDisplay } from './userMessageDisplay';
 import { writeInputPatternHighlighters } from './inputPatternHighlighters';
@@ -784,8 +787,7 @@ export const applyCustomization = async (
       fn: c =>
         writeThinkerSymbolWidthLocation(
           c,
-          Math.max(...config.settings.thinkingStyle.phases.map(p => p.length)) +
-            1
+          thinkerSymbolBoxWidth(config.settings.thinkingStyle.phases)
         ),
       condition:
         JSON.stringify(config.settings.thinkingStyle.phases) !==
