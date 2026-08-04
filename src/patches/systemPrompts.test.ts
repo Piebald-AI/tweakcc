@@ -49,8 +49,12 @@ function buildMockPromptData(
   const derivedGetInterpolatedContent =
     overrides.getInterpolatedContent ??
     (!hasExplicitFields && content ? () => content : () => '');
-  const derivedPieces =
-    overrides.pieces ?? (!hasExplicitFields && content ? [content] : []);
+  // The pieces are the vanilla cli.js text, and applySystemPrompts writes a
+  // prompt back verbatim when the markdown still equals that baseline (#922).
+  // Fixtures therefore state a baseline only when they mean "untouched"; the
+  // default of none keeps a fixture on the escaping path, which is where a
+  // user-edited prompt goes.
+  const derivedPieces = overrides.pieces ?? [];
 
   const promptContent = overrides.prompt?.content ?? content ?? '';
 
@@ -99,12 +103,12 @@ describe('systemPrompts.ts', () => {
       const mockPromptData = buildMockPromptData({
         prompt: {
           variables: ['MAX_TIMEOUT'],
-          content: 'Timeout: ${MAX_TIMEOUT()} ms',
+          content: 'Timeout: ${MAX_TIMEOUT()} ms!',
         },
         regex: 'Timeout: ([\\w$]+)\\(\\) ms',
         getInterpolatedContent: (match: RegExpMatchArray) => {
           const capturedVar = match[1];
-          return `Timeout: \${${capturedVar}()} ms`;
+          return `Timeout: \${${capturedVar}()} ms!`;
         },
         pieces: ['Timeout: ${', '()} ms'],
         identifiers: [1],
@@ -117,21 +121,21 @@ describe('systemPrompts.ts', () => {
 
       const result = await applySystemPrompts(cliContent, '1.0.0', false);
 
-      expect(result.newContent).toBe('Timeout: ${J$$()} ms');
-      expect(result.newContent).not.toBe('Timeout: ${J$()} ms');
+      expect(result.newContent).toBe('Timeout: ${J$$()} ms!');
+      expect(result.newContent).not.toBe('Timeout: ${J$()} ms!');
     });
 
     it('should handle multiple occurrences of $$ correctly', async () => {
       const mockPromptData = buildMockPromptData({
         prompt: {
           variables: ['VAR1', 'VAR2'],
-          content: 'Values: ${VAR1} and ${VAR2}',
+          content: 'Values: ${VAR1} and ${VAR2}!',
         },
         regex: 'Values: ([\\w$]+) and ([\\w$]+)',
         getInterpolatedContent: (match: RegExpMatchArray) => {
           const var1 = match[1];
           const var2 = match[2];
-          return `Values: \${${var1}} and \${${var2}}`;
+          return `Values: \${${var1}} and \${${var2}}!`;
         },
         pieces: ['Values: ${', '} and ${', '}'],
         identifiers: [1, 2],
@@ -144,7 +148,7 @@ describe('systemPrompts.ts', () => {
 
       const result = await applySystemPrompts(cliContent, '1.0.0', false);
 
-      expect(result.newContent).toBe('Values: ${A$$} and ${B$$}');
+      expect(result.newContent).toBe('Values: ${A$$} and ${B$$}!');
       expect(result.newContent).not.toContain('${A$}');
       expect(result.newContent).not.toContain('${B$}');
     });
@@ -281,7 +285,7 @@ describe('systemPrompts.ts', () => {
 
     it('should escape carriage returns in double-quoted string literals (CRLF-edited prompts)', async () => {
       const mockPromptData = buildMockPromptData({
-        content: 'ORIGINAL',
+        prompt: { content: 'line one\r\nfind\\ blocked' },
         regex: 'ORIGINAL',
         getInterpolatedContent: () => 'line one\r\nfind\\ blocked',
         pieces: ['ORIGINAL'],
@@ -298,7 +302,7 @@ describe('systemPrompts.ts', () => {
 
     it('should escape carriage returns in single-quoted string literals (CRLF-edited prompts)', async () => {
       const mockPromptData = buildMockPromptData({
-        content: 'ORIGINAL',
+        prompt: { content: 'line one\r\nfind\\ blocked' },
         regex: 'ORIGINAL',
         getInterpolatedContent: () => 'line one\r\nfind\\ blocked',
         pieces: ['ORIGINAL'],
@@ -315,7 +319,7 @@ describe('systemPrompts.ts', () => {
 
     it('should escape a lone carriage return (old-Mac line endings) in double-quoted string literals', async () => {
       const mockPromptData = buildMockPromptData({
-        content: 'ORIGINAL',
+        prompt: { content: 'line one\rline two' },
         regex: 'ORIGINAL',
         getInterpolatedContent: () => 'line one\rline two',
         pieces: ['ORIGINAL'],
@@ -351,7 +355,7 @@ describe('systemPrompts.ts', () => {
         prompt: { content: 'text ${unclosed backtick' },
         regex: 'text \\$\\{unclosed backtick',
         getInterpolatedContent: () => 'text ${unclosed backtick',
-        pieces: ['text ${unclosed backtick'],
+        pieces: ['text ORIGINAL'],
       });
 
       setupMocks(mockPromptData);
@@ -381,7 +385,9 @@ describe('systemPrompts.ts', () => {
       // catch it). The apply must refuse the injection rather than corrupt cli.js.
       const mockPromptData = buildMockPromptData({
         promptId: 'stale-memory-instructions',
-        prompt: { content: 'Memory ${HAS_UPKEEP_FN} tail' },
+        prompt: {
+          content: 'Memory ${HAS_UPKEEP_FN} ${STALE_UPKEEP_FLAG} tail',
+        },
         regex: 'Memory \\$\\{([\\w$]+)\\} tail',
         // Q1 is the real captured bundle var; STALE_UPKEEP_FLAG is a leftover
         // human-name that applyIdentifierMapping could not map.
@@ -567,7 +573,6 @@ describe('systemPrompts.ts', () => {
         content: 'Value: `${x}`',
         regex: 'Value: `\\$\\{x\\}`',
         getInterpolatedContent: () => 'Value: `${x}`',
-        pieces: ['Value: `${x}`'],
       });
 
       setupMocks(mockPromptData);
@@ -608,7 +613,6 @@ describe('systemPrompts.ts', () => {
         content: 'Use \\`foo\\` and `bar` for config',
         regex: 'Use \\\\`foo\\\\` and `bar` for config',
         getInterpolatedContent: () => 'Use \\`foo\\` and `bar` for config',
-        pieces: ['Use \\`foo\\` and `bar` for config'],
       });
 
       setupMocks(mockPromptData);
@@ -657,7 +661,6 @@ describe('systemPrompts.ts', () => {
         content: 'Run `cmd` then ${cond?`a`:`b`}',
         regex: 'Run `cmd` then \\$\\{cond\\?`a`:`b`\\}',
         getInterpolatedContent: () => 'Run `cmd` then ${cond?`a`:`b`}',
-        pieces: ['Run `cmd` then ${cond?`a`:`b`}'],
       });
 
       setupMocks(mockPromptData);
@@ -676,7 +679,6 @@ describe('systemPrompts.ts', () => {
         content: 'Use `x` and ${c?`a`:`b`}',
         regex: 'Use `x` and \\$\\{c\\?`a`:`b`\\}',
         getInterpolatedContent: () => 'Use `x` and ${c?`a`:`b`}',
-        pieces: ['Use `x` and ${c?`a`:`b`}'],
       });
 
       setupMocks(mockPromptData);
@@ -858,7 +860,7 @@ describe('systemPrompts.ts', () => {
       const mockPromptData = buildMockPromptData({
         prompt: {
           variables: ['MAX_TIMEOUT'],
-          content: 'Timeout: ${MAX_TIMEOUT()} ms',
+          content: 'Timeout(patched): ${MAX_TIMEOUT()} ms',
         },
         regex: 'Timeout: ([\\w$]+)\\(\\) ms',
         getInterpolatedContent: (match: RegExpMatchArray) => {
@@ -886,13 +888,17 @@ describe('systemPrompts.ts', () => {
   describe('backtick round-trip byte-identity (#869)', () => {
     const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+    // These assert that the escaper itself is byte-identity on template-literal
+    // text, so they deliberately route through the escaping path rather than
+    // the uncustomized write-back (#922): no pieces baseline, so the markdown
+    // always counts as edited.
     const applyBacktick = async (source: string) => {
       setupMocks(
         buildMockPromptData({
           content: source,
           regex: escapeRegex(source),
           getInterpolatedContent: () => source,
-          pieces: [source],
+          pieces: [],
         })
       );
       const cliContent = 'x:`' + source + '`';
@@ -1015,6 +1021,93 @@ describe('systemPrompts.ts', () => {
       }
       expect(checked).toBeGreaterThan(0);
       expect(failures).toEqual([]);
+    });
+  });
+
+  describe('uncustomized prompts are written back verbatim (#922)', () => {
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // `source` is the raw string-literal body exactly as it appears in cli.js.
+    const applyQuoted = async (
+      source: string,
+      delimiter: '"' | "'",
+      edit?: (baseline: string) => string
+    ) => {
+      const pieces = [source];
+      const baseline = promptSync.reconstructContentFromPieces(pieces, [], {});
+      const mdContent = edit ? edit(baseline) : baseline;
+      setupMocks(
+        buildMockPromptData({
+          prompt: { content: mdContent },
+          regex: escapeRegex(source),
+          getInterpolatedContent: () => mdContent,
+          pieces,
+        })
+      );
+      const cliContent = 'x:' + delimiter + source + delimiter;
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+      return { newContent: result.newContent, cliContent, result };
+    };
+
+    it('leaves a literal backslash in an uncustomized prompt undoubled', async () => {
+      // Vanilla `use A\\Client` decodes to `use A\Client`; the escaping pass
+      // used to double it again and ship `use A\\Client` to Claude Code.
+      const { newContent, cliContent } = await applyQuoted(
+        'use A\\\\Client;',
+        '"'
+      );
+      expect(newContent).toBe(cliContent);
+    });
+
+    it('leaves an escaped quote in an uncustomized interpolation-bearing prompt alone', async () => {
+      // `${` is inert text inside a quoted literal, but it makes the prompt
+      // ineligible for quote decoding, so the .md keeps the raw \" and the
+      // escaping pass used to ship it as \\\" (#922).
+      const { newContent, cliContent } = await applyQuoted(
+        'import x from \\"pkg\\"; cost ${n}',
+        '"'
+      );
+      expect(newContent).toBe(cliContent);
+    });
+
+    it('leaves an uncustomized single-quoted prompt byte-identical', async () => {
+      const { newContent, cliContent } = await applyQuoted(
+        "the SDK\\'s reference ${n}",
+        "'"
+      );
+      expect(newContent).toBe(cliContent);
+    });
+
+    it('treats the markdown round-trip trailing newline as uncustomized', async () => {
+      // generateMarkdownFromPrompt/parseMarkdownPrompt is only trim-stable, so
+      // an untouched .md can come back with a trailing newline the pieces never
+      // had. That is serialization, not a customization.
+      const { newContent, cliContent } = await applyQuoted(
+        'use A\\\\Client;',
+        '"',
+        baseline => baseline + '\n'
+      );
+      expect(newContent).toBe(cliContent);
+    });
+
+    it('leaves the escaping path intact for a customized prompt', async () => {
+      // The skip is keyed on "the user changed nothing", so any real edit must
+      // still go through delimiter escaping. (That escaping is still not an
+      // exact inverse of the .md's hybrid encoding, which is why the doubled
+      // backslash below survives — the remaining half of #922.)
+      const { newContent, cliContent } = await applyQuoted(
+        'use A\\\\Client;',
+        '"',
+        baseline => baseline + ' EDITED'
+      );
+      expect(newContent).not.toBe(cliContent);
+      expect(newContent).toBe('x:"use A\\\\\\\\Client; EDITED"');
+    });
+
+    it('reports an uncustomized prompt as unchanged rather than applied', async () => {
+      const { result } = await applyQuoted('use A\\\\Client;', '"');
+      expect(result.results[0].applied).toBe(false);
+      expect(result.results[0].details).toBe('unchanged');
     });
   });
 });
