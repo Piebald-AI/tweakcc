@@ -1501,6 +1501,14 @@ export const applyIdentifierMapping = (
       [new RegExp(`\\b${humanName}\\b`, 'g'), actualVar] as const
   );
 
+  // Scoping relies on every identifier slot landing inside an interpolation.
+  // That holds because the pieces themselves carry the `${` and `}` around each
+  // slot, not because anything here enforces it: across every snapshot in
+  // data/prompts, all 105218 insertion points in the 24863 prompts that carry
+  // identifiers fall inside a span. A prompt assembled by concatenation instead
+  // (`"before" + x + "after"`) would put the name outside every span and its
+  // mapping would be skipped, so re-check that if the extractor's output shape
+  // ever changes.
   let result = '';
   let cursor = 0;
 
