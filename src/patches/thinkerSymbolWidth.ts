@@ -4,9 +4,16 @@ import stringWidth from 'string-width';
 
 import { globalReplace } from './index';
 
+/** The width Claude Code ships, and what the box keeps when there is nothing to size. */
+const VANILLA_BOX_WIDTH = 2;
+
 /**
  * Width of the spinner symbol box, in terminal cells: the widest phase plus one
  * cell separating the symbol from the thinking verb.
+ *
+ * An empty phase list keeps the vanilla width: `Math.max()` of nothing is
+ * -Infinity, which reached the bundle as `width:-Infinity`. That is valid
+ * JavaScript, so neither `node --check` nor the parse gate would have caught it.
  *
  * Measured with display width rather than `String.length`, because the two only
  * agree for symbols that are single UTF-16 code units. A regional-indicator
@@ -16,7 +23,9 @@ import { globalReplace } from './index';
  * ever showed up with custom symbols.
  */
 export const thinkerSymbolBoxWidth = (phases: string[]): number =>
-  Math.max(...phases.map(phase => stringWidth(phase))) + 1;
+  phases.length === 0
+    ? VANILLA_BOX_WIDTH
+    : Math.max(...phases.map(phase => stringWidth(phase))) + 1;
 
 // Claude Code 2.1.195 migrated the spinner symbol box to the JSX automatic
 // runtime and React-Compiler memoization, so the old braced anchor

@@ -22,6 +22,13 @@ describe('thinkerSymbolBoxWidth', () => {
     }
   );
 
+  it('falls back to the vanilla width when there are no phases', () => {
+    // Math.max() of nothing is -Infinity, which used to reach the bundle as
+    // `width:-Infinity`. That is valid JavaScript, so neither node --check nor
+    // the parse gate would catch it. A hand-edited config can empty the list.
+    expect(thinkerSymbolBoxWidth([])).toBe(2);
+  });
+
   it('sizes a wide symbol by display width, not UTF-16 code units', () => {
     // A regional-indicator flag is 2 surrogate pairs plus the trailing space:
     // 5 code units but 3 terminal cells.
