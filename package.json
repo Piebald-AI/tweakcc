@@ -82,6 +82,7 @@
     "node-lief": "^1.3.2",
     "oxfmt": "^0.28.0",
     "react": "^19.1.1",
+    "string-width": "^8.1.0",
     "terminal-link": "^3.0.0",
     "which": "^6.0.0"
   },
