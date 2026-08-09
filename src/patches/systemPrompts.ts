@@ -231,7 +231,32 @@ export const applySystemPrompts = async (
       const replacements: string[] = [];
       let abortDetails: string | undefined;
 
+      // reconstructContentFromPieces produced the .md body in the first place,
+      // so an untouched file still equals it and there is nothing to apply.
+      // Re-encoding it anyway is not safe: the .md is a hybrid of decoded
+      // quotes and raw JavaScript escapes (#921/#922), so the escaping passes
+      // below are not its inverse — they double a backslash that was already
+      // literal prompt text and ship `use A\\Client` where cli.js had
+      // `use A\Client`. Writing each occurrence back exactly as found is both
+      // correct and the only form guaranteed to survive the round trip.
+      // Compared trimmed because the markdown round trip is only trim-stable:
+      // gray-matter normalises the trailing newline, and applyOriginalWhitespace
+      // already treats the edges as serialization rather than content.
+      const originalBaselineContent = reconstructContentFromPieces(
+        pieces,
+        identifiers,
+        identifierMap
+      ).trim();
+      const isUncustomized = prompt.content.trim() === originalBaselineContent;
+
       for (const m of matches) {
+        // Each occurrence keeps its own text: cli.js can repeat a prompt with
+        // different minified variables at each site (#678).
+        if (isUncustomized) {
+          replacements.push(m[0]);
+          continue;
+        }
+
         const interpolatedContent = getInterpolatedContent(m);
 
         // Check the delimiter character before this match to determine string type
@@ -325,11 +350,6 @@ export const applySystemPrompts = async (
 
       // Calculate character counts for this prompt (both with human-readable placeholders)
       // Note: trim() to match how markdown files are parsed and how whitespace is applied
-      const originalBaselineContent = reconstructContentFromPieces(
-        pieces,
-        identifiers,
-        identifierMap
-      ).trim();
       const originalLength = originalBaselineContent.length;
       const newLength = prompt.content.trim().length;
 
