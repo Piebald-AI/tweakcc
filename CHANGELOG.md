@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [v4.3.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.3) - 2026-08-13
+
 - Clarify that `--apply --patches` restores from backup before applying the listed patch IDs (#699)
 - Skip system prompts whose stored file references interpolation identifiers the bundle no longer defines (#901) - @StreamDemon
 - Regenerate prompt markdown when interpolation identifiers are renamed without a version bump (#902) - @StreamDemon
