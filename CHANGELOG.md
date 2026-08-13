@@ -7,34 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-- Clarify that `--apply --patches` restores from backup then applies only the listed patch IDs (not additive); prefer `tweakcc --apply` with no filter (#699)
-- Skip a system prompt instead of corrupting `cli.js` when a stale prompt file would inject an identifier the current bundle does not define; an interpolation identifier renamed upstream without a per-prompt version bump left the old human-name unmapped, so `--apply` wrote an undefined variable that `node --check` could not catch and that crashed Claude Code on the first turn (#901) - @StreamDemon
-- Detect identifier drift during system-prompt sync: when the extractor renames a prompt's interpolation identifiers without bumping the per-prompt version, the version stamps match but the stored markdown still uses the old names, so sync now regenerates such a file (or flags a conflict if the user modified it) instead of skipping it as up to date (#902) - @StreamDemon
-- Fix the session-memory patch being dropped entirely on Claude Code 2.1.217: the legacy-extraction check keyed off the `tengu_session_memory` substring, which now survives only as telemetry event names (`tengu_session_memory_rated`, etc.), so 2.1.217's new `querySource` extraction path was misclassified as legacy and the absence of the refactored-away token-limit pattern became fatal for the whole feature; detection now keys off the actual legacy extraction gate (#905) - @StreamDemon
-- Fix the session-memory total-file-limit knob reading `CM_SM_TOTAL_FILE_LIMIT` instead of `CC_SM_TOTAL_FILE_LIMIT`; it was the only `CM_SM_*` name among four `CC_SM_*` siblings, so the total-file-limit env var never took effect (#907) - @StreamDemon
-- Parse the fully-patched bundle with `node --check` before writing it; if it does not parse, abort the apply without writing (Claude Code is left untouched) and print the syntax error, instead of shipping a `cli.js` that reports success and then crashes Claude Code at startup (#908) - @StreamDemon
-- Restore a session-memory tuning knob on Claude Code 2.1.218: the multi-file memory refactor removed the declarative update-threshold object and the `# Session Title` per-section/total token budgets, so four of the five `CC_SM_*` env vars no longer had an anchor and silently did nothing; `CC_SM_TOOL_CALLS_BETWEEN_UPDATES` now re-anchors onto the surviving `tengu_bramble_lintel` cadence flag, and the token-limit/threshold knobs are documented as legacy-only (#913) - @StreamDemon
-- Stop native `--apply` from bloating the patched binary with a large zero-padding gap on Linux/ELF installs: the rebuilt `.bun` section was placed at LIEF's `nextVirtualAddress()` (which rounds up to a coarse boundary) and extending the writable segment to reach it materialized the virtual-address gap as real zero bytes in the file (Claude Code 2.1.218 grew from 273MB to 721MB, ~59% zeros); it is now placed immediately after the writable segment when that segment is topmost, cutting the same patched binary to ~460MB (#915) - @StreamDemon
-- Stop `--apply` corrupting non-ASCII characters in double- and single-quoted system prompts on native installs: the `\uXXXX` encoding for Bun's Latin-1 module ran before the backslash-doubling from #664, so the doubling escaped the backslash the encoder had just emitted and an em dash reached Claude Code as the literal text `\u2014`; the encoding now runs after the string-literal escaping (#920) - @StreamDemon
-- Decode `\"` and `\'` when generating a system prompt's markdown, so the file shows the prompt text instead of JavaScript string-literal syntax and `--apply` stops embedding a real backslash where the bundle only had a quote; this is applied to prompts that are plain text end to end, since inside a `${...}` interpolation those escapes belong to nested JavaScript and decoding them would make the prompt look unterminated and be skipped (#921) - @StreamDemon
-- Fix system-prompt patching only replacing the first occurrence of a repeated prompt string, leaving later occurrences (e.g. Claude Code's compact-mode prompt array) vanilla; the search regex now matches globally and each occurrence is interpolated and escaped independently, since the minified variable names captured at different occurrences can differ even when the surrounding prompt text is identical (#678)
-- Stop `--apply` rewriting prompt prose that names one of the prompt's own interpolation placeholders: the human-readable name was substituted across the whole body, so the background-session prompt's own documentation of the `$CLAUDE_JOB_DIR/tmp` environment variable reached Claude Code as `$e/tmp`; the substitution is now scoped to live `${...}` interpolations, where the name really is an identifier (#931) - @StreamDemon
-- Write a system prompt back to `cli.js` exactly as found when its markdown still matches the vanilla baseline: the generated markdown is a hybrid of decoded quotes and raw JavaScript escapes, so the escaping pass is not its inverse and every `--apply` re-encoded prompts nobody had customized, doubling a backslash that was already prompt text (`use Anthropic\\Bedrock\\MantleClient;` reached Claude Code where the bundle had a single backslash) and re-escaping a quote the bundle had already escaped; 16 prompts on Claude Code 2.1.221 were affected (#922) - @StreamDemon
-- Size the thinking spinner's box by terminal display width instead of UTF-16 code units, so a custom symbol set built from wide or multi-code-unit characters is no longer measured as wider than it renders (a regional-indicator flag counts 4 code units but occupies 2 cells, so the box overshot and pushed the thinking verb away from the symbol); the shipped symbol sets are unaffected, and the measurement is pinned by tests against all three of them because `✳` (U+2733) is a text-presentation dingbat that some width implementations count as an emoji and therefore as 2 cells; an empty phase list now keeps Claude Code's vanilla width instead of writing `width:-Infinity`, which was valid JavaScript and so invisible to the parse gate (#925) - @StreamDemon
-- Stop the thinker-symbol-width patch resizing a box that is not the spinner: the layout run it matches is emitted once per memoized render branch, but Claude Code also renders the same box shape in a deadline/status component that shows a static glyph, so a custom symbol width was widening an unrelated part of the UI; a box now qualifies only when its function also references one of the spinner frame arrays, which on 2.1.221 selects 9 of the 10 occurrences; when no frame array can be located the patch still resizes every match, so an upstream change to how the frame list is built costs the extra box rather than the whole patch (#934) - @StreamDemon
+## [v4.3.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.3) - 2026-08-13
+
+- Clarify that `--apply --patches` restores from backup before applying the listed patch IDs (#699)
+- Skip system prompts whose stored file references interpolation identifiers the bundle no longer defines (#901) - @StreamDemon
+- Regenerate prompt markdown when interpolation identifiers are renamed without a version bump (#902) - @StreamDemon
+- Fix the session-memory patch being skipped on Claude Code 2.1.217 (#905) - @StreamDemon
+- Fix the session-memory total-file-limit knob reading `CM_SM_TOTAL_FILE_LIMIT` instead of `CC_SM_TOTAL_FILE_LIMIT` (#907) - @StreamDemon
+- Validate the patched bundle with `node --check` before writing it (#908) - @StreamDemon
+- Re-anchor `CC_SM_TOOL_CALLS_BETWEEN_UPDATES` for Claude Code 2.1.218 and mark the other `CC_SM_*` knobs legacy-only (#913) - @StreamDemon
+- Stop native `--apply` padding patched ELF binaries with hundreds of megabytes of zeros (#915) - @StreamDemon
+- Fix non-ASCII characters being corrupted in quoted system prompts on native installs (#920) - @StreamDemon
+- Decode `\"` and `\'` when generating a plain-text system prompt's markdown (#921) - @StreamDemon
+- Fix system-prompt patching only replacing the first occurrence of a repeated prompt (#678)
+- Scope interpolation placeholder substitution to live `${...}` interpolations (#931) - @StreamDemon
+- Write unmodified system prompts back to `cli.js` unchanged instead of re-escaping them (#922) - @StreamDemon
+- Size the thinking spinner's box by terminal display width instead of UTF-16 code units (#925) - @StreamDemon
+- Restrict the thinker-symbol-width patch to boxes that reference a spinner frame array (#934) - @StreamDemon
+- Recognize the extension-less 'cli' entry module of Claude Code 2.1.229+ (#946) - @ahalekelly
 
 ## [v4.3.2](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.2) - 2026-07-20
 
 - fix: match try/catch agent-color write in session-color patch (#864) - @VitalyOstanin
 - fix: match semicolon-separated chevron init in input-chevron-color patch (#865) - @VitalyOstanin
-- Require confirmation before `--apply` rewrites Claude Code; print a pre-apply patch summary and add `--yes`/`-y` to skip for scripts/CI (#817)
-- Fix over-escaping of backslashes in backtick-delimited system prompts that produced invalid JS and crashed Claude Code at startup (#870) - @StreamDemon
-- Fix thinking-block-visibility patch for Claude Code 2.1.209 and later (the early return is now `if(...){return null}`, so an unbounded `.+?` spanned ~7.6KB into an unrelated function and the replacement deleted it, crashing Claude Code at startup) (#882) - @StreamDemon
-- Fix React variable resolution for Claude Code 2.1.209 and later, restoring the patches-applied indication, conversation-title, and toolsets patches (modules are now wrapped in function expressions rather than arrow functions) (#882) - @StreamDemon
+- Require confirmation before `--apply` rewrites Claude Code, with `--yes`/`-y` to skip for scripts and CI (#817)
+- Fix over-escaping of backslashes in backtick-delimited system prompts (#870) - @StreamDemon
+- Fix thinking-block-visibility patch for Claude Code 2.1.209 and later (#882) - @StreamDemon
+- Fix React variable resolution for Claude Code 2.1.209 and later, restoring the patches-applied indication, conversation-title, and toolsets patches (#882) - @StreamDemon
 - fix(tableFormat): match hoisted rows-array inter-row separator (Claude Code >= 2.1.212) (#884) - @LMS927369
-- Fix carriage returns not being escaped when applying double- or single-quoted system prompts, so a prompt edited with CRLF line endings no longer leaves a raw carriage return in the string literal and crashes Claude Code at startup (#887) - @StreamDemon
-- Fix system-prompt sync crashing on prompts whose content begins with an HTML comment (`<!--`), which collided with the `<!--`/`-->` front-matter delimiters so `matter.stringify` re-parsed the body as YAML; the throw aborted the whole sync and left every later prompt's markdown file uncreated, surfacing as `ENOENT` "Failed to read markdown file" errors on `--apply` (#889) - @StreamDemon
-- Fix agents-md patch for Claude Code 2.1.212 and later (verified on 2.1.212 and 2.1.214; the async CLAUDE.md reader gained an `isDirectory` callback and an oversize-telemetry branch, so none of the existing matchers applied and AGENTS.md fallback silently stopped working) (#893) - @StreamDemon
+- Fix carriage returns not being escaped in double- and single-quoted system prompts (#887) - @StreamDemon
+- Fix system-prompt sync crashing on prompts whose content begins with an HTML comment (#889) - @StreamDemon
+- Fix agents-md patch for Claude Code 2.1.212 and later (#893) - @StreamDemon
 - Backfill source-grounded prompt metadata, names, IDs, and descriptions across Claude Code 2.1.20–2.1.212 snapshots (#895) - @mike1858
 
 ## [v4.3.1](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.1) - 2026-07-06
