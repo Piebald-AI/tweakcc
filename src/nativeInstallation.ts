@@ -227,7 +227,11 @@ function isClaudeModule(moduleName: string): boolean {
     moduleName.endsWith('/claude.exe') ||
     moduleName === 'claude.exe' ||
     moduleName.endsWith('/src/entrypoints/cli.js') ||
-    moduleName === 'src/entrypoints/cli.js'
+    moduleName === 'src/entrypoints/cli.js' ||
+    // Claude Code >= 2.1.229 names the entry module `cli` with no extension
+    // (`/$bunfs/root/cli` on POSIX, `B:/~BUN/root/cli` on Windows).
+    moduleName.endsWith('/cli') ||
+    moduleName === 'cli'
   );
 }
 
