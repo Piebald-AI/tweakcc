@@ -9369,6 +9369,39 @@
       "version": "2.1.173"
     },
     {
+      "name": "Tool Description: Computer computer_batch (batching guidance)",
+      "id": "tool-description-computer-computer_batch-batching-guidance",
+      "description": "Recommends batching predictable computer-use actions to eliminate unnecessary model-to-API round trips",
+      "pieces": [
+        "batching a predictable sequence eliminates all but one. Use this whenever you can predict the outcome of several actions ahead — "
+      ],
+      "identifiers": [],
+      "identifierMap": {},
+      "version": "2.1.231"
+    },
+    {
+      "name": "Tool Description: Computer computer_batch (coordinate note)",
+      "id": "tool-description-computer-computer_batch-coordinate-note",
+      "description": "Warns that clicks after a mid-batch screenshot still use coordinates from the pre-batch full-screen screenshot",
+      "pieces": [
+        "Mid-batch screenshot actions are allowed for inspection but coordinates in subsequent clicks always refer to the PRE-BATCH full-screen screenshot."
+      ],
+      "identifiers": [],
+      "identifierMap": {},
+      "version": "2.1.231"
+    },
+    {
+      "name": "Tool Description: Computer computer_batch (opening)",
+      "id": "tool-description-computer-computer_batch-opening",
+      "description": "Introduces computer_batch as a way to execute predictable action sequences in one model-to-API round trip",
+      "pieces": [
+        "Execute a sequence of actions in ONE tool call. Each individual tool call requires a model→API round trip (seconds); "
+      ],
+      "identifiers": [],
+      "identifierMap": {},
+      "version": "2.1.231"
+    },
+    {
       "name": "Tool Description: Computer hold_key",
       "id": "tool-description-computer-hold_key",
       "description": "Describes the computer-use hold_key tool for pressing and holding keys or key combinations with allowlist and system-combo checks",
@@ -9537,6 +9570,17 @@
         "2": "MAX_CONCURRENT_DEVICE_BASH_CALLS"
       },
       "version": "2.1.227"
+    },
+    {
+      "name": "Tool Description: device_bash (opening)",
+      "id": "tool-description-devicebash-opening",
+      "description": "Introduces device_bash as sandboxed shell execution on the user’s local device rather than the cloud container",
+      "pieces": [
+        "Run a shell command on the user's local machine (the device running Claude Code), inside Claude Code's OS sandbox. This is NOT the cloud "
+      ],
+      "identifiers": [],
+      "identifierMap": {},
+      "version": "2.1.231"
     },
     {
       "name": "Tool Description: Edit",
@@ -10572,6 +10616,39 @@
       "identifiers": [],
       "identifierMap": {},
       "version": "2.1.178"
+    },
+    {
+      "name": "Tool Description: ToolSearch (input validation note)",
+      "id": "tool-description-toolsearch-input-validation-note",
+      "description": "Explains the InputValidationError failure for unfetched deferred tools and requires selecting named deferred tools before calling them",
+      "pieces": [
+        " Until fetched, only the name is known — there is no parameter schema, so calling the tool fails with InputValidationError. When any instruction, system reminder, or other tool's description names a deferred tool, fetch it with query \"select:<name>\" before calling it."
+      ],
+      "identifiers": [],
+      "identifierMap": {},
+      "version": "2.1.231"
+    },
+    {
+      "name": "Tool Description: ToolSearch (opening)",
+      "id": "tool-description-toolsearch-opening",
+      "description": "Introduces ToolSearch as the schema loader for deferred tools announced by name in system reminders",
+      "pieces": [
+        "Fetches full schema definitions for deferred tools so they can be called.\n\nDeferred tools appear by name in <system-reminder> messages."
+      ],
+      "identifiers": [],
+      "identifierMap": {},
+      "version": "2.1.231"
+    },
+    {
+      "name": "Tool Description: ToolSearch (unfetched tool note)",
+      "id": "tool-description-toolsearch-unfetched-tool-note",
+      "description": "Explains that deferred tools expose no callable parameter schema until ToolSearch fetches them",
+      "pieces": [
+        " Until fetched, only the name is known — there is no parameter schema, so the tool cannot be invoked."
+      ],
+      "identifiers": [],
+      "identifierMap": {},
+      "version": "2.1.231"
     },
     {
       "name": "Tool Description: WebFetch",
