@@ -995,15 +995,12 @@ function rebuildBunData(
  * @param outputPath - Target file path
  * @param originalPath - Original file to copy permissions from
  */
-function atomicWriteBinary(
-  binary: LIEF.ELF.Binary | LIEF.PE.Binary | LIEF.MachO.Binary,
+function atomicReplaceFile(
+  tempPath: string,
   outputPath: string,
   originalPath: string,
-  copyPermissions: boolean = true
+  copyPermissions: boolean
 ): void {
-  const tempPath = outputPath + '.tmp';
-  binary.write(tempPath);
-
   if (copyPermissions) {
     const origStat = fs.statSync(originalPath);
     fs.chmodSync(tempPath, origStat.mode);
@@ -1037,6 +1034,28 @@ function atomicWriteBinary(
 
     throw error;
   }
+}
+
+function atomicWriteBinary(
+  binary: LIEF.ELF.Binary | LIEF.PE.Binary | LIEF.MachO.Binary,
+  outputPath: string,
+  originalPath: string,
+  copyPermissions: boolean = true
+): void {
+  const tempPath = outputPath + '.tmp';
+  binary.write(tempPath);
+  atomicReplaceFile(tempPath, outputPath, originalPath, copyPermissions);
+}
+
+/** Atomically write a raw binary buffer while retaining the original mode. */
+function atomicWriteBuffer(
+  content: Buffer,
+  outputPath: string,
+  originalPath: string
+): void {
+  const tempPath = outputPath + '.tmp';
+  fs.writeFileSync(tempPath, content);
+  atomicReplaceFile(tempPath, outputPath, originalPath, true);
 }
 
 /**
@@ -1222,6 +1241,205 @@ export interface BunSectionPlacement {
   compact: boolean;
 }
 
+const ELF64_EHDR_SIZE = 64;
+const ELF64_PHDR_SIZE = 56;
+const ELF64_SHDR_SIZE = 64;
+const ELF64_SHT_NOBITS = 8;
+
+function bigintToSafeNumber(value: bigint, label: string): number {
+  if (value < 0n || value > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error(`${label} is outside JavaScript's safe buffer range`);
+  }
+  return Number(value);
+}
+
+/**
+ * Rebuild an ELF file around the current tail `.bun` payload instead of appending
+ * another copy. This is valid only when `.bun` occupies the end of its writable
+ * PT_LOAD: data after that boundary is file-only metadata, whose offsets can be
+ * shifted without moving any mapped virtual address.
+ *
+ * Returns null for layouts that do not meet those invariants; callers must fall
+ * back to relocation rather than risk changing mapped ELF content.
+ */
+export function replaceTailBunSection(params: {
+  file: Buffer;
+  bunFileOffset: bigint;
+  bunVirtualAddress: bigint;
+  bunSize: bigint;
+  rwFileOffset: bigint;
+  rwVirtualAddress: bigint;
+  rwFileSize: bigint;
+  rwVirtualSize: bigint;
+  pageSize: bigint;
+  newSectionData: Buffer;
+}): Buffer | null {
+  const {
+    file,
+    bunFileOffset,
+    bunVirtualAddress,
+    bunSize,
+    rwFileOffset,
+    rwVirtualAddress,
+    rwFileSize,
+    rwVirtualSize,
+    pageSize,
+    newSectionData,
+  } = params;
+
+  if (
+    file.length < ELF64_EHDR_SIZE ||
+    !file.subarray(0, 4).equals(Buffer.from([0x7f, 0x45, 0x4c, 0x46])) ||
+    file[4] !== 2 ||
+    file[5] !== 1 ||
+    pageSize <= 0n
+  ) {
+    return null;
+  }
+
+  const rwFileEnd = rwFileOffset + rwFileSize;
+  const oldAllocatedSize = alignBigInt(bunSize, pageSize);
+  if (
+    bunFileOffset + oldAllocatedSize !== rwFileEnd ||
+    bunVirtualAddress + oldAllocatedSize !== rwVirtualAddress + rwVirtualSize ||
+    rwFileEnd > BigInt(file.length)
+  ) {
+    return null;
+  }
+
+  const ePhoff = file.readBigUInt64LE(32);
+  const eShoff = file.readBigUInt64LE(40);
+  const ePhentsize = file.readUInt16LE(54);
+  const ePhnum = file.readUInt16LE(56);
+  const eShentsize = file.readUInt16LE(58);
+  const eShnum = file.readUInt16LE(60);
+  if (ePhentsize !== ELF64_PHDR_SIZE || eShentsize !== ELF64_SHDR_SIZE) {
+    return null;
+  }
+
+  const phTableEnd = ePhoff + BigInt(ePhentsize * ePhnum);
+  const shTableEnd = eShoff + BigInt(eShentsize * eShnum);
+  if (
+    phTableEnd > BigInt(file.length) ||
+    eShoff < rwFileEnd ||
+    shTableEnd > BigInt(file.length)
+  ) {
+    return null;
+  }
+
+  // Everything after the writable file end must be file-only. Moving another
+  // PT_LOAD would require changing its file offset and virtual-address mapping.
+  for (let index = 0; index < ePhnum; index++) {
+    const headerOffset = bigintToSafeNumber(
+      ePhoff + BigInt(index * ELF64_PHDR_SIZE),
+      'ELF program header offset'
+    );
+    if (file.readUInt32LE(headerOffset) !== 1) {
+      continue;
+    }
+    const offset = file.readBigUInt64LE(headerOffset + 8);
+    const fileSize = file.readBigUInt64LE(headerOffset + 32);
+    if (offset !== rwFileOffset && offset + fileSize > rwFileEnd) {
+      return null;
+    }
+  }
+
+  // A section may not straddle the replacement boundary. Such a section would
+  // have mapped bytes before the boundary and moved bytes after it.
+  for (let index = 0; index < eShnum; index++) {
+    const headerOffset = bigintToSafeNumber(
+      eShoff + BigInt(index * ELF64_SHDR_SIZE),
+      'ELF section header offset'
+    );
+    const type = file.readUInt32LE(headerOffset + 4);
+    const offset = file.readBigUInt64LE(headerOffset + 24);
+    const size = file.readBigUInt64LE(headerOffset + 32);
+    if (
+      type !== ELF64_SHT_NOBITS &&
+      offset < rwFileEnd &&
+      offset + size > rwFileEnd
+    ) {
+      return null;
+    }
+  }
+
+  const newAllocatedSize = alignBigInt(BigInt(newSectionData.length), pageSize);
+  const sizeDelta = newAllocatedSize - oldAllocatedSize;
+  const oldTailOffset = bigintToSafeNumber(
+    rwFileEnd,
+    'ELF writable segment end'
+  );
+  const newTailOffset = bigintToSafeNumber(
+    rwFileEnd + sizeDelta,
+    'ELF replacement tail offset'
+  );
+  if (newTailOffset < 0) {
+    return null;
+  }
+
+  const result = Buffer.alloc(
+    bigintToSafeNumber(BigInt(file.length) + sizeDelta, 'ELF replacement size')
+  );
+  const bunOffset = bigintToSafeNumber(bunFileOffset, '.bun file offset');
+  file.copy(result, 0, 0, bunOffset);
+  newSectionData.copy(result, bunOffset);
+  file.copy(result, newTailOffset, oldTailOffset);
+
+  // The section table lies in the moved file-only tail. Repoint it first, then
+  // update each section whose bytes moved. SHT_NOBITS has no file bytes.
+  const newShoff = eShoff + sizeDelta;
+  result.writeBigUInt64LE(newShoff, 40);
+  let bunSectionFound = false;
+  for (let index = 0; index < eShnum; index++) {
+    const headerOffset = bigintToSafeNumber(
+      newShoff + BigInt(index * ELF64_SHDR_SIZE),
+      'ELF section header offset'
+    );
+    const sectionType = result.readUInt32LE(headerOffset + 4);
+    const sectionAddress = result.readBigUInt64LE(headerOffset + 16);
+    const sectionOffset = result.readBigUInt64LE(headerOffset + 24);
+    const sectionSize = result.readBigUInt64LE(headerOffset + 32);
+
+    if (
+      sectionOffset === bunFileOffset &&
+      sectionAddress === bunVirtualAddress &&
+      sectionSize === bunSize
+    ) {
+      result.writeBigUInt64LE(BigInt(newSectionData.length), headerOffset + 32);
+      bunSectionFound = true;
+    } else if (sectionType !== ELF64_SHT_NOBITS && sectionOffset >= rwFileEnd) {
+      result.writeBigUInt64LE(sectionOffset + sizeDelta, headerOffset + 24);
+    }
+  }
+  if (!bunSectionFound) {
+    return null;
+  }
+
+  // Locate the exact writable PT_LOAD and resize only its file/memory extent.
+  let rwProgramHeaderFound = false;
+  for (let index = 0; index < ePhnum; index++) {
+    const headerOffset = bigintToSafeNumber(
+      ePhoff + BigInt(index * ELF64_PHDR_SIZE),
+      'ELF program header offset'
+    );
+    const type = result.readUInt32LE(headerOffset);
+    const offset = result.readBigUInt64LE(headerOffset + 8);
+    const virtualAddress = result.readBigUInt64LE(headerOffset + 16);
+    if (
+      type === 1 &&
+      offset === rwFileOffset &&
+      virtualAddress === rwVirtualAddress
+    ) {
+      result.writeBigUInt64LE(rwFileSize + sizeDelta, headerOffset + 32);
+      result.writeBigUInt64LE(rwVirtualSize + sizeDelta, headerOffset + 40);
+      rwProgramHeaderFound = true;
+      break;
+    }
+  }
+
+  return rwProgramHeaderFound ? result : null;
+}
+
 /**
  * Compute where to place the rebuilt `.bun` section inside the writable PT_LOAD.
  *
@@ -1292,14 +1510,50 @@ function repackELFSection(
       throw new Error('.bun section not found');
     }
 
-    const rwSegment = elfBinary
-      .segments()
-      .find(s => s.type === 'LOAD' && (s.flags & 2) !== 0);
+    // Match the writable PT_LOAD that actually contains `.bun`; choosing the
+    // first writable segment is unsafe on binaries with an additional RW LOAD.
+    const rwSegment = elfBinary.segments().find(s => {
+      const segmentEnd = s.virtualAddress + BigInt(s.virtualSize);
+      return (
+        s.type === 'LOAD' &&
+        (s.flags & 2) !== 0 &&
+        s.virtualAddress <= bunSection.virtualAddress &&
+        bunSection.virtualAddress < segmentEnd
+      );
+    });
     if (!rwSegment) {
-      throw new Error('No writable ELF PT_LOAD segment found');
+      throw new Error('No writable ELF PT_LOAD contains .bun');
     }
 
     const newSectionData = buildSectionData(newBunBuffer, sectionHeaderSize);
+
+    // Current Bun appends the active `.bun` at the end of this PT_LOAD, with
+    // only file-only metadata after it. Replace that allocation in place and
+    // shift the metadata tail, avoiding an orphaned previous module graph.
+    const compactedFile = replaceTailBunSection({
+      file: fs.readFileSync(binPath),
+      bunFileOffset: bunSection.fileOffset,
+      bunVirtualAddress: bunSection.virtualAddress,
+      bunSize: bunSection.size,
+      rwFileOffset: rwSegment.fileOffset,
+      rwVirtualAddress: rwSegment.virtualAddress,
+      rwFileSize: rwSegment.fileSize,
+      rwVirtualSize: BigInt(rwSegment.virtualSize),
+      pageSize: elfBinary.pageSize(),
+      newSectionData,
+    });
+    if (compactedFile) {
+      debug(
+        `repackELFSection: replaced tail .bun in place at offset=0x${bunSection.fileOffset.toString(16)}, size=0x${newSectionData.length.toString(16)}`
+      );
+      atomicWriteBuffer(compactedFile, outputPath, binPath);
+      debug('repackELFSection: In-place replacement completed successfully');
+      return;
+    }
+
+    debug(
+      'repackELFSection: .bun is not a replaceable tail allocation; falling back to relocation'
+    );
     const oldBunSectionVaddr = bunSection.virtualAddress;
     const vaddrBytes = Buffer.alloc(8);
     vaddrBytes.writeBigUInt64LE(oldBunSectionVaddr);
