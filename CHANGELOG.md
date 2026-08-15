@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Replace the existing `.bun` payload for ELF binaries instead of appending a new one (#952) - @signadou
+
 ## [v4.3.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.3) - 2026-08-13
 
 - Clarify that `--apply --patches` restores from backup before applying the listed patch IDs (#699)

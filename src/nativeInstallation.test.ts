@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { computeBunSectionPlacement } from './nativeInstallation';
+import {
+  computeBunSectionPlacement,
+  replaceTailBunSection,
+} from './nativeInstallation';
 
 // Real Claude Code 2.1.218 native (ELF) numbers, read via readelf:
 //   RW PT_LOAD: vaddr 0x524f1a0, fileoff 0x504f1a0, filesz/memsz 0xb42ae60
@@ -17,6 +20,126 @@ const REAL_218 = {
   newContentSize: 0xb231a61n,
   pageSize: 0x1000n,
 };
+
+function makeReplaceableElf(): Buffer {
+  const file = Buffer.alloc(0x6000);
+  file.set([0x7f, 0x45, 0x4c, 0x46, 2, 1]);
+  file.writeBigUInt64LE(0x40n, 32); // e_phoff
+  file.writeBigUInt64LE(0x5000n, 40); // e_shoff
+  file.writeUInt16LE(56, 54); // e_phentsize
+  file.writeUInt16LE(1, 56); // e_phnum
+  file.writeUInt16LE(64, 58); // e_shentsize
+  file.writeUInt16LE(2, 60); // e_shnum
+
+  // Sole PT_LOAD: RW, file [0x1000, 0x4000), vaddr [0x500000, 0x503000)
+  file.writeUInt32LE(1, 0x40);
+  file.writeUInt32LE(6, 0x44);
+  file.writeBigUInt64LE(0x1000n, 0x48);
+  file.writeBigUInt64LE(0x500000n, 0x50);
+  file.writeBigUInt64LE(0x3000n, 0x60);
+  file.writeBigUInt64LE(0x3000n, 0x68);
+
+  // .bun section: final page of the RW LOAD, old logical size 0x900.
+  const bunHeader = 0x5000 + 64;
+  file.writeUInt32LE(1, bunHeader);
+  file.writeBigUInt64LE(0x502000n, bunHeader + 16);
+  file.writeBigUInt64LE(0x3000n, bunHeader + 24);
+  file.writeBigUInt64LE(0x900n, bunHeader + 32);
+
+  // File-only tail section that must move with the section table.
+  file.writeUInt32LE(1, 0x5000);
+  file.writeBigUInt64LE(0x4200n, 0x5000 + 24);
+  file.writeBigUInt64LE(0x100n, 0x5000 + 32);
+  file.fill(0xab, 0x4200, 0x4300);
+  return file;
+}
+
+describe('replaceTailBunSection', () => {
+  it('replaces a tail .bun allocation and shifts file-only metadata by the aligned delta', () => {
+    const result = replaceTailBunSection({
+      file: makeReplaceableElf(),
+      bunFileOffset: 0x3000n,
+      bunVirtualAddress: 0x502000n,
+      bunSize: 0x900n,
+      rwFileOffset: 0x1000n,
+      rwVirtualAddress: 0x500000n,
+      rwFileSize: 0x3000n,
+      rwVirtualSize: 0x3000n,
+      pageSize: 0x1000n,
+      newSectionData: Buffer.alloc(0x1800, 0xcd),
+    });
+
+    expect(result).not.toBeNull();
+    const output = result!;
+    expect(output.length).toBe(0x7000);
+    expect(output.subarray(0x3000, 0x4800)).toEqual(Buffer.alloc(0x1800, 0xcd));
+    expect(output.readBigUInt64LE(40)).toBe(0x6000n);
+    expect(output.readBigUInt64LE(0x40 + 32)).toBe(0x4000n);
+    expect(output.readBigUInt64LE(0x40 + 40)).toBe(0x4000n);
+    expect(output.readBigUInt64LE(0x6000 + 24)).toBe(0x5200n);
+    expect(output.readBigUInt64LE(0x6000 + 64 + 32)).toBe(0x1800n);
+    expect(output.subarray(0x5200, 0x5300)).toEqual(Buffer.alloc(0x100, 0xab));
+  });
+
+  it('reuses the existing allocation without growing the binary when the rebuilt .bun fits in its page', () => {
+    const result = replaceTailBunSection({
+      file: makeReplaceableElf(),
+      bunFileOffset: 0x3000n,
+      bunVirtualAddress: 0x502000n,
+      bunSize: 0x900n,
+      rwFileOffset: 0x1000n,
+      rwVirtualAddress: 0x500000n,
+      rwFileSize: 0x3000n,
+      rwVirtualSize: 0x3000n,
+      pageSize: 0x1000n,
+      newSectionData: Buffer.alloc(0x800, 0xef),
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.length).toBe(0x6000);
+    expect(result!.readBigUInt64LE(0x5000 + 64 + 32)).toBe(0x800n);
+  });
+
+  it('declines a `.bun` whose allocation does not reach the writable segment end', () => {
+    const result = replaceTailBunSection({
+      file: makeReplaceableElf(),
+      bunFileOffset: 0x3000n,
+      bunVirtualAddress: 0x502000n,
+      bunSize: 0x900n,
+      rwFileOffset: 0x1000n,
+      rwVirtualAddress: 0x500000n,
+      rwFileSize: 0x3000n,
+      rwVirtualSize: 0x4000n,
+      pageSize: 0x1000n,
+      newSectionData: Buffer.alloc(0x1800),
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it('declines layouts where another loadable segment reaches into the moved tail', () => {
+    const file = makeReplaceableElf();
+    file.writeUInt16LE(2, 56);
+    file.writeUInt32LE(1, 0x40 + 56);
+    file.writeBigUInt64LE(0x3f00n, 0x40 + 56 + 8);
+    file.writeBigUInt64LE(0x600000n, 0x40 + 56 + 16);
+    file.writeBigUInt64LE(0x200n, 0x40 + 56 + 32);
+    const result = replaceTailBunSection({
+      file,
+      bunFileOffset: 0x3000n,
+      bunVirtualAddress: 0x502000n,
+      bunSize: 0x900n,
+      rwFileOffset: 0x1000n,
+      rwVirtualAddress: 0x500000n,
+      rwFileSize: 0x3000n,
+      rwVirtualSize: 0x3000n,
+      pageSize: 0x1000n,
+      newSectionData: Buffer.alloc(0x1800),
+    });
+
+    expect(result).toBeNull();
+  });
+});
 
 describe('computeBunSectionPlacement', () => {
   it('places the new .bun right after the writable segment when it is topmost (no zero-padding gap)', () => {
