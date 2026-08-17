@@ -17,6 +17,12 @@ const makeTryCatchSaveAgentColor = () =>
   'catch(z){if(Qd(z))w(`saveAgentColor failed (${Yt(z)}): ${ne(z)}`,{level:"error"});else throw z}' +
   'if(H===V$())WA().currentSessionAgentColor=$;c("tengu_agent_color_set",{})}';
 
+const makeOptionsArgSaveAgentColor = () =>
+  ';async function Mr$(H,$,q,z){let K=q??sT(H);' +
+  'try{await Hv(K,{type:"agent-color",agentColor:$,sessionId:H},z)}' +
+  'catch(J){if(Qd(J))w(`saveAgentColor failed (${Yt(J)}): ${ne(J)}`,{level:"error"});else throw J}' +
+  'if(H===V$())WA().currentSessionAgentColor=$;c("tengu_agent_color_set",{})}';
+
 const makeCLIState = () =>
   'effortValue:oR(w.effort),' +
   'activeOverlays:new Set,fastMode:cP8(N5),' +
@@ -115,6 +121,15 @@ describe('sessionColor', () => {
       expect(result).not.toBeNull();
       expect(result).toContain('globalThis.__tweakccSaveAgentColor');
       expect(result).toContain('try{await Hv(K,');
+      expect(result).toContain('(c)=>Mr$(V$(),c)');
+    });
+
+    it('should patch saveAgentColor that takes an options argument', () => {
+      const result = patchSaveAgentColor(makeOptionsArgSaveAgentColor());
+      expect(result).not.toBeNull();
+      expect(result).toContain('globalThis.__tweakccSaveAgentColor');
+      expect(result).toContain('try{await Hv(K,');
+      expect(result).toContain('sessionId:H},z)');
       expect(result).toContain('(c)=>Mr$(V$(),c)');
     });
 
