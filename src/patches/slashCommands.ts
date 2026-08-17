@@ -60,24 +60,27 @@ const analyzeArrayFromOpenBracket = (
 /**
  * Find the end position of the slash command array using stack machine.
  *
- * Supports both pre-2.1.138 form (plain `=>[ID,ID,...]` with 30+ bare
- * identifiers) and 2.1.138+ form where the array uses spread operators for
+ * Supports the pre-2.1.138 form (plain `=>[ID,ID,...]` with 30+ bare
+ * identifiers), the 2.1.138+ form where the array uses spread operators for
  * conditionally-included commands, e.g.:
  *   =L8(()=>[AUK,pL4,DX4,y64,...gT4?[gT4]:[],Qj4,lI6,vL4,...,W94(),...])
+ * and the 2.1.227+ form where the list moved into a named function whose body
+ * returns the array, e.g.:
+ *   function $tS(){return[uOd,Wza,lHf,...t5n("fleetFork"),nEf,...]}
  *
  * The candidate must also sit in slash-command-specific code. The bundle keeps
  * slash-command definitions near command metadata such as name/userFacingName,
- * so this rejects unrelated large arrow-return arrays.
+ * so this rejects unrelated large arrays.
  */
 export const findSlashCommandListEndPosition = (
   fileContents: string
 ): number | null => {
-  // Walk every `=>[` candidate. The slash command array is the (only) array
-  // following an arrow-return that contains >= 30 top-level items.
-  const arrowPattern = /=>\s*\[/g;
+  // Walk every `=>[` and `return[` candidate. The slash command array is the
+  // (only) array returned from a function that contains >= 30 top-level items.
+  const candidatePattern = /(?:=>|return)\s*\[/g;
   let m: RegExpExecArray | null;
   let best: { closing: number; items: number } | null = null;
-  while ((m = arrowPattern.exec(fileContents)) !== null) {
+  while ((m = candidatePattern.exec(fileContents)) !== null) {
     const bracketIndex = m.index + m[0].length - 1; // position of '['
     const anchorWindow = fileContents.slice(
       Math.max(0, m.index - 12000),
