@@ -15,6 +15,7 @@ const normalNote =
   ' Until fetched, only the name is known — there is no parameter schema, so the tool cannot be invoked.';
 const strictNote =
   ' Until fetched, only the name is known — there is no parameter schema, so calling the tool fails with InputValidationError. Fetch it with query select:<name> before calling it.';
+const EXTRACTOR_TIMEOUT_MS = 5_000;
 
 describe('promptExtractor assembled descriptions', () => {
   it('keeps every source fragment of a long concatenated description', () => {
@@ -45,6 +46,7 @@ void unrelated;
         cwd: repoRoot,
         env: { ...process.env, PROMPT_EXTRACTOR_PERF: '0' },
         stdio: 'pipe',
+        timeout: EXTRACTOR_TIMEOUT_MS,
       });
 
       const data = JSON.parse(readFileSync(outputPath, 'utf8'));
@@ -92,6 +94,7 @@ void setting;
         cwd: repoRoot,
         env: { ...process.env, PROMPT_EXTRACTOR_PERF: '0' },
         stdio: 'pipe',
+        timeout: EXTRACTOR_TIMEOUT_MS,
       });
 
       const data = JSON.parse(readFileSync(outputPath, 'utf8'));
@@ -120,7 +123,7 @@ void setting;
         cwd: repoRoot,
         env: { ...process.env, PROMPT_EXTRACTOR_PERF: '0' },
         stdio: 'pipe',
-        timeout: 5_000,
+        timeout: EXTRACTOR_TIMEOUT_MS,
       });
 
       const data = JSON.parse(readFileSync(outputPath, 'utf8'));
@@ -149,6 +152,7 @@ void helpText;
         cwd: repoRoot,
         env: { ...process.env, PROMPT_EXTRACTOR_PERF: '0' },
         stdio: 'pipe',
+        timeout: EXTRACTOR_TIMEOUT_MS,
       });
 
       const data = JSON.parse(readFileSync(outputPath, 'utf8'));
