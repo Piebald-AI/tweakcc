@@ -236,6 +236,59 @@ function isClaudeModule(moduleName: string): boolean {
 }
 
 /**
+ * True if the module is one of the code-split chunks emitted alongside the
+ * entrypoint.
+ *
+ * Claude Code >= 2.1.243 is built with Bun's code splitting enabled: the entry
+ * module is a ~20 KB loader that `import`s ~1400 sibling `chunk-<hash>.js`
+ * modules, and essentially all of the application source lives in those chunks
+ * rather than in the entrypoint.
+ */
+export function isChunkModule(moduleName: string): boolean {
+  return /(^|\/)chunk-[^/]+\.js$/.test(moduleName);
+}
+
+/**
+ * Boundary marker used to present a code-split binary as a single string.
+ *
+ * `readContent()` hands callers one string so that a patch can be written as a
+ * plain search-and-replace, but a code-split binary has no single module to
+ * hand back. Concatenating the JS modules with a boundary that names each one
+ * keeps that contract: `writeContent()` splits on the same marker and routes
+ * every part back to the module it came from.
+ *
+ * The marker starts with a newline and is a `//` comment so that the assembled
+ * string stays valid, readable JavaScript.
+ */
+export const MODULE_BOUNDARY = '\n//#__tweakcc_module__:';
+
+/**
+ * Splits a concatenated multi-module payload back into [name, contents] pairs.
+ * Returns null if the payload is not in multi-module form.
+ */
+export function splitModulePayload(
+  content: string
+): Array<[string, string]> | null {
+  if (!content.startsWith(MODULE_BOUNDARY)) {
+    return null;
+  }
+
+  return content
+    .split(MODULE_BOUNDARY)
+    .slice(1) // leading '' before the first boundary
+    .map(segment => {
+      const nameEnd = segment.indexOf('\n');
+      if (nameEnd === -1) {
+        throw new Error('Malformed tweakcc module boundary: missing newline');
+      }
+      return [segment.slice(0, nameEnd), segment.slice(nameEnd + 1)] as [
+        string,
+        string,
+      ];
+    });
+}
+
+/**
  * Detects the module struct size from the modules list byte length.
  * Returns SIZEOF_MODULE_NEW (52) or SIZEOF_MODULE_OLD (36).
  */
@@ -697,6 +750,103 @@ function getBunData(
 }
 
 /**
+ * Collects every module holding application JavaScript, in module-table order.
+ * A binary that is not code-split yields exactly one (the entrypoint); a
+ * code-split one yields the entrypoint plus its chunks.
+ *
+ * Extraction and repacking have to agree exactly on this set -- a payload is
+ * written back by module name, so both sides share this one definition rather
+ * than repeating the predicate and risking drift.
+ */
+function collectJsModules(
+  bunData: Buffer,
+  bunOffsets: BunOffsets,
+  moduleStructSize: number
+): Array<[string, Buffer]> {
+  const jsModules: Array<[string, Buffer]> = [];
+
+  mapModules(
+    bunData,
+    bunOffsets,
+    moduleStructSize,
+    (module, moduleName, index) => {
+      debug(`collectJsModules: Module ${index}: ${moduleName}`);
+
+      // Module name is typically:
+      // - Unix/macOS: /$bunfs/root/claude
+      // - Windows:    B:/~BUN/root/claude.exe
+      if (!isClaudeModule(moduleName) && !isChunkModule(moduleName)) {
+        return undefined;
+      }
+
+      const moduleContents = getStringPointerContent(bunData, module.contents);
+      if (moduleContents.length > 0) {
+        jsModules.push([moduleName, moduleContents]);
+      }
+
+      return undefined; // visit every module
+    }
+  );
+
+  return jsModules;
+}
+
+/** Caps a name list so a wholesale mismatch cannot produce an unreadable error. */
+function summarizeNames(names: string[]): string {
+  const shown = names.slice(0, 5).join(', ');
+  return names.length > 5 ? `${shown}, ... (${names.length} total)` : shown;
+}
+
+/**
+ * Turns a split payload into per-module replacements, rejecting any payload
+ * that does not name exactly the modules it was assembled from.
+ *
+ * rebuildBunData() applies replacements by module name, so an unknown or
+ * repeated name is silently dropped and an absent one silently keeps the
+ * original contents. Each of those writes a binary that looks patched but is
+ * not, so validate the whole payload up front and fail loudly instead.
+ */
+export function buildModuleReplacements(
+  parts: Array<[string, string]>,
+  expectedNames: string[]
+): Map<string, Buffer> {
+  const replacements = new Map<string, Buffer>();
+  const duplicates: string[] = [];
+
+  for (const [moduleName, body] of parts) {
+    if (replacements.has(moduleName)) {
+      duplicates.push(moduleName);
+    }
+    replacements.set(moduleName, Buffer.from(body, 'utf8'));
+  }
+
+  if (duplicates.length > 0) {
+    throw new Error(
+      `Module payload names a module more than once: ${summarizeNames(duplicates)}`
+    );
+  }
+
+  const expected = new Set(expectedNames);
+  const unknown = [...replacements.keys()].filter(name => !expected.has(name));
+  if (unknown.length > 0) {
+    throw new Error(
+      `Module payload names ${unknown.length} module(s) absent from the binary: ` +
+        summarizeNames(unknown)
+    );
+  }
+
+  const missing = expectedNames.filter(name => !replacements.has(name));
+  if (missing.length > 0) {
+    throw new Error(
+      `Module payload is missing ${missing.length} module(s) present in the binary: ` +
+        summarizeNames(missing)
+    );
+  }
+
+  return replacements;
+}
+
+/**
  * Extracts claude.js from a native installation binary.
  * Returns the contents as a Buffer, or null if not found.
  *
@@ -717,35 +867,42 @@ export function extractClaudeJsFromNativeInstallation(
       `extractClaudeJsFromNativeInstallation: Got bunData, size=${bunData.length} bytes, moduleStructSize=${moduleStructSize}`
     );
 
-    const result = mapModules(
-      bunData,
-      bunOffsets,
-      moduleStructSize,
-      (module, moduleName, index) => {
-        debug(
-          `extractClaudeJsFromNativeInstallation: Module ${index}: ${moduleName}`
-        );
+    const jsModules = collectJsModules(bunData, bunOffsets, moduleStructSize);
 
-        // Module name is typically:
-        // - Unix/macOS: /$bunfs/root/claude
-        // - Windows:    B:/~BUN/root/claude.exe
-        if (!isClaudeModule(moduleName)) return undefined;
-
-        const moduleContents = getStringPointerContent(
-          bunData,
-          module.contents
-        );
-
-        debug(
-          `extractClaudeJsFromNativeInstallation: Found claude module, contents length=${moduleContents.length}`
-        );
-
-        return moduleContents.length > 0 ? moduleContents : undefined;
-      }
+    debug(
+      `extractClaudeJsFromNativeInstallation: Found ${jsModules.length} JS module(s)`
     );
 
-    if (result) {
-      return result;
+    // Not code-split: hand back the entrypoint verbatim, exactly as before.
+    if (jsModules.length === 1) {
+      return jsModules[0][1];
+    }
+
+    if (jsModules.length > 1) {
+      // The boundary must not occur inside the source it delimits, or the
+      // round-trip through writeContent() would mis-split. Bail out rather than
+      // risk writing a corrupted binary.
+      for (const [moduleName, contents] of jsModules) {
+        if (contents.includes(MODULE_BOUNDARY)) {
+          throw new Error(
+            `Module ${moduleName} already contains the tweakcc boundary marker`
+          );
+        }
+      }
+
+      debug(
+        `extractClaudeJsFromNativeInstallation: Code-split binary, joining ${jsModules.length} modules`
+      );
+
+      return Buffer.from(
+        jsModules
+          .map(
+            ([moduleName, contents]) =>
+              `${MODULE_BOUNDARY}${moduleName}\n${contents.toString('utf8')}`
+          )
+          .join(''),
+        'utf8'
+      );
     }
 
     debug(
@@ -766,7 +923,11 @@ export function extractClaudeJsFromNativeInstallation(
 function rebuildBunData(
   bunData: Buffer,
   bunOffsets: BunOffsets,
-  modifiedClaudeJs: Buffer | null,
+  /**
+   * A Buffer replaces the entrypoint module's contents; a Map replaces the
+   * contents of each named module (used for code-split binaries).
+   */
+  modifiedClaudeJs: Buffer | Map<string, Buffer> | null,
   moduleStructSize: number
 ): Buffer {
   // Phase 1: Collect all string data
@@ -788,9 +949,13 @@ function rebuildBunData(
   mapModules(bunData, bunOffsets, moduleStructSize, (module, moduleName) => {
     const nameBytes = getStringPointerContent(bunData, module.name);
 
-    // Check if this is claude.js and we have modified contents
+    // Check if this module has modified contents
     let contentsBytes: Buffer;
-    if (modifiedClaudeJs && isClaudeModule(moduleName)) {
+    if (modifiedClaudeJs instanceof Map) {
+      contentsBytes =
+        modifiedClaudeJs.get(moduleName) ??
+        getStringPointerContent(bunData, module.contents);
+    } else if (modifiedClaudeJs && isClaudeModule(moduleName)) {
       contentsBytes = modifiedClaudeJs;
     } else {
       contentsBytes = getStringPointerContent(bunData, module.contents);
@@ -1706,10 +1871,32 @@ export function repackNativeInstallation(
   // Extract Bun data and rebuild with modified claude.js
   const { bunOffsets, bunData, sectionHeaderSize, moduleStructSize } =
     getBunData(binary);
+
+  // A payload produced from a code-split binary carries every module it was
+  // assembled from; split it back apart so each lands in its own module.
+  const parts = splitModulePayload(modifiedClaudeJs.toString('utf8'));
+  let replacement: Buffer | Map<string, Buffer>;
+
+  if (parts) {
+    // Only a payload naming exactly the modules it came from may be written;
+    // anything else would leave some module silently unpatched.
+    replacement = buildModuleReplacements(
+      parts,
+      collectJsModules(bunData, bunOffsets, moduleStructSize).map(
+        ([moduleName]) => moduleName
+      )
+    );
+    debug(
+      `repackNativeInstallation: Code-split payload, writing ${parts.length} modules`
+    );
+  } else {
+    replacement = modifiedClaudeJs;
+  }
+
   const newBuffer = rebuildBunData(
     bunData,
     bunOffsets,
-    modifiedClaudeJs,
+    replacement,
     moduleStructSize
   );
 

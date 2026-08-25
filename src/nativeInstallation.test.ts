@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildModuleReplacements,
   computeBunSectionPlacement,
+  isChunkModule,
+  MODULE_BOUNDARY,
   replaceTailBunSection,
+  splitModulePayload,
 } from './nativeInstallation';
 
 // Real Claude Code 2.1.218 native (ELF) numbers, read via readelf:
@@ -233,5 +237,167 @@ describe('computeBunSectionPlacement', () => {
     expect(p.compact).toBe(false);
     expect(p.newVaddr % REAL_218.pageSize).toBe(0n);
     expect(p.newVaddr).toBe(0x20001000n); // align(0x20000800, page)
+  });
+});
+
+describe('isChunkModule', () => {
+  it('recognizes the code-split chunks emitted by Bun', () => {
+    expect(isChunkModule('/$bunfs/root/chunk-zrs5zyqa.js')).toBe(true);
+    expect(isChunkModule('B:/~BUN/root/chunk-b08jpphw.js')).toBe(true);
+    expect(isChunkModule('chunk-abc123.js')).toBe(true);
+  });
+
+  it('does not claim the entrypoint or ordinary modules', () => {
+    expect(isChunkModule('/$bunfs/root/cli')).toBe(false);
+    expect(isChunkModule('/$bunfs/root/claude')).toBe(false);
+    expect(isChunkModule('/$bunfs/root/chart.umd.min.js')).toBe(false);
+    expect(isChunkModule('/$bunfs/root/image-processor.node')).toBe(false);
+    // A directory named like a chunk must not drag its children in.
+    expect(isChunkModule('/$bunfs/root/chunk-abc.js/nested.js')).toBe(false);
+  });
+});
+
+describe('splitModulePayload', () => {
+  const join = (parts: Array<[string, string]>) =>
+    parts.map(([n, b]) => `${MODULE_BOUNDARY}${n}\n${b}`).join('');
+
+  it('returns null for a single-module payload so legacy binaries are untouched', () => {
+    expect(splitModulePayload('var a=1;')).toBeNull();
+    expect(splitModulePayload('')).toBeNull();
+  });
+
+  it('round-trips names and bodies exactly', () => {
+    const parts: Array<[string, string]> = [
+      ['/$bunfs/root/cli', 'var a=1;'],
+      ['/$bunfs/root/chunk-a.js', 'var b=2;\nvar c=3;'],
+      ['/$bunfs/root/chunk-b.js', ''],
+    ];
+    expect(splitModulePayload(join(parts))).toEqual(parts);
+  });
+
+  it('preserves bodies that contain blank lines and comment-like text', () => {
+    const parts: Array<[string, string]> = [
+      ['/$bunfs/root/cli', '\n\n// not a boundary\n'],
+      ['/$bunfs/root/chunk-a.js', '//#__tweakcc_module__ without colon'],
+    ];
+    expect(splitModulePayload(join(parts))).toEqual(parts);
+  });
+
+  it('survives a patch that changes a body length', () => {
+    const parts: Array<[string, string]> = [
+      ['/$bunfs/root/chunk-a.js', 'var x=200000;'],
+      ['/$bunfs/root/chunk-b.js', 'var y=1;'],
+    ];
+    const patched = join(parts).replace(
+      'var x=200000;',
+      'var x=(+process.env.CLAUDE_CODE_CONTEXT_LIMIT||200000);'
+    );
+    expect(splitModulePayload(patched)).toEqual([
+      [
+        '/$bunfs/root/chunk-a.js',
+        'var x=(+process.env.CLAUDE_CODE_CONTEXT_LIMIT||200000);',
+      ],
+      ['/$bunfs/root/chunk-b.js', 'var y=1;'],
+    ]);
+  });
+
+  it('throws rather than mis-split a malformed boundary', () => {
+    expect(() =>
+      splitModulePayload(`${MODULE_BOUNDARY}no-newline-after-name`)
+    ).toThrow(/Malformed tweakcc module boundary/);
+  });
+});
+
+describe('buildModuleReplacements', () => {
+  // The names a code-split binary would hand to the payload.
+  const BINARY = [
+    '/$bunfs/root/cli',
+    '/$bunfs/root/chunk-a.js',
+    '/$bunfs/root/chunk-b.js',
+  ];
+  const payload = (parts: Array<[string, string]>) =>
+    parts.map(([n, b]) => `${MODULE_BOUNDARY}${n}\n${b}`).join('');
+  const split = (parts: Array<[string, string]>) =>
+    splitModulePayload(payload(parts))!;
+
+  it("accepts a payload naming exactly the binary's modules", () => {
+    const parts: Array<[string, string]> = [
+      ['/$bunfs/root/cli', 'var a=1;'],
+      ['/$bunfs/root/chunk-a.js', 'var b=2;'],
+      ['/$bunfs/root/chunk-b.js', 'var c=3;'],
+    ];
+    const out = buildModuleReplacements(split(parts), BINARY);
+    expect([...out.keys()].sort()).toEqual([...BINARY].sort());
+    expect(out.get('/$bunfs/root/chunk-a.js')?.toString('utf8')).toBe(
+      'var b=2;'
+    );
+  });
+
+  it('accepts modules in a different order than the binary lists them', () => {
+    const parts: Array<[string, string]> = [
+      ['/$bunfs/root/chunk-b.js', 'var c=3;'],
+      ['/$bunfs/root/cli', 'var a=1;'],
+      ['/$bunfs/root/chunk-a.js', 'var b=2;'],
+    ];
+    expect(() => buildModuleReplacements(split(parts), BINARY)).not.toThrow();
+  });
+
+  // A patch that clobbers a boundary line drops that module from the payload.
+  // Writing on would silently keep the module's ORIGINAL contents.
+  it("rejects a payload missing one of the binary's modules", () => {
+    const parts: Array<[string, string]> = [
+      ['/$bunfs/root/cli', 'var a=1;'],
+      ['/$bunfs/root/chunk-a.js', 'var b=2;'],
+    ];
+    expect(() => buildModuleReplacements(split(parts), BINARY)).toThrow(
+      /missing 1 module\(s\).*chunk-b\.js/s
+    );
+  });
+
+  // Map construction keeps the LAST value, so a repeated name would silently
+  // discard the edits made to the earlier copy.
+  it('rejects a payload naming the same module twice', () => {
+    const parts: Array<[string, string]> = [
+      ['/$bunfs/root/cli', 'var a=1;'],
+      ['/$bunfs/root/chunk-a.js', 'var b=2;'],
+      ['/$bunfs/root/chunk-b.js', 'var c=3;'],
+      ['/$bunfs/root/chunk-a.js', 'var b=999;'],
+    ];
+    expect(() => buildModuleReplacements(split(parts), BINARY)).toThrow(
+      /more than once.*chunk-a\.js/s
+    );
+  });
+
+  // rebuildBunData looks replacements up by name, so a name the binary does
+  // not have is never consulted and its edits vanish without a trace.
+  it('rejects a payload naming a module the binary does not have', () => {
+    const parts: Array<[string, string]> = [
+      ['/$bunfs/root/cli', 'var a=1;'],
+      ['/$bunfs/root/chunk-a.js', 'var b=2;'],
+      ['/$bunfs/root/chunk-b.js', 'var c=3;'],
+      ['/$bunfs/root/chunk-typo.js', 'var d=4;'],
+    ];
+    expect(() => buildModuleReplacements(split(parts), BINARY)).toThrow(
+      /absent from the binary.*chunk-typo\.js/s
+    );
+  });
+
+  it('reports a mangled boundary name as both unknown and missing', () => {
+    // Corrupting one name is simultaneously an unknown entry and an absent one;
+    // whichever fires, it must not be accepted.
+    const parts: Array<[string, string]> = [
+      ['/$bunfs/root/cli', 'var a=1;'],
+      ['/$bunfs/root/chunk-a.js', 'var b=2;'],
+      ['/$bunfs/root/chunk-B.js', 'var c=3;'], // was chunk-b.js
+    ];
+    expect(() => buildModuleReplacements(split(parts), BINARY)).toThrow();
+  });
+
+  it('caps the reported names so a wholesale mismatch stays readable', () => {
+    const many = Array.from(
+      { length: 30 },
+      (_, i) => `/$bunfs/root/chunk-${i}.js`
+    );
+    expect(() => buildModuleReplacements([], many)).toThrow(/\(30 total\)/);
   });
 });
