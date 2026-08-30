@@ -70,6 +70,37 @@ describe('assertPatchedBundleParses', () => {
     expect(() => assertPatchedBundleParses(keywordsInStrings)).not.toThrow();
   });
 
+  it('does not throw on a valid ESM multi-chunk entry bundle', () => {
+    // Newer CC native builds (observed on 2.1.245) extract an ESM entry chunk
+    // that begins with cross-chunk import statements. Under the CommonJS goal
+    // such a bundle always fails, so the gate must retry under the ESM goal
+    // before declaring it broken.
+    const esm =
+      'import{x}from"/$bunfs/root/chunk-abc123.js";\n' +
+      'if(x)console.log(x);\n';
+    expect(() => assertPatchedBundleParses(esm)).not.toThrow();
+  });
+
+  it('throws on a broken ESM bundle with the real break, not the module-goal diagnostic', () => {
+    // When the bundle is ESM and genuinely broken, the CommonJS failure is the
+    // goal mismatch at the healthy import statement; the thrown message must
+    // carry the ESM-goal diagnostic that points at the actual break.
+    const brokenEsm =
+      'import{x}from"/$bunfs/root/chunk-abc123.js";\n' + 'let b=;\n';
+    let caught: unknown;
+    try {
+      assertPatchedBundleParses(brokenEsm);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(PatchedBundleParseError);
+    const message = (caught as Error).message;
+    expect(message).toContain('SyntaxError');
+    expect(message).not.toContain(
+      'Cannot use import statement outside a module'
+    );
+  });
+
   it('surfaces a bounded SyntaxError even when the break is on a very long line', () => {
     // Prompt-injection sites live on long minified lines. node --check writes
     // its diagnostic to stderr then exits; a piped stderr truncates before the
