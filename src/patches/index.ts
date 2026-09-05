@@ -11,7 +11,9 @@ import { ClaudeCodeInstallationInfo, TweakccConfig } from '../types';
 import { debug, replaceFileBreakingHardLinks } from '../utils';
 import {
   extractClaudeJsFromNativeInstallation,
+  extractClaudeJsModulesFromNativeInstallation,
   repackNativeInstallation,
+  repackNativeInstallationModules,
 } from '../nativeInstallationLoader';
 import { DEFAULT_SETTINGS } from '../defaultSettings';
 import {
@@ -90,7 +92,23 @@ import {
   restoreClijsFromBackup,
 } from '../installationBackup';
 import { compareVersions } from '../systemPromptSync';
-import { writePreventUnsupportedUpdates } from './preventUnsupportedUpdates';
+import {
+  writePreventUnsupportedUpdates,
+  writePreventUnsupportedUpdatesModules,
+} from './preventUnsupportedUpdates';
+import type {
+  ExtractedBunCorpus,
+  ExtractedBunModule,
+  BunModuleReplacement,
+} from '../nativeInstallation';
+
+/** Decode executable sources according to Bun's serialized string encoding. */
+function nativeSource(module: ExtractedBunModule): string {
+  if (module.encoding === 2) return module.contents.toString('utf16le');
+  if (module.encoding === 1) return module.contents.toString('latin1');
+  if (module.encoding === 0) return module.contents.toString('utf8');
+  throw new Error(`Unsupported Bun source encoding: ${module.encoding}`);
+}
 
 export { showDiff, showPositionalDiff, globalReplace } from './patchDiffing';
 export {
@@ -480,10 +498,9 @@ const PATCH_DEFINITIONS = [
   },
   {
     id: 'prevent-unsupported-updates',
-    name: 'prevent unsupported updates',
+    name: 'Prevent unsupported updates',
     group: PatchGroup.MISC_CONFIGURABLE,
-    description:
-      'Auto-updates blocked for CC versions not yet supported by tweakcc',
+    description: 'Native/npm auto-updates require a published prompt snapshot',
   },
 ] as const;
 
@@ -602,6 +619,12 @@ export const applyCustomization = async (
   patchFilter?: string[] | null
 ): Promise<ApplyCustomizationResult> => {
   let content: string;
+  let nativeCorpus: ExtractedBunCorpus | null = null;
+  let nativeSourcePath: string | undefined;
+  let nativeGuardEdits: BunModuleReplacement[] = [];
+  const needsNativeGuard =
+    !!config.settings.misc?.preventUpdateToUnsupportedVersions &&
+    (!patchFilter || patchFilter.includes('prevent-unsupported-updates'));
 
   if (ccInstInfo.nativeInstallationPath) {
     // For native installations: restore the binary, then extract to memory
@@ -624,8 +647,19 @@ export const applyCustomization = async (
       `Extracting claude.js from ${backupExists ? 'backup' : 'native installation'}: ${pathToExtractFrom}`
     );
 
-    const claudeJsBuffer =
-      await extractClaudeJsFromNativeInstallation(pathToExtractFrom);
+    // Only this explicitly selected feature opts into module-aware application;
+    // it must patch the actual installer chunk rather than a tiny import stub.
+    if (needsNativeGuard) {
+      nativeCorpus =
+        await extractClaudeJsModulesFromNativeInstallation(pathToExtractFrom);
+      if (!nativeCorpus)
+        throw new Error('Failed to extract native module corpus');
+      nativeSourcePath = pathToExtractFrom;
+    }
+    const entry = nativeCorpus?.modules.find(module => module.isEntrypoint);
+    const claudeJsBuffer = entry
+      ? Buffer.from(nativeSource(entry), 'utf8')
+      : await extractClaudeJsFromNativeInstallation(pathToExtractFrom);
 
     if (!claudeJsBuffer) {
       throw new Error('Failed to extract claude.js from native installation');
@@ -647,6 +681,8 @@ export const applyCustomization = async (
 
     content = await fs.readFile(ccInstInfo.cliPath, { encoding: 'utf8' });
   }
+
+  const originalContent = content;
 
   // Collect all patch results
   const allResults: PatchResult[] = [];
@@ -972,7 +1008,33 @@ export const applyCustomization = async (
       condition: !!config.settings.misc?.enableChannelsMode,
     },
     'prevent-unsupported-updates': {
-      fn: c => writePreventUnsupportedUpdates(c),
+      fn: c => {
+        if (!nativeCorpus) return writePreventUnsupportedUpdates(c);
+        const modules = nativeCorpus.modules.filter(
+          module => module.isJavaScript
+        );
+        const sources = modules.map(module =>
+          module.isEntrypoint ? c : nativeSource(module)
+        );
+        const patched = writePreventUnsupportedUpdatesModules(sources);
+        if (!patched) return null;
+        const entryIndex = modules.findIndex(module => module.isEntrypoint);
+        if (entryIndex < 0) return null;
+        // Stage the complete pair atomically. The binary is written only after
+        // every changed source passes parsing; no half-installed guard is saved.
+        nativeGuardEdits = modules.flatMap((module, index) =>
+          patched[index] === sources[index]
+            ? []
+            : [
+                {
+                  index: module.index,
+                  name: module.name,
+                  contents: Buffer.from(patched[index], 'utf8'),
+                },
+              ]
+        );
+        return patched[entryIndex];
+      },
       condition: !!config.settings.misc?.preventUpdateToUnsupportedVersions,
     },
   };
@@ -983,13 +1045,41 @@ export const applyCustomization = async (
   const { content: patchedContent, results: patchResults } =
     applyPatchImplementations(content, patchImplementations, patchFilter);
   content = patchedContent;
+  if (nativeGuardEdits.length) {
+    // Chunk-only edits do not change the entrypoint string used by the generic
+    // runner, but must still be reported as a successfully applied patch.
+    const guardResult = patchResults.find(
+      result => result.id === 'prevent-unsupported-updates'
+    );
+    if (guardResult) guardResult.applied = true;
+  }
   allResults.push(...patchResults);
 
   // ==========================================================================
   // Verify the patched bundle parses before writing it
   // ==========================================================================
   try {
-    assertPatchedBundleParses(content);
+    const entry = nativeCorpus?.modules.find(module => module.isEntrypoint);
+    // Unmodified native bytes will not be repacked; the backup remains intact.
+    if (
+      !ccInstInfo.nativeInstallationPath ||
+      content !== originalContent ||
+      nativeGuardEdits.length
+    ) {
+      assertPatchedBundleParses(
+        content,
+        entry?.moduleFormat === 1 || !ccInstInfo.nativeInstallationPath
+          ? 'module'
+          : 'script'
+      );
+    }
+    for (const edit of nativeGuardEdits) {
+      const module = nativeCorpus!.modules[edit.index];
+      assertPatchedBundleParses(
+        edit.contents.toString('utf8'),
+        module.moduleFormat === 1 ? 'module' : 'script'
+      );
+    }
   } catch (err) {
     if (!(err instanceof PatchedBundleParseError)) {
       throw err;
@@ -1004,7 +1094,12 @@ export const applyCustomization = async (
   // ==========================================================================
   // Write the modified content back
   // ==========================================================================
-  if (ccInstInfo.nativeInstallationPath) {
+  const nativeChanged =
+    content !== originalContent || nativeGuardEdits.length > 0;
+  // Restoring the backup already removes a disabled/filtered guard. Repacking
+  // an untouched modern graph through the legacy entrypoint writer would lose
+  // metadata tables that only the module-aware writer preserves.
+  if (ccInstInfo.nativeInstallationPath && nativeChanged) {
     // For native installations: repack the modified claude.js back into the binary
     debug(
       `Repacking modified claude.js into native installation: ${ccInstInfo.nativeInstallationPath}`
@@ -1016,12 +1111,32 @@ export const applyCustomization = async (
     debug(`Saved patched JS from native to: ${patchedPath}`);
 
     const modifiedBuffer = Buffer.from(content, 'utf8');
-    await repackNativeInstallation(
-      ccInstInfo.nativeInstallationPath,
-      modifiedBuffer,
-      ccInstInfo.nativeInstallationPath
-    );
-  } else {
+    if (nativeCorpus && nativeSourcePath) {
+      const entry = nativeCorpus.modules.find(module => module.isEntrypoint)!;
+      const edits = nativeGuardEdits.filter(edit => edit.index !== entry.index);
+      if (content !== nativeSource(entry)) {
+        edits.push({
+          index: entry.index,
+          name: entry.name,
+          contents: modifiedBuffer,
+        });
+      }
+      await repackNativeInstallationModules(
+        nativeSourcePath,
+        {
+          sourceSha256: nativeCorpus.sourceSha256,
+          modules: edits,
+        },
+        ccInstInfo.nativeInstallationPath
+      );
+    } else {
+      await repackNativeInstallation(
+        ccInstInfo.nativeInstallationPath,
+        modifiedBuffer,
+        ccInstInfo.nativeInstallationPath
+      );
+    }
+  } else if (!ccInstInfo.nativeInstallationPath) {
     // For NPM installations: replace the cli.js file
     if (!ccInstInfo.cliPath) {
       throw new Error('cliPath is required for NPM installations');

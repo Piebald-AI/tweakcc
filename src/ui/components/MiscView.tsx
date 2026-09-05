@@ -678,7 +678,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         id: 'preventUnsupportedUpdates',
         title: 'Prevent updates to unsupported versions',
         description:
-          'Blocks Claude Code auto-updates to versions not yet supported by tweakcc.',
+          'Blocks native/npm auto-updates until a prompt snapshot is published. Network errors block updates; reapply after updating. Manual/package-manager updates are unchanged.',
         getValue: () =>
           settings.misc?.preventUpdateToUnsupportedVersions ?? false,
         toggle: () => {
