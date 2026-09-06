@@ -652,9 +652,17 @@ export const applyCustomization = async (
     if (needsNativeGuard) {
       nativeCorpus =
         await extractClaudeJsModulesFromNativeInstallation(pathToExtractFrom);
-      if (!nativeCorpus)
-        throw new Error('Failed to extract native module corpus');
-      nativeSourcePath = pathToExtractFrom;
+      if (nativeCorpus) {
+        nativeSourcePath = pathToExtractFrom;
+      } else {
+        // This feature is optional. If ordinary extraction can still recover
+        // an entrypoint, keep unrelated patches available and report only the
+        // guard as failed. A missing native dependency still fails below when
+        // neither extractor can produce usable source.
+        debug(
+          'Native module corpus unavailable; the update guard will be reported as failed.'
+        );
+      }
     }
     const entry = nativeCorpus?.modules.find(module => module.isEntrypoint);
     const claudeJsBuffer = entry
@@ -1009,7 +1017,14 @@ export const applyCustomization = async (
     },
     'prevent-unsupported-updates': {
       fn: c => {
-        if (!nativeCorpus) return writePreventUnsupportedUpdates(c);
+        if (!nativeCorpus) {
+          // A native extraction fallback is not an npm installation. Applying
+          // the historical npm-only matcher would falsely report protection
+          // while leaving the native updater untouched.
+          return ccInstInfo.nativeInstallationPath
+            ? null
+            : writePreventUnsupportedUpdates(c);
+        }
         const modules = nativeCorpus.modules.filter(
           module => module.isJavaScript
         );
