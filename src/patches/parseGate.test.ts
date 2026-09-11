@@ -18,6 +18,18 @@ const BROKEN_869 =
   'module.exports = out;\n';
 
 describe('assertPatchedBundleParses', () => {
+  it('checks ESM imports and top-level await without executing or resolving imports', () => {
+    const source =
+      'import { value } from "/nonexistent/chunk.js"; export const result = await value;';
+    expect(() => assertPatchedBundleParses(source, 'module')).not.toThrow();
+    expect(() => assertPatchedBundleParses(source)).toThrow(
+      PatchedBundleParseError
+    );
+    expect(() =>
+      assertPatchedBundleParses('export const broken = ;', 'module')
+    ).toThrow(PatchedBundleParseError);
+  });
+
   it('does not throw on valid CommonJS', () => {
     const valid = 'const x = 1;\nmodule.exports = { x };\n';
     expect(() => assertPatchedBundleParses(valid)).not.toThrow();
