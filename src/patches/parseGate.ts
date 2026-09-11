@@ -90,12 +90,27 @@ export const isParseFailureExit = (err: unknown): boolean =>
  * that begins with cross-chunk `import` statements. Parsed as CommonJS, such a
  * bundle always fails with one of these diagnostics — unpatched or not — so
  * they signal "retry under the ESM goal", never "the bundle is broken".
+ *
+ * The top-level `await` entry is a prefix match so it covers both the current
+ * wording ("… async functions and the top level bodies of modules") and the
+ * older, shorter one. It matters because CommonJS parsing reports the first
+ * offending construct: an ESM chunk whose top-level `await` precedes a genuine
+ * syntax error would otherwise be diagnosed at the healthy `await`.
  */
 const ESM_GOAL_DIAGNOSTICS = [
   'Cannot use import statement outside a module',
   "Unexpected token 'export'",
   "Cannot use 'import.meta' outside a module",
+  'await is only valid in async function',
 ] as const;
+
+/** Outcome of one `node --check` run under a single module goal. */
+interface ParseCheckResult {
+  tmpFile: string;
+  parseFailed: boolean;
+  operationalFailure: string | null;
+  stderr: string;
+}
 
 /**
  * Parses the fully-patched bundle with `node --check` and throws
@@ -130,7 +145,7 @@ export const assertPatchedBundleParses = (content: string): void => {
   }
 
   try {
-    const check = (ext: 'cjs' | 'mjs') => {
+    const check = (ext: 'cjs' | 'mjs'): ParseCheckResult => {
       const tmpFile = path.join(dir, `bundle.${ext}`);
       const errFile = path.join(dir, `stderr-${ext}.txt`);
       let errFd: number;
