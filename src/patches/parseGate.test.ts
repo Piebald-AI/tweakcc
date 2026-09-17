@@ -7,6 +7,7 @@ import {
   PatchedBundleParseError,
   sanitizeParseError,
   isParseFailureExit,
+  looksLikeEsModule,
 } from './parseGate';
 
 // The exact over-escaped template/ternary that shipped in #869 (fixed by #870).
@@ -16,6 +17,14 @@ const BROKEN_869 =
   'var y = 1, l = 0;\n' +
   'var out = `${l?`\\\\`${y}\\\\``:y}`;\n' +
   'module.exports = out;\n';
+
+// The head of an npm install's cli.js, which has been an ES module since Claude
+// Code v1.0.20. Shaped like the real thing: minified, no leading whitespace,
+// top-level import on the very first byte.
+const ESM_BUNDLE =
+  'import{createRequire as vP5}from"node:module";' +
+  'var MP5=Object.create,yP5=vP5(import.meta.url);' +
+  'export default MP5;\n';
 
 describe('assertPatchedBundleParses', () => {
   it('does not throw on valid CommonJS', () => {
@@ -85,6 +94,73 @@ describe('assertPatchedBundleParses', () => {
     const message = (caught as Error).message;
     expect(message).toContain('SyntaxError');
     expect(message.length).toBeLessThan(4000);
+  });
+
+  it('does not throw on a valid ES module bundle (#981)', () => {
+    // An npm install's cli.js is ESM. Checking it as `.cjs` made every apply
+    // fail with "Cannot use import statement outside a module" even though the
+    // bundle was perfectly valid.
+    expect(() => assertPatchedBundleParses(ESM_BUNDLE)).not.toThrow();
+  });
+
+  it('does not throw on CommonJS-only syntax an ES module parse would reject', () => {
+    // `await` is a reserved word in module code but an ordinary identifier in a
+    // script, so this is the mirror image of #981: pinning `.mjs` instead of
+    // `.cjs` would merely move the breakage onto Bun-compiled native installs.
+    const cjsOnly = 'var await = 1;\nmodule.exports = await;\n';
+    expect(() => assertPatchedBundleParses(cjsOnly)).not.toThrow();
+  });
+
+  it('falls back to the other mode when the module-kind guess is wrong', () => {
+    // Claude Code's bundle embeds JS source as string payloads, so a `;import{`
+    // inside a string literal can make a CommonJS bundle look like ESM. The
+    // guess only picks which mode is tried first; the bundle must still pass.
+    const misleading =
+      'var payload = "x;import{a}from\'b\'";\n' +
+      'var await = 1;\n' +
+      'module.exports = payload + await;\n';
+    expect(looksLikeEsModule(misleading)).toBe(true);
+    expect(() => assertPatchedBundleParses(misleading)).not.toThrow();
+  });
+
+  it('reports the ESM diagnostic, not the mode mismatch, when an ESM bundle is broken', () => {
+    // Both modes reject this, so the gate must still throw — and the message
+    // has to name the real break rather than the CommonJS parse's complaint
+    // about the import statement, which would send the reader nowhere.
+    let caught: unknown;
+    try {
+      assertPatchedBundleParses(`${ESM_BUNDLE}let a=;\n`);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(PatchedBundleParseError);
+    const message = (caught as Error).message;
+    expect(message).toContain('SyntaxError');
+    expect(message).not.toContain(
+      'Cannot use import statement outside a module'
+    );
+  });
+});
+
+describe('looksLikeEsModule', () => {
+  it('detects a minified top-level import at the first byte', () => {
+    expect(looksLikeEsModule(ESM_BUNDLE)).toBe(true);
+  });
+
+  it('detects import and export statements after a statement boundary', () => {
+    expect(looksLikeEsModule('var a=1;import"./side-effect.js";')).toBe(true);
+    expect(looksLikeEsModule('function f(){}\nexport{f};')).toBe(true);
+    expect(looksLikeEsModule('if(x){y()}export default 1;')).toBe(true);
+  });
+
+  it('does not count a dynamic import, which is legal in CommonJS', () => {
+    expect(looksLikeEsModule('const m = await import("./x.js");')).toBe(false);
+    expect(looksLikeEsModule('var a=1;import("./x.js").then(f);')).toBe(false);
+  });
+
+  it('does not count import or export appearing mid-expression', () => {
+    expect(looksLikeEsModule('const importantThing = 1;')).toBe(false);
+    expect(looksLikeEsModule('module.exports = { exported: 1 };')).toBe(false);
   });
 });
 
