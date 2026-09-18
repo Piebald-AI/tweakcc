@@ -8,6 +8,8 @@
 
 import type {
   extractClaudeJsFromNativeInstallation as ExtractFn,
+  extractClaudeJsModulesFromNativeInstallation as ExtractModulesFn,
+  repackNativeInstallationModules as RepackModulesFn,
   repackNativeInstallation as RepackFn,
   resolveNixBinaryWrapper as ResolveNixFn,
 } from './nativeInstallation';
@@ -16,6 +18,8 @@ import { debug } from './utils';
 
 interface NativeInstallationModule {
   extractClaudeJsFromNativeInstallation: typeof ExtractFn;
+  extractClaudeJsModulesFromNativeInstallation: typeof ExtractModulesFn;
+  repackNativeInstallationModules: typeof RepackModulesFn;
   repackNativeInstallation: typeof RepackFn;
   resolveNixBinaryWrapper: typeof ResolveNixFn;
 }
@@ -61,6 +65,33 @@ export async function extractClaudeJsFromNativeInstallation(
     return null;
   }
   return mod.extractClaudeJsFromNativeInstallation(nativeInstallationPath);
+}
+
+/**
+ * Reads the complete embedded corpus. The path must resolve any Nix wrapper.
+ * Returns null when native support is unavailable or the graph cannot be read.
+ */
+export async function extractClaudeJsModulesFromNativeInstallation(
+  nativeInstallationPath: string
+): Promise<ReturnType<typeof ExtractModulesFn>> {
+  const mod = await tryLoadNativeInstallationModule();
+  if (!mod) return null;
+  return mod.extractClaudeJsModulesFromNativeInstallation(
+    nativeInstallationPath
+  );
+}
+
+/**
+ * Writes identity-validated source replacements without loading native support
+ * until needed. Throws if support is unavailable or validation/writing fails.
+ * Callers must use the digest from the original corpus and resolved binary path.
+ */
+export async function repackNativeInstallationModules(
+  ...args: Parameters<typeof RepackModulesFn>
+): Promise<void> {
+  const mod = await tryLoadNativeInstallationModule();
+  if (!mod) throw new Error('Native module repacking requires node-lief');
+  mod.repackNativeInstallationModules(...args);
 }
 
 /**
