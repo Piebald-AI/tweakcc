@@ -177,6 +177,26 @@ npx tweakcc@latest --apply --config-url https://gist.githubusercontent.com/bl-ue
 
 Your local config will **not** be overwritten; the remote config will be copied into your `config.json` under `remoteConfig.settings`.
 
+## Guard automatic updates
+
+The **Prevent updates to unsupported versions** toggle in Misc settings enables
+`settings.misc.preventUpdateToUnsupportedVersions` (default: `false`). Native and
+npm automatic updates then require an HTTP 200 response for the target version's
+prompt snapshot in the official TweakCC repository. Missing snapshots, network
+errors, and checks taking longer than five seconds block that automatic update.
+
+The native guard checks the final target after Claude Code's canary selection and
+version caps. Legacy npm automatic installers use the exact checked version rather
+than resolving a moving `stable` or `latest` tag again. Manual `claude update` / `claude install` calls and package-manager
+updates are intentionally unchanged. Verified layouts are the 2.1.20 npm bundle
+and the split native bundle in 2.1.261; an unknown layout is reported as a failed
+patch rather than partially instrumented.
+
+A published snapshot means prompt data is available, **not** that every patch in
+your installed TweakCC release supports that Claude Code version. A successful
+update replaces the patched executable, so **reapply TweakCC after updating** to
+restore this guard and your other customizations.
+
 ## CLI Commands
 
 In addition to the interactive TUI (`npx tweakcc`) and the `--apply` flag, tweakcc provides three subcommands for advanced use: `unpack`, `repack`, and `adhoc-patch`.

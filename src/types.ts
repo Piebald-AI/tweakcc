@@ -139,6 +139,7 @@ export interface MiscConfig {
   enableVoiceMode: boolean;
   enableVoiceConciseOutput: boolean;
   enableChannelsMode: boolean;
+  preventUpdateToUnsupportedVersions: boolean;
 }
 
 export interface InputPatternHighlighter {

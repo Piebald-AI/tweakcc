@@ -85,9 +85,9 @@ export const isParseFailureExit = (err: unknown): boolean =>
 
 /**
  * Parses the fully-patched bundle with `node --check` and throws
- * PatchedBundleParseError if it does not parse. The bundle is CommonJS
- * (`@bun-cjs`), so the temp file uses a `.cjs` extension to pin CommonJS parsing
- * regardless of any ambient package.json "type". A real parser is used rather
+ * PatchedBundleParseError if it does not parse. CommonJS remains the default;
+ * callers handling Bun ESM chunks must select `module` from the record's format.
+ * The .cjs/.mjs extension pins parsing regardless of ambient package.json type. A real parser is used rather
  * than `new Function` / `vm.compileFunction`, which impose a bare function-body
  * context that diverges from module parsing. `node --check` writes its
  * diagnostic to stderr and then exits, which truncates a piped stderr on long
@@ -96,7 +96,10 @@ export const isParseFailureExit = (err: unknown): boolean =>
  * spawn failure, or an unwritable temp file warns and skips the check, so an
  * operational problem never blocks an otherwise-valid apply.
  */
-export const assertPatchedBundleParses = (content: string): void => {
+export const assertPatchedBundleParses = (
+  content: string,
+  sourceType: 'script' | 'module' = 'script'
+): void => {
   let dir: string;
   try {
     dir = fsSync.mkdtempSync(path.join(os.tmpdir(), 'tweakcc-parse-'));
@@ -109,7 +112,10 @@ export const assertPatchedBundleParses = (content: string): void => {
     return;
   }
 
-  const tmpFile = path.join(dir, 'bundle.cjs');
+  const tmpFile = path.join(
+    dir,
+    sourceType === 'module' ? 'bundle.mjs' : 'bundle.cjs'
+  );
   const errFile = path.join(dir, 'stderr.txt');
   try {
     try {
