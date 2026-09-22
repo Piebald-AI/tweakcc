@@ -1960,7 +1960,7 @@
         "1": "ARTIFACT_FEATURE_GATES",
         "2": "ARTIFACT_CHECK_TOOL_NAME",
         "3": "CAPABILITY_VERIFICATION_CLAUSES",
-        "4": "BOOLEAN_IDENTITY_FUNCTION"
+        "4": "IS_TRUTHY_FN"
       },
       "version": "2.1.280"
     },
@@ -2932,6 +2932,17 @@
       "identifiers": [],
       "identifierMap": {},
       "version": "2.1.277"
+    },
+    {
+      "name": "Data: SDK set model system prompt field",
+      "id": "data-sdk-set-model-system-prompt-field",
+      "description": "Schema description for the internal set_model system_prompt field, including next-turn application with unchanged tool definitions, non-empty updates, feature overrides, and compatibility behavior",
+      "pieces": [
+        "@internal Replaces the custom system prompt (the --system-prompt / initialize systemPrompt slot). The session keeps sending the system prompt it has recorded, so the new text is first sent after the next compaction; under systemPromptSnapshot: false it is sent from the next turn on. The tool definitions already sent do not change. Applied only when the model request is accepted; must be non-empty (there is no revert-to-built-in form); re-send the current model for a prompt-only update; sending the text already in effect changes nothing. The CLAUDE_CODE_SYSTEM_PROMPT_GB_FEATURE per-turn read, where configured, still wins. Transports that do not implement it, and older builds, ack success without applying it."
+      ],
+      "identifiers": [],
+      "identifierMap": {},
+      "version": "2.1.280"
     },
     {
       "name": "Data: Self-hosted runner decode-token command help",
@@ -12155,6 +12166,61 @@
       "identifiers": [],
       "identifierMap": {},
       "version": "2.1.199"
+    },
+    {
+      "name": "Tool Description: SearchPlugins examples",
+      "id": "tool-description-searchplugins-examples",
+      "description": "Provides keyword-query examples for SearchPlugins",
+      "pieces": [
+        "Examples:\n- \"use the deploy plugin\" → keywords [\"deploy\"]\n- \"is there something for linting?\" → keywords [\"lint\", \"format\", \"code quality\"]"
+      ],
+      "identifiers": [],
+      "identifierMap": {},
+      "version": "2.1.280"
+    },
+    {
+      "name": "Tool Description: SearchPlugins purpose",
+      "id": "tool-description-searchplugins-purpose",
+      "description": "Explains when to search the user's Claude.ai organization plugin catalog by keyword",
+      "pieces": [
+        "Search the user's claude.ai plugin catalog by keyword. Call this when a plugin (slash command, skill bundle, hook, or agent) from the user's org catalog might help complete the task."
+      ],
+      "identifiers": [],
+      "identifierMap": {},
+      "version": "2.1.280"
+    },
+    {
+      "name": "Tool Description: SearchPlugins result handling",
+      "id": "tool-description-searchplugins-result-handling",
+      "description": "Describes SearchPlugins results and when to render an install card, relay matches, or continue silently",
+      "pieces": [
+        "Returns a ranked list with id, name, description, and whether the plugin is already enabled for this session (in a channel session, whether the channel has it). When results fit and SuggestPluginInstall is among your tools, call it to render the install card; otherwise relay the relevant results in text instead. If nothing relevant, proceed without mentioning that you searched."
+      ],
+      "identifiers": [],
+      "identifierMap": {},
+      "version": "2.1.280"
+    },
+    {
+      "name": "Tool Description: SearchPlugins up-front guidance",
+      "id": "tool-description-searchplugins-up-front-guidance",
+      "description": "Guides proactive plugin searches for organization-specific processes, systems, or data that existing tools and project scripts do not cover",
+      "pieces": [
+        "${",
+        "} The user does not need to name a plugin: search when the task depends on their team's own process, systems or data and nothing you already have, the project's own scripts included, covers it.\n\n${",
+        "}\n- \"ship this to staging\" → keywords [\"deploy\", \"release\", \"staging\"]\n- \"review this contract against our playbook\" → keywords [\"legal\", \"contract\", \"playbook\"]\n- \"which deals close this week?\" → keywords [\"sales\", \"pipeline\", \"crm\"]\n\nDo not search unasked for one-off questions or tasks you can handle directly (\"explain this regex\", \"fix this typo\"), or after the user ignored a suggestion in this conversation.\n\n${",
+        "}"
+      ],
+      "identifiers": [
+        0,
+        1,
+        2
+      ],
+      "identifierMap": {
+        "0": "SEARCH_PLUGINS_PURPOSE",
+        "1": "SEARCH_PLUGINS_EXAMPLES",
+        "2": "SEARCH_PLUGINS_RESULT_HANDLING"
+      },
+      "version": "2.1.280"
     },
     {
       "name": "Tool Description: SearchSkills",
