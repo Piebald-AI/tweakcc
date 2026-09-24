@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Replace the existing `.bun` payload for ELF binaries instead of appending a new one (#952) - @signadou
 - Preserve prompt identity across formatting-only interpolation source changes and correct the Claude Code 2.1.235 prompt archive (#958) - @mike1858
+- Fix the parse gate rejecting ESM native bundles on Claude Code 2.1.245+ (#978) - @aegntic
 
 ## [v4.3.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.3) - 2026-08-13
 
