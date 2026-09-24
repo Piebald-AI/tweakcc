@@ -7,7 +7,10 @@ import {
   repackNativeInstallation,
   repackNativeInstallationModules,
 } from '../nativeInstallationLoader';
-import { writePreventUnsupportedUpdates } from './preventUnsupportedUpdates';
+import {
+  writePreventUnsupportedUpdates,
+  writePreventUnsupportedUpdatesModules,
+} from './preventUnsupportedUpdates';
 import { applyCustomization } from './index';
 import { assertPatchedBundleParses } from './parseGate';
 
@@ -94,6 +97,50 @@ describe('native update guard extraction fallback', () => {
       Buffer.from('const base = 1;')
     );
   });
+
+  it.each([
+    [0, 'utf8', 'const label = "café 🦆";'],
+    [1, 'latin1', 'const label = "café";'],
+    [2, 'utf16le', 'const label = "café 🦆";'],
+  ] as const)(
+    'decodes Bun encoding %i before matching native update guards',
+    async (encoding, codec, source) => {
+      // Keep the bytes authoritative: UTF-8-decoding the UTF-16 fixture must not
+      // accidentally pass just because the matching algorithm is mocked below.
+      const modules = [source, 'export const value = 1;'].map(
+        (text, index) => ({
+          index,
+          name: index === 0 ? '/$bunfs/root/cli' : '/$bunfs/root/chunk.js',
+          contents: Buffer.from(text, codec),
+          loader: 1,
+          moduleFormat: 1,
+          encoding,
+          side: 0,
+          isEntrypoint: index === 0,
+          isJavaScript: true,
+        })
+      );
+      vi.mocked(extractClaudeJsModulesFromNativeInstallation).mockResolvedValue(
+        {
+          sourceSha256: '0'.repeat(64),
+          moduleStructSize: 52,
+          entryPointId: 0,
+          modules,
+        }
+      );
+      vi.mocked(writePreventUnsupportedUpdatesModules).mockReturnValue(null);
+      await applyCustomization(config(), installation, [
+        'prevent-unsupported-updates',
+      ]);
+      expect(writePreventUnsupportedUpdatesModules).toHaveBeenCalledWith([
+        source,
+        'export const value = 1;',
+      ]);
+      expect(extractClaudeJsFromNativeInstallation).not.toHaveBeenCalled();
+      expect(repackNativeInstallation).not.toHaveBeenCalled();
+      expect(repackNativeInstallationModules).not.toHaveBeenCalled();
+    }
+  );
 
   it('reports the guard as failed while applying an unrelated native customization', async () => {
     const result = await applyCustomization(config(), installation, [

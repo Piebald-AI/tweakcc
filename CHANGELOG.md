@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keep unrelated native customizations available when optional update-guard extraction fails (#408) - @mike1858
 - Preserve automatic module-format detection while enforcing explicit parse modes for known native chunks (#408) - @mike1858
 
+- Verify native update-guard source decoding for Bun's UTF-8, Latin-1, and UTF-16LE encodings (#408) - @mike1858
+
 ## [v4.3.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.3) - 2026-08-13
 
 - Clarify that `--apply --patches` restores from backup before applying the listed patch IDs (#699)

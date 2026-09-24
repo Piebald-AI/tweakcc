@@ -104,6 +104,10 @@ import type {
 
 /** Decode executable sources according to Bun's serialized string encoding. */
 function nativeSource(module: ExtractedBunModule): string {
+  // Bun 1.4.1 reused the never-written Utf8 tag (2) for little-endian UTF-16;
+  // decoding it as UTF-8 corrupts source before the updater matcher sees it.
+  // The enum and to_wtf_string agree on 0=UTF-8, 1=Latin-1, 2=UTF-16:
+  // https://github.com/oven-sh/bun/blob/4661e494f052c83c80dade1318e5710238340be6/src/standalone_graph/StandaloneModuleGraph.rs#L407-L419
   if (module.encoding === 2) return module.contents.toString('utf16le');
   if (module.encoding === 1) return module.contents.toString('latin1');
   if (module.encoding === 0) return module.contents.toString('utf8');
