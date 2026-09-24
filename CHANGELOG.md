@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix the parse gate rejecting ESM native bundles on Claude Code 2.1.245+ (#978) - @aegntic
 
 - Add identity-validated native JavaScript module replacement for split Bun bundles (#408) - @mike1858
+- Gate native and npm automatic updates on published prompt snapshots, with fail-closed checks and unchanged manual updates (#408) - @mike1858
+- Keep unrelated native customizations available when optional update-guard extraction fails (#408) - @mike1858
+- Preserve automatic module-format detection while enforcing explicit parse modes for known native chunks (#408) - @mike1858
+
+- Verify native update-guard source decoding for Bun's UTF-8, Latin-1, and UTF-16LE encodings (#408) - @mike1858
 
 ## [v4.3.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.3) - 2026-08-13
 

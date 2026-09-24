@@ -20,6 +20,21 @@ function configWithDefaults(
 }
 
 describe('applyPlan', () => {
+  it('plans the update guard only when explicitly enabled and selected', () => {
+    const config = configWithDefaults();
+    const id = 'prevent-unsupported-updates';
+    expect(isPatchEnabledByConfig(id, config, '2.1.261')).toBe(false);
+    config.settings.misc!.preventUpdateToUnsupportedVersions = true;
+    expect(
+      getPlannedPatches(config, '2.1.261', [id]).map(patch => patch.id)
+    ).toEqual([id]);
+    expect(
+      getPlannedPatches(config, '2.1.261', ['themes']).map(patch => patch.id)
+    ).not.toContain(id);
+    delete (config.settings as Partial<TweakccConfig['settings']>).misc;
+    expect(isPatchEnabledByConfig(id, config, '2.1.261')).toBe(false);
+  });
+
   it('marks default-on patches when using DEFAULT_SETTINGS', () => {
     const planned = getPlannedPatches(configWithDefaults(), '2.1.200', null);
     const byId = Object.fromEntries(planned.map(p => [p.id, p]));

@@ -87,6 +87,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableVoiceMode: false,
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
+    preventUpdateToUnsupportedVersions: false,
   };
 
   const ensureMisc = () => {
@@ -670,6 +671,21 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.allowCustomAgentModels =
               !settings.misc!.allowCustomAgentModels;
+          });
+        },
+      },
+      {
+        id: 'preventUnsupportedUpdates',
+        title: 'Prevent updates to unsupported versions',
+        description:
+          'Blocks native/npm auto-updates until a prompt snapshot is published. Network errors block updates; reapply after updating. Manual/package-manager updates are unchanged.',
+        getValue: () =>
+          settings.misc?.preventUpdateToUnsupportedVersions ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.preventUpdateToUnsupportedVersions =
+              !settings.misc!.preventUpdateToUnsupportedVersions;
           });
         },
       },

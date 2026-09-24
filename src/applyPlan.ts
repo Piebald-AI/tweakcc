@@ -192,6 +192,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.enableVoiceMode;
     case 'channels-mode':
       return !!misc?.enableChannelsMode;
+    case 'prevent-unsupported-updates':
+      return !!misc?.preventUpdateToUnsupportedVersions;
     default:
       // New PatchIds should get an explicit case above.
       return true;

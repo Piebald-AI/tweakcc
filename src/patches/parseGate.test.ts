@@ -18,6 +18,29 @@ const BROKEN_869 =
   'module.exports = out;\n';
 
 describe('assertPatchedBundleParses', () => {
+  it('checks ESM imports and top-level await without executing or resolving imports', () => {
+    const source =
+      'import { value } from "/nonexistent/chunk.js"; export const result = await value;';
+    expect(() => assertPatchedBundleParses(source, 'module')).not.toThrow();
+    expect(() => assertPatchedBundleParses(source)).not.toThrow();
+    expect(() => assertPatchedBundleParses(source, 'script')).toThrow(
+      PatchedBundleParseError
+    );
+    expect(() =>
+      assertPatchedBundleParses('export const broken = ;', 'module')
+    ).toThrow(PatchedBundleParseError);
+  });
+
+  it('does not fall back from an explicit ESM goal to permissive CommonJS syntax', () => {
+    // Sloppy CommonJS permits with-statements; ESM is strict. Known ESM must
+    // fail rather than silently succeeding under a different runtime goal.
+    const source = 'with ({ value: 1 }) { console.log(value); }';
+    expect(() => assertPatchedBundleParses(source, 'script')).not.toThrow();
+    expect(() => assertPatchedBundleParses(source, 'module')).toThrow(
+      PatchedBundleParseError
+    );
+  });
+
   it('does not throw on valid CommonJS', () => {
     const valid = 'const x = 1;\nmodule.exports = { x };\n';
     expect(() => assertPatchedBundleParses(valid)).not.toThrow();

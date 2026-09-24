@@ -130,8 +130,15 @@ interface ParseCheckResult {
  * parse failure; a timeout, signal, spawn failure, or an unwritable temp file
  * warns and skips the check, so an operational problem never blocks an
  * otherwise-valid apply.
+ *
+ * When a caller knows the Bun record's format, `script` or `module` pins that
+ * goal without retrying the other. The default `auto` preserves detection for
+ * callers without module metadata and for older native bundles.
  */
-export const assertPatchedBundleParses = (content: string): void => {
+export const assertPatchedBundleParses = (
+  content: string,
+  sourceType: 'auto' | 'script' | 'module' = 'auto'
+): void => {
   let dir: string;
   try {
     dir = fsSync.mkdtempSync(path.join(os.tmpdir(), 'tweakcc-parse-'));
@@ -192,6 +199,20 @@ export const assertPatchedBundleParses = (content: string): void => {
         )
       );
     };
+
+    // An explicit format is authoritative: accepting the opposite goal could
+    // hide syntax that the actual module loader will reject at runtime.
+    if (sourceType !== 'auto') {
+      const result = check(sourceType === 'module' ? 'mjs' : 'cjs');
+      if (result.operationalFailure !== null) {
+        warnOperational(result.operationalFailure);
+      } else if (result.parseFailed) {
+        throw new PatchedBundleParseError(
+          sanitizeParseError(result.stderr, result.tmpFile)
+        );
+      }
+      return;
+    }
 
     const asCjs = check('cjs');
     if (asCjs.operationalFailure !== null) {

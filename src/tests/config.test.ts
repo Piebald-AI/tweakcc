@@ -135,6 +135,26 @@ describe('config.ts', () => {
   });
 
   describe('readConfigFile', () => {
+    it.each([undefined, false, true])(
+      'normalizes the update guard setting %s without enabling it implicitly',
+      async value => {
+        const settings = {
+          ...DEFAULT_SETTINGS,
+          misc: {
+            ...DEFAULT_SETTINGS.misc,
+            preventUpdateToUnsupportedVersions: value,
+          },
+        };
+        vi.spyOn(fs, 'readFile').mockResolvedValue(
+          JSON.stringify({ settings })
+        );
+        expect(
+          (await readConfigFile()).settings.misc
+            .preventUpdateToUnsupportedVersions
+        ).toBe(value ?? false);
+      }
+    );
+
     it('should return the default config if the file does not exist', async () => {
       vi.spyOn(fs, 'readFile').mockRejectedValue(createEnoent());
       const result = await readConfigFile();
