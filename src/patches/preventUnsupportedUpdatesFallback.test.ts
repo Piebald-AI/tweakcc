@@ -9,6 +9,7 @@ import {
 } from '../nativeInstallationLoader';
 import { writePreventUnsupportedUpdates } from './preventUnsupportedUpdates';
 import { applyCustomization } from './index';
+import { assertPatchedBundleParses } from './parseGate';
 
 // All filesystem and installation effects are mocked. These cases exercise
 // failure isolation in the real apply pipeline without touching a client.
@@ -109,6 +110,10 @@ describe('native update guard extraction fallback', () => {
       '/test/claude',
       Buffer.from('const base = 1;;void 0;'),
       '/test/claude'
+    );
+    expect(assertPatchedBundleParses).toHaveBeenCalledWith(
+      'const base = 1;;void 0;',
+      'auto'
     );
     expect(repackNativeInstallationModules).not.toHaveBeenCalled();
     expect(writePreventUnsupportedUpdates).not.toHaveBeenCalled();

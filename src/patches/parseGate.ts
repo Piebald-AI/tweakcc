@@ -84,21 +84,60 @@ export const isParseFailureExit = (err: unknown): boolean =>
   err != null && typeof (err as { status?: unknown }).status === 'number';
 
 /**
+ * `node --check` diagnostics that indicate the wrong module goal rather than a
+ * broken bundle. Older CC native builds bundle as CommonJS (`@bun-cjs`), but
+ * newer multi-chunk builds (observed on 2.1.245) extract an ESM entry chunk
+ * that begins with cross-chunk `import` statements. Parsed as CommonJS, such a
+ * bundle always fails with one of these diagnostics — unpatched or not — so
+ * they signal "retry under the ESM goal", never "the bundle is broken".
+ *
+ * The top-level `await` entry is a prefix match so it covers both the current
+ * wording ("… async functions and the top level bodies of modules") and the
+ * older, shorter one. It matters because CommonJS parsing reports the first
+ * offending construct: an ESM chunk whose top-level `await` precedes a genuine
+ * syntax error would otherwise be diagnosed at the healthy `await`.
+ */
+const ESM_GOAL_DIAGNOSTICS = [
+  'Cannot use import statement outside a module',
+  "Unexpected token 'export'",
+  "Cannot use 'import.meta' outside a module",
+  'await is only valid in async function',
+] as const;
+
+/** Outcome of one `node --check` run under a single module goal. */
+interface ParseCheckResult {
+  tmpFile: string;
+  parseFailed: boolean;
+  operationalFailure: string | null;
+  stderr: string;
+}
+
+/**
  * Parses the fully-patched bundle with `node --check` and throws
- * PatchedBundleParseError if it does not parse. CommonJS remains the default;
- * callers handling Bun ESM chunks must select `module` from the record's format.
- * The .cjs/.mjs extension pins parsing regardless of ambient package.json type. A real parser is used rather
- * than `new Function` / `vm.compileFunction`, which impose a bare function-body
- * context that diverges from module parsing. `node --check` writes its
- * diagnostic to stderr and then exits, which truncates a piped stderr on long
- * lines, so stderr is captured to a file. The check is bounded by a timeout.
- * Only a genuine non-zero exit is treated as a parse failure; a timeout, signal,
- * spawn failure, or an unwritable temp file warns and skips the check, so an
- * operational problem never blocks an otherwise-valid apply.
+ * PatchedBundleParseError if it does not parse. The bundle may be CommonJS
+ * (older `@bun-cjs` native builds) or ESM (newer multi-chunk builds), so the
+ * temp file uses an explicit extension to pin the module goal regardless of any
+ * ambient package.json "type": the check runs under CommonJS first and, only
+ * when that fails to parse, retries under the ESM goal. A bundle that parses
+ * under either goal passes; only failing both is a parse failure, and the
+ * reported diagnostic comes from the goal the bundle actually targets (a
+ * CommonJS goal-mismatch message would point at a healthy `import` statement).
+ * A real parser is used rather than `new Function` / `vm.compileFunction`,
+ * which impose a bare function-body context that diverges from module parsing.
+ * `node --check` writes its diagnostic to stderr and then exits, which
+ * truncates a piped stderr on long lines, so stderr is captured to a file. The
+ * check is bounded by a timeout. Only a genuine non-zero exit is treated as a
+ * parse failure; a timeout, signal, spawn failure, or an unwritable temp file
+ * warns and skips the check, so an operational problem never blocks an
+ * otherwise-valid apply.
+ *
+ * When a caller knows the Bun record's format, `script` or `module` pins that
+ * goal without retrying the other. The default `auto` preserves detection for
+ * callers without module metadata and for older native bundles.
  */
 export const assertPatchedBundleParses = (
   content: string,
-  sourceType: 'script' | 'module' = 'script'
+  sourceType: 'auto' | 'script' | 'module' = 'auto'
 ): void => {
   let dir: string;
   try {
@@ -112,69 +151,97 @@ export const assertPatchedBundleParses = (
     return;
   }
 
-  const tmpFile = path.join(
-    dir,
-    sourceType === 'module' ? 'bundle.mjs' : 'bundle.cjs'
-  );
-  const errFile = path.join(dir, 'stderr.txt');
   try {
-    try {
-      fsSync.writeFileSync(tmpFile, content, 'utf8');
-    } catch (err) {
-      console.warn(
-        chalk.yellow(
-          `Warning: could not write the patched bundle for verification (${String(err)}); skipping the parse check.`
-        )
-      );
-      return;
-    }
-
-    let errFd: number;
-    try {
-      errFd = fsSync.openSync(errFile, 'w');
-    } catch (err) {
-      console.warn(
-        chalk.yellow(
-          `Warning: could not open a temp file to verify the patched bundle (${String(err)}); skipping the parse check.`
-        )
-      );
-      return;
-    }
-    let parseFailed = false;
-    let operationalFailure: string | null = null;
-    try {
-      execFileSync(process.execPath, ['--check', tmpFile], {
-        stdio: ['ignore', 'ignore', errFd],
-        timeout: PARSE_CHECK_TIMEOUT_MS,
-      });
-    } catch (err) {
-      if (isParseFailureExit(err)) {
-        parseFailed = true;
-      } else {
-        operationalFailure = String(err);
+    const check = (ext: 'cjs' | 'mjs'): ParseCheckResult => {
+      const tmpFile = path.join(dir, `bundle.${ext}`);
+      const errFile = path.join(dir, `stderr-${ext}.txt`);
+      let errFd: number;
+      try {
+        fsSync.writeFileSync(tmpFile, content, 'utf8');
+        errFd = fsSync.openSync(errFile, 'w');
+      } catch (err) {
+        return {
+          tmpFile,
+          parseFailed: false,
+          operationalFailure: String(err),
+          stderr: '',
+        };
       }
-    } finally {
-      fsSync.closeSync(errFd);
-    }
-
-    if (operationalFailure !== null) {
-      console.warn(
-        chalk.yellow(
-          `Warning: the parse check could not run to completion (${operationalFailure}); skipping it.`
-        )
-      );
-      return;
-    }
-
-    if (parseFailed) {
+      let parseFailed = false;
+      let operationalFailure: string | null = null;
+      try {
+        execFileSync(process.execPath, ['--check', tmpFile], {
+          stdio: ['ignore', 'ignore', errFd],
+          timeout: PARSE_CHECK_TIMEOUT_MS,
+        });
+      } catch (err) {
+        if (isParseFailureExit(err)) {
+          parseFailed = true;
+        } else {
+          operationalFailure = String(err);
+        }
+      } finally {
+        fsSync.closeSync(errFd);
+      }
       let stderr = '';
       try {
         stderr = fsSync.readFileSync(errFile, 'utf8');
       } catch {
         // The sanitizer synthesizes a message when stderr is unavailable.
       }
-      throw new PatchedBundleParseError(sanitizeParseError(stderr, tmpFile));
+      return { tmpFile, parseFailed, operationalFailure, stderr };
+    };
+
+    const warnOperational = (description: string): void => {
+      console.warn(
+        chalk.yellow(
+          `Warning: the parse check could not run to completion (${description}); skipping it.`
+        )
+      );
+    };
+
+    // An explicit format is authoritative: accepting the opposite goal could
+    // hide syntax that the actual module loader will reject at runtime.
+    if (sourceType !== 'auto') {
+      const result = check(sourceType === 'module' ? 'mjs' : 'cjs');
+      if (result.operationalFailure !== null) {
+        warnOperational(result.operationalFailure);
+      } else if (result.parseFailed) {
+        throw new PatchedBundleParseError(
+          sanitizeParseError(result.stderr, result.tmpFile)
+        );
+      }
+      return;
     }
+
+    const asCjs = check('cjs');
+    if (asCjs.operationalFailure !== null) {
+      warnOperational(asCjs.operationalFailure);
+      return;
+    }
+    if (!asCjs.parseFailed) {
+      return;
+    }
+
+    // CommonJS parsing failed. If the bundle targets the ESM goal, that is the
+    // expected outcome rather than a patching regression, so retry under the
+    // ESM goal before declaring the bundle broken.
+    const asMjs = check('mjs');
+    if (asMjs.operationalFailure !== null) {
+      warnOperational(asMjs.operationalFailure);
+      return;
+    }
+    if (!asMjs.parseFailed) {
+      return;
+    }
+
+    const goalMismatch = ESM_GOAL_DIAGNOSTICS.some(diagnostic =>
+      asCjs.stderr.includes(diagnostic)
+    );
+    const failure = goalMismatch ? asMjs : asCjs;
+    throw new PatchedBundleParseError(
+      sanitizeParseError(failure.stderr, failure.tmpFile)
+    );
   } finally {
     try {
       fsSync.rmSync(dir, { recursive: true, force: true });

@@ -1083,9 +1083,13 @@ export const applyCustomization = async (
     ) {
       assertPatchedBundleParses(
         content,
-        entry?.moduleFormat === 1 || !ccInstInfo.nativeInstallationPath
-          ? 'module'
-          : 'script'
+        entry
+          ? entry.moduleFormat === 1
+            ? 'module'
+            : 'script'
+          : ccInstInfo.nativeInstallationPath
+            ? 'auto'
+            : 'module'
       );
     }
     for (const edit of nativeGuardEdits) {
