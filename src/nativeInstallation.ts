@@ -3,6 +3,8 @@
  */
 
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
+import { isUtf8 } from 'node:buffer';
 import { execSync } from 'node:child_process';
 import LIEF from 'node-lief';
 import { isDebug, debug } from './utils';
@@ -197,6 +199,46 @@ interface BunData {
   moduleStructSize: number;
 }
 
+/** An embedded module's stable table identity and unmodified source bytes. */
+export interface ExtractedBunModule {
+  index: number;
+  name: string;
+  contents: Buffer;
+  loader: number;
+  moduleFormat: number;
+  encoding: number;
+  side: number;
+  isEntrypoint: boolean;
+  isJavaScript: boolean;
+}
+
+/** Read-only module view; retain the source digest when preparing replacements. */
+export interface ExtractedBunCorpus {
+  sourceSha256: string;
+  moduleStructSize: 36 | 52;
+  entryPointId: number;
+  modules: ExtractedBunModule[];
+}
+
+/**
+ * One explicit source replacement. Both index and full embedded name must match;
+ * basenames are not unique in a compiled graph. Contents must be UTF-8 JavaScript.
+ */
+export interface BunModuleReplacement {
+  index: number;
+  name: string;
+  contents: Buffer;
+}
+
+/**
+ * Replacements prepared against one exact executable. The digest rejects stale
+ * work if the installation updated between extraction and repacking.
+ */
+export interface BunModuleReplacements {
+  sourceSha256: string;
+  modules: readonly BunModuleReplacement[];
+}
+
 /**
  * Read a StringPointer slice from given buffer.
  */
@@ -204,10 +246,23 @@ function getStringPointerContent(
   buffer: Buffer,
   stringPointer: StringPointer
 ): Buffer {
-  return buffer.subarray(
-    stringPointer.offset,
-    stringPointer.offset + stringPointer.length
-  );
+  const { offset, length } = stringPointer;
+  const end = offset + length;
+  // Buffer.subarray silently truncates invalid pointers. A repacker must reject
+  // corruption rather than rebuild a seemingly valid graph from truncated data.
+  if (
+    !Number.isSafeInteger(offset) ||
+    !Number.isSafeInteger(length) ||
+    offset < 0 ||
+    length < 0 ||
+    end < offset ||
+    end > buffer.length
+  ) {
+    throw new Error(
+      `Bun string pointer is out of bounds: offset=${offset}, length=${length}, buffer=${buffer.length}`
+    );
+  }
+  return buffer.subarray(offset, end);
 }
 
 function parseStringPointer(buffer: Buffer, offset: number): StringPointer {
@@ -236,28 +291,44 @@ function isClaudeModule(moduleName: string): boolean {
 }
 
 /**
- * Detects the module struct size from the modules list byte length.
- * Returns SIZEOF_MODULE_NEW (52) or SIZEOF_MODULE_OLD (36).
+ * Detects 36- or 52-byte records from a bounded module table. Throws if neither
+ * layout is structurally valid or both are valid; never guesses for a writer.
  */
-function detectModuleStructSize(modulesListLength: number): number {
-  const fitsNew = modulesListLength % SIZEOF_MODULE_NEW === 0;
-  const fitsOld = modulesListLength % SIZEOF_MODULE_OLD === 0;
-
-  if (fitsNew && !fitsOld) return SIZEOF_MODULE_NEW;
-  if (fitsOld && !fitsNew) return SIZEOF_MODULE_OLD;
-  if (fitsNew && fitsOld) {
-    // Ambiguous — prefer new format (more likely with recent Bun versions)
-    debug(
-      `detectModuleStructSize: Ambiguous module list length ${modulesListLength}, assuming new format`
+export function detectModuleStructSize(
+  bunData: Buffer,
+  modulesPtr: StringPointer
+): 36 | 52 {
+  const records = getStringPointerContent(bunData, modulesPtr);
+  // 468 bytes fits both widths. Validate names and every payload pointer so a
+  // legacy table cannot be mistaken for the newer format merely by its length.
+  const candidates = [SIZEOF_MODULE_NEW, SIZEOF_MODULE_OLD].filter(size => {
+    if (!records.length || records.length % size !== 0) return false;
+    try {
+      for (let offset = 0; offset < records.length; offset += size) {
+        const module = parseCompiledModuleGraphFile(records, offset, size);
+        const name = getStringPointerContent(bunData, module.name);
+        if (!name.length || name.includes(0) || !isUtf8(name)) return false;
+        for (const pointer of [
+          module.contents,
+          module.sourcemap,
+          module.bytecode,
+          module.moduleInfo,
+          module.bytecodeOriginPath,
+        ]) {
+          getStringPointerContent(bunData, pointer);
+        }
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  if (candidates.length !== 1) {
+    throw new Error(
+      `Invalid or ambiguous Bun module record layout: ${records.length} bytes, ${candidates.length} valid layouts`
     );
-    return SIZEOF_MODULE_NEW;
   }
-
-  // Neither fits cleanly — try new format as default
-  debug(
-    `detectModuleStructSize: Module list length ${modulesListLength} doesn't cleanly divide by either struct size, assuming new format`
-  );
-  return SIZEOF_MODULE_NEW;
+  return candidates[0] as 36 | 52;
 }
 
 /**
@@ -400,7 +471,10 @@ function parseBunDataBlob(bunDataContent: Buffer): {
     offsetsStart + SIZEOF_OFFSETS
   );
   const bunOffsets = parseOffsets(offsetsBytes);
-  const moduleStructSize = detectModuleStructSize(bunOffsets.modulesPtr.length);
+  const moduleStructSize = detectModuleStructSize(
+    bunDataContent,
+    bunOffsets.modulesPtr
+  );
 
   return {
     bunOffsets,
@@ -622,7 +696,10 @@ function extractBunDataFromELFOverlay(elfBinary: LIEF.ELF.Binary): BunData {
 
   // Reconstruct full blob [data][offsets][trailer] to match other formats
   const bunDataBlob = Buffer.concat([dataRegion, offsetsBytes, trailerBytes]);
-  const moduleStructSize = detectModuleStructSize(bunOffsets.modulesPtr.length);
+  const moduleStructSize = detectModuleStructSize(
+    bunDataBlob,
+    bunOffsets.modulesPtr
+  );
 
   return {
     bunOffsets,
@@ -696,6 +773,61 @@ function getBunData(
   }
 }
 
+/** Hashes the exact input executable, not just the source module being edited. */
+function binaryDigest(binaryPath: string): string {
+  return createHash('sha256').update(fs.readFileSync(binaryPath)).digest('hex');
+}
+
+/**
+ * Extracts every embedded module without decoding binary payloads as text.
+ * Returns null on unsupported/corrupt input or missing modules. The path must
+ * already resolve any Nix wrapper. No files are modified.
+ */
+export function extractClaudeJsModulesFromNativeInstallation(
+  nativeInstallationPath: string
+): ExtractedBunCorpus | null {
+  try {
+    LIEF.logging.disable();
+    const sourceSha256 = binaryDigest(nativeInstallationPath);
+    const binary = LIEF.parse(nativeInstallationPath);
+    const { bunOffsets, bunData, moduleStructSize } = getBunData(binary);
+    const modules: ExtractedBunModule[] = [];
+    mapModules(bunData, bunOffsets, moduleStructSize, (module, name, index) => {
+      modules.push({
+        index,
+        name,
+        contents: getStringPointerContent(bunData, module.contents),
+        loader: module.loader,
+        moduleFormat: module.moduleFormat,
+        encoding: module.encoding,
+        side: module.side,
+        isEntrypoint: index === bunOffsets.entryPointId,
+        // Loader 5 assets can have .js or cli names while containing binary
+        // payloads. Names never override the loader in the module-aware API.
+        isJavaScript: module.loader === 1,
+      });
+      return undefined;
+    });
+    if (!modules.some(module => module.isEntrypoint)) {
+      throw new Error('Bun entrypoint is outside the module table');
+    }
+    // An auto-update during extraction must not pair one graph with another
+    // executable's identity. The digest accompanies subsequent write requests.
+    if (binaryDigest(nativeInstallationPath) !== sourceSha256) {
+      throw new Error('Native binary changed during extraction');
+    }
+    return {
+      sourceSha256,
+      moduleStructSize: moduleStructSize as 36 | 52,
+      entryPointId: bunOffsets.entryPointId,
+      modules,
+    };
+  } catch (error) {
+    debug('extractClaudeJsModulesFromNativeInstallation:', error);
+    return null;
+  }
+}
+
 /**
  * Extracts claude.js from a native installation binary.
  * Returns the contents as a Buffer, or null if not found.
@@ -761,6 +893,125 @@ export function extractClaudeJsFromNativeInstallation(
 
     return null;
   }
+}
+
+/**
+ * Replaces explicitly identified JavaScript sources in a normalized Bun blob.
+ * Returns the original buffer for byte-identical edits. Throws before allocating
+ * output for duplicate/missing targets, invalid UTF-8, or unsupported records.
+ *
+ * Existing payloads stay at their original offsets: bytecode contains aligned
+ * opaque data that cannot safely be relocated as ordinary strings. Replacement
+ * source is appended before the offsets/trailer; only selected records change.
+ */
+export function replaceBunModuleSources(
+  bunData: Buffer,
+  replacements: readonly BunModuleReplacement[]
+): Buffer {
+  const { bunOffsets, moduleStructSize } = parseBunDataBlob(bunData);
+  const targets = new Map<number, BunModuleReplacement>();
+  for (const replacement of replacements) {
+    if (!Number.isSafeInteger(replacement.index) || replacement.index < 0) {
+      throw new Error('Invalid Bun replacement index');
+    }
+    if (targets.has(replacement.index)) {
+      throw new Error(`Duplicate Bun replacement index: ${replacement.index}`);
+    }
+    if (!isUtf8(replacement.contents) || replacement.contents.includes(0)) {
+      throw new Error(
+        'Bun replacement must contain UTF-8 JavaScript without NUL bytes'
+      );
+    }
+    targets.set(replacement.index, replacement);
+  }
+  const changed: BunModuleReplacement[] = [];
+  mapModules(bunData, bunOffsets, moduleStructSize, (module, name, index) => {
+    const replacement = targets.get(index);
+    if (!replacement) return undefined;
+    if (replacement.name !== name) {
+      throw new Error(`Bun replacement name mismatch at index ${index}`);
+    }
+    if (module.loader !== 1) {
+      throw new Error(`Cannot replace non-JavaScript Bun module: ${name}`);
+    }
+    if (![0, 1, 2].includes(module.encoding)) {
+      throw new Error(`Unsupported Bun source encoding: ${module.encoding}`);
+    }
+    if (
+      !getStringPointerContent(bunData, module.contents).equals(
+        replacement.contents
+      )
+    ) {
+      changed.push(replacement);
+    }
+    targets.delete(index);
+    return undefined;
+  });
+  if (targets.size)
+    throw new Error('Bun replacement index is outside the module table');
+  if (!changed.length) return bunData;
+
+  const offsetsStart = bunData.length - SIZEOF_OFFSETS - BUN_TRAILER.length;
+  const addedLength = changed.reduce(
+    (sum, item) => sum + item.contents.length + 1,
+    0
+  );
+  const newOffsetsStart = offsetsStart + addedLength;
+  // Every serialized pointer is u32, even though byteCount is u64. Reject an
+  // oversized result instead of wrapping a pointer into another module's data.
+  if (newOffsetsStart > 0xffffffff)
+    throw new Error('Bun replacement exceeds u32 offsets');
+  if (
+    bunOffsets.modulesPtr.offset + bunOffsets.modulesPtr.length >
+    offsetsStart
+  ) {
+    throw new Error('Bun module table overlaps its trailer');
+  }
+  const output = Buffer.alloc(bunData.length + addedLength);
+  bunData.copy(output, 0, 0, offsetsStart);
+  bunData.copy(output, newOffsetsStart, offsetsStart);
+  let cursor = offsetsStart;
+  for (const replacement of changed) {
+    const record =
+      bunOffsets.modulesPtr.offset + replacement.index * moduleStructSize;
+    replacement.contents.copy(output, cursor);
+    output.writeUInt32LE(cursor, record + 8);
+    output.writeUInt32LE(replacement.contents.length, record + 12);
+    cursor += replacement.contents.length + 1;
+
+    // Bun's ModuleLoader loads moduleInfo independently of bytecode; JSC can
+    // skip source analysis using stale imports/exports even after a cache miss.
+    // Invalidate both caches and the origin override, plus the obsolete map.
+    // Source: oven-sh/bun@0d9b296, ModuleLoader.zig:1189 and
+    // src/jsc/bindings/ZigSourceProvider.cpp:73. Unchanged modules retain caches.
+    output.fill(0, record + 16, record + (moduleStructSize === 52 ? 48 : 32));
+    // Bun 1.4.1 reuses the formerly unused tag 2 for UTF-16. Tag 0 takes
+    // cloneUTF8 in both old and new runtimes, so replacement bytes have an
+    // unambiguous interpretation without guessing the compiler version.
+    // oven-sh/bun@4661e494, StandaloneModuleGraph.rs:411,703.
+    output.writeUInt8(0, record + moduleStructSize - 4);
+    if (bunOffsets.flags & (1 << 5)) {
+      // Modern graphs store cached source hashes immediately after the module
+      // table. Zero means recompute: keeping the old hash can produce stale
+      // cache keys even after this module's own bytecode has been removed.
+      const hash =
+        bunOffsets.modulesPtr.offset +
+        bunOffsets.modulesPtr.length +
+        replacement.index * 4;
+      if (hash + 4 > offsetsStart)
+        throw new Error('Bun source hash table is out of bounds');
+      output.writeUInt32LE(0, hash);
+    }
+  }
+  output.writeBigUInt64LE(BigInt(newOffsetsStart), newOffsetsStart);
+  // Appending source breaks the compiler's contiguous-source-run invariant.
+  // Clear only this flag; retaining it could let Bun discard pages containing
+  // unrelated caches between the original source run and the appended source.
+  output.writeUInt32LE(
+    (bunOffsets.flags & ~(1 << 4)) >>> 0,
+    newOffsetsStart + 28
+  );
+  return output;
 }
 
 function rebuildBunData(
@@ -1502,7 +1753,8 @@ function repackELFSection(
   binPath: string,
   newBunBuffer: Buffer,
   outputPath: string,
-  sectionHeaderSize: number
+  sectionHeaderSize: number,
+  sourceSnapshot?: Buffer
 ): void {
   try {
     const bunSection = elfBinary.getSection('.bun');
@@ -1531,7 +1783,9 @@ function repackELFSection(
     // only file-only metadata after it. Replace that allocation in place and
     // shift the metadata tail, avoiding an orphaned previous module graph.
     const compactedFile = replaceTailBunSection({
-      file: fs.readFileSync(binPath),
+      // Module-aware writes use the verified input snapshot, not a path that
+      // an updater could have replaced since parsing the graph.
+      file: sourceSnapshot ?? fs.readFileSync(binPath),
       bunFileOffset: bunSection.fileOffset,
       bunVirtualAddress: bunSection.virtualAddress,
       bunSize: bunSection.size,
@@ -1713,6 +1967,64 @@ export function repackNativeInstallation(
     moduleStructSize
   );
 
+  writeRepackedBunData(
+    binary,
+    binPath,
+    newBuffer,
+    outputPath,
+    sectionHeaderSize
+  );
+}
+
+/**
+ * Writes module replacements prepared from an extracted corpus. The input path
+ * must be the resolved native executable. Rejects stale digests and invalid
+ * targets before writing; outputPath may be a separate disposable executable.
+ * Source is never executed here. Existing platform writers handle permissions
+ * and atomic replacement. Throws on parse, validation, or write failure.
+ *
+ * Digest checks reject observed updates, but are not an installation lock.
+ * Callers doing in-place writes must serialize them with other installers;
+ * use a separate output path when the input can update concurrently.
+ */
+export function repackNativeInstallationModules(
+  binPath: string,
+  replacements: BunModuleReplacements,
+  outputPath: string
+): void {
+  const sourceSnapshot = fs.readFileSync(binPath);
+  if (
+    createHash('sha256').update(sourceSnapshot).digest('hex') !==
+    replacements.sourceSha256
+  ) {
+    throw new Error('Native binary changed since module extraction');
+  }
+  LIEF.logging.disable();
+  const binary = LIEF.parse(binPath);
+  const { bunData, sectionHeaderSize } = getBunData(binary);
+  const newBuffer = replaceBunModuleSources(bunData, replacements.modules);
+  if (binaryDigest(binPath) !== replacements.sourceSha256) {
+    throw new Error('Native binary changed during module repacking');
+  }
+  writeRepackedBunData(
+    binary,
+    binPath,
+    newBuffer,
+    outputPath,
+    sectionHeaderSize,
+    sourceSnapshot
+  );
+}
+
+/** Dispatches a validated Bun blob to the existing platform-specific writer. */
+function writeRepackedBunData(
+  binary: ReturnType<typeof LIEF.parse>,
+  binPath: string,
+  newBuffer: Buffer,
+  outputPath: string,
+  sectionHeaderSize: number | undefined,
+  sourceSnapshot?: Buffer
+): void {
   switch (binary.format) {
     case 'MachO':
       if (!sectionHeaderSize) {
@@ -1746,7 +2058,8 @@ export function repackNativeInstallation(
           binPath,
           newBuffer,
           outputPath,
-          sectionHeaderSize
+          sectionHeaderSize,
+          sourceSnapshot
         );
       } else {
         // Legacy overlay format
