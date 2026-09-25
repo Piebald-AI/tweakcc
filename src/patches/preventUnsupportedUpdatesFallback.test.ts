@@ -12,7 +12,11 @@ import {
   writePreventUnsupportedUpdatesModules,
 } from './preventUnsupportedUpdates';
 import { applyCustomization } from './index';
-import { assertPatchedBundleParses } from './parseGate';
+import {
+  assertPatchedBundleParses,
+  PatchedBundleParseError,
+} from './parseGate';
+import { applySystemPromptsToSources } from './systemPrompts';
 
 // All filesystem and installation effects are mocked. These cases exercise
 // failure isolation in the real apply pipeline without touching a client.
@@ -47,6 +51,10 @@ vi.mock('../nativeInstallationLoader', () => ({
   repackNativeInstallationModules: vi.fn(),
 }));
 vi.mock('./systemPrompts', () => ({
+  applySystemPromptsToSources: vi.fn(async sources => ({
+    sources: [...sources],
+    results: [],
+  })),
   applySystemPrompts: vi.fn(async content => ({
     newContent: content,
     results: [],
@@ -142,6 +150,172 @@ describe('native update guard extraction fallback', () => {
     }
   );
 
+  it.each([false, true])(
+    'preserves chunk prompt edits with updater guard enabled=%s',
+    async enabled => {
+      const modules = [
+        {
+          index: 0,
+          name: '/$bunfs/root/cli',
+          contents: Buffer.from('import "./chunk.js";'),
+          loader: 1,
+          moduleFormat: 1,
+          encoding: 0,
+          side: 0,
+          isEntrypoint: true,
+          isJavaScript: true,
+        },
+        {
+          index: 1,
+          name: '/$bunfs/root/chunk.js',
+          contents: Buffer.from('export const prompt="old";'),
+          loader: 1,
+          moduleFormat: 1,
+          encoding: 0,
+          side: 0,
+          isEntrypoint: false,
+          isJavaScript: true,
+        },
+        {
+          index: 2,
+          name: '/$bunfs/root/prompt.md',
+          contents: Buffer.from('# old'),
+          loader: 13,
+          moduleFormat: 0,
+          encoding: 0,
+          side: 0,
+          isEntrypoint: false,
+          isJavaScript: false,
+        },
+        {
+          index: 3,
+          name: '/$bunfs/root/asset.js',
+          contents: Buffer.from([0xff]),
+          loader: 5,
+          moduleFormat: 0,
+          encoding: 0,
+          side: 0,
+          isEntrypoint: false,
+          isJavaScript: false,
+        },
+      ];
+      vi.mocked(extractClaudeJsModulesFromNativeInstallation).mockResolvedValue(
+        {
+          sourceSha256: '0'.repeat(64),
+          moduleStructSize: 52,
+          entryPointId: 0,
+          modules,
+        }
+      );
+      vi.mocked(applySystemPromptsToSources).mockResolvedValueOnce({
+        sources: [
+          'import "./chunk.js";',
+          'export const prompt="new";',
+          '# new',
+        ],
+        results: [],
+      });
+      vi.mocked(writePreventUnsupportedUpdatesModules).mockReturnValue([
+        'import "./chunk.js";',
+        'export const prompt="new";void 0;',
+      ]);
+      const settings = config();
+      settings.settings.misc.preventUpdateToUnsupportedVersions = enabled;
+      await applyCustomization(settings, installation, [
+        'test-prompt',
+        'prevent-unsupported-updates',
+      ]);
+      expect(applySystemPromptsToSources).toHaveBeenCalledWith(
+        ['import "./chunk.js";', 'export const prompt="old";', '# old'],
+        installation.version,
+        undefined,
+        ['test-prompt', 'prevent-unsupported-updates'],
+        new Set([2])
+      );
+      if (enabled)
+        expect(writePreventUnsupportedUpdatesModules).toHaveBeenCalledWith([
+          'import "./chunk.js";',
+          'export const prompt="new";',
+        ]);
+      expect(repackNativeInstallationModules).toHaveBeenCalledWith(
+        '/test/claude',
+        {
+          sourceSha256: '0'.repeat(64),
+          modules: [
+            {
+              index: 1,
+              name: modules[1].name,
+              contents: Buffer.from(
+                enabled
+                  ? 'export const prompt="new";void 0;'
+                  : 'export const prompt="new";'
+              ),
+            },
+            { index: 2, name: modules[2].name, contents: Buffer.from('# new') },
+          ],
+        },
+        '/test/claude'
+      );
+      expect(assertPatchedBundleParses).toHaveBeenCalledWith(
+        enabled
+          ? 'export const prompt="new";void 0;'
+          : 'export const prompt="new";',
+        'module'
+      );
+      expect(assertPatchedBundleParses).not.toHaveBeenCalledWith(
+        '# new',
+        expect.anything()
+      );
+      expect(repackNativeInstallation).not.toHaveBeenCalled();
+    }
+  );
+
+  it('refuses to repack when an edited chunk fails parsing', async () => {
+    vi.mocked(extractClaudeJsModulesFromNativeInstallation).mockResolvedValue({
+      sourceSha256: '0'.repeat(64),
+      moduleStructSize: 52,
+      entryPointId: 0,
+      modules: [
+        {
+          index: 0,
+          name: '/$bunfs/root/cli',
+          contents: Buffer.from('export {};'),
+          loader: 1,
+          moduleFormat: 1,
+          encoding: 0,
+          side: 0,
+          isEntrypoint: true,
+          isJavaScript: true,
+        },
+        {
+          index: 1,
+          name: '/$bunfs/root/chunk.js',
+          contents: Buffer.from('export {};'),
+          loader: 1,
+          moduleFormat: 1,
+          encoding: 0,
+          side: 0,
+          isEntrypoint: false,
+          isJavaScript: true,
+        },
+      ],
+    });
+    vi.mocked(applySystemPromptsToSources).mockResolvedValueOnce({
+      sources: ['export {};', 'broken('],
+      results: [],
+    });
+    vi.mocked(assertPatchedBundleParses)
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {
+        throw new PatchedBundleParseError('bad chunk');
+      });
+    await expect(
+      applyCustomization(config(), installation, ['test-prompt'])
+    ).rejects.toThrow('bad chunk');
+    expect(repackNativeInstallationModules).not.toHaveBeenCalled();
+    expect(repackNativeInstallation).not.toHaveBeenCalled();
+  });
+
   it('reports the guard as failed while applying an unrelated native customization', async () => {
     const result = await applyCustomization(config(), installation, [
       'model-customizations',
@@ -189,13 +363,13 @@ describe('native update guard extraction fallback', () => {
     expect(repackNativeInstallationModules).not.toHaveBeenCalled();
   });
 
-  it('does not attempt optional corpus extraction when the guard is disabled', async () => {
+  it('still reads the prompt corpus when the optional guard is disabled', async () => {
     const disabled = config();
     disabled.settings.misc.preventUpdateToUnsupportedVersions = false;
     await applyCustomization(disabled, installation, [
       'prevent-unsupported-updates',
     ]);
-    expect(extractClaudeJsModulesFromNativeInstallation).not.toHaveBeenCalled();
+    expect(extractClaudeJsModulesFromNativeInstallation).toHaveBeenCalled();
     expect(repackNativeInstallation).not.toHaveBeenCalled();
     expect(writePreventUnsupportedUpdates).not.toHaveBeenCalled();
   });

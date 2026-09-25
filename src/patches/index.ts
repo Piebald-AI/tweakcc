@@ -57,7 +57,10 @@ import { writeOpusplan1m } from './opusplan1m';
 import { writeThinkingVisibility } from './thinkingVisibility';
 import { writeSubagentModels } from './subagentModels';
 import { writePatchesAppliedIndication } from './patchesAppliedIndication';
-import { applySystemPrompts } from './systemPrompts';
+import {
+  applySystemPrompts,
+  applySystemPromptsToSources,
+} from './systemPrompts';
 import { writeFixLspSupport } from './fixLspSupport';
 import { writeToolsets } from './toolsets';
 import { writeTableFormat } from './tableFormat';
@@ -626,9 +629,9 @@ export const applyCustomization = async (
   let nativeCorpus: ExtractedBunCorpus | null = null;
   let nativeSourcePath: string | undefined;
   let nativeGuardEdits: BunModuleReplacement[] = [];
-  const needsNativeGuard =
-    !!config.settings.misc?.preventUpdateToUnsupportedVersions &&
-    (!patchFilter || patchFilter.includes('prevent-unsupported-updates'));
+  // Prompt edits and the optional updater guard share one staged module set.
+  // Neither may reconstruct a chunk from the original after the other edits it.
+  const nativePromptSources = new Map<number, string>();
 
   if (ccInstInfo.nativeInstallationPath) {
     // For native installations: restore the binary, then extract to memory
@@ -651,24 +654,27 @@ export const applyCustomization = async (
       `Extracting claude.js from ${backupExists ? 'backup' : 'native installation'}: ${pathToExtractFrom}`
     );
 
-    // Only this explicitly selected feature opts into module-aware application;
-    // it must patch the actual installer chunk rather than a tiny import stub.
-    if (needsNativeGuard) {
-      nativeCorpus =
-        await extractClaudeJsModulesFromNativeInstallation(pathToExtractFrom);
-      if (nativeCorpus) {
-        nativeSourcePath = pathToExtractFrom;
-      } else {
-        // This feature is optional. If ordinary extraction can still recover
-        // an entrypoint, keep unrelated patches available and report only the
-        // guard as failed. A missing native dependency still fails below when
-        // neither extractor can produce usable source.
-        debug(
-          'Native module corpus unavailable; the update guard will be reported as failed.'
-        );
-      }
+    // Modern builds distribute prompts across chunks; the entrypoint is only
+    // an import stub. Read the corpus even when the updater guard is disabled.
+    nativeCorpus =
+      await extractClaudeJsModulesFromNativeInstallation(pathToExtractFrom);
+    if (nativeCorpus) {
+      nativeSourcePath = pathToExtractFrom;
+    } else {
+      // Retain the legacy extraction fallback for older installations or
+      // unavailable module metadata. Without a corpus the update guard cannot
+      // safely locate its targets; it reports failure rather than using npm
+      // matching against an incomplete native source.
+      debug(
+        'Native module corpus unavailable; using legacy entrypoint extraction.'
+      );
     }
     const entry = nativeCorpus?.modules.find(module => module.isEntrypoint);
+    // A program entrypoint must be executable JavaScript. This is a tripwire
+    // for corrupt metadata/new loader formats, not a supported text entrypoint.
+    if (nativeCorpus && (!entry || !entry.isJavaScript)) {
+      throw new Error('Native entrypoint is not a JavaScript module');
+    }
     const claudeJsBuffer = entry
       ? Buffer.from(nativeSource(entry), 'utf8')
       : await extractClaudeJsFromNativeInstallation(pathToExtractFrom);
@@ -702,12 +708,43 @@ export const applyCustomization = async (
   // ==========================================================================
   // Apply system prompt customizations (has its own result format)
   // ==========================================================================
-  const systemPromptsResult = await applySystemPrompts(
-    content,
-    ccInstInfo.version,
-    undefined, // escapeNonAscii - auto-detect
-    patchFilter
+  // Loader 13 is Bun's Text loader (not a file-extension heuristic). Embedded
+  // Markdown/TXT prompts are runtime strings; binary/file loaders stay opaque.
+  // oven-sh/bun@4661e494, src/ast/loader.rs: Loader::Text = 13.
+  const nativeModules = nativeCorpus?.modules.filter(
+    module => module.isJavaScript || module.loader === 13
   );
+  const modulePromptResult = nativeModules
+    ? await applySystemPromptsToSources(
+        nativeModules.map(nativeSource),
+        ccInstInfo.version,
+        undefined,
+        patchFilter,
+        new Set(
+          nativeModules.flatMap((module, index) =>
+            module.loader === 13 ? [index] : []
+          )
+        )
+      )
+    : undefined;
+  if (nativeModules && modulePromptResult) {
+    for (const [index, module] of nativeModules.entries()) {
+      nativePromptSources.set(module.index, modulePromptResult.sources[index]);
+    }
+  }
+  const nativeEntry = nativeCorpus?.modules.find(module => module.isEntrypoint);
+  const systemPromptsResult =
+    modulePromptResult && nativeEntry
+      ? {
+          newContent: nativePromptSources.get(nativeEntry.index)!,
+          results: modulePromptResult.results,
+        }
+      : await applySystemPrompts(
+          content,
+          ccInstInfo.version,
+          undefined,
+          patchFilter
+        );
   content = systemPromptsResult.newContent;
 
   // Sort system prompt results alphabetically by name before adding
@@ -1033,7 +1070,9 @@ export const applyCustomization = async (
           module => module.isJavaScript
         );
         const sources = modules.map(module =>
-          module.isEntrypoint ? c : nativeSource(module)
+          module.isEntrypoint
+            ? c
+            : (nativePromptSources.get(module.index) ?? nativeSource(module))
         );
         const patched = writePreventUnsupportedUpdatesModules(sources);
         if (!patched) return null;
@@ -1074,6 +1113,22 @@ export const applyCustomization = async (
   }
   allResults.push(...patchResults);
 
+  // Compose prompt and guard changes by module identity. The guard was applied
+  // to prompt-patched sources, so its final text supersedes that module only.
+  const nativeEdits = new Map<number, BunModuleReplacement>();
+  for (const module of nativeModules ?? []) {
+    const patched = nativePromptSources.get(module.index)!;
+    if (patched !== nativeSource(module)) {
+      nativeEdits.set(module.index, {
+        index: module.index,
+        name: module.name,
+        contents: Buffer.from(patched, 'utf8'),
+      });
+    }
+  }
+  for (const edit of nativeGuardEdits) nativeEdits.set(edit.index, edit);
+  const nativeModuleEdits = [...nativeEdits.values()];
+
   // ==========================================================================
   // Verify the patched bundle parses before writing it
   // ==========================================================================
@@ -1083,7 +1138,7 @@ export const applyCustomization = async (
     if (
       !ccInstInfo.nativeInstallationPath ||
       content !== originalContent ||
-      nativeGuardEdits.length
+      nativeModuleEdits.length
     ) {
       assertPatchedBundleParses(
         content,
@@ -1096,8 +1151,13 @@ export const applyCustomization = async (
             : 'module'
       );
     }
-    for (const edit of nativeGuardEdits) {
+    for (const edit of nativeModuleEdits) {
       const module = nativeCorpus!.modules[edit.index];
+      // Text-loader contents are not programs. Parsing Markdown as JavaScript
+      // would reject valid prompt edits; the repacker still validates UTF-8.
+      // The final entrypoint was checked above after all generic patches. Its
+      // staged prompt-only copy is intermediate text and will not be written.
+      if (module.isEntrypoint || module.loader === 13) continue;
       assertPatchedBundleParses(
         edit.contents.toString('utf8'),
         module.moduleFormat === 1 ? 'module' : 'script'
@@ -1118,7 +1178,7 @@ export const applyCustomization = async (
   // Write the modified content back
   // ==========================================================================
   const nativeChanged =
-    content !== originalContent || nativeGuardEdits.length > 0;
+    content !== originalContent || nativeModuleEdits.length > 0;
   // Restoring the backup already removes a disabled/filtered guard. Repacking
   // an untouched modern graph through the legacy entrypoint writer would lose
   // metadata tables that only the module-aware writer preserves.
@@ -1136,7 +1196,9 @@ export const applyCustomization = async (
     const modifiedBuffer = Buffer.from(content, 'utf8');
     if (nativeCorpus && nativeSourcePath) {
       const entry = nativeCorpus.modules.find(module => module.isEntrypoint)!;
-      const edits = nativeGuardEdits.filter(edit => edit.index !== entry.index);
+      const edits = nativeModuleEdits.filter(
+        edit => edit.index !== entry.index
+      );
       if (content !== nativeSource(entry)) {
         edits.push({
           index: entry.index,

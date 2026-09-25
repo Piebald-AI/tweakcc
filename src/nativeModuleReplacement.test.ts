@@ -188,6 +188,25 @@ describe.each([36, 52] as const)(
       );
     });
 
+    it('replaces text-loader prompts without changing the loader or unrelated bytes', () => {
+      const graph = makeGraph(width);
+      graph.data[width * 2 - 3] = 13;
+      const text =
+        '# Prompt\nKeep `code`, ${literal}, café and \\paths unchanged.\n';
+      const output = replaceBunModuleSources(graph.data, [
+        { index: 1, name: graph.names[1], contents: Buffer.from(text) },
+      ]);
+      expect(sourceAt(output, width, 1).toString()).toBe(text);
+      expect(output[width * 2 - 3]).toBe(13);
+      expect(output[width * 2 - 4]).toBe(0);
+      expect(sourceAt(output, width, 0)).toEqual(
+        sourceAt(graph.data, width, 0)
+      );
+      expect(sourceAt(output, width, 2)).toEqual(
+        sourceAt(graph.data, width, 2)
+      );
+    });
+
     it('rejects binary assets even when named like the Claude entrypoint', () => {
       const graph = makeGraph(width);
       graph.data[width - 3] = 5;
