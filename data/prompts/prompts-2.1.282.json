@@ -8070,16 +8070,19 @@
         " These files no longer match the user's commits — your rewound version or your rewrite — here and, as uncommitted changes, on the user's machine: ${",
         "(",
         ".restored.files,{openEnded:",
-        ".restored.filesTruncated,show:WOs})}. Check \\`git diff HEAD -- PATH\\` first (the user may have uncommitted edits of their own there); then \\`git checkout HEAD -- PATH\\` puts the user's committed version back (for a file those commits deleted, remove it instead), unless undoing those commits is what the user asked for."
+        ".restored.filesTruncated,show:",
+        "})}. Check \\`git diff HEAD -- PATH\\` first (the user may have uncommitted edits of their own there); then \\`git checkout HEAD -- PATH\\` puts the user's committed version back (for a file those commits deleted, remove it instead), unless undoing those commits is what the user asked for."
       ],
       "identifiers": [
         0,
         1,
-        1
+        1,
+        2
       ],
       "identifierMap": {
         "0": "FORMAT_PATH_LIST_FN",
-        "1": "DIRECTORY_SYNC_RESULT"
+        "1": "DIRECTORY_SYNC_RESULT",
+        "2": "FORMAT_RESTORED_PATH_FN"
       },
       "version": "2.1.282"
     },

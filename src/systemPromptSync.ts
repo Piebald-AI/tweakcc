@@ -1274,12 +1274,73 @@ export const escapeNonAsciiChars = (text: string): string => {
   });
 };
 
+/**
+ * A serialized build-path property, including its JS string delimiters. Bun
+ * rewrites the npm-relative hook worker path into a virtual-filesystem path.
+ * Keep this non-capturing: identifier captures are positional and adding a group
+ * here would silently map every subsequent prompt variable to the wrong value.
+ * Escaped characters are allowed, but raw quotes/newlines cannot cross a field.
+ */
+const HOOKS_WORKER_URL_PROPERTY = String.raw`HOOKS_WORKER_URL:"(?:\\[^\r\n]|[^"\\\r\n])*"`;
+
+/**
+ * Retains the target build's worker URL when an otherwise edited prompt embeds
+ * build metadata. Only an unchanged snapshot property is substituted; an
+ * explicitly edited property is left alone. Ambiguous/missing metadata is not
+ * guessed. Replacement callbacks preserve dollar signs in Bun's /$bunfs paths.
+ */
+const preserveMatchedWorkerUrl = (
+  content: string,
+  pieces: string[],
+  matchedContent: string
+): string => {
+  const original = pieces.flatMap(piece =>
+    [...piece.matchAll(new RegExp(HOOKS_WORKER_URL_PROPERTY, 'g'))].map(
+      match => match[0]
+    )
+  );
+  const actual = [
+    ...matchedContent.matchAll(new RegExp(HOOKS_WORKER_URL_PROPERTY, 'g')),
+  ];
+  if (original.length !== 1 || actual.length !== 1) return content;
+  // Build metadata is executable code inside a live interpolation. A user can
+  // quote the same property in prose to explain it; that text is not metadata
+  // and must not be rewritten along with the build object's actual property.
+  let result = '';
+  let cursor = 0;
+  for (const { start, end } of interpolationSpans(content)) {
+    result += content.slice(cursor, start);
+    result += content
+      .slice(start, end)
+      .replace(new RegExp(HOOKS_WORKER_URL_PROPERTY, 'g'), property =>
+        property === original[0] ? actual[0][0] : property
+      );
+    cursor = end;
+  }
+  return result + content.slice(cursor);
+};
+
+/**
+ * Builds a prompt matcher with positional identifier captures. Build-specific
+ * hook worker paths may differ, but all surrounding metadata remains literal.
+ * The matched path must be preserved by the replacement pipeline below.
+ */
 export const buildSearchRegexFromPieces = (
   pieces: string[],
   ccVersion: string,
   buildTime?: string
 ): string => {
   let pattern = '';
+  // One build object gives an unambiguous source-to-replacement correspondence.
+  // Leave multi-property snapshots literal rather than accepting paths that the
+  // replacement helper cannot safely associate with their original fields.
+  const varyWorkerUrl =
+    pieces.reduce(
+      (count, piece) =>
+        count +
+        [...piece.matchAll(new RegExp(HOOKS_WORKER_URL_PROPERTY, 'g'))].length,
+      0
+    ) === 1;
 
   for (let i = 0; i < pieces.length; i++) {
     // Replace <<CCVERSION>> with actual version before escaping
@@ -1290,8 +1351,17 @@ export const buildSearchRegexFromPieces = (
       piece = piece.replace(/<<BUILD_TIME>>/g, buildTime);
     }
 
-    // Escape special regex characters in the text piece
-    const escapedPiece = piece.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // The doctor prompt embeds a build object whose worker path differs in npm
+    // and native bundles. Split out only that property before escaping literal
+    // text; the final regex adds no captures and cannot swallow adjacent fields.
+    const escapedPiece = piece
+      .split(new RegExp(`(${HOOKS_WORKER_URL_PROPERTY})`, 'g'))
+      .map((fragment, index) =>
+        index % 2 === 1 && varyWorkerUrl
+          ? HOOKS_WORKER_URL_PROPERTY
+          : fragment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      )
+      .join('');
 
     // Handle non-ASCII characters by creating alternation patterns
     const withNonAsciiHandling = escapeNonAsciiForRegex(escapedPiece);
@@ -1618,8 +1688,17 @@ export const loadSystemPromptsWithRegex = async (
 
       // The markdown file has content with human-readable variable names
       // We need to replace those with the actual minified variable names from cli.js
-      return applyIdentifierMapping(
+      // Matching a build-specific URL is not permission to replace it with the
+      // snapshot's npm path. Carry the exact matched property into customized
+      // Markdown before mapping identifiers; unchanged prompts still round-trip
+      // verbatim in applySystemPrompts.
+      const content = preserveMatchedWorkerUrl(
         replacementPrompt.content,
+        jsonPrompt.pieces,
+        match[0]
+      );
+      return applyIdentifierMapping(
+        content,
         jsonPrompt.identifiers,
         jsonPrompt.identifierMap,
         extractedVars,
