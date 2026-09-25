@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { applySystemPrompts } from './systemPrompts';
+import {
+  applySystemPrompts,
+  applySystemPromptsToSources,
+} from './systemPrompts';
 import * as promptSync from '../systemPromptSync';
 import * as systemPromptHashIndex from '../systemPromptHashIndex';
 
@@ -96,6 +99,115 @@ function setupMocks(
 describe('systemPrompts.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe('split native sources', () => {
+    it('patches every chunk with its own captures and loads prompts only once', async () => {
+      setupMocks(
+        buildMockPromptData({
+          prompt: { content: 'Hello ${NAME}!' },
+          regex: 'Hello \\$\\{([\\w$]+)\\}',
+          getInterpolatedContent: match => `Hello \${${match[1]}}!`,
+          pieces: ['Hello ${', '}'],
+          identifiers: [1],
+          identifierMap: { '1': 'NAME' },
+        })
+      );
+      const sources = [
+        'import "./a.js";',
+        'const a=`Hello ${x}`;',
+        'const b=`Hello ${y}`;',
+      ];
+      const result = await applySystemPromptsToSources(sources, '2.1.280');
+      expect(result.sources).toEqual([
+        sources[0],
+        'const a=`Hello ${x}!`;',
+        'const b=`Hello ${y}!`;',
+      ]);
+      expect(sources[1]).toBe('const a=`Hello ${x}`;');
+      expect(promptSync.loadSystemPromptsWithRegex).toHaveBeenCalledTimes(1);
+      expect(result.results).toHaveLength(1);
+      expect(result.results[0]).toMatchObject({ applied: true });
+    });
+
+    it('warns only when a prompt is absent from the entire corpus', async () => {
+      setupMocks(buildMockPromptData({ content: 'Needle' }));
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+      try {
+        await applySystemPromptsToSources(
+          ['const a=1;', 'const b="Needle";'],
+          '2.1.280'
+        );
+        expect(log.mock.calls.flat().join('\n')).not.toContain(
+          'Could not find system prompt'
+        );
+        await applySystemPromptsToSources(
+          ['const a=1;', 'const b=2;'],
+          '2.1.280'
+        );
+        expect(
+          log.mock.calls.filter(([message]) =>
+            String(message).includes('Could not find system prompt')
+          )
+        ).toHaveLength(1);
+      } finally {
+        log.mockRestore();
+      }
+    });
+
+    it('writes text-loader prompts literally, without JavaScript escaping', async () => {
+      const text = 'New `code` ${LITERAL} café \\path';
+      setupMocks(
+        buildMockPromptData({
+          prompt: { content: text },
+          regex: 'ORIGINAL',
+          getInterpolatedContent: () => text,
+        })
+      );
+      const result = await applySystemPromptsToSources(
+        ['`ORIGINAL'],
+        '2.1.280',
+        true,
+        undefined,
+        new Set([0])
+      );
+      expect(result.sources).toEqual(['`' + text]);
+      expect(result.results[0].applied).toBe(true);
+    });
+
+    it('never matches across module boundaries', async () => {
+      setupMocks(
+        buildMockPromptData({
+          regex: 'FIRST[\\s\\S]*LAST',
+          content: 'replacement',
+        })
+      );
+      const sources = ['const a="FIRST";', 'const b="LAST";'];
+      expect(
+        (await applySystemPromptsToSources(sources, '2.1.280')).sources
+      ).toEqual(sources);
+    });
+
+    it('preserves untouched sources byte-for-byte and respects prompt filters', async () => {
+      setupMocks(
+        buildMockPromptData({
+          content: 'Hello',
+          pieces: ['Hello'],
+          regex: 'Hello',
+        })
+      );
+      const sources = ['const a="Hello";', 'const b=`Hello`;'];
+      expect(
+        (await applySystemPromptsToSources(sources, '2.1.280')).sources
+      ).toEqual(sources);
+      expect(
+        (
+          await applySystemPromptsToSources(sources, '2.1.280', undefined, [
+            'other',
+          ])
+        ).results
+      ).toEqual([expect.objectContaining({ skipped: true, applied: false })]);
+    });
   });
 
   describe('applySystemPrompts', () => {
