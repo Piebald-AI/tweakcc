@@ -661,6 +661,8 @@ tweakcc allows you to customize the various parts of Claude Code's system prompt
 
 👉 See [**Claude Code System Prompts**](https://github.com/Piebald-AI/claude-code-system-prompts) for a breakdown of all the system prompt parts, as well as a changelog and diffs for each CC version.
 
+👉 And see [**OrcaPromptVault**](https://github.com/Continuum-AI-Corp/OrcaPromptVault/tree/main/Claude-Code) for what the *assembled* prompt looks like on the wire once those parts are composed: dated recordings of the outgoing request, with the tool declarations that went with it. It is the other half of the picture when you are deciding what to customize — interactive sends 26,131 characters and 35 tools, `claude -p` on the same version sends 20,806 and 29, so a part you patch may not be in the prompt your run actually gets.
+
 Because the system prompt is **dynamically composed** based on several factors, **it's not one string** that can be simply modified in a text editor. It's a bunch of smaller strings sprinkled throughout Claude Code's source code.
 
 tweakcc's method for modifying the system prompts involves maintaining one markdown file for each individual portion of the prompt, resulting in a file for each tool description, each agent/utility prompt, and one for the main system prompt and a few more for various large notes inserted into other prompt parts.
