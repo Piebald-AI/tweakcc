@@ -79,7 +79,7 @@ With tweakcc, you can
 - Style the **user messages in the chat history** beyond the default plain gray text
 - Remove the **ASCII border** from the input box
 - Expand **thinking blocks** by default, so that you don't need to use the transcript (<kbd>Ctrl+O</kbd>) to see them
-- Configure which Claude **model** each **subagent** (Plan, Explore, and general-purpose) uses
+- Configure which Claude **model** each **subagent** (Plan, Explore, general-purpose, claude-code-guide, and statusline-setup) uses
 - Switch between **table formats** - Claude Code default, Unicode (`┌─┬─┐`), ASCII/markdown (`|---|`), Unicode without top/bottom borders.
 
 tweakcc also

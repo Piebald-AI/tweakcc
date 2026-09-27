@@ -2,12 +2,13 @@ import { Box, Text, useInput } from 'ink';
 import { useContext, useState } from 'react';
 import { SettingsContext } from '../App';
 import Header from './Header';
+import { SubagentModelsConfig } from '@/types';
 
 interface SubagentModelsViewProps {
   onBack: () => void;
 }
 
-type SubagentType = 'plan' | 'explore' | 'generalPurpose';
+type SubagentType = keyof SubagentModelsConfig;
 
 export function SubagentModelsView({ onBack }: SubagentModelsViewProps) {
   const { settings, updateSettings } = useContext(SettingsContext);
@@ -19,6 +20,8 @@ export function SubagentModelsView({ onBack }: SubagentModelsViewProps) {
     plan: null,
     explore: null,
     generalPurpose: null,
+    claudeCodeGuide: null,
+    statuslineSetup: null,
   };
 
   const subagents: { id: SubagentType; title: string; description: string }[] =
@@ -38,10 +41,22 @@ export function SubagentModelsView({ onBack }: SubagentModelsViewProps) {
         title: 'General-purpose Agent',
         description: 'The agent used for general multi-step tasks.',
       },
+      {
+        id: 'claudeCodeGuide',
+        title: 'Claude Code Guide Agent',
+        description:
+          'The agent that answers questions about Claude Code, the Agent SDK, and the Claude API. Uses haiku by default.',
+      },
+      {
+        id: 'statuslineSetup',
+        title: 'Statusline Setup Agent',
+        description:
+          'The agent that configures the status line setting. Uses sonnet by default.',
+      },
     ];
 
   const modelOptions = [
-    { label: 'Default (Inherited)', value: null },
+    { label: 'Default', value: null },
     { label: 'sonnet', value: 'sonnet' },
     { label: 'haiku', value: 'haiku' },
     { label: 'opus', value: 'opus' },
@@ -68,6 +83,8 @@ export function SubagentModelsView({ onBack }: SubagentModelsViewProps) {
               plan: null,
               explore: null,
               generalPurpose: null,
+              claudeCodeGuide: null,
+              statuslineSetup: null,
             };
           }
           s.subagentModels[activeSubagent] = selectedModel;

@@ -162,6 +162,8 @@ export interface SubagentModelsConfig {
   plan: string | null;
   explore: string | null;
   generalPurpose: string | null;
+  claudeCodeGuide: string | null;
+  statuslineSetup: string | null;
 }
 
 export interface Settings {

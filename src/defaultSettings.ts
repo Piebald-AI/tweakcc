@@ -731,6 +731,8 @@ export const DEFAULT_SETTINGS: Settings = {
     plan: null,
     explore: null,
     generalPurpose: null,
+    claudeCodeGuide: null,
+    statuslineSetup: null,
   },
   inputPatternHighlighters: [],
   inputPatternHighlightersTestText: 'Type test text here to see highlighting',
