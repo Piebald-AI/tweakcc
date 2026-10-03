@@ -1,5 +1,6 @@
 import { showDiff } from './index';
 import { debug } from '../utils';
+import { isGraphContextActive } from './graphContext';
 
 const VALID_COLORS = [
   'red',
@@ -62,12 +63,16 @@ export const writeSessionColor = (oldFile: string): string | null => {
   }
 
   if (!patched) {
+    // Code-split builds (CC 2.1.2xx) keep saveAgentColor in another module;
+    // the two halves meet through globalThis.__tweakccSaveAgentColor.
+    if (isGraphContextActive()) return patchSaveAgentColor(oldFile);
     debug('patch: sessionColor: failed to find app state init patterns');
     return null;
   }
 
   const saveColorResult = patchSaveAgentColor(result);
   if (!saveColorResult) {
+    if (isGraphContextActive()) return result;
     debug('patch: sessionColor: failed to patch saveAgentColor');
     return null;
   }
@@ -76,10 +81,12 @@ export const writeSessionColor = (oldFile: string): string | null => {
 };
 
 export const patchSaveAgentColor = (oldFile: string): string | null => {
+  // CC 2.1.2xx added a trailing options parameter that is forwarded to the
+  // transcript append: async function gwt(e,n,r,s){…await xE(g,{…},s)}
   const prefix =
     '([,;{}])' +
     '(async function ([$\\w]+)' +
-    '\\(([$\\w]+),([$\\w]+),([$\\w]+)(?:,[$\\w]+)?\\)' +
+    '\\(([$\\w]+),([$\\w]+),([$\\w]+)(?:,[$\\w]+)*\\)' +
     '\\{let [$\\w]+=\\6\\?\\?[$\\w]+\\(\\4\\);';
 
   const patterns = [

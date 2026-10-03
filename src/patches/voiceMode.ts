@@ -25,6 +25,7 @@
 //    return`# Output efficiency...`
 // ```
 
+import { graphMemo, graphSources, isGraphContextActive } from './graphContext';
 import { showDiff } from './index';
 
 const patchAmberQuartz = (file: string): string | null => {
@@ -66,9 +67,23 @@ const patchAmberQuartz = (file: string): string | null => {
   const voicePattern =
     /name:"voice",description:"Toggle voice mode"[\s\S]{0,500}?get isHidden\(\)\{return!([$\w]+)\(\)\}/;
   const voiceMatch = file.match(voicePattern);
+  // Code-split builds (CC 2.1.2xx) import the gate from another module, so
+  // the command and the gate's definition are in different modules; learn the
+  // gate's name from the graph and patch the module that defines it.
+  const gateName =
+    voiceMatch?.[1] ??
+    (isGraphContextActive()
+      ? graphMemo('voice-gate', () => {
+          for (const source of graphSources()?.values() ?? []) {
+            const hit = source.match(voicePattern);
+            if (hit) return hit[1];
+          }
+          return undefined;
+        })
+      : undefined);
 
-  if (voiceMatch && voiceMatch.index !== undefined) {
-    const funcName = voiceMatch[1];
+  if (gateName) {
+    const funcName = gateName;
     const escaped = funcName.replace(/[$]/g, '\\$');
     const funcPattern = new RegExp(`function ${escaped}\\(\\)\\{`);
     const funcMatch = file.match(funcPattern);

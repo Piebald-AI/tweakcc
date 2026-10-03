@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { InputPatternHighlighter } from '../types';
+import {
+  beginGraphContext,
+  endGraphContext,
+  enterGraphModule,
+  leaveGraphModule,
+} from './graphContext';
 import { writeInputPatternHighlighters } from './inputPatternHighlighters';
 
 vi.mock('./index', async () => {
@@ -67,5 +73,31 @@ describe('writeInputPatternHighlighters', () => {
     expect(result).toContain('matchAll(new RegExp("todo", "g"))');
     expect(result).toContain('style:(x)=>chalk(x),priority:100');
     expect(result).not.toContain('.createElement(');
+  });
+
+  it('rewrites the CC 2.1.285 renderer that already lists bold/italic/background', () => {
+    // 2.1.285 renders every style prop natively except inverse, so without the
+    // rewrite an inverse highlighter silently does nothing.
+    const renderer =
+      'R=(V,ne)=>e(s,{children:V.map((m,E)=>{if(m.highlight?.shimmerColor&&m.highlight.color){return e(n,{children:m.text.split("").map((W,T)=>e(z,{char:W},T))},E)}' +
+      'return e(n,{color:m.highlight?.color,backgroundColor:m.highlight?.backgroundColor,dimColor:m.highlight?.dimColor,bold:m.highlight?.bold,italic:m.highlight?.italic,underline:m.highlight?.underline,strikethrough:m.highlight?.strikethrough,children:e(Zr,{children:m.text})},E)})},ne)';
+    beginGraphContext(new Map([['/$bunfs/root/chunk-r.js', renderer]]));
+    enterGraphModule('/$bunfs/root/chunk-r.js');
+    let result: string | null;
+    try {
+      result = writeInputPatternHighlighters(renderer, [
+        baseHighlighter({ name: 'inv', regex: 'x', styling: ['inverse'] }),
+      ]);
+    } finally {
+      leaveGraphModule();
+      endGraphContext();
+    }
+    expect(result).not.toBeNull();
+    expect(result).toContain(
+      'inverse:m.highlight?.style?void 0:m.highlight?.inverse'
+    );
+    expect(result).toContain(
+      'children:e(Zr,{children:m.highlight?.style?m.highlight.style(m.text):m.text})'
+    );
   });
 });

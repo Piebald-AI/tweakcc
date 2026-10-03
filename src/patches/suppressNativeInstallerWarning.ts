@@ -2,6 +2,9 @@ import { showDiff } from './index';
 
 const WARNING_PATTERNS = [
   /[$\w]+\.push\(\{message:`Native installation exists but [^`]*`,userActionRequired:!0,type:"path"\}\)/g,
+  // CC 2.1.2xx `claude doctor` reports the same check through its own
+  // {issue,fix} list in a separate module.
+  /[$\w]+\.push\(\{issue:(?:`Native installation exists but [^`]*`|"Native installation exists but [^"]*"),fix:(?:`[^`]*`|"[^"]*")\}\)/g,
   /Claude Code has switched from npm to native installer\. Run `claude install` or see https:\/\/docs\.anthropic\.com\/en\/docs\/claude-code\/getting-started for more options\./g,
 ];
 

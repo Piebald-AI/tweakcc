@@ -9,8 +9,10 @@ import {
 } from './index';
 import {
   findSlashCommandListEndPosition,
+  insertAfterLoginRegistration,
   writeSlashCommandDefinition as writeSlashCommandDefinitionToArray,
 } from './slashCommands';
+import { isGraphContextActive, resolveAcrossGraph } from './graphContext';
 import { Toolset } from '../types';
 
 // ============================================================================
@@ -55,6 +57,19 @@ export const findSelectComponentName = (
         return match[1];
       }
     }
+  }
+
+  // Code-split builds (CC 2.1.2xx) render Select through a bare JSX-runtime
+  // import in other chunks: e(De,{options:E,onFocus:F,onChange:M,…,visibleOptionCount:Te,…})
+  if (isGraphContextActive()) {
+    const imported = resolveAcrossGraph(
+      'ink:Select',
+      source =>
+        source.match(
+          /[^$\w.][$\w]+\(([$\w]+),\{options:[$\w]+,(?:[$\w]+:[$\w]+,){0,4}onChange:[$\w]+,(?:[$\w]+:[$\w]+,){0,4}visibleOptionCount:/
+        )?.[1]
+    );
+    if (imported) return imported;
   }
 
   console.error('patch: findSelectComponentName: failed to find selectPattern');
@@ -1393,6 +1408,208 @@ export const writeModeChangeUpdateToolset = (
  * @param acceptEditsToolset - Optional toolset to use in accept-edits Shift+Tab mode
  * @param planModeToolset - Optional toolset to switch to when entering plan mode
  */
+/**
+ * Code-split builds (CC 2.1.2xx). The REPL no longer builds its tool list in
+ * one memo; every caller goes through the tool catalog
+ * (`var K5={getAllBaseTools:AC,getTools:tP,assembleToolPool:ept}`), where
+ *   var tP=(e,r)=>{…}            // e = tool permission context
+ *   function ept(e,r,n){let s=tP(e,n),…}
+ * are also exported and called directly. Filter inside both definitions so
+ * every path sees the active toolset, and register `/toolset [name]`.
+ *
+ * The active toolset lives in globalThis.__tweakccToolset (set by
+ * /toolset); when unset, the same mode bindings as the classic patch apply
+ * (default / plan / acceptEdits / auto toolsets, plus the
+ * TWEAKCC_TOOLSET_* environment overrides).
+ */
+const writeToolsetsCodeSplit = (
+  oldFile: string,
+  toolsets: Toolset[],
+  defaultToolset: string | null,
+  acceptEditsToolset?: string | null,
+  planModeToolset?: string | null
+): string | null => {
+  const toolsetsJSON = JSON.stringify(
+    Object.fromEntries(
+      toolsets.map(ts => [
+        ts.name,
+        ts.allowedTools === '*' ? '*' : ts.allowedTools,
+      ])
+    )
+  );
+  let file = oldFile;
+
+  const catalog = file.match(
+    /[{,]getAllBaseTools:[$\w]+,getTools:([$\w]+),assembleToolPool:([$\w]+)\}/
+  );
+  if (catalog) {
+    const [, getTools, assemble] = catalog;
+    const esc = (s: string) => s.replace(/\$/g, '\\$');
+    const getToolsDef = file.match(
+      new RegExp(`var ${esc(getTools)}=\\(([$\\w]+),([$\\w]+)\\)=>\\{`)
+    );
+    const assembleDef = file.match(
+      new RegExp(
+        `function ${esc(assemble)}\\(([$\\w]+),([$\\w]+),([$\\w]+)\\)\\{`
+      )
+    );
+    if (getToolsDef?.index !== undefined && assembleDef?.index !== undefined) {
+      const fallback = getToolsetFallbackExpression(
+        'tweakccState',
+        defaultToolset,
+        acceptEditsToolset,
+        planModeToolset
+      );
+      const filter =
+        `const tweakccFilterMemo=new WeakMap;function tweakccFilterTools(tweakccTools,tweakccContext){` +
+        `let tweakccState={toolset:globalThis.__tweakccToolset,toolsetAutoMode:null,toolPermissionContext:tweakccContext},` +
+        `tweakccName=${fallback},tweakccSets=${toolsetsJSON};` +
+        `if(!Array.isArray(tweakccTools)||typeof tweakccName!=="string"||!Object.prototype.hasOwnProperty.call(tweakccSets,tweakccName))return tweakccTools;` +
+        // Same input + same toolset → same array: callers compare tool
+        // lists by identity and refresh when they differ.
+        `let tweakccCached=tweakccFilterMemo.get(tweakccTools);if(tweakccCached&&tweakccCached.name===tweakccName)return tweakccCached.out;` +
+        `let tweakccAllowed=tweakccSets[tweakccName],` +
+        `tweakccOut=tweakccAllowed==="*"?tweakccTools:tweakccTools.filter(tweakccTool=>tweakccAllowed.includes(tweakccTool.name));` +
+        `tweakccFilterMemo.set(tweakccTools,{name:tweakccName,out:tweakccOut});return tweakccOut}` +
+        `globalThis.__tweakccFilterTools=tweakccFilterTools;` +
+        // Effective toolset for a permission context (explicit choice, else
+        // the mode binding) and the status-line suffix built from it.
+        `globalThis.__tweakccToolsetName=(tweakccContext)=>{let tweakccState={toolset:globalThis.__tweakccToolset,toolsetAutoMode:null,toolPermissionContext:tweakccContext??{}};let tweakccName=${fallback};return typeof tweakccName==="string"&&tweakccName?tweakccName:void 0};` +
+        `globalThis.__tweakccToolsetLabel=(tweakccMode)=>{let tweakccName=globalThis.__tweakccToolsetName({mode:tweakccMode});return tweakccName?" ["+tweakccName+"]":""};`;
+      const [aHead, a1, a2, a3] = assembleDef;
+      const newAssemble = `${filter}function ${assemble}(${a1},${a2},${a3}){return tweakccFilterTools(tweakccAssembleToolPool(${a1},${a2},${a3}),${a1})}function tweakccAssembleToolPool(${a1},${a2},${a3}){`;
+      file =
+        file.slice(0, assembleDef.index) +
+        newAssemble +
+        file.slice(assembleDef.index + aHead.length);
+      const getToolsAgain = file.match(
+        new RegExp(`var ${esc(getTools)}=\\(([$\\w]+),([$\\w]+)\\)=>\\{`)
+      )!;
+      const [gHead, g1, g2] = getToolsAgain;
+      const newGetTools = `var ${getTools}=(${g1},${g2})=>tweakccFilterTools(tweakccGetTools(${g1},${g2}),${g1}),tweakccGetTools=(${g1},${g2})=>{`;
+      file =
+        file.slice(0, getToolsAgain.index!) +
+        newGetTools +
+        file.slice(getToolsAgain.index! + gHead.length);
+      showDiff(oldFile, file, 'toolset filter in tool catalog', 0, 0);
+    }
+  }
+
+  // The REPL session store merges its startup tool list back into the pool
+  // and caches the result, so filter its output as well:
+  //   computeToolPool(h,M,E){let K={toolPermissionContext:h.toolPermissionContext,…
+  const storePool = file.match(
+    /computeToolPool\(([$\w]+),([$\w]+),([$\w]+)\)\{let [$\w]+=\{toolPermissionContext:\1\.toolPermissionContext,/
+  );
+  if (storePool?.index !== undefined) {
+    const [, s, t, u] = storePool;
+    const head = `computeToolPool(${s},${t},${u}){`;
+    const wrapper =
+      `computeToolPool(${s},${t},${u}){let tweakccPool=this.tweakccComputeToolPool(${s},${t},${u}),tweakccFiltered=globalThis.__tweakccFilterTools?.(tweakccPool?.tools,${s}.toolPermissionContext);` +
+      `if(!tweakccPool||!Array.isArray(tweakccFiltered)||tweakccFiltered===tweakccPool.tools)return tweakccPool;` +
+      `if(this.tweakccPoolMemo?.src===tweakccPool&&this.tweakccPoolMemo.tools===tweakccFiltered)return this.tweakccPoolMemo.out;` +
+      `let tweakccOut={...tweakccPool,tools:tweakccFiltered};this.tweakccPoolMemo={src:tweakccPool,tools:tweakccFiltered,out:tweakccOut};return tweakccOut}` +
+      `tweakccComputeToolPool(${s},${t},${u}){`;
+    const before = file;
+    file =
+      file.slice(0, storePool.index) +
+      wrapper +
+      file.slice(storePool.index + head.length);
+    showDiff(before, file, wrapper, storePool.index, storePool.index);
+  }
+
+  // Mode status line: `⏸ plan mode on` → `⏸ plan mode on [readonly]`.
+  //   if(ee[6]!==M)Me=bW(M),…;const Ie=E?"":" on";…children:[Ce,Me,Ie,K]
+  const onLabel = file.match(/const ([$\w]+)=([$\w]+)\?"":" on";/);
+  if (onLabel?.index !== undefined) {
+    const before = file.slice(Math.max(0, onLabel.index - 400), onLabel.index);
+    const modeVar = [
+      ...before.matchAll(/if\([$\w]+\[\d+\]!==([$\w]+)\)[$\w]+=[$\w]+\(\1\)/g),
+    ].at(-1)?.[1];
+    if (modeVar) {
+      const replacement = `const ${onLabel[1]}=(${onLabel[2]}?"":" on")+(globalThis.__tweakccToolsetLabel?.(${modeVar})??"");`;
+      const previous = file;
+      file =
+        file.slice(0, onLabel.index) +
+        replacement +
+        file.slice(onLabel.index + onLabel[0].length);
+      showDiff(
+        previous,
+        file,
+        replacement,
+        onLabel.index,
+        onLabel.index + onLabel[0].length
+      );
+    }
+  }
+
+  if (file.includes('name:"login"') && !file.includes('name:"toolset"')) {
+    const commandDef = buildToolsetPickerCommand(file, toolsets);
+    const registered = commandDef
+      ? insertAfterLoginRegistration(file, commandDef)
+      : null;
+    if (registered) file = registered;
+  }
+
+  return file === oldFile ? null : file;
+};
+
+/**
+ * `/toolset` for code-split builds: with a name it switches directly; with
+ * no argument it renders a native Select picker (Claude Code's own Select,
+ * Box and Text, reached through the graph bridge).
+ */
+const buildToolsetPickerCommand = (
+  file: string,
+  toolsets: Toolset[]
+): string | null => {
+  const react = getReactVar(file);
+  const box = findBoxComponent(file);
+  const text = findTextComponent(file);
+  const select = findSelectComponentName(file);
+  if (!react || !box || !text || !select) return null;
+  const names = toolsets.map(ts => ts.name);
+  const options = JSON.stringify([
+    ...toolsets.map(ts => ({
+      label: ts.name,
+      value: ts.name,
+      description:
+        ts.allowedTools === '*'
+          ? 'All tools'
+          : ts.allowedTools.length === 0
+            ? 'No tools'
+            : `${ts.allowedTools.length} tool${ts.allowedTools.length !== 1 ? 's' : ''}: ${ts.allowedTools.join(', ')}`,
+    })),
+    {
+      label: 'Mode default',
+      value: '__tweakcc_default',
+      description:
+        'Clear the selection and use the toolset bound to the current mode',
+    },
+  ]);
+  const h = `${react}.createElement`;
+  return (
+    `,{type:"local-jsx",name:"toolset",description:${JSON.stringify(
+      `Choose the toolset Claude can use (${names.join(', ')})`
+    )},argumentHint:"[name|default]",` +
+    `load:()=>Promise.resolve({call:async(tweakccDone,tweakccContext,tweakccArgs)=>{` +
+    `const tweakccNames=${JSON.stringify(names)},tweakccWanted=String(tweakccArgs??"").trim(),` +
+    `tweakccSay=(message)=>tweakccDone(message,{display:"system"}),` +
+    `tweakccSet=(name)=>{if(name==="__tweakcc_default"||name==="default"||name==="none"){globalThis.__tweakccToolset=void 0;tweakccSay("Toolset cleared; using the mode default.");return}` +
+    `if(!tweakccNames.includes(name)){tweakccSay("Unknown toolset: "+name+". Available: "+tweakccNames.join(", "));return}` +
+    `globalThis.__tweakccToolset=name;tweakccSay("Toolset changed to "+name+".")};` +
+    `if(tweakccWanted){tweakccSet(tweakccWanted);return null}` +
+    `const tweakccCurrent=globalThis.__tweakccToolsetName?.(tweakccContext?.getAppState?.()?.toolPermissionContext);` +
+    `return ${h}(${box},{flexDirection:"column",paddingX:1},` +
+    `${h}(${text},{bold:!0,color:"suggestion"},"Select toolset"),` +
+    `${h}(${text},{dimColor:!0},"A toolset limits which tools Claude can see and call."),` +
+    `${h}(${box},{marginY:1},${h}(${text},null,"Current: "+(tweakccCurrent??"none (all tools)"))),` +
+    `${h}(${select},{options:${options},defaultValue:tweakccCurrent,defaultFocusValue:tweakccCurrent,onChange:tweakccSet,onCancel:()=>tweakccSay("Toolset not changed.")}),` +
+    `${h}(${box},{marginTop:1},${h}(${text},{dimColor:!0,italic:!0},"Enter to confirm \\u00b7 Esc to cancel \\u00b7 managed with tweakcc")))` +
+    `}})}`
+  );
+};
+
 export const writeToolsets = (
   oldFile: string,
   toolsets: Toolset[],
@@ -1403,6 +1620,16 @@ export const writeToolsets = (
   // Return if no toolsets are configured
   if (!toolsets || toolsets.length === 0) {
     return oldFile;
+  }
+
+  if (isGraphContextActive()) {
+    return writeToolsetsCodeSplit(
+      oldFile,
+      toolsets,
+      defaultToolset,
+      acceptEditsToolset,
+      planModeToolset
+    );
   }
 
   let result: string | null = oldFile;

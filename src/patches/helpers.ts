@@ -1,4 +1,57 @@
 import { escapeIdent } from '.';
+import {
+  exportedNameOf,
+  graphMemo,
+  graphSources,
+  isGraphContextActive,
+  requestImport,
+  requestPrelude,
+  resolveAcrossGraph,
+} from './graphContext';
+
+/**
+ * React in a code-split build is an ES module whose API is exported one
+ * minified name per member (`g=function(t){return s.H.useState(t)}`,
+ * `Wc=function(t,e,n){…}` for createElement). Patches were written against a
+ * React namespace object, so give them one: `$tcc_React`, a getter-backed
+ * object over aliased imports (getters, because the exports are assigned by
+ * the chunk's lazy initialiser rather than at module evaluation).
+ */
+const REACT_SHIM = '$tcc_React';
+const getGraphReactShim = (): string | undefined => {
+  const react = graphMemo('react-members', () => {
+    for (const [module, source] of graphSources() ?? []) {
+      if (!source.includes('.H.useState(')) continue;
+      const members = new Map<string, string>();
+      for (const match of source.matchAll(
+        /([$\w]+)=function\([$\w,]*\)\{return [$\w]+\.H\.(use[A-Za-z]+)\(/g
+      )) {
+        const exported = exportedNameOf(module, match[1]);
+        if (exported && !members.has(match[2])) members.set(match[2], exported);
+      }
+      const createElement = source.match(
+        /[,;{ ]([$\w]+)=function\(([$\w]+),([$\w]+),([$\w]+)\)\{var [$\w]+,[$\w]+=\{\},[$\w]+=null;if\(\3!=null\)/
+      );
+      const exportedCreateElement =
+        createElement && exportedNameOf(module, createElement[1]);
+      if (exportedCreateElement && members.has('useState')) {
+        members.set('createElement', exportedCreateElement);
+        return { module, members };
+      }
+    }
+    return null;
+  });
+  if (!react) return undefined;
+  const getters = [...react.members].map(([member, exported]) => {
+    const alias = requestImport(exported, react.module);
+    return `get ${member}(){return ${alias}}`;
+  });
+  requestPrelude(
+    REACT_SHIM,
+    `var ${REACT_SHIM}={${getters.join(',')},Fragment:Symbol.for("react.fragment")};${REACT_SHIM}.default=${REACT_SHIM};`
+  );
+  return REACT_SHIM;
+};
 
 /**
  * Escapes every non-ASCII code unit as a `\uXXXX` sequence so injected source
@@ -37,6 +90,19 @@ export const findChalkVar = (fileContents: string): string | undefined => {
       maxCount = count;
       chalkVar = varName;
     }
+  }
+  // In a code-split build a module that never styles text has no chalk
+  // calls of its own; borrow the graph's chalk instance. A module with only a
+  // stray match or two is also better served by the graph-wide winner.
+  if (isGraphContextActive() && maxCount < 3) {
+    const imported = resolveAcrossGraph('chalk', source => {
+      const counts = new Map<string, number>();
+      for (const match of source.matchAll(chalkPattern))
+        counts.set(match[1], (counts.get(match[1]) ?? 0) + 1);
+      const best = [...counts].sort((a, b) => b[1] - a[1])[0];
+      return best && best[1] >= 10 ? best[0] : undefined;
+    });
+    if (imported) return imported;
   }
   return chalkVar;
 };
@@ -148,6 +214,10 @@ let requireFuncNameCache: string | null = null;
  * Get the React variable name (cached)
  */
 export const getReactVar = (fileContents: string): string | undefined => {
+  // Code-split native builds import React piecemeal (one minified export per
+  // hook); patches get a namespace-shaped shim instead.
+  if (isGraphContextActive()) return getGraphReactShim();
+
   // Return cached value if available
   if (reactVarCache != null) {
     return reactVarCache;
@@ -267,6 +337,10 @@ export const findRequireFunc = (fileContents: string): string | undefined => {
  * @returns "require" for Bun, or the require function variable name for esbuild
  */
 export const getRequireFuncName = (fileContents: string): string => {
+  // Code-split native chunks are Bun ES modules; Bun exposes CommonJS
+  // require there as import.meta.require (the chunks use it themselves).
+  if (isGraphContextActive()) return 'import.meta.require';
+
   // Return cached value if available
   if (requireFuncNameCache != null) {
     return requireFuncNameCache;
@@ -323,6 +397,20 @@ export const findTextComponent = (fileContents: string): string | undefined => {
   const bodyDestructureMatch = fileContents.match(bodyDestructurePattern);
   if (bodyDestructureMatch) {
     return bodyDestructureMatch[1];
+  }
+
+  // CC 2.1.2xx (React compiler output): props are destructured inside a
+  // memo-cache guard: function n(o){let r=w(31),…;if(r[0]!==o)({color:d,backgroundColor:l,dimColor:…}=o…
+  const memoDestructurePattern =
+    /\bfunction ([$\w]+)\(([$\w]+)\)\{let [$\w]+=[$\w]+\(\d+\)[^;]{0,200};if\([$\w]+\[0\]!==\2\)\(\{color:[$\w]+,backgroundColor:[$\w]+,dimColor:/;
+  const memoDestructureMatch = fileContents.match(memoDestructurePattern);
+  if (memoDestructureMatch) {
+    return memoDestructureMatch[1];
+  }
+
+  if (isGraphContextActive()) {
+    const imported = resolveAcrossGraph('ink:Text', findTextComponent);
+    if (imported) return imported;
   }
 
   console.log('patch: findTextComponent: failed to find text component');
@@ -398,6 +486,24 @@ export const findBoxComponent = (fileContents: string): string | undefined => {
       findThemedBoxWrapper(fileContents, restStyleBoxMatch[1]) ??
       restStyleBoxMatch[1]
     );
+  }
+
+  // Method 6: the theme-aware Box wrapper that resolves theme color names
+  // (CC 2.1.2xx code-split builds, where Ink's raw Box lives in another chunk):
+  // function wt(o){let r=Ck();return e(Tl,{...o,borderColor:j(o.borderColor,r),…})}var s=wt;
+  const themedWrapperPattern =
+    /function ([$\w]+)\(([$\w]+)\)\{let [$\w]+=[$\w]+\(\);return [$\w]+\([$\w]+,\{\.\.\.\2,borderColor:[$\w]+\(\2\.borderColor,[$\w]+\),borderTopColor:/;
+  const themedWrapperMatch = fileContents.match(themedWrapperPattern);
+  if (themedWrapperMatch) {
+    const alias = fileContents.match(
+      new RegExp(`var ([$\\w]+)=${escapeIdent(themedWrapperMatch[1])};`)
+    );
+    return alias?.[1] ?? themedWrapperMatch[1];
+  }
+
+  if (isGraphContextActive()) {
+    const imported = resolveAcrossGraph('ink:Box', findBoxComponent);
+    if (imported) return imported;
   }
 
   console.error(

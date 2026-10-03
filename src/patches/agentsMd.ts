@@ -16,6 +16,12 @@ export const writeAgentsMd = (
   file: string,
   altNames: string[]
 ): string | null => {
+  const wrapped = writeAgentsMdPrologue(file, altNames);
+  if (wrapped) return writeAgentsMdProjectFiles(wrapped, altNames) ?? wrapped;
+
+  const projectFilesOnly = writeAgentsMdProjectFiles(file, altNames);
+  if (projectFilesOnly) return projectFilesOnly;
+
   const async2214 = writeAgentsMdAsync2214(file, altNames);
   if (async2214) return async2214;
 
@@ -85,6 +91,69 @@ const injectRerouteIntoCatch = (
  * A missing CLAUDE.md throws ENOENT from the helper's stat() and lands in the catch,
  * so the reroute is injected there (same strategy as writeAgentsMdAsync2199).
  */
+/**
+ * CC 2.1.2xx batch-reads each directory's project instruction files from a
+ * fixed list and never calls the per-file reader for them:
+ *   projectFiles:Nn?[qu(yn,"CLAUDE.md"),qu(yn,".claude","CLAUDE.md")].filter(…):[]
+ * When neither CLAUDE.md exists in a directory, add the first alternative
+ * name that does, so it is loaded into context exactly like CLAUDE.md.
+ */
+const writeAgentsMdProjectFiles = (
+  file: string,
+  altNames: string[]
+): string | null => {
+  const pattern =
+    /projectFiles:([$\w]+)\?\[([$\w]+)\(([$\w]+),"CLAUDE\.md"\),\2\(\3,"\.claude","CLAUDE\.md"\)\]/;
+  const m = file.match(pattern);
+  if (!m || m.index === undefined) return null;
+  const [whole, cond, join, dir] = m;
+  const base = `[${join}(${dir},"CLAUDE.md"),${join}(${dir},".claude","CLAUDE.md")]`;
+  const replacement =
+    `projectFiles:${cond}?(()=>{let tweakccBase=${base};` +
+    `try{let tweakccFs=import.meta.require("fs");` +
+    `if(tweakccBase.some(tweakccPath=>tweakccFs.existsSync(tweakccPath)))return tweakccBase;` +
+    `for(let tweakccAlt of ${JSON.stringify(altNames)}){let tweakccPath=${join}(${dir},tweakccAlt);if(tweakccFs.existsSync(tweakccPath))return[...tweakccBase,tweakccPath]}}catch{}` +
+    `return tweakccBase})()`;
+  const startIndex = m.index;
+  const endIndex = startIndex + whole.length;
+  const newFile =
+    file.slice(0, startIndex) + replacement + file.slice(endIndex);
+  showDiff(file, newFile, replacement, startIndex, endIndex);
+  return newFile;
+};
+
+/**
+ * CC 2.1.2xx: the reader gained a fourth (storage backend) parameter, and a
+ * backend reports a missing file as `case"absent":return{info:null,…}`
+ * without throwing, so a catch-block reroute would never run:
+ *   async function pye(e,n,r,s){try{let g,h=!1;if(s){…case"absent":return{info:null,includePaths:[]};…}
+ *     …if(g===null){t(`[CLAUDE.md] skipping ${e}: …`);…}return GJe(g,e,n,r)}catch(g){return awn(g,e),{info:null,includePaths:[]}}}
+ * Add a prologue instead: read CLAUDE.md as before and, when that yields no
+ * info, try each alternative name in the same directory.
+ */
+const writeAgentsMdPrologue = (
+  file: string,
+  altNames: string[]
+): string | null => {
+  const pattern =
+    /async function ([$\w]+)\(([$\w]+),([$\w]+),([$\w]+),([$\w]+)\)\{(?=try\{[^]{0,1200}?`\[CLAUDE\.md\] skipping \$\{\2\}[^]{0,400}?\}catch\([$\w]+\)\{return [$\w]+\([$\w]+,\2\),\{info:null,includePaths:\[\]\}\}\})/;
+  const m = file.match(pattern);
+  if (!m || m.index === undefined) return null;
+  const [head, fn, path, a, b, c] = m;
+  const args = `${a},${b},${c}`;
+  const prologue =
+    `if(!tweakccAltPass&&(${path}.endsWith("/CLAUDE.md")||${path}.endsWith("\\\\CLAUDE.md"))){` +
+    `let tweakccPrimary=await ${fn}(${path},${args},!0);if(tweakccPrimary.info)return tweakccPrimary;` +
+    `for(let tweakccAlt of ${JSON.stringify(altNames)}){try{let tweakccResult=await ${fn}(${path}.slice(0,-9)+tweakccAlt,${args},!0);if(tweakccResult.info)return tweakccResult}catch{}}` +
+    `return tweakccPrimary}`;
+  const newHead = `async function ${fn}(${path},${args},tweakccAltPass){${prologue}`;
+  const startIndex = m.index;
+  const endIndex = startIndex + head.length;
+  const newFile = file.slice(0, startIndex) + newHead + file.slice(endIndex);
+  showDiff(file, newFile, newHead, startIndex, endIndex);
+  return newFile;
+};
+
 const writeAgentsMdAsync2214 = (
   file: string,
   altNames: string[]

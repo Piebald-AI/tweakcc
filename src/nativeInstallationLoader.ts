@@ -8,9 +8,11 @@
 
 import type {
   extractClaudeJsFromNativeInstallation as ExtractFn,
-  extractClaudeJsModulesFromNativeInstallation as ExtractModulesFn,
-  repackNativeInstallationModules as RepackModulesFn,
+  extractClaudeJsModulesFromNativeInstallation as ExtractCorpusFn,
+  extractNativeInstallationModules as ExtractModulesFn,
   repackNativeInstallation as RepackFn,
+  repackNativeInstallationModules as RepackModulesFn,
+  repackNativeInstallationModuleGraph as RepackGraphFn,
   resolveNixBinaryWrapper as ResolveNixFn,
 } from './nativeInstallation';
 
@@ -18,9 +20,11 @@ import { debug } from './utils';
 
 interface NativeInstallationModule {
   extractClaudeJsFromNativeInstallation: typeof ExtractFn;
-  extractClaudeJsModulesFromNativeInstallation: typeof ExtractModulesFn;
-  repackNativeInstallationModules: typeof RepackModulesFn;
+  extractClaudeJsModulesFromNativeInstallation: typeof ExtractCorpusFn;
+  extractNativeInstallationModules: typeof ExtractModulesFn;
   repackNativeInstallation: typeof RepackFn;
+  repackNativeInstallationModules: typeof RepackModulesFn;
+  repackNativeInstallationModuleGraph: typeof RepackGraphFn;
   resolveNixBinaryWrapper: typeof ResolveNixFn;
 }
 
@@ -67,13 +71,35 @@ export async function extractClaudeJsFromNativeInstallation(
   return mod.extractClaudeJsFromNativeInstallation(nativeInstallationPath);
 }
 
+export async function extractNativeInstallationModules(
+  nativeInstallationPath: string
+): Promise<ReturnType<typeof ExtractModulesFn>> {
+  const mod = await tryLoadNativeInstallationModule();
+  return mod?.extractNativeInstallationModules(nativeInstallationPath) ?? null;
+}
+
+/** Writes changed module sources back into a code-split native graph. */
+export async function repackNativeInstallationModuleGraph(
+  binPath: string,
+  replacements: ReadonlyMap<string, Buffer>,
+  outputPath: string
+): Promise<void> {
+  const mod = await tryLoadNativeInstallationModule();
+  if (!mod) {
+    throw new Error(
+      '`repackNativeInstallationModuleGraph()` called but `node-lief` is not available.'
+    );
+  }
+  mod.repackNativeInstallationModuleGraph(binPath, replacements, outputPath);
+}
+
 /**
  * Reads the complete embedded corpus. The path must resolve any Nix wrapper.
  * Returns null when native support is unavailable or the graph cannot be read.
  */
 export async function extractClaudeJsModulesFromNativeInstallation(
   nativeInstallationPath: string
-): Promise<ReturnType<typeof ExtractModulesFn>> {
+): Promise<ReturnType<typeof ExtractCorpusFn>> {
   const mod = await tryLoadNativeInstallationModule();
   if (!mod) return null;
   return mod.extractClaudeJsModulesFromNativeInstallation(

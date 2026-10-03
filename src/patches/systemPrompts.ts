@@ -13,7 +13,10 @@ import { setAppliedHash, computeMD5Hash } from '../systemPromptHashIndex';
  * Result of applying system prompts
  */
 export interface SystemPromptsResult {
+  /** The patched source (first source when several were given). */
   newContent: string;
+  /** Every patched source, in the order given. */
+  newContents: string[];
   results: PatchResult[];
 }
 
@@ -131,20 +134,26 @@ const escapeUnescapedChar = (str: string, char: string): string => {
 
 /**
  * Apply system prompt customizations to cli.js content
- * @param content - The current content of cli.js
+ * @param input - The current content of cli.js, or every JavaScript module of
+ *   a code-split native build (each prompt is patched in the module that
+ *   contains it)
  * @param version - The Claude Code version
  * @param escapeNonAscii - Whether to escape non-ASCII characters (auto-detected if not specified)
  * @param patchFilter - Optional list of patch/prompt IDs to apply (if provided, only matching prompts are applied)
  * @returns SystemPromptsResult with modified content and per-prompt results
  */
 export const applySystemPrompts = async (
-  content: string,
+  input: string | readonly string[],
   version: string,
   escapeNonAscii?: boolean,
   patchFilter?: string[] | null
 ): Promise<SystemPromptsResult> => {
+  const contents = typeof input === 'string' ? [input] : [...input];
+  const allSource = contents.length === 1 ? contents[0] : contents.join('\n');
+
   // Auto-detect if we should escape non-ASCII characters based on cli.js content
-  const shouldEscapeNonAscii = escapeNonAscii ?? detectUnicodeEscaping(content);
+  const shouldEscapeNonAscii =
+    escapeNonAscii ?? detectUnicodeEscaping(allSource);
 
   if (shouldEscapeNonAscii) {
     debug(
@@ -153,7 +162,7 @@ export const applySystemPrompts = async (
   }
 
   // Extract BUILD_TIME from cli.js content
-  const buildTime = extractBuildTime(content);
+  const buildTime = extractBuildTime(allSource);
   if (buildTime) {
     debug(`Extracted BUILD_TIME from cli.js: ${buildTime}`);
   }
@@ -195,10 +204,16 @@ export const applySystemPrompts = async (
     // construction + match: an oversized pattern (e.g. the Model Migration Guide) can
     // overflow V8's regex stack on Node <=22 and abort the whole --apply (#753).
     let pattern: RegExp;
-    let matches: RegExpMatchArray[];
+    // Code-split native builds pass every module: patch the first module that
+    // contains the prompt, at every occurrence within it.
+    let matches: RegExpMatchArray[] = [];
+    let moduleIndex = 0;
     try {
       pattern = new RegExp(regex, 'gsi');
-      matches = [...content.matchAll(pattern)];
+      for (let i = 0; i < contents.length && matches.length === 0; i++) {
+        matches = [...contents[i].matchAll(pattern)];
+        if (matches.length > 0) moduleIndex = i;
+      }
     } catch (error) {
       console.log(
         chalk.yellow(
@@ -218,6 +233,7 @@ export const applySystemPrompts = async (
     }
 
     if (matches.length > 0) {
+      let content = contents[moduleIndex];
       const firstMatch = matches[0];
       const matchIndex = firstMatch.index!;
 
@@ -365,6 +381,7 @@ export const applySystemPrompts = async (
         pattern,
         () => replacements[replacementIndex++]
       );
+      contents[moduleIndex] = content;
 
       // Store the hash of the applied prompt content
       const appliedHash = computeMD5Hash(prompt.content);
@@ -420,11 +437,14 @@ export const applySystemPrompts = async (
         !prompt.name.startsWith('Data:') &&
         prompt.name !== 'Skill: Build with Claude API'
       ) {
+        // The full regex can be tens of kilobytes; print it only in verbose
+        // mode so one missing prompt cannot bury the rest of the output.
         console.log(
           chalk.yellow(
-            `Could not find system prompt "${prompt.name}" in cli.js (using regex ${stringifyRegex(pattern)})`
+            `Could not find system prompt "${prompt.name}" in Claude Code's source (run with --verbose to see the pattern)`
           )
         );
+        verbose(`  Pattern: ${stringifyRegex(pattern)}`);
       }
 
       verbose(`\n  Debug info for ${prompt.name}:`);
@@ -433,7 +453,8 @@ export const applySystemPrompts = async (
       );
       verbose(`  Trying to match pattern in cli.js...`);
       try {
-        const testMatch = content.match(new RegExp(regex.substring(0, 100)));
+        const partial = new RegExp(regex.substring(0, 100));
+        const testMatch = contents.some(source => partial.test(source));
         verbose(
           `  Partial match result: ${testMatch ? 'found partial' : 'no match'}`
         );
@@ -444,7 +465,8 @@ export const applySystemPrompts = async (
   }
 
   return {
-    newContent: content,
+    newContent: contents[0],
+    newContents: contents,
     results,
   };
 };

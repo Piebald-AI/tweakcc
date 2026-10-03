@@ -35,4 +35,18 @@ describe('writeChannelsMode', () => {
     expect(result).toContain('Channels active. Restart Claude Code without ');
     expect(result).not.toContain('carries prompt injection risks');
   });
+
+  it('enables channels when the gate also checks a policy first (CC 2.1.290+)', () => {
+    const input = GATES.replace(
+      'function a(){return F("tengu_harbor",!1)}',
+      'function a(){return P("allow_channels")&&F("tengu_harbor",!1)}'
+    );
+
+    const result = writeChannelsMode(input);
+
+    expect(result).not.toBeNull();
+    expect(result).toContain(
+      'function a(){return !0;return P("allow_channels")&&F("tengu_harbor",!1)}'
+    );
+  });
 });

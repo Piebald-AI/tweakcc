@@ -1,5 +1,6 @@
 // Please see the note about writing patches in ./index
 
+import { isGraphContextActive } from './graphContext';
 import { LocationResult, showDiff } from './index';
 
 const getShowMoreItemsInSelectMenusLocation = (
@@ -150,12 +151,48 @@ const patchSuggestionsCap = (file: string): string | null => {
   return newFile;
 };
 
+/**
+ * CC 2.1.2xx /model picker: its visible count is height-derived but capped:
+ *   Zo=Math.max(2,Math.min(10,Math.floor((ze-A-B-C-D)/2)))
+ * near "Switch between Claude models". Raise the cap to `numberOfItems`.
+ */
+const patchModelPickerCap = (
+  file: string,
+  numberOfItems: number
+): string | null => {
+  const anchor = file.indexOf('Switch between Claude models');
+  if (anchor === -1) return null;
+  const pattern = /Math\.max\(2,Math\.min\(10,Math\.floor\(/g;
+  const hits = [...file.matchAll(pattern)].filter(
+    m => m.index! < anchor && anchor - m.index! < 8000
+  );
+  if (hits.length === 0) return null;
+  const hit = hits[hits.length - 1];
+  const replacement = `Math.max(2,Math.min(${numberOfItems},Math.floor(`;
+  const newFile =
+    file.slice(0, hit.index!) +
+    replacement +
+    file.slice(hit.index! + hit[0].length);
+  showDiff(file, newFile, replacement, hit.index!, hit.index! + hit[0].length);
+  return newFile;
+};
+
 export const writeShowMoreItemsInSelectMenus = (
   oldFile: string,
   numberOfItems: number
 ): string | null => {
   const locations = getShowMoreItemsInSelectMenusLocation(oldFile);
   if (locations.length === 0) {
+    // Code-split builds (CC 2.1.2xx) keep the help menu, command list and
+    // model picker in modules without any visibleOptionCount default.
+    if (isGraphContextActive()) {
+      let file = oldFile;
+      file = patchHelpMenuHeight(file) ?? file;
+      file = patchCommandsVisibleCount(file) ?? file;
+      file = patchSuggestionsCap(file) ?? file;
+      file = patchModelPickerCap(file, numberOfItems) ?? file;
+      return file === oldFile ? null : file;
+    }
     console.error(
       'patch: writeShowMoreItemsInSelectMenus: failed to find locations'
     );
@@ -187,7 +224,7 @@ export const writeShowMoreItemsInSelectMenus = (
   const heightPatched = patchHelpMenuHeight(newFile);
   if (heightPatched) {
     newFile = heightPatched;
-  } else {
+  } else if (!isGraphContextActive()) {
     console.error(
       'patch: writeShowMoreItemsInSelectMenus: failed to find help menu height pattern'
     );
@@ -199,11 +236,13 @@ export const writeShowMoreItemsInSelectMenus = (
   const visibleCountPatched = patchCommandsVisibleCount(newFile);
   if (visibleCountPatched) {
     newFile = visibleCountPatched;
-  } else {
+  } else if (!isGraphContextActive()) {
     console.error(
       'patch: writeShowMoreItemsInSelectMenus: failed to find visibleCount pattern'
     );
   }
+
+  newFile = patchModelPickerCap(newFile, numberOfItems) ?? newFile;
 
   // Also patch the slash command autocomplete suggestions cap when present.
   // Math.min(6,Math.max(1,rows-3)) → Math.max(1,rows-3)

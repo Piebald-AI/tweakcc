@@ -95,7 +95,6 @@ export async function completeStartupCheck(
   }
 
   // Backup native binary if we don't have any backup yet (for native installations)
-  let hasBackedUpNativeBinary = false;
   if (
     ccInstInfo.nativeInstallationPath &&
     !(await doesFileExist(NATIVE_BINARY_BACKUP_FILE))
@@ -104,7 +103,6 @@ export async function completeStartupCheck(
       `startupCheck: ${NATIVE_BINARY_BACKUP_FILE} not found; backing up native binary`
     );
     await backupNativeBinary(ccInstInfo);
-    hasBackedUpNativeBinary = true;
   }
 
   // If the installed CC version is different from what we have backed up, clear out our backup
@@ -121,16 +119,10 @@ export async function completeStartupCheck(
       await backupClijs(ccInstInfo);
     }
 
-    // Also backup native binary if version changed
-    if (ccInstInfo.nativeInstallationPath && !hasBackedUpNativeBinary) {
-      debug(
-        `startupCheck: real version (${realVersion}) != backed up version (${backedUpVersion}); backing up native binary`
-      );
-      if (await doesFileExist(NATIVE_BINARY_BACKUP_FILE)) {
-        await fs.unlink(NATIVE_BINARY_BACKUP_FILE);
-      }
-      await backupNativeBinary(ccInstInfo);
-    }
+    // Never replace an existing native backup based only on config.ccVersion.
+    // A patched binary reports the same Claude version as its clean source, and
+    // stale config metadata must not turn that patched binary into the backup.
+    // Missing native backups are created above before this branch.
 
     return {
       wasUpdated: true,
