@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Verify native update-guard source decoding for Bun's UTF-8, Latin-1, and UTF-16LE encodings (#408) - @mike1858
 - Preserve build-specific hook worker paths and capture the directory-sync formatter in 2.1.282 prompts (#1012) - @mike1858
+- Support code-split native builds (Claude Code 2.1.2xx) and fix patches for Claude Code 2.1.281-2.1.288 (#1023) - @basekevin
 
 ## [v4.3.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.3) - 2026-08-13
 

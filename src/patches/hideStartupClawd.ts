@@ -20,6 +20,23 @@ import { showDiff } from './index';
 const findStartupClawdComponents = (oldFile: string): number[] => {
   const indices: number[] = [];
 
+  // CC 2.1.2xx: Clawd is one pose-aware component that already returns null
+  // in some modes (so nulling it is layout-safe) and picks the Apple Terminal
+  // variant itself:
+  //   function Qee(g){…let{pose:b}=d,…;if($t()){return null}if(a.terminal==="Apple_Terminal"){…}
+  // CC 2.1.285 destructures more props and moved the terminal check into a
+  // helper defined before the component:
+  //   function wpe(o){…let{pose:c,color:l,paint:m}=t,…;if(St()){return null}if(Uqt(p)){…
+  // The window must not cross into another function, or a small helper that
+  // precedes the component (e.g. `function Uqt(o){…}`) would be matched.
+  const poseComponentPattern =
+    /function [$\w]+\([$\w]+\)\{(?=(?:(?!function )[^]){0,400}?\{pose:[$\w]+(?:,[$\w]+:[$\w]+)*\}=[$\w]+(?:(?!function )[^]){0,300}?(?:==="Apple_Terminal"|\{return null\}))(?=[^]{0,2200}?"clawd_body")/;
+  const poseMatch = oldFile.match(poseComponentPattern);
+  if (poseMatch && poseMatch.index !== undefined) {
+    indices.push(poseMatch.index + poseMatch[0].length);
+    return indices;
+  }
+
   const clawdPattern = /▛███▜|\\u259B\\u2588\\u2588\\u2588\\u259C/gi;
 
   // Find the inner component function name

@@ -1,6 +1,7 @@
 import { stringifyRegex } from '@/utils';
 import { InputPatternHighlighter } from '../types';
 import { findChalkVar, showDiff } from './index';
+import { isGraphContextActive } from './graphContext';
 
 // ======================================================================
 
@@ -273,69 +274,7 @@ const writeCustomHighlighterCreation = (
 
   const useMemoCode = '';
 
-  let genCode = '';
-  for (let i = 0; i < highlighters.length; i++) {
-    const highlighter = highlighters[i];
-    const chalkChain = buildChalkChain(chalkVar, highlighter);
-    const formatStr = highlighter.format ?? '{MATCH}';
-    JSON.stringify(formatStr).replace(/\{MATCH\}/g, '"+x+"'); // preserve legacy side-effect-free transform shape for diff stability
-
-    // Note: format handling for this branch is currently color/style-only.
-
-    let colorStr = highlighter.foregroundColor;
-    if (colorStr) {
-      const rgbMatch = colorStr.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
-      if (rgbMatch) {
-        const [, r, g, b] = rgbMatch.map(Number);
-        colorStr = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-      }
-    }
-    const colorValue = colorStr ? JSON.stringify(colorStr) : 'undefined';
-    let bgColorStr = highlighter.backgroundColor;
-    if (bgColorStr) {
-      const bgRgbMatch = bgColorStr.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
-      if (bgRgbMatch) {
-        const [, r, g, b] = bgRgbMatch.map(Number);
-        bgColorStr = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-      }
-    }
-    const bgColorValue = bgColorStr ? JSON.stringify(bgColorStr) : null;
-    const styling = highlighter.styling ?? [];
-    const isBold = styling.includes('bold');
-    const isItalic = styling.includes('italic');
-    const isUnderline = styling.includes('underline');
-    const isInverse = styling.includes('inverse');
-    const isDim = styling.includes('dim');
-    const isStrikethrough = styling.includes('strikethrough');
-
-    const regexSource =
-      highlighter.regex ??
-      (highlighter as unknown as { pattern?: string }).pattern;
-    if (!regexSource) {
-      console.error(
-        `patch: inputPatternHighlighters: highlighter "${highlighter.name}" has no regex/pattern; skipping`
-      );
-      continue;
-    }
-    let flags = highlighter.regexFlags ?? '';
-    if (!flags.includes('g')) {
-      flags += 'g';
-    }
-    let regex: RegExp;
-    try {
-      regex = new RegExp(regexSource, flags);
-    } catch (error) {
-      console.error(
-        `patch: inputPatternHighlighters: highlighter "${highlighter.name}" has invalid regex; skipping`,
-        error
-      );
-      continue;
-    }
-    const regexStr = stringifyRegex(regex);
-
-    genCode += `if(typeof ${inputVar}==="string"){for(let m of ${inputVar}.matchAll(${regexStr})){${rangesVar}.push({start:m.index,end:m.index+m[0].length,color:${colorValue}${bgColorValue ? `,backgroundColor:${bgColorValue}` : ''}${isBold ? ',bold:!0' : ''}${isItalic ? ',italic:!0' : ''}${isUnderline ? ',underline:!0' : ''}${isInverse ? ',inverse:!0' : ''}${isDim ? ',dimColor:!0' : ''}${isStrikethrough ? ',strikethrough:!0' : ''},style:(x)=>${chalkChain}(x),priority:100})}}`;
-  }
-
+  const genCode = buildRangePushes(inputVar, rangesVar, chalkVar, highlighters);
   if (!genCode) {
     console.error(
       'patch: inputPatternHighlighters: no usable highlighters generated (all skipped)'
@@ -402,6 +341,180 @@ const writeCustomHighlighterCreation = (
 
 // ======================================================================
 
+/**
+ * Code that pushes one highlight range per regex match of `inputExpr` onto
+ * `rangesVar`. Empty when no highlighter is usable.
+ */
+const buildRangePushes = (
+  inputExpr: string,
+  rangesVar: string,
+  chalkVar: string,
+  highlighters: InputPatternHighlighter[]
+): string => {
+  let genCode = '';
+  for (const highlighter of highlighters) {
+    const chalkChain = buildChalkChain(chalkVar, highlighter);
+
+    // Note: format handling for this branch is currently color/style-only.
+
+    let colorStr = highlighter.foregroundColor;
+    if (colorStr) {
+      const rgbMatch = colorStr.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+      if (rgbMatch) {
+        const [, r, g, b] = rgbMatch.map(Number);
+        colorStr = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+      }
+    }
+    const colorValue = colorStr ? JSON.stringify(colorStr) : 'undefined';
+    let bgColorStr = highlighter.backgroundColor;
+    if (bgColorStr) {
+      const bgRgbMatch = bgColorStr.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+      if (bgRgbMatch) {
+        const [, r, g, b] = bgRgbMatch.map(Number);
+        bgColorStr = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+      }
+    }
+    const bgColorValue = bgColorStr ? JSON.stringify(bgColorStr) : null;
+    const styling = highlighter.styling ?? [];
+    const isBold = styling.includes('bold');
+    const isItalic = styling.includes('italic');
+    const isUnderline = styling.includes('underline');
+    const isInverse = styling.includes('inverse');
+    const isDim = styling.includes('dim');
+    const isStrikethrough = styling.includes('strikethrough');
+
+    const regexSource =
+      highlighter.regex ??
+      (highlighter as unknown as { pattern?: string }).pattern;
+    if (!regexSource) {
+      console.error(
+        `patch: inputPatternHighlighters: highlighter "${highlighter.name}" has no regex/pattern; skipping`
+      );
+      continue;
+    }
+    let flags = highlighter.regexFlags ?? '';
+    if (!flags.includes('g')) {
+      flags += 'g';
+    }
+    let regex: RegExp;
+    try {
+      regex = new RegExp(regexSource, flags);
+    } catch (error) {
+      console.error(
+        `patch: inputPatternHighlighters: highlighter "${highlighter.name}" has invalid regex; skipping`,
+        error
+      );
+      continue;
+    }
+    const regexStr = stringifyRegex(regex);
+
+    genCode += `if(typeof ${inputExpr}==="string"){for(let m of ${inputExpr}.matchAll(${regexStr})){${rangesVar}.push({start:m.index,end:m.index+m[0].length,color:${colorValue}${bgColorValue ? `,backgroundColor:${bgColorValue}` : ''}${isBold ? ',bold:!0' : ''}${isItalic ? ',italic:!0' : ''}${isUnderline ? ',underline:!0' : ''}${isInverse ? ',inverse:!0' : ''}${isDim ? ',dimColor:!0' : ''}${isStrikethrough ? ',strikethrough:!0' : ''},style:(x)=>${chalkChain}(x),priority:100})}}`;
+  }
+  return genCode;
+};
+
+/**
+ * CC 2.1.2xx renderer: the JSX runtime is a bare minified import and the
+ * shimmer branch uses a block body:
+ *   if(x.highlight?.shimmerColor&&x.highlight.color){return e(n,{children:…},N)}
+ *   return e(n,{color:x.highlight?.color,dimColor:x.highlight?.dimColor,underline:x.highlight?.underline,children:e(Zr,{children:x.text})},N)
+ */
+const writeCustomHighlighterImplCodeSplit = (
+  oldFile: string
+): string | null => {
+  // CC 2.1.285 also passes backgroundColor/bold/italic/strikethrough natively
+  // (still not inverse, and no chalk `style` hook), so accept those too.
+  const rendererRegex =
+    /return ([$\w]+)\(([$\w]+),\{color:([$\w]+)\.highlight\?\.color,(?:backgroundColor:\3\.highlight\?\.backgroundColor,)?dimColor:\3\.highlight\?\.dimColor,(?:(?:underline|inverse|bold|italic|strikethrough):\3\.highlight\?\.(?:underline|inverse|bold|italic|strikethrough),)*children:\1\(([$\w]+),\{children:\3\.text\}\)\},([$\w]+)\)/;
+  const match = oldFile.match(rendererRegex);
+  if (!match || match.index === undefined) return null;
+  const [, jsx, outerText, seg, innerText, key] = match;
+  const esc = (s: string) => s.replace(/\$/g, '\\$');
+
+  let workingFile = oldFile;
+  const shimmer = workingFile.match(
+    new RegExp(
+      `if\\(${esc(seg)}\\.highlight\\?\\.shimmerColor&&${esc(seg)}\\.highlight\\.color\\)\\{?return ${esc(jsx)}\\(`
+    )
+  );
+  if (shimmer && shimmer.index !== undefined) {
+    const guard =
+      `if(typeof ${seg}.highlight?.color==='function')` +
+      `return ${jsx}(${outerText},{children:${jsx}(${innerText},{children:${seg}.highlight.color(${seg}.text)})},${key});`;
+    workingFile =
+      workingFile.slice(0, shimmer.index) +
+      guard +
+      workingFile.slice(shimmer.index);
+  }
+
+  const again = workingFile.match(rendererRegex);
+  if (!again || again.index === undefined) return null;
+  const augmented =
+    `return ${jsx}(${outerText},{` +
+    `color:${seg}.highlight?.style?void 0:${seg}.highlight?.color,` +
+    `backgroundColor:${seg}.highlight?.style?void 0:${seg}.highlight?.backgroundColor,` +
+    `dimColor:${seg}.highlight?.dimColor,` +
+    `inverse:${seg}.highlight?.style?void 0:${seg}.highlight?.inverse,` +
+    `bold:${seg}.highlight?.style?void 0:${seg}.highlight?.bold,` +
+    `italic:${seg}.highlight?.style?void 0:${seg}.highlight?.italic,` +
+    `underline:${seg}.highlight?.style?void 0:${seg}.highlight?.underline,` +
+    `strikethrough:${seg}.highlight?.style?void 0:${seg}.highlight?.strikethrough,` +
+    `children:${jsx}(${innerText},{children:${seg}.highlight?.style?${seg}.highlight.style(${seg}.text):${seg}.text})` +
+    `},${key})`;
+  const newFile =
+    workingFile.slice(0, again.index) +
+    augmented +
+    workingFile.slice(again.index + again[0].length);
+  showDiff(oldFile, newFile, 'code-split shimmer guard + renderer', 0, 0);
+  return newFile;
+};
+
+/**
+ * CC 2.1.2xx range builder: React-compiler memo block instead of useMemo,
+ * and the prompt text lives in a `draft` store (`draft.value`):
+ *   function PBe(h){let Lr=w(467),{ref:M,draft:E,…}=h,…
+ *   if(Lr[97]!==Cl||…){let Fi=[];if(ut&&wt&&!zt)Fi.push({start:Zo,end:Zo+gt.length,color:"warning",priority:20});…
+ * The memo guard does not know about our extra dependency (the text), so it
+ * is made to recompute on every render (range building is cheap).
+ */
+const writeCustomHighlighterCreationCodeSplit = (
+  oldFile: string,
+  chalkVar: string,
+  highlighters: InputPatternHighlighter[]
+): string | null => {
+  const regex =
+    /if\(([$\w]+\[\d+\]!==[$\w]+(?:\|\|[$\w]+\[\d+\]!==[$\w]+)*)\)\{let ([$\w]+)=\[\];(if\([$\w]+&&[$\w]+&&![$\w]+\)\2\.push\(\{start:[$\w]+,end:[$\w]+\+[$\w]+\.length,color:"warning",priority:\d+\}\))/;
+  const match = oldFile.match(regex);
+  if (!match || match.index === undefined) return null;
+  const [whole, guard, rangesVar, firstPush] = match;
+  const fnStart = oldFile.lastIndexOf('function ', match.index);
+  const header = oldFile.slice(fnStart, Math.min(match.index, fnStart + 1500));
+  const draft = header.match(/[{,]draft:([$\w]+)[,}]/);
+  if (!draft) return null;
+  const genCode = buildRangePushes(
+    `${draft[1]}.value`,
+    rangesVar,
+    chalkVar,
+    highlighters
+  );
+  if (!genCode) return null;
+  const replacement = `if(!0||${guard}){let ${rangesVar}=[];${genCode}${firstPush}`;
+  const newFile =
+    oldFile.slice(0, match.index) +
+    replacement +
+    oldFile.slice(match.index + whole.length);
+  showDiff(
+    oldFile,
+    newFile,
+    replacement,
+    match.index,
+    match.index + whole.length
+  );
+  return newFile;
+};
+
+// ======================================================================
+
 export const writeInputPatternHighlighters = (
   oldFile: string,
   highlighters: InputPatternHighlighter[]
@@ -427,6 +540,18 @@ export const writeInputPatternHighlighters = (
   }
 
   let newFile: string | null;
+
+  // Code-split builds (CC 2.1.2xx): the renderer and the range builder are in
+  // different modules; patch whichever this module contains.
+  if (isGraphContextActive()) {
+    const renderer = writeCustomHighlighterImplCodeSplit(oldFile);
+    const creation = writeCustomHighlighterCreationCodeSplit(
+      renderer ?? oldFile,
+      chalkVar,
+      enabledHighlighters
+    );
+    return creation ?? renderer;
+  }
 
   newFile = writeCustomHighlighterImpl(oldFile);
   if (!newFile) {

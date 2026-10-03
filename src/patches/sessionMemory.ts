@@ -46,6 +46,33 @@
 //     not a literal tool-call count.
 
 import { showDiff, globalReplace } from './index';
+import { isGraphContextActive } from './graphContext';
+
+/**
+ * Force the memory-extraction mode predicate on.
+ *   function X(){if(!x("tengu_passport_quail",!1))return!1;return!Te()||x("tengu_slate_thimble",!1)}
+ * CC 2.1.2xx first honours a remote-memory override:
+ *   function gDe(){if(fDe()!==null)return!0;if(!x("tengu_passport_quail",!1))return!1;return!Te()||x("tengu_slate_thimble",!1)}
+ */
+const patchExtractMode = (file: string): string | null => {
+  const extractModePattern =
+    /(function [$\w]+\(\))\{(?:if\([$\w]+\(\)!==null\)return!0;)?if\(![$\w]+\("tengu_passport_quail",!1\)\)return!1;return![$\w]+\(\)\|\|[$\w]+\("tengu_slate_thimble",!1\)\}/;
+  const extractModeMatch = file.match(extractModePattern);
+  if (!extractModeMatch || extractModeMatch.index === undefined) return null;
+  const replacement = `${extractModeMatch[1]}{return!0}`;
+  const newFile =
+    file.slice(0, extractModeMatch.index) +
+    replacement +
+    file.slice(extractModeMatch.index + extractModeMatch[0].length);
+  showDiff(
+    file,
+    newFile,
+    replacement,
+    extractModeMatch.index,
+    extractModeMatch.index + extractModeMatch[0].length
+  );
+  return newFile;
+};
 
 const LEGACY_EXTRACTION_GATE =
   /function [$\w]+\(\)\{return [$\w]+\("tengu_session_memory"/;
@@ -73,7 +100,12 @@ const patchExtraction = (file: string): string | null => {
   if (anchorIndex !== -1) {
     const windowEnd = Math.min(file.length, anchorIndex + 8000);
     const window = file.slice(anchorIndex, windowEnd);
-    const gatePattern = /if\(![$\w]+\("tengu_passport_quail",!1\)\)return;/;
+    // CC 2.1.2xx adds a manual-trigger escape hatch before the flag, and
+    // CC 2.1.283 a second one after it:
+    //   if(!M&&!x("tengu_passport_quail",!1))return;
+    //   if(!A&&!x("tengu_passport_quail",!1)&&!Ee())return;
+    const gatePattern =
+      /if\((?:![$\w]+&&)?![$\w]+\("tengu_passport_quail",!1\)(?:&&![$\w]+\(\))?\)return;/;
     const gateMatch = window.match(gatePattern);
 
     if (gateMatch && gateMatch.index !== undefined) {
@@ -257,6 +289,26 @@ const patchUpdateThresholds = (
  * Combined patch - applies extraction, past sessions, token limits, and update thresholds
  */
 export const writeSessionMemory = (oldFile: string): string | null => {
+  // Code-split builds (CC 2.1.2xx) put the extraction gate, the
+  // extract-mode predicate and the session-search UI in separate modules.
+  if (isGraphContextActive()) {
+    const saved = console.error;
+    console.error = () => {};
+    try {
+      let file = patchExtraction(oldFile) ?? oldFile;
+      file = patchExtractMode(file) ?? file;
+      const pastSessions = patchPastSessions(file);
+      if (pastSessions && pastSessions !== file) file = pastSessions;
+      return file === oldFile
+        ? pastSessions === oldFile
+          ? oldFile
+          : null
+        : file;
+    } finally {
+      console.error = saved;
+    }
+  }
+
   let newFile = patchExtraction(oldFile);
   if (!newFile) return null;
 
@@ -268,24 +320,7 @@ export const writeSessionMemory = (oldFile: string): string | null => {
   }
   newFile = withPastSessions;
 
-  const extractModePattern =
-    /(function [$\w]+\(\))\{if\(![$\w]+\("tengu_passport_quail",!1\)\)return!1;return![$\w]+\(\)\|\|[$\w]+\("tengu_slate_thimble",!1\)\}/;
-  const extractModeMatch = newFile.match(extractModePattern);
-  if (extractModeMatch && extractModeMatch.index !== undefined) {
-    const replacement = `${extractModeMatch[1]}{return!0}`;
-    const beforePatch = newFile;
-    newFile =
-      newFile.slice(0, extractModeMatch.index) +
-      replacement +
-      newFile.slice(extractModeMatch.index + extractModeMatch[0].length);
-    showDiff(
-      beforePatch,
-      newFile,
-      replacement,
-      extractModeMatch.index,
-      extractModeMatch.index + extractModeMatch[0].length
-    );
-  }
+  newFile = patchExtractMode(newFile) ?? newFile;
 
   const tokenLimitsFile = patchTokenLimits(newFile, usedLegacyExtraction);
   if (tokenLimitsFile) {

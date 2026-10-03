@@ -34,6 +34,9 @@ export const writeHideStartupBanner = (oldFile: string): string | null => {
   const modernCardPatterns = [
     /(function [$\w]+\(\)\{)(?=let [$\w]+=[\w$]+\.c\(\d+\),[$\w]+=[\w$]+\(\)\.oauthAccount\?\.displayName\?\?""|let [$\w]+=[\w$]+\(\),[$\w]+=[\w$]+\?\.displayName\?\?"")/,
     /(function [$\w]+\(\)\{)(?=let [$\w]+=[\w$]+\.c\(\d+\),[$\w]+=[\w$]+\(\),[$\w]+=[\w$]+\?\.displayName\?\?"")/,
+    // CC 2.1.2xx: the card takes an options arg and reads its header data
+    // through one helper: function Is(o){…,{version:C,cwd:L,billingType:V,agentName:F}=KYe(),…
+    /(function [$\w]+\([$\w]*\)\{)(?=let [$\w]+=[$\w]+\(\d+\)[^]{0,400}?\{version:[$\w]+,cwd:[$\w]+,billingType:[$\w]+(?:,agentName:[$\w]+)?\}=[$\w]+\(\))/,
   ];
 
   for (const modernCardPattern of modernCardPatterns) {

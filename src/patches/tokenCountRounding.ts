@@ -45,16 +45,30 @@ export const writeTokenCountRounding = (
   // a TDZ crash where `M$` is referenced while initializing itself.
   const simpleExpression = '[$\\w]+(?:\\?\\.[$\\w]+)*(?:\\([^()]*\\))?';
 
-  // Pattern 0 (CC >=2.1.195, JSX automatic runtime): the token display no longer
-  // carries a key:"tokens" prop; the count moved into a JSX children array.
-  // Matches: VAR=FUNC(EXPR),...children:[VAR," tokens"]
-  const m0 = oldFile.match(
+  // Pattern -1 (CC 2.1.2xx): the spinner hook formats the count once and
+  // builds its label with a template literal:
+  //   bt=ns(Ct),It=`${X.arrowDown} ${bt} tokens`
+  const mTemplate = oldFile.match(
     new RegExp(
-      `(([$\\w]+)=[$\\w]+\\()(${simpleExpression})(\\),.{0,2000}children:\\[\\2," tokens"\\])`
+      `(([$\\w]+)=[$\\w]+\\()(${simpleExpression})(\\),[$\\w]+=\`[^\`]{0,80}\\$\\{\\2\\} tokens\`)`
     )
   );
 
-  if (m0 && m0.index !== undefined) {
+  // Pattern 0 (CC >=2.1.195, JSX automatic runtime): the token display no longer
+  // carries a key:"tokens" prop; the count moved into a JSX children array.
+  // Matches: VAR=FUNC(EXPR),...children:[VAR," tokens"]
+  const m0 = mTemplate
+    ? null
+    : oldFile.match(
+        new RegExp(
+          `(([$\\w]+)=[$\\w]+\\()(${simpleExpression})(\\),.{0,2000}children:\\[\\2," tokens"\\])`
+        )
+      );
+
+  if (mTemplate && mTemplate.index !== undefined) {
+    [fullMatch, pre, , partToWrap, post] = mTemplate;
+    startIndex = mTemplate.index;
+  } else if (m0 && m0.index !== undefined) {
     [fullMatch, pre, , partToWrap, post] = m0;
     startIndex = m0.index;
   } else {

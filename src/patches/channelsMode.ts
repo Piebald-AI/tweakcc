@@ -53,6 +53,7 @@
 // Replaces the "Experimental · prompt injection risks" banner text with
 // a short neutral message.
 
+import { isGraphContextActive } from './graphContext';
 import { showDiff } from './index';
 
 /**
@@ -220,6 +221,31 @@ const patchServerDevWarning = (file: string): string | null => {
  * 5. ChannelsNotice server dev-flag warning → removed
  */
 export const writeChannelsMode = (oldFile: string): string | null => {
+  // Code-split builds (CC 2.1.2xx) spread the channel gates over separate
+  // modules; on a module graph apply whichever of them this module contains.
+  if (isGraphContextActive()) {
+    const quiet = <T>(fn: () => T): T => {
+      const saved = console.error;
+      console.error = () => {};
+      try {
+        return fn();
+      } finally {
+        console.error = saved;
+      }
+    };
+    let file = oldFile;
+    for (const step of [
+      patchChannelsEnabled,
+      patchGateFunction,
+      patchPermissionRelay,
+      patchChannelsNotice,
+      patchServerDevWarning,
+    ]) {
+      file = quiet(() => step(file)) ?? file;
+    }
+    return file === oldFile ? null : file;
+  }
+
   let newFile = patchChannelsEnabled(oldFile);
   if (!newFile) return null;
 

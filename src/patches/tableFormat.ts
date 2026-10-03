@@ -126,6 +126,9 @@ const TABLE_BORDERS_CLEAN_SPACED =
 // Clean-top-bottom format - keep borders as is, we only remove inter-row separators
 // (No replacement needed for borders, just remove inter-row separators)
 
+// How far around the border definition the table's own rules are rewritten.
+const TABLE_CODE_WINDOW = 3000;
+
 // =============================================================================
 // Helper Functions
 // =============================================================================
@@ -286,8 +289,15 @@ export const writeTableFormat = (
       if (tableRendererMatch && tableRendererMatch.index !== undefined) {
         const start = tableRendererMatch.index;
         const end = start + tableRendererMatch[0].length;
+        const rowVar = tableRendererMatch[1].replace(/\$/g, '\\$');
+        // The row also *starts* with the border (`let ee="\u2502"`), not only
+        // each cell separator; replace both so rows read `| a | b |`.
         const patchedRenderer = newFile
           .slice(start, end)
+          .replace(
+            new RegExp(`let ${rowVar}="(?:\\\\u2502|│)"`),
+            `let ${tableRendererMatch[1]}="|"`
+          )
           .replace(/" \\u2502"/g, '" |"')
           .replace(/" │"/g, '" |"');
         newFile =
@@ -300,11 +310,29 @@ export const writeTableFormat = (
       }
     }
 
-    // 3. Patch the horizontal separator for compact view
+    // 3. Patch the horizontal separator for compact view. Only near the table
+    // code: code-split builds put the prompt rule, dialog dividers etc. in
+    // their own modules, and a global replace turned every one of them into
+    // dashes. CC 2.1.28x draws the narrow-terminal separator through a
+    // repeat helper (`Zs("\u2500",d)`) rather than `.repeat(`.
     {
       const before = newFile;
-      newFile = newFile.replace(/"─"\.repeat\(/g, '"-".repeat(');
-      newFile = newFile.replace(/"\\u2500"\.repeat\(/g, '"-".repeat(');
+      const anchor = [
+        TABLE_BORDERS_PATTERN,
+        TABLE_BORDERS_PATTERN_NATIVE,
+        TABLE_BORDERS_PATTERN_SPACED,
+      ]
+        .map(p => oldFile.search(p))
+        .find(i => i !== -1);
+      if (anchor !== undefined) {
+        const start = Math.max(0, anchor - TABLE_CODE_WINDOW);
+        const end = Math.min(newFile.length, anchor + TABLE_CODE_WINDOW);
+        const region = newFile
+          .slice(start, end)
+          .replace(/"(?:─|\\u2500)"\.repeat\(/g, '"-".repeat(')
+          .replace(/([$\w]+)\("(?:─|\\u2500)",/g, '$1("-",');
+        newFile = newFile.slice(0, start) + region + newFile.slice(end);
+      }
       if (newFile !== before) {
         patchCount++;
         debug('Patched horizontal separator characters');

@@ -95,12 +95,12 @@ const getOpenDocumentLocation = (oldFile: string): LocationResult | null => {
 };
 
 export const writeFixLspSupport = (oldFile: string): string | null => {
-  // CC >= 2.1.152 has native open/change/save/close file sync for LSP.
+  // CC >= 2.1.152 has native open/change/save file sync for LSP. CC 2.1.2xx
+  // dropped closeFile from that API (isFileOpen instead); requiring it made
+  // the check miss and the patch injected a second didOpen per request.
   if (
     oldFile.includes('textDocument/didOpen') &&
-    /openFile:[$\w]+,changeFile:[$\w]+,saveFile:[$\w]+,closeFile:[$\w]+/.test(
-      oldFile
-    )
+    /openFile:[$\w]+,changeFile:[$\w]+,saveFile:[$\w]+/.test(oldFile)
   ) {
     return oldFile;
   }

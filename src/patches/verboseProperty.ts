@@ -10,9 +10,15 @@ const getVerbosePropertyLocation = (oldFile: string): LocationResult | null => {
     /(?:[$\w]+\.)?(?:createElement|jsxs?)\([$\w]+,\{(?=[^}]*responseLengthRef:)(?=[^}]*spinnerSuffix:)(?=[^}]*thinkingStatus:)(?=[^}]*isCompacting:)[^}]*verbose:[^,}]+[^}]*\}/;
   const legacyCreateElementPattern =
     /(?:createElement|jsxs?)\([$\w]+,\{[^}]+spinnerTip[^}]+overrideMessage[^}]+\}/;
+  // CC 2.1.2xx code-split builds call the JSX runtime through a bare minified
+  // import (`e(jmn,{responseLengthRef:…,spinnerSuffix:…,verbose:Ie,…})`) and
+  // the element no longer carries thinkingStatus/isCompacting.
+  const bareJsxPattern =
+    /[^$\w.][$\w]+\([$\w]+,\{(?=[^}]*responseLengthRef:)(?=[^}]*spinnerSuffix:)[^}]*verbose:[^,}]+[^}]*\}/;
   const createElementMatch =
     oldFile.match(createElementPattern) ??
-    oldFile.match(legacyCreateElementPattern);
+    oldFile.match(legacyCreateElementPattern) ??
+    oldFile.match(bareJsxPattern);
 
   if (!createElementMatch || createElementMatch.index === undefined) {
     console.error(

@@ -1,5 +1,6 @@
 // Please see the note about writing patches in ./index
 
+import { isGraphContextActive } from './graphContext';
 import { showDiff } from './index';
 
 /**
@@ -36,20 +37,53 @@ import { showDiff } from './index';
  */
 
 export const writeThinkingVisibility = (oldFile: string): string | null => {
+  // CC 2.1.2xx folds thinking into the grey collapsed tool group ("Thought
+  // for 2s, read 2 files") before the per-block renderer below ever runs:
+  //   else if(q_r(xe)||Oe!==void 0&&iRt(Oe.message))ve(),w.push(xe);else if(Oe!==void 0){let De=Oe.memo.summary…
+  // Keep every thinking message standalone. On a module graph this lives in
+  // a different module from the renderer, so each applies where it matches.
+  const foldPattern =
+    /else if\(([$\w]+\([$\w]+\))\|\|([$\w]+)!==void 0&&[$\w]+\(\2\.message\)\)(?=[$\w]+\(\),[$\w]+\.push\([$\w]+\);else if\(\2!==void 0\)\{let [$\w]+=\2\.memo\.summary)/;
+  const foldMatch = oldFile.match(foldPattern);
+  let file = oldFile;
+  if (foldMatch && foldMatch.index !== undefined) {
+    const replacement = `else if(${foldMatch[1]}||${foldMatch[2]}!==void 0)`;
+    file =
+      oldFile.slice(0, foldMatch.index) +
+      replacement +
+      oldFile.slice(foldMatch.index + foldMatch[0].length);
+    showDiff(
+      oldFile,
+      file,
+      replacement,
+      foldMatch.index,
+      foldMatch.index + foldMatch[0].length
+    );
+  }
+  const rendered = writeThinkingRenderer(file);
+  if (rendered) return rendered;
+  if (file !== oldFile && isGraphContextActive()) return file;
+  console.error(
+    'patch: thinkingVisibility: failed to find thinking visibility pattern'
+  );
+  return null;
+};
+
+const writeThinkingRenderer = (oldFile: string): string | null => {
   // Unified pattern that matches both formats:
   // - Group 1: `case"thinking":` (+/- `{`)
   // - Group 2: `if(...) return null;` (the early return we want to remove)
   // - Group 3: Everything from `{` or return up to `isTranscriptMode:`
   // - Then the variable name followed by comma (replaced with `true,`)
+  // CC 2.1.2xx first short-circuits redacted thinking with its own branch
+  // (`if(sQe(l)){…return ue}`) before the early `return null`; group 1 keeps
+  // that branch intact.
   const pattern =
-    /(case"thinking":\{?)(if\(.{0,80}?\)\s*(?:\{\s*return null\s*;?\s*\}|return null\s*;?))(.{0,400}?isTranscriptMode:)([$\w]+)\s*,/;
+    /(case"thinking":\{?(?:if\([$\w]+\([$\w]+\)\)\{.{0,400}?return [$\w]+\})?)(if\(.{0,80}?\)\s*(?:\{\s*return null\s*;?\s*\}|return null\s*;?))(.{0,400}?isTranscriptMode:)([$\w]+)\s*,/;
 
   const match = oldFile.match(pattern);
 
   if (!match || match.index === undefined) {
-    console.error(
-      'patch: thinkingVisibility: failed to find thinking visibility pattern'
-    );
     return null;
   }
 

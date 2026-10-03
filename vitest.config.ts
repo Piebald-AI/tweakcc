@@ -9,5 +9,8 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    env: {
+      TWEAKCC_CONFIG_DIR: '/tmp/tweakcc-vitest-config',
+    },
   },
 });

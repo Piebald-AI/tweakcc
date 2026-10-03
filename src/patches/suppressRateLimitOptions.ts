@@ -7,6 +7,9 @@ export const writeSuppressRateLimitOptions = (
 ): string | null => {
   const patterns = [
     /showAllInTranscript:[$\w]+,(?:agentDefinitions:[$\w]+,)?onOpenRateLimitOptions:([$\w]+)/g,
+    // CC 2.1.2xx: the message list reads the opener from a context object:
+    //   onOpenRateLimitOptions:R?.openRateLimitOptions
+    /onOpenRateLimitOptions:([$\w]+\??\.openRateLimitOptions)(?=[,}])/g,
   ];
 
   let newFile = oldFile;

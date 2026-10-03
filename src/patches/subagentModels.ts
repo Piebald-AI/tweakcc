@@ -171,5 +171,26 @@ export const writeSubagentModels = (
     currentFile = afterGeneralPurpose;
   }
 
+  if (config.explore) currentFile = patchExploreInheritOverride(currentFile);
+
   return currentFile;
+};
+
+/**
+ * CC 2.1.2xx resolves the built-in Explore agent's model through a helper
+ * that ignores the agent's `model` field and always inherits:
+ *   function Fse(e,n){if(e.agentType!==fk.agentType||e.source!=="built-in")return e.model;if(JFt())return"inherit";…return msn(n)?{inheritCap:sYe}:"inherit"}
+ * Let a configured (non-"inherit") model win.
+ */
+const patchExploreInheritOverride = (file: string): string => {
+  const pattern =
+    /(function [$\w]+\(([$\w]+),[$\w]+\)\{if\(\2\.agentType!==[$\w]+\.agentType\|\|\2\.source!=="built-in"\)return \2\.model;)/;
+  const m = file.match(pattern);
+  if (!m || m.index === undefined) return file;
+  const param = m[2];
+  const insertAt = m.index + m[1].length;
+  const guard = `if(${param}.model&&${param}.model!=="inherit")return ${param}.model;`;
+  const newFile = file.slice(0, insertAt) + guard + file.slice(insertAt);
+  showDiff(file, newFile, guard, insertAt, insertAt);
+  return newFile;
 };
