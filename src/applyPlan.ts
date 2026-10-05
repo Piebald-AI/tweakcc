@@ -162,6 +162,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.suppressNativeInstallerWarning;
     case 'filter-scroll-escape-sequences':
       return !!misc?.filterScrollEscapeSequences;
+    case 'tmux-graphics-passthrough':
+      return !!misc?.tmuxGraphicsPassthrough;
     case 'allow-custom-agent-models':
       return !!misc?.allowCustomAgentModels;
     case 'worktree-mode':

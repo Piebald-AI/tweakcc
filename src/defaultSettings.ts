@@ -714,6 +714,7 @@ export const DEFAULT_SETTINGS: Settings = {
     allowBypassPermissionsInSudo: false,
     suppressNativeInstallerWarning: false,
     filterScrollEscapeSequences: false,
+    tmuxGraphicsPassthrough: false,
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
     enableContextLimitOverride: false,
