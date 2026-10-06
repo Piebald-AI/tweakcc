@@ -84,6 +84,14 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
+import {
+  writeSkipDevChannelsDialog,
+  writeSkipDevChannelsDialogModules,
+} from './skipDevChannelsDialog';
+import {
+  writeSkipTrustDialog,
+  writeSkipTrustDialogModules,
+} from './skipTrustDialog';
 import { writeClearScreen } from './clearScreen';
 import { writeSessionColor } from './sessionColor';
 import { writeKeybindingCustomization } from './keybindingCustomization';
@@ -501,6 +509,20 @@ const PATCH_DEFINITIONS = [
       'Enable MCP channel notifications (--channels without allowlist or dev flag)',
   },
   {
+    id: 'skip-dev-channels-dialog',
+    name: 'Skip development channels warning',
+    group: PatchGroup.FEATURES,
+    description:
+      'Accept the --dangerously-load-development-channels warning automatically',
+  },
+  {
+    id: 'skip-trust-dialog',
+    name: 'Skip workspace trust dialog',
+    group: PatchGroup.FEATURES,
+    description:
+      'Trust every folder without asking, as if you chose "Yes, I trust this folder"',
+  },
+  {
     id: 'prevent-unsupported-updates',
     name: 'Prevent unsupported updates',
     group: PatchGroup.MISC_CONFIGURABLE,
@@ -636,7 +658,13 @@ export const applyCustomization = async (
     'prevent-unsupported-updates',
     !!config.settings.misc?.preventUpdateToUnsupportedVersions
   );
-  const needsNativeCorpus = needsNativeGuard;
+  const needsNativeCorpus =
+    needsNativeGuard ||
+    wants(
+      'skip-dev-channels-dialog',
+      !!config.settings.misc?.skipDevChannelsDialog
+    ) ||
+    wants('skip-trust-dialog', !!config.settings.misc?.skipTrustDialog);
 
   if (ccInstInfo.nativeInstallationPath) {
     // For native installations: restore the binary, then extract to memory
@@ -1057,6 +1085,38 @@ export const applyCustomization = async (
     'channels-mode': {
       fn: c => writeChannelsMode(c),
       condition: !!config.settings.misc?.enableChannelsMode,
+    },
+    'skip-dev-channels-dialog': {
+      fn: c => {
+        if (!nativeCorpus) {
+          // A native extraction fallback only has the entrypoint, which no
+          // longer holds the dialog; npm's cli.js holds everything.
+          return ccInstInfo.nativeInstallationPath
+            ? null
+            : writeSkipDevChannelsDialog(c);
+        }
+        return stageModulePatch(
+          'skip-dev-channels-dialog',
+          c,
+          writeSkipDevChannelsDialogModules(nativeModuleSources(c))
+        );
+      },
+      condition: !!config.settings.misc?.skipDevChannelsDialog,
+    },
+    'skip-trust-dialog': {
+      fn: c => {
+        if (!nativeCorpus) {
+          return ccInstInfo.nativeInstallationPath
+            ? null
+            : writeSkipTrustDialog(c);
+        }
+        return stageModulePatch(
+          'skip-trust-dialog',
+          c,
+          writeSkipTrustDialogModules(nativeModuleSources(c))
+        );
+      },
+      condition: !!config.settings.misc?.skipTrustDialog,
     },
     'prevent-unsupported-updates': {
       fn: c => {

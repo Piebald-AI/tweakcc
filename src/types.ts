@@ -139,6 +139,8 @@ export interface MiscConfig {
   enableVoiceMode: boolean;
   enableVoiceConciseOutput: boolean;
   enableChannelsMode: boolean;
+  skipTrustDialog: boolean;
+  skipDevChannelsDialog: boolean;
   preventUpdateToUnsupportedVersions: boolean;
 }
 
