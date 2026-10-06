@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 - Keep tweakcc-patched native binaries when Claude Code re-verifies an installed version, and add `--install-hook` to re-apply customizations in the background after Claude Code replaces the binary
+- Add patches to skip the workspace trust and development channels dialogs (#1025) - @gergesh
 
 ## [v4.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.4.0) - 2026-10-10
 

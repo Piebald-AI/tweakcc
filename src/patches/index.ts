@@ -91,6 +91,8 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
+import { writeSkipDevChannelsDialog } from './skipDevChannelsDialog';
+import { writeSkipTrustDialog } from './skipTrustDialog';
 import { writeDisableCtrlZSuspend } from './disableCtrlZSuspend';
 import { writeWebFetchUserAgent } from './webFetchUserAgent';
 import { writeSkipSkillShellValidation } from './skipSkillShellValidation';
@@ -542,6 +544,20 @@ const PATCH_DEFINITIONS = [
     name: 'Shimmer style',
     group: PatchGroup.MISC_CONFIGURABLE,
     description: 'Spinner message shimmer will be toggled, sped up, or widened',
+  },
+  {
+    id: 'skip-dev-channels-dialog',
+    name: 'Skip development channels warning',
+    group: PatchGroup.FEATURES,
+    description:
+      'Accept the --dangerously-load-development-channels warning automatically',
+  },
+  {
+    id: 'skip-trust-dialog',
+    name: 'Skip workspace trust dialog',
+    group: PatchGroup.FEATURES,
+    description:
+      'Trust every folder without asking, as if you chose "Yes, I trust this folder"',
   },
   {
     id: 'prevent-unsupported-updates',
@@ -1014,6 +1030,14 @@ export const buildPatchImplementations = (
     'shimmer-style': {
       fn: c => writeShimmerStyle(c, config.settings.misc!.shimmer),
       condition: isShimmerCustomized(config.settings.misc?.shimmer),
+    },
+    'skip-dev-channels-dialog': {
+      fn: c => writeSkipDevChannelsDialog(c),
+      condition: !!config.settings.misc?.skipDevChannelsDialog,
+    },
+    'skip-trust-dialog': {
+      fn: c => writeSkipTrustDialog(c),
+      condition: !!config.settings.misc?.skipTrustDialog,
     },
     // npm monolith only. Native builds spread the updater over several
     // modules; applyCustomization patches the whole module graph at once.
