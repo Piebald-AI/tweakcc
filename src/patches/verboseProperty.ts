@@ -3,21 +3,24 @@
 import { LocationResult, showDiff } from './index';
 
 const getVerbosePropertyLocation = (oldFile: string): LocationResult | null => {
-  // CC >=2.1.x compiles the UI with the React JSX automatic runtime, so the
-  // spinner element is emitted as `X.jsx(C,{...})` / `X.jsxs(C,{...})` rather
-  // than `X.createElement(C,{...})`. Accept all three call forms.
+  // CC >=2.1.280: Match verbose prop in CALL context, not destructuring
+  // Key: responseLengthRef has a dotted value (e.g., oo.responseLength) in calls,
+  // but a simple identifier in destructuring patterns
+  const cc2_1_280Pattern =
+    /\{[^{}]*responseLengthRef:\w+\.\w+[^{}]*verbose:[^,}]+[^{}]*\}/;
+
+  // CC >=2.1.x (pre-2.1.280) - createElement/jsxs patterns
   const createElementPattern =
     /(?:[$\w]+\.)?(?:createElement|jsxs?)\([$\w]+,\{(?=[^}]*responseLengthRef:)(?=[^}]*spinnerSuffix:)(?=[^}]*thinkingStatus:)(?=[^}]*isCompacting:)[^}]*verbose:[^,}]+[^}]*\}/;
   const legacyCreateElementPattern =
     /(?:createElement|jsxs?)\([$\w]+,\{[^}]+spinnerTip[^}]+overrideMessage[^}]+\}/;
+
   const createElementMatch =
+    oldFile.match(cc2_1_280Pattern) ??
     oldFile.match(createElementPattern) ??
     oldFile.match(legacyCreateElementPattern);
 
   if (!createElementMatch || createElementMatch.index === undefined) {
-    console.error(
-      'patch: verbose: failed to find createElement with verbose spinner props'
-    );
     return null;
   }
 
@@ -27,7 +30,6 @@ const getVerbosePropertyLocation = (oldFile: string): LocationResult | null => {
   const verboseMatch = extractedString.match(verbosePattern);
 
   if (!verboseMatch || verboseMatch.index === undefined) {
-    console.error('patch: verbose: failed to find verbose property');
     return null;
   }
 

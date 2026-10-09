@@ -552,14 +552,30 @@ export const escapeIdent = (ident: string): string => {
 
 /**
  * Apply patches to content using the implementations map, tracking results.
+ * For CC 2.1.280+: If a patch fails on the entrypoint, try each JS module.
  * @param patchFilter - Optional list of patch IDs to apply (if provided, only matching patches are applied)
+ * @param corpus - Optional module corpus for module-aware patching
  */
 const applyPatchImplementations = (
   content: string,
   implementations: Record<PatchId, PatchImplementation>,
-  patchFilter?: string[] | null
-): { content: string; results: PatchResult[] } => {
+  patchFilter?: string[] | null,
+  corpus?: ExtractedBunCorpus | null
+): {
+  content: string;
+  results: PatchResult[];
+  moduleEdits: BunModuleReplacement[];
+} => {
   const results: PatchResult[] = [];
+  const moduleEdits: BunModuleReplacement[] = [];
+
+  // For module-aware patching: track which modules have been modified
+  const moduleContents: Map<number, string> = new Map();
+  if (corpus) {
+    for (const mod of corpus.modules.filter(m => m.isJavaScript)) {
+      moduleContents.set(mod.index, nativeSource(mod));
+    }
+  }
 
   // Process patches in the order defined in PATCH_DEFINITIONS
   for (const def of PATCH_DEFINITIONS) {
@@ -592,12 +608,38 @@ const applyPatchImplementations = (
     }
 
     debug(`Applying patch: ${def.name}`);
-    const result = impl.fn(content);
-    const failed = result === null;
-    const applied = !failed && result !== content;
 
-    if (!failed) {
+    // First, try the patch on the entrypoint content
+    const result = impl.fn(content);
+    let failed = result === null;
+    let applied = !failed && result !== content;
+
+    if (!failed && result !== null) {
       content = result;
+    }
+
+    // If failed on entrypoint and we have a corpus, try each JS module
+    if (failed && corpus && moduleContents.size > 0) {
+      const jsModules = corpus.modules.filter(m => m.isJavaScript);
+
+      for (const mod of jsModules) {
+        const modContent = moduleContents.get(mod.index) ?? nativeSource(mod);
+        try {
+          const modResult = impl.fn(modContent);
+          if (modResult !== null && modResult !== modContent) {
+            // Found a match in this module!
+            debug(
+              `patch: ${def.id}: matched in module ${mod.index} (${mod.name})`
+            );
+            moduleContents.set(mod.index, modResult);
+            failed = false;
+            applied = true;
+            break;
+          }
+        } catch {
+          // Patch threw on this module, try next
+        }
+      }
     }
 
     results.push({
@@ -610,7 +652,22 @@ const applyPatchImplementations = (
     });
   }
 
-  return { content, results };
+  // Collect all module edits
+  if (corpus) {
+    for (const mod of corpus.modules.filter(m => m.isJavaScript)) {
+      const original = nativeSource(mod);
+      const current = moduleContents.get(mod.index);
+      if (current && current !== original) {
+        moduleEdits.push({
+          index: mod.index,
+          name: mod.name,
+          contents: Buffer.from(current, 'utf8'),
+        });
+      }
+    }
+  }
+
+  return { content, results, moduleEdits };
 };
 
 // =============================================================================
@@ -626,10 +683,6 @@ export const applyCustomization = async (
   let nativeCorpus: ExtractedBunCorpus | null = null;
   let nativeSourcePath: string | undefined;
   let nativeGuardEdits: BunModuleReplacement[] = [];
-  const needsNativeGuard =
-    !!config.settings.misc?.preventUpdateToUnsupportedVersions &&
-    (!patchFilter || patchFilter.includes('prevent-unsupported-updates'));
-
   if (ccInstInfo.nativeInstallationPath) {
     // For native installations: restore the binary, then extract to memory
     await restoreNativeBinaryFromBackup(ccInstInfo);
@@ -651,38 +704,46 @@ export const applyCustomization = async (
       `Extracting claude.js from ${backupExists ? 'backup' : 'native installation'}: ${pathToExtractFrom}`
     );
 
-    // Only this explicitly selected feature opts into module-aware application;
-    // it must patch the actual installer chunk rather than a tiny import stub.
-    if (needsNativeGuard) {
-      nativeCorpus =
-        await extractClaudeJsModulesFromNativeInstallation(pathToExtractFrom);
-      if (nativeCorpus) {
-        nativeSourcePath = pathToExtractFrom;
-      } else {
-        // This feature is optional. If ordinary extraction can still recover
-        // an entrypoint, keep unrelated patches available and report only the
-        // guard as failed. A missing native dependency still fails below when
-        // neither extractor can produce usable source.
-        debug(
-          'Native module corpus unavailable; the update guard will be reported as failed.'
-        );
+    // CC 2.1.280+: Always extract full module corpus for module-aware patching.
+    // The actual UI code is in chunk modules, not the tiny entrypoint.
+    nativeCorpus =
+      await extractClaudeJsModulesFromNativeInstallation(pathToExtractFrom);
+    if (nativeCorpus) {
+      nativeSourcePath = pathToExtractFrom;
+      debug(
+        `Extracted ${nativeCorpus.modules.length} modules (${nativeCorpus.modules.filter(m => m.isJavaScript).length} JS) from native installation`
+      );
+
+      // Get entrypoint content - patches will be tried here first, then on modules
+      const entry = nativeCorpus.modules.find(m => m.isEntrypoint);
+      if (!entry) {
+        throw new Error('Native binary has no entrypoint module');
       }
+      content = nativeSource(entry);
+
+      // Save entrypoint for debugging
+      const origPath = path.join(CONFIG_DIR, 'native-claudejs-orig.js');
+      fsSync.writeFileSync(origPath, content);
+      debug(`Saved entrypoint JS to: ${origPath}`);
+    } else {
+      // Fallback: try legacy entrypoint-only extraction
+      debug(
+        'Native module corpus unavailable; falling back to entrypoint-only extraction.'
+      );
+      const claudeJsBuffer =
+        await extractClaudeJsFromNativeInstallation(pathToExtractFrom);
+
+      if (!claudeJsBuffer) {
+        throw new Error('Failed to extract claude.js from native installation');
+      }
+
+      // Save original extracted JS for debugging
+      const origPath = path.join(CONFIG_DIR, 'native-claudejs-orig.js');
+      fsSync.writeFileSync(origPath, claudeJsBuffer);
+      debug(`Saved original extracted JS from native to: ${origPath}`);
+
+      content = claudeJsBuffer.toString('utf8');
     }
-    const entry = nativeCorpus?.modules.find(module => module.isEntrypoint);
-    const claudeJsBuffer = entry
-      ? Buffer.from(nativeSource(entry), 'utf8')
-      : await extractClaudeJsFromNativeInstallation(pathToExtractFrom);
-
-    if (!claudeJsBuffer) {
-      throw new Error('Failed to extract claude.js from native installation');
-    }
-
-    // Save original extracted JS for debugging
-    const origPath = path.join(CONFIG_DIR, 'native-claudejs-orig.js');
-    fsSync.writeFileSync(origPath, claudeJsBuffer);
-    debug(`Saved original extracted JS from native to: ${origPath}`);
-
-    content = claudeJsBuffer.toString('utf8');
   } else {
     // For NPM installations: restore cli.js from backup, then read it
     await restoreClijsFromBackup(ccInstInfo);
@@ -1061,9 +1122,23 @@ export const applyCustomization = async (
   // ==========================================================================
   // Apply all patches
   // ==========================================================================
-  const { content: patchedContent, results: patchResults } =
-    applyPatchImplementations(content, patchImplementations, patchFilter);
+  const {
+    content: patchedContent,
+    results: patchResults,
+    moduleEdits,
+  } = applyPatchImplementations(
+    content,
+    patchImplementations,
+    patchFilter,
+    nativeCorpus
+  );
   content = patchedContent;
+
+  // Merge module edits from patches with any guard edits
+  if (moduleEdits.length > 0) {
+    debug(`Patches modified ${moduleEdits.length} module(s)`);
+    nativeGuardEdits = [...nativeGuardEdits, ...moduleEdits];
+  }
   if (nativeGuardEdits.length) {
     // Chunk-only edits do not change the entrypoint string used by the generic
     // runner, but must still be reported as a successfully applied patch.
@@ -1123,9 +1198,9 @@ export const applyCustomization = async (
   // an untouched modern graph through the legacy entrypoint writer would lose
   // metadata tables that only the module-aware writer preserves.
   if (ccInstInfo.nativeInstallationPath && nativeChanged) {
-    // For native installations: repack the modified claude.js back into the binary
+    // For native installations: repack the modified modules back into the binary
     debug(
-      `Repacking modified claude.js into native installation: ${ccInstInfo.nativeInstallationPath}`
+      `Repacking modified modules into native installation: ${ccInstInfo.nativeInstallationPath}`
     );
 
     // Save patched JS for debugging
@@ -1133,26 +1208,20 @@ export const applyCustomization = async (
     fsSync.writeFileSync(patchedPath, content, 'utf8');
     debug(`Saved patched JS from native to: ${patchedPath}`);
 
-    const modifiedBuffer = Buffer.from(content, 'utf8');
     if (nativeCorpus && nativeSourcePath) {
-      const entry = nativeCorpus.modules.find(module => module.isEntrypoint)!;
-      const edits = nativeGuardEdits.filter(edit => edit.index !== entry.index);
-      if (content !== nativeSource(entry)) {
-        edits.push({
-          index: entry.index,
-          name: entry.name,
-          contents: modifiedBuffer,
-        });
-      }
+      debug(`Total module edits to apply: ${nativeGuardEdits.length}`);
+
       await repackNativeInstallationModules(
         nativeSourcePath,
         {
           sourceSha256: nativeCorpus.sourceSha256,
-          modules: edits,
+          modules: nativeGuardEdits,
         },
         ccInstInfo.nativeInstallationPath
       );
     } else {
+      // Fallback for non-module-aware extraction
+      const modifiedBuffer = Buffer.from(content, 'utf8');
       await repackNativeInstallation(
         ccInstInfo.nativeInstallationPath,
         modifiedBuffer,

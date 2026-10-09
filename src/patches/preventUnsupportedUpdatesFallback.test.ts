@@ -189,14 +189,15 @@ describe('native update guard extraction fallback', () => {
     expect(repackNativeInstallationModules).not.toHaveBeenCalled();
   });
 
-  it('does not attempt optional corpus extraction when the guard is disabled', async () => {
+  it('extracts corpus for module-aware patching even when guard is disabled', async () => {
     const disabled = config();
     disabled.settings.misc.preventUpdateToUnsupportedVersions = false;
     await applyCustomization(disabled, installation, [
       'prevent-unsupported-updates',
     ]);
-    expect(extractClaudeJsModulesFromNativeInstallation).not.toHaveBeenCalled();
-    expect(repackNativeInstallation).not.toHaveBeenCalled();
+    // Module corpus is now always extracted for module-aware patching
+    expect(extractClaudeJsModulesFromNativeInstallation).toHaveBeenCalled();
+    // But the guard patch itself should not be applied when disabled
     expect(writePreventUnsupportedUpdates).not.toHaveBeenCalled();
   });
 });
