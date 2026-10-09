@@ -56,7 +56,10 @@ import { writeModelCustomizations } from './modelSelector';
 import { writeOpusplan1m } from './opusplan1m';
 import { writeThinkingVisibility } from './thinkingVisibility';
 import { writeSubagentModels } from './subagentModels';
-import { writePatchesAppliedIndication } from './patchesAppliedIndication';
+import {
+  writePatchesAppliedIndication,
+  writePatchesAppliedIndicationModules,
+} from './patchesAppliedIndication';
 import { applySystemPrompts } from './systemPrompts';
 import { writeFixLspSupport } from './fixLspSupport';
 import { writeToolsets } from './toolsets';
@@ -873,6 +876,14 @@ export const applyCustomization = async (
       fn: c =>
         writePatchesAppliedIndication(
           c,
+          '4.3.3',
+          legacyItems,
+          showTweakccVersion,
+          showPatchesApplied
+        ),
+      modules: mods =>
+        writePatchesAppliedIndicationModules(
+          mods,
           '4.3.3',
           legacyItems,
           showTweakccVersion,
