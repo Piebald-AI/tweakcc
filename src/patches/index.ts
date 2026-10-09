@@ -576,12 +576,13 @@ const applyPatchImplementations = (
   const results: PatchResult[] = [];
   const moduleEdits: BunModuleReplacement[] = [];
 
-  // For module-aware patching: track which modules have been modified
+  // Module-aware patching (CC 2.1.280+): every JS module, the entrypoint
+  // included, is tracked here so all edits are repacked into the binary.
   const moduleContents: Map<number, string> = new Map();
-  if (corpus) {
-    for (const mod of corpus.modules.filter(m => m.isJavaScript)) {
-      moduleContents.set(mod.index, nativeSource(mod));
-    }
+  const jsModules = corpus ? corpus.modules.filter(m => m.isJavaScript) : [];
+  const entry = jsModules.find(m => m.isEntrypoint);
+  for (const mod of jsModules) {
+    moduleContents.set(mod.index, mod === entry ? content : nativeSource(mod));
   }
 
   // Process patches in the order defined in PATCH_DEFINITIONS
@@ -616,23 +617,13 @@ const applyPatchImplementations = (
 
     debug(`Applying patch: ${def.name}`);
 
-    // First, try the patch on the entrypoint content
-    const result = impl.fn(content);
-    let failed = result === null;
-    let applied = !failed && result !== content;
+    let failed = true;
+    let applied = false;
 
-    if (!failed && result !== null) {
-      content = result;
-    }
-
-    if (failed && corpus && moduleContents.size > 0 && impl.modules) {
-      const jsModules = corpus.modules.filter(m => m.isJavaScript);
+    if (corpus && impl.modules) {
       const byName = new Map<string, string>();
       for (const mod of jsModules) {
-        byName.set(
-          mod.name,
-          moduleContents.get(mod.index) ?? nativeSource(mod)
-        );
+        byName.set(mod.name, moduleContents.get(mod.index)!);
       }
       let changed: Map<string, string> | null = null;
       try {
@@ -640,7 +631,8 @@ const applyPatchImplementations = (
       } catch (e) {
         debug(`patch: ${def.id}: corpus patch threw: ${e}`);
       }
-      if (changed && changed.size > 0) {
+      if (changed) {
+        failed = false;
         for (const mod of jsModules) {
           const next = changed.get(mod.name);
           if (next !== undefined && next !== byName.get(mod.name)) {
@@ -648,33 +640,40 @@ const applyPatchImplementations = (
               `patch: ${def.id}: modified module ${mod.index} (${mod.name})`
             );
             moduleContents.set(mod.index, next);
+            applied = true;
           }
         }
-        failed = false;
-        applied = true;
       }
-    } else if (failed && corpus && moduleContents.size > 0) {
-      const jsModules = corpus.modules.filter(m => m.isJavaScript);
-
-      for (const mod of jsModules) {
-        const modContent = moduleContents.get(mod.index) ?? nativeSource(mod);
-        try {
-          const modResult = impl.fn(modContent);
-          if (modResult !== null && modResult !== modContent) {
-            // Found a match in this module!
-            debug(
-              `patch: ${def.id}: matched in module ${mod.index} (${mod.name})`
-            );
-            moduleContents.set(mod.index, modResult);
-            failed = false;
-            applied = true;
-            // Continue to check other modules - some patches need to modify multiple modules
+    } else {
+      // Try the entrypoint first (the whole bundle on npm / older native builds)
+      const result = impl.fn(content);
+      if (result !== null) {
+        failed = false;
+        applied = result !== content;
+        content = result;
+        if (entry) moduleContents.set(entry.index, content);
+      } else {
+        // Then every module; some patches legitimately touch several
+        for (const mod of jsModules) {
+          if (mod === entry) continue;
+          const modContent = moduleContents.get(mod.index)!;
+          try {
+            const modResult = impl.fn(modContent);
+            if (modResult !== null && modResult !== modContent) {
+              debug(
+                `patch: ${def.id}: matched in module ${mod.index} (${mod.name})`
+              );
+              moduleContents.set(mod.index, modResult);
+              failed = false;
+              applied = true;
+            }
+          } catch {
+            // Patch threw on this module, try next
           }
-        } catch {
-          // Patch threw on this module, try next
         }
       }
     }
+    if (entry) content = moduleContents.get(entry.index)!;
 
     results.push({
       id: def.id,
@@ -688,10 +687,9 @@ const applyPatchImplementations = (
 
   // Collect all module edits
   if (corpus) {
-    for (const mod of corpus.modules.filter(m => m.isJavaScript)) {
-      const original = nativeSource(mod);
-      const current = moduleContents.get(mod.index);
-      if (current && current !== original) {
+    for (const mod of jsModules) {
+      const current = moduleContents.get(mod.index)!;
+      if (current !== nativeSource(mod)) {
         moduleEdits.push({
           index: mod.index,
           name: mod.name,
@@ -716,7 +714,6 @@ export const applyCustomization = async (
   let content: string;
   let nativeCorpus: ExtractedBunCorpus | null = null;
   let nativeSourcePath: string | undefined;
-  let nativeGuardEdits: BunModuleReplacement[] = [];
   if (ccInstInfo.nativeInstallationPath) {
     // For native installations: restore the binary, then extract to memory
     await restoreNativeBinaryFromBackup(ccInstInfo);
@@ -1115,39 +1112,22 @@ export const applyCustomization = async (
       condition: !!config.settings.misc?.enableChannelsMode,
     },
     'prevent-unsupported-updates': {
-      fn: c => {
-        if (!nativeCorpus) {
-          // A native extraction fallback is not an npm installation. Applying
-          // the historical npm-only matcher would falsely report protection
-          // while leaving the native updater untouched.
-          return ccInstInfo.nativeInstallationPath
-            ? null
-            : writePreventUnsupportedUpdates(c);
-        }
-        const modules = nativeCorpus.modules.filter(
-          module => module.isJavaScript
-        );
-        const sources = modules.map(module =>
-          module.isEntrypoint ? c : nativeSource(module)
-        );
-        const patched = writePreventUnsupportedUpdatesModules(sources);
+      // A native extraction fallback is not an npm installation. Applying the
+      // historical npm-only matcher would falsely report protection while
+      // leaving the native updater untouched.
+      fn: c =>
+        ccInstInfo.nativeInstallationPath
+          ? null
+          : writePreventUnsupportedUpdates(c),
+      // Both guard sides are staged together; the binary is written only after
+      // every changed module passes parsing, so no half-installed guard is saved.
+      modules: mods => {
+        const names = [...mods.keys()];
+        const patched = writePreventUnsupportedUpdatesModules([
+          ...mods.values(),
+        ]);
         if (!patched) return null;
-        const entryIndex = modules.findIndex(module => module.isEntrypoint);
-        if (entryIndex < 0) return null;
-        // Stage the complete pair atomically. The binary is written only after
-        // every changed source passes parsing; no half-installed guard is saved.
-        nativeGuardEdits = modules.flatMap((module, index) =>
-          patched[index] === sources[index]
-            ? []
-            : [
-                {
-                  index: module.index,
-                  name: module.name,
-                  contents: Buffer.from(patched[index], 'utf8'),
-                },
-              ]
-        );
-        return patched[entryIndex];
+        return new Map(names.map((name, i) => [name, patched[i]]));
       },
       condition: !!config.settings.misc?.preventUpdateToUnsupportedVersions,
     },
@@ -1168,18 +1148,8 @@ export const applyCustomization = async (
   );
   content = patchedContent;
 
-  // Merge module edits from patches with any guard edits
   if (moduleEdits.length > 0) {
     debug(`Patches modified ${moduleEdits.length} module(s)`);
-    nativeGuardEdits = [...nativeGuardEdits, ...moduleEdits];
-  }
-  if (nativeGuardEdits.length) {
-    // Chunk-only edits do not change the entrypoint string used by the generic
-    // runner, but must still be reported as a successfully applied patch.
-    const guardResult = patchResults.find(
-      result => result.id === 'prevent-unsupported-updates'
-    );
-    if (guardResult) guardResult.applied = true;
   }
   allResults.push(...patchResults);
 
@@ -1192,7 +1162,7 @@ export const applyCustomization = async (
     if (
       !ccInstInfo.nativeInstallationPath ||
       content !== originalContent ||
-      nativeGuardEdits.length
+      moduleEdits.length
     ) {
       assertPatchedBundleParses(
         content,
@@ -1205,7 +1175,7 @@ export const applyCustomization = async (
             : 'module'
       );
     }
-    for (const edit of nativeGuardEdits) {
+    for (const edit of moduleEdits) {
       const module = nativeCorpus!.modules[edit.index];
       assertPatchedBundleParses(
         edit.contents.toString('utf8'),
@@ -1226,8 +1196,7 @@ export const applyCustomization = async (
   // ==========================================================================
   // Write the modified content back
   // ==========================================================================
-  const nativeChanged =
-    content !== originalContent || nativeGuardEdits.length > 0;
+  const nativeChanged = content !== originalContent || moduleEdits.length > 0;
   // Restoring the backup already removes a disabled/filtered guard. Repacking
   // an untouched modern graph through the legacy entrypoint writer would lose
   // metadata tables that only the module-aware writer preserves.
@@ -1243,13 +1212,13 @@ export const applyCustomization = async (
     debug(`Saved patched JS from native to: ${patchedPath}`);
 
     if (nativeCorpus && nativeSourcePath) {
-      debug(`Total module edits to apply: ${nativeGuardEdits.length}`);
+      debug(`Total module edits to apply: ${moduleEdits.length}`);
 
       await repackNativeInstallationModules(
         nativeSourcePath,
         {
           sourceSha256: nativeCorpus.sourceSha256,
-          modules: nativeGuardEdits,
+          modules: moduleEdits,
         },
         ccInstInfo.nativeInstallationPath
       );
