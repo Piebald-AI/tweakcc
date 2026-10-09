@@ -12,21 +12,14 @@ import { debug } from '../utils';
  * CC <=2.1.69 (sync): Function uses readFileSync/existsSync/statSync directly
  * CC >=2.1.83 (async): File reading is split into jh1 (async reader) and XB9 (processor)
  *   The async reader catches ENOENT/EISDIR errors and returns {info:null,includePaths:[]}
+ * CC >=2.1.295: AGENTS.md is native via a built-in plugin; extend its name list
  */
 export const writeAgentsMd = (
   file: string,
   altNames: string[]
 ): string | null => {
-  // CC 2.1.295+ has native AGENTS.md support in the _bt array
-  // Check if AGENTS.md is already in the file paths array
-  if (
-    file.includes('["AGENTS.md"]') ||
-    file.includes('["AGENTS.md",') ||
-    file.includes('"AGENTS.md"],')
-  ) {
-    debug('patch: agentsMd: native AGENTS.md support detected, skipping patch');
-    return file;
-  }
+  const plugin2295 = writeAgentsMdPlugin2295(file, altNames);
+  if (plugin2295) return plugin2295;
 
   const async2214 = writeAgentsMdAsync2214(file, altNames);
   if (async2214) return async2214;
@@ -38,6 +31,43 @@ export const writeAgentsMd = (
   if (asyncResult) return asyncResult;
 
   return writeAgentsMdSync(file, altNames);
+};
+
+/**
+ * CC >=2.1.295 loads AGENTS.md natively through the built-in "cc-plugin-agents-md"
+ * plugin: when the project has no CLAUDE.md, its prompt.context hook calls
+ * `fs.ancestors({names:AGENTS_NAMES})` and loads every match (with @imports) from
+ * the cwd's ancestors, exactly like CLAUDE.md; Read/@-mentions under a subdirectory
+ * attach that subdirectory's files the same way. The names live in one array:
+ *   var AUt=["AGENTS.md",".claude/AGENTS.md"];var xJe=["CLAUDE.md",".claude/CLAUDE.md","CLAUDE.local.md"];
+ * Appending the configured names that are not already in it gives them the same
+ * native treatment. If every configured name is already there, the file is
+ * returned unchanged (native support covers the config).
+ */
+const writeAgentsMdPlugin2295 = (
+  file: string,
+  altNames: string[]
+): string | null => {
+  const m = file.match(
+    /var [$\w]+=(\["AGENTS\.md",".claude\/AGENTS\.md"[^\]]*\]);var [$\w]+=\["CLAUDE\.md",".claude\/CLAUDE\.md","CLAUDE\.local\.md"\]/
+  );
+  if (!m || m.index === undefined) return null;
+
+  const names: string[] = JSON.parse(m[1]);
+  const missing = altNames.filter(n => !names.includes(n));
+  if (missing.length === 0) {
+    debug('patch: agentsMd: every configured name is loaded natively');
+    return file;
+  }
+
+  const newArray = JSON.stringify([...names, ...missing]);
+  const startIndex = m.index + m[0].indexOf(m[1]);
+  const endIndex = startIndex + m[1].length;
+  const newFile = file.slice(0, startIndex) + newArray + file.slice(endIndex);
+
+  showDiff(file, newFile, newArray, startIndex, endIndex);
+
+  return newFile;
 };
 
 /**

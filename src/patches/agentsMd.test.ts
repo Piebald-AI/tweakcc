@@ -220,3 +220,31 @@ describe('agentsMd', () => {
     });
   });
 });
+
+describe('agentsMd CC 2.1.295 (native AGENTS.md plugin)', () => {
+  // Real excerpt of /$bunfs/root/chunk-jnm89pnt.js from CC 2.1.295.
+  const chunk =
+    'var GWo=(t)=>!x3n.includes(t.kind);var AUt=["AGENTS.md",".claude/AGENTS.md"];' +
+    'var xJe=["CLAUDE.md",".claude/CLAUDE.md","CLAUDE.local.md"];var PJe="main";' +
+    'var zWo=["clear","compact","resume"];';
+
+  it('appends only the names the plugin does not load natively', () => {
+    const result = writeAgentsMd(chunk, ['AGENTS.md', 'GEMINI.md', 'QWEN.md']);
+    expect(result).toContain(
+      'var AUt=["AGENTS.md",".claude/AGENTS.md","GEMINI.md","QWEN.md"];var xJe=["CLAUDE.md",'
+    );
+    expect(result!.match(/"AGENTS\.md"/g)).toHaveLength(1);
+  });
+
+  it('returns the module unchanged when every name is native or already added', () => {
+    expect(writeAgentsMd(chunk, ['AGENTS.md'])).toBe(chunk);
+    const once = writeAgentsMd(chunk, ['AGENTS.md', 'GEMINI.md'])!;
+    expect(writeAgentsMd(once, ['AGENTS.md', 'GEMINI.md'])).toBe(once);
+  });
+
+  it('ignores other modules that merely mention AGENTS.md', () => {
+    const permissions =
+      'var _bt=[["CLAUDE.md"],["CLAUDE.local.md"],["AGENTS.md"],[".claude","CLAUDE.md"]];';
+    expect(writeAgentsMd(permissions, ['AGENTS.md', 'GEMINI.md'])).toBeNull();
+  });
+});
