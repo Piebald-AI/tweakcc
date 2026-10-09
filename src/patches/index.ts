@@ -634,7 +634,7 @@ const applyPatchImplementations = (
             moduleContents.set(mod.index, modResult);
             failed = false;
             applied = true;
-            break;
+            // Continue to check other modules - some patches need to modify multiple modules
           }
         } catch {
           // Patch threw on this module, try next

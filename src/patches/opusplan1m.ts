@@ -9,83 +9,32 @@
 // that occur when Claude thinks it's near its context limit.
 //
 // See: https://github.com/Piebald-AI/tweakcc/issues/108
+//
+// Updated for CC 2.1.280+ module architecture where code is split across chunks.
 
-import { escapeIdent, showDiff } from './index';
-
-/**
- * Patch 1: Fix the mode-switching function (bF) to recognize opusplan[1m]
- *
- * The bF function determines which model to use based on mode. Currently it does
- * an exact match: K8A() === "opusplan". We need it to also match "opusplan[1m]".
- *
- * Original:
- *   if (K8A() === "opusplan" && K === "plan" && !Y) return q8A();
- *
- * Patched:
- *   if ((K8A() === "opusplan" || K8A() === "opusplan[1m]") && K === "plan" && !Y) return q8A();
- */
-const patchModeSwitchingFunction = (oldFile: string): string | null => {
-  // Pattern matches: if (FUNC() === "opusplan" && VAR === "plan" && !VAR) return FUNC();
-  // We need to be careful to match the exact structure while allowing for minified variable names
-  const pattern =
-    /if\s*\(\s*([$\w]+)\(\)\s*===\s*"opusplan"\s*&&\s*([$\w]+)\s*===\s*"plan"\s*&&\s*!([$\w]+)\s*\)\s*return\s*([$\w]+)\(\);/;
-
-  const match = oldFile.match(pattern);
-  if (!match || match.index === undefined) {
-    const nativePattern =
-      /if\s*\(\s*\(?[$\w]+\s*===\s*"opusplan"\s*\|\|\s*[$\w]+\s*===\s*"opusplan\[1m\]"\)?\s*&&\s*[$\w]+\s*===\s*"plan"\s*&&\s*![$\w]+\s*\)/;
-    if (nativePattern.test(oldFile)) return oldFile;
-
-    console.error(
-      'patch: opusplan1m: patchModeSwitchingFunction: failed to find mode switching pattern'
-    );
-    return null;
-  }
-
-  const [fullMatch, k8aFunc, modeVar, exceedsVar, opusFunc] = match;
-
-  // Build the replacement with OR condition for opusplan[1m]
-  const replacement = `if((${k8aFunc}()==="opusplan"||${k8aFunc}()==="opusplan[1m]")&&${modeVar}==="plan"&&!${exceedsVar})return ${opusFunc}();`;
-
-  const newFile =
-    oldFile.slice(0, match.index) +
-    replacement +
-    oldFile.slice(match.index + fullMatch.length);
-
-  showDiff(
-    oldFile,
-    newFile,
-    replacement,
-    match.index,
-    match.index + fullMatch.length
-  );
-  return newFile;
-};
+import { showDiff } from './index';
 
 /**
- * Patch 2: Add "opusplan[1m]" to the model aliases list (k0A)
+ * Patch 1: Add "opusplan[1m]" to the GV model aliases array
  *
  * Original:
- *   k0A = ["sonnet", "opus", "haiku", "sonnet[1m]", "opusplan"]
+ *   GV=["sonnet","opus","haiku","fable","best","sonnet[1m]","opus[1m]","fable[1m]","opusplan"]
  *
  * Patched:
- *   k0A = ["sonnet", "opus", "haiku", "sonnet[1m]", "opusplan", "opusplan[1m]"]
+ *   GV=["sonnet","opus","haiku","fable","best","sonnet[1m]","opus[1m]","fable[1m]","opusplan","opusplan[1m]"]
  */
 const patchModelAliasesList = (oldFile: string): string | null => {
-  // Pattern matches the model aliases array assignment
-  const pattern = /(\[(?:"[^"]+",)*"opusplan")/;
+  // Match the GV array ending with "opusplan"]
+  const pattern = /("opusplan"\])/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
-    console.error(
-      'patch: opusplan1m: patchModelAliasesList: failed to find model aliases list'
-    );
-    return null;
+    // Check if already patched
+    if (/"opusplan\[1m\]"\]/.test(oldFile)) return oldFile;
+    return null; // This file doesn't have the GV array
   }
 
-  // Add opusplan[1m] to the list
-  const replacement = match[0] + ',"opusplan[1m]"';
-
+  const replacement = '"opusplan","opusplan[1m]"]';
   const newFile =
     oldFile.slice(0, match.index) +
     replacement +
@@ -102,35 +51,110 @@ const patchModelAliasesList = (oldFile: string): string | null => {
 };
 
 /**
- * Patch 3: Fix the description function (Zm3) to handle opusplan[1m]
+ * Patch 2: Add opusplan[1m] case to the ca(e) model switch
  *
  * Original:
- *   if (A === "opusplan") return "Opus 4.6 in plan mode, else Sonnet 4.6";
+ *   case"opusplan":return ga(n);
  *
  * Patched:
- *   if (A === "opusplan") return "Opus 4.6 in plan mode, else Sonnet 4.6";
- *   if (A === "opusplan[1m]") return "Opus 4.6 in plan mode, else Sonnet 4.6 (1M context)";
+ *   case"opusplan":case"opusplan[1m]":return ga(n);
  */
-const patchDescriptionFunction = (oldFile: string): string | null => {
-  // Pattern matches old versioned and new generic opusplan descriptions.
+const patchModelSwitchCa = (oldFile: string): string | null => {
+  // Match: case"opusplan":return FUNC(VAR);
+  // Must NOT be followed by case"opusplan[1m]" (already patched)
   const pattern =
-    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*"([^"]*Opus[^"]*plan mode[^"]*Sonnet[^"]*)";)/;
+    /case"opusplan":return ([$\w]+)\(([$\w]+)\);(?!case"opusplan\[1m\]")/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
-    console.error(
-      'patch: opusplan1m: patchDescriptionFunction: failed to find description pattern'
-    );
-    return null;
+    // Check if already patched
+    if (/case"opusplan":case"opusplan\[1m\]":return/.test(oldFile))
+      return oldFile;
+    return null; // This file doesn't have the ca() switch
+  }
+
+  const [fullMatch, funcName, varName] = match;
+  const replacement = `case"opusplan":case"opusplan[1m]":return ${funcName}(${varName});`;
+  const newFile =
+    oldFile.slice(0, match.index) +
+    replacement +
+    oldFile.slice(match.index + fullMatch.length);
+
+  showDiff(
+    oldFile,
+    newFile,
+    replacement,
+    match.index,
+    match.index + fullMatch.length
+  );
+  return newFile;
+};
+
+/**
+ * Patch 3: Add opusplan[1m] case to the Dt(e) model resolution switch
+ *
+ * Original:
+ *   case"opusplan":return s?VA(YB(sm())):sm();
+ *
+ * Patched:
+ *   case"opusplan":case"opusplan[1m]":return s?VA(YB(sm())):sm();
+ */
+const patchModelSwitchDt = (oldFile: string): string | null => {
+  // Match: case"opusplan":return VAR?FUNC(FUNC(FUNC())):FUNC();
+  const pattern =
+    /case"opusplan":return ([$\w]+)\?([$\w]+)\(([$\w]+)\(([$\w]+)\(\)\)\):([$\w]+)\(\);(?!case"opusplan\[1m\]")/;
+
+  const match = oldFile.match(pattern);
+  if (!match || match.index === undefined) {
+    // Check if already patched
+    if (/case"opusplan":case"opusplan\[1m\]":return [$\w]+\?/.test(oldFile))
+      return oldFile;
+    return null; // This file doesn't have the Dt() switch
+  }
+
+  const [fullMatch, condVar, fn1, fn2, fn3, fn4] = match;
+  const replacement = `case"opusplan":case"opusplan[1m]":return ${condVar}?${fn1}(${fn2}(${fn3}())):${fn4}();`;
+  const newFile =
+    oldFile.slice(0, match.index) +
+    replacement +
+    oldFile.slice(match.index + fullMatch.length);
+
+  showDiff(
+    oldFile,
+    newFile,
+    replacement,
+    match.index,
+    match.index + fullMatch.length
+  );
+  return newFile;
+};
+
+/**
+ * Patch 4: Extend the r8(e) description function for opusplan[1m]
+ *
+ * Original:
+ *   if(e==="opusplan")return"Opus in plan mode, else Sonnet";
+ *
+ * Patched:
+ *   if(e==="opusplan")return"Opus in plan mode, else Sonnet";if(e==="opusplan[1m]")return"Opus in plan mode, else Sonnet (1M context)";
+ */
+const patchDescriptionFunction = (oldFile: string): string | null => {
+  // Match: if(VAR==="opusplan")return"...Opus...plan mode...Sonnet...";
+  const pattern =
+    /(if\(([$\w]+)==="opusplan"\)return"([^"]*Opus[^"]*plan mode[^"]*Sonnet[^"]*)";)/;
+
+  const match = oldFile.match(pattern);
+  if (!match || match.index === undefined) {
+    // Check if already patched
+    if (/if\([^)]*==="opusplan\[1m\]"\)return"[^"]*1M context/.test(oldFile))
+      return oldFile;
+    return null; // This file doesn't have the r8() function
   }
 
   const [fullMatch, , varName, description] = match;
-
-  // Add the opusplan[1m] case right after the opusplan case
   const replacement =
     fullMatch +
     `if(${varName}==="opusplan[1m]")return"${description} (1M context)";`;
-
   const newFile =
     oldFile.slice(0, match.index) +
     replacement +
@@ -147,34 +171,29 @@ const patchDescriptionFunction = (oldFile: string): string | null => {
 };
 
 /**
- * Patch 4: Fix the label function (Tq4) to handle opusplan[1m]
+ * Patch 5: Extend the iY(e) label function for opusplan[1m]
  *
  * Original:
- *   if (A === "opusplan") return "Opus Plan";
+ *   if(e==="opusplan")return"Opus Plan";
  *
  * Patched:
- *   if (A === "opusplan") return "Opus Plan";
- *   if (A === "opusplan[1m]") return "Opus Plan 1M";
+ *   if(e==="opusplan")return"Opus Plan";if(e==="opusplan[1m]")return"Opus Plan 1M";
  */
 const patchLabelFunction = (oldFile: string): string | null => {
-  // Pattern matches: if (VAR === "opusplan") return "Opus Plan";
-  const pattern =
-    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*"Opus Plan";)/;
+  // Match: if(VAR==="opusplan")return"Opus Plan";
+  const pattern = /(if\(([$\w]+)==="opusplan"\)return"Opus Plan";)/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
-    console.error(
-      'patch: opusplan1m: patchLabelFunction: failed to find label pattern'
-    );
-    return null;
+    // Check if already patched
+    if (/if\([^)]*==="opusplan\[1m\]"\)return"Opus Plan 1M"/.test(oldFile))
+      return oldFile;
+    return null; // This file doesn't have the iY() function
   }
 
   const [fullMatch, , varName] = match;
-
-  // Add the opusplan[1m] case right after the opusplan case
   const replacement =
     fullMatch + `if(${varName}==="opusplan[1m]")return"Opus Plan 1M";`;
-
   const newFile =
     oldFile.slice(0, match.index) +
     replacement +
@@ -191,54 +210,29 @@ const patchLabelFunction = (oldFile: string): string | null => {
 };
 
 /**
- * Patch 5: Add opusplan[1m] menu option function (similar to Mm3)
+ * Patch 6: Extend the JL(e) plan mode check for opusplan[1m]
  *
- * We need to add a function that returns the menu option for opusplan[1m],
- * and inject it into the model selector options.
+ * Original:
+ *   return e==="opusplan"||e==="haiku";
  *
- * The existing Mm3 function:
- *   Mm3 = () => {
- *     return {
- *       value: "opusplan",
- *       label: "Opus Plan Mode",
- *       description: "Use Opus 4.6 in plan mode, Sonnet 4.6 otherwise",
- *     };
- *   };
- *
- * We'll add a similar function for opusplan[1m] and inject it where opusplan options are added.
+ * Patched:
+ *   return e==="opusplan"||e==="opusplan[1m]"||e==="haiku";
  */
-const patchModelSelectorOptions = (oldFile: string): string | null => {
-  // Find where opusplan is added to the model list: [...A, Mm3()]
-  // Old pattern: if (K === "opusplan") return [...A, Mm3()];
-  // New pattern: if (K === "opusplan") return v1A([...A, Mm3()]);
-  // We need to add a similar case for opusplan[1m]
-  // Capture groups: 1=fullMatch, 2=conditionVar (K), 3=listVar (A), 4=funcName (Mm3)
-  const pattern =
-    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*(?:[$\w]+\()?\[\s*\.\.\.([$\w]+)\s*,\s*([$\w]+)\(\)\s*\]\)?;)/;
+const patchPlanModeCheck = (oldFile: string): string | null => {
+  // Match: return VAR==="opusplan"||VAR==="haiku";
+  const pattern = /(return )([$\w]+)==="opusplan"\|\|([$\w]+)==="haiku"(;)/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
-    console.error(
-      'patch: opusplan1m: patchModelSelectorOptions: failed to find model selector pattern'
-    );
-    return null;
+    // Check if already patched
+    if (/==="opusplan"\|\|[$\w]+==="opusplan\[1m\]"\|\|/.test(oldFile))
+      return oldFile;
+    return null; // This file doesn't have the JL() function
   }
 
-  const [fullMatch, , varName, listVar] = match;
-
-  const wrapperMatch = fullMatch.match(
-    new RegExp(`return\\s*([$\\w]+)\\(\\s*\\[\\.\\.\\.${escapeIdent(listVar)}`)
-  );
-  const wrapFn = wrapperMatch ? wrapperMatch[1] : null;
-
-  const newEntry = `{value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus in plan mode, Sonnet (1M context) otherwise"}`;
-  const returnExpr = wrapFn
-    ? `${wrapFn}([...${listVar},${newEntry}])`
-    : `[...${listVar},${newEntry}]`;
-
-  const replacement =
-    fullMatch + `if(${varName}==="opusplan[1m]")return ${returnExpr};`;
-
+  const [fullMatch, ret, var1, var2, semi] = match;
+  // Insert opusplan[1m] check
+  const replacement = `${ret}${var1}==="opusplan"||${var1}==="opusplan[1m]"||${var2}==="haiku"${semi}`;
   const newFile =
     oldFile.slice(0, match.index) +
     replacement +
@@ -251,114 +245,79 @@ const patchModelSelectorOptions = (oldFile: string): string | null => {
     match.index,
     match.index + fullMatch.length
   );
-  return newFile;
-};
-
-/**
- * Patch 6: Add opusplan[1m] to the model selector list so it's ALWAYS visible
- *
- * This injects push statements to add opusplan and opusplan[1m] to the model list
- * so they always appear in the /model menu, not just when selected.
- *
- * We find the point right after the conditional check `if(K===null||A.some(...))`
- * and inject before the opusplan conditional return.
- */
-const patchAlwaysShowInModelSelector = (oldFile: string): string | null => {
-  // Find the pattern: if(K===null||A.some((VAR)=>VAR.value===K))return A;
-  // This is right before the opusplan conditional, and we want to inject pushes before this
-  const pattern =
-    /(if\s*\(\s*[$\w]+\s*===\s*null\s*\|\|\s*([$\w]+)\.some\s*\(\s*\(\s*[$\w]+\s*\)\s*=>\s*[$\w]+\.value\s*===\s*[$\w]+\s*\)\s*\)\s*return\s*(?:[$\w]+\()?[$\w]+\)?\s*;)/;
-
-  const match = oldFile.match(pattern);
-  if (!match || match.index === undefined) {
-    console.error(
-      'patch: opusplan1m: patchAlwaysShowInModelSelector: failed to find model list check pattern'
-    );
-    return null;
-  }
-
-  const [, , listVar] = match;
-
-  // Inject pushes BEFORE the conditional return
-  // This ensures opusplan and opusplan[1m] are always in the list
-  const inject =
-    `${listVar}.push({value:"opusplan",label:"Opus Plan Mode",description:"Use Opus in plan mode, Sonnet otherwise"});` +
-    `${listVar}.push({value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus in plan mode, Sonnet (1M context) otherwise"});`;
-
-  const newFile =
-    oldFile.slice(0, match.index) + inject + oldFile.slice(match.index);
-
-  showDiff(oldFile, newFile, inject, match.index, match.index);
   return newFile;
 };
 
 /**
  * Main entry point: Apply all opusplan[1m] patches
+ * Note: Different patches apply to different module files:
+ * - Model aliases array (GV) is in a separate module (e.g., chunk-fg6ja6wn.js)
+ * - Most functions are in the main model handling module (e.g., chunk-sn362cnh.js)
+ *
+ * Returns the patched file if any patches applied, or null if no patterns matched.
+ * This allows the patch framework to try other modules.
  */
 export const writeOpusplan1m = (oldFile: string): string | null => {
   let newFile = oldFile;
+  let anyPatched = false;
 
-  // Patch 1: Mode switching function
-  let result = patchModeSwitchingFunction(newFile);
-  if (result) {
-    newFile = result;
-  } else {
-    console.error('patch: opusplan1m: failed to apply mode switching patch');
-    return null;
+  // Try all patches - they may be in different files, so we track if any succeeded
+
+  // Patch 1: Model aliases list (may be in a different module)
+  let result = patchModelAliasesList(newFile);
+  if (result !== null) {
+    if (result !== newFile) {
+      newFile = result;
+      anyPatched = true;
+    }
   }
 
-  // Patch 2: Model aliases list
-  result = patchModelAliasesList(newFile);
-  if (result) {
-    newFile = result;
-  } else {
-    console.error(
-      'patch: opusplan1m: failed to apply model aliases list patch'
-    );
-    return null;
+  // Patch 2: ca() model switch
+  result = patchModelSwitchCa(newFile);
+  if (result !== null) {
+    if (result !== newFile) {
+      newFile = result;
+      anyPatched = true;
+    }
   }
 
-  // Patch 3: Description function
+  // Patch 3: Dt() model resolution switch
+  result = patchModelSwitchDt(newFile);
+  if (result !== null) {
+    if (result !== newFile) {
+      newFile = result;
+      anyPatched = true;
+    }
+  }
+
+  // Patch 4: Description function
   result = patchDescriptionFunction(newFile);
-  if (result) {
-    newFile = result;
-  } else {
-    console.error(
-      'patch: opusplan1m: failed to apply description function patch'
-    );
-    return null;
+  if (result !== null) {
+    if (result !== newFile) {
+      newFile = result;
+      anyPatched = true;
+    }
   }
 
-  // Patch 4: Label function
+  // Patch 5: Label function
   result = patchLabelFunction(newFile);
-  if (result) {
-    newFile = result;
-  } else {
-    console.error('patch: opusplan1m: failed to apply label function patch');
-    return null;
+  if (result !== null) {
+    if (result !== newFile) {
+      newFile = result;
+      anyPatched = true;
+    }
   }
 
-  // Patch 5: Model selector options (conditional show when selected)
-  result = patchModelSelectorOptions(newFile);
-  if (result) {
-    newFile = result;
-  } else {
-    console.error(
-      'patch: opusplan1m: failed to apply model selector options patch'
-    );
-    return null;
+  // Patch 6: Plan mode check
+  result = patchPlanModeCheck(newFile);
+  if (result !== null) {
+    if (result !== newFile) {
+      newFile = result;
+      anyPatched = true;
+    }
   }
 
-  // Patch 6: Always show in model selector (push to list)
-  result = patchAlwaysShowInModelSelector(newFile);
-  if (result) {
-    newFile = result;
-  } else {
-    console.error(
-      'patch: opusplan1m: failed to apply always-show-in-selector patch'
-    );
-    return null;
-  }
-
-  return newFile;
+  // Return the patched file if any sub-patch applied, otherwise null
+  // This allows the patch framework to try other modules
+  return anyPatched ? newFile : null;
 };
