@@ -84,7 +84,7 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
-import { writeClearScreen } from './clearScreen';
+import { writeClearScreen, writeClearScreenModules } from './clearScreen';
 import { writeSessionColor } from './sessionColor';
 import { writeKeybindingCustomization } from './keybindingCustomization';
 import {
@@ -860,6 +860,7 @@ export const applyCustomization = async (
     },
     'clear-screen': {
       fn: c => writeClearScreen(c),
+      modules: m => writeClearScreenModules(m),
     },
     'session-color': {
       fn: c => writeSessionColor(c),
