@@ -1480,7 +1480,12 @@ const writeToolsetsCodeSplit = (
         `globalThis.__tweakccToolsetLabel=(tweakccMode)=>{let tweakccName=globalThis.__tweakccToolsetName({mode:tweakccMode});return tweakccName?" ["+tweakccName+"]":""};` +
         // Whether the main session's active toolset allows a tool, for the
         // declared-tool hold below (computeToolPool records the context).
-        `globalThis.__tweakccToolsetAllows=(tweakccTool)=>{let tweakccAllowed=${toolsetsJSON}[globalThis.__tweakccToolsetName(globalThis.__tweakccMainToolContext)];return tweakccAllowed===void 0||tweakccToolAllowed(tweakccAllowed,tweakccTool)};`;
+        `globalThis.__tweakccToolsetAllows=(tweakccTool)=>{let tweakccAllowed=${toolsetsJSON}[globalThis.__tweakccToolsetName(globalThis.__tweakccMainToolContext)];return tweakccAllowed===void 0||tweakccToolAllowed(tweakccAllowed,tweakccTool)};` +
+        // "No such tool available" text naming the active toolset and its
+        // tools (sub-patch 2d); undefined when no restricted toolset applies.
+        `globalThis.__tweakcc_toolErrorMsg=(tweakccTool,tweakccHint)=>{let tweakccName=globalThis.__tweakccToolsetName(globalThis.__tweakccMainToolContext),tweakccAllowed=${toolsetsJSON}[tweakccName];if(!Array.isArray(tweakccAllowed))return;` +
+        `let tweakccLead="Error: No such tool available: "+tweakccTool+(tweakccHint??"");` +
+        `return tweakccLead+(tweakccLead.endsWith(".")?" ":". ")+"The active toolset is '"+tweakccName+"' which only includes: "+(tweakccAllowed.join(", ")||"no tools")+". Do not attempt to use "+tweakccTool+" again \\u2014 it will fail. If the user switches toolsets via /toolset, you may retry."};`;
       const [aHead, a1, a2, a3] = assembleDef;
       const newAssemble = `${filter}function ${assemble}(${a1},${a2},${a3}){return tweakccFilterTools(tweakccAssembleToolPool(${a1},${a2},${a3}),${a1})}function tweakccAssembleToolPool(${a1},${a2},${a3}){`;
       file =
@@ -1537,6 +1542,22 @@ const writeToolsetsCodeSplit = (
     const previous = file;
     file = file.slice(0, end) + addition + file.slice(end);
     showDiff(previous, file, addition, end, end);
+  }
+
+  // Unknown-tool results list the active toolset's tools:
+  //   content:`<tool_use_error>Error: No such tool available: ${w}${Ge}</tool_use_error>`,…,toolUseResult:`Error: No such tool available: ${w}${Ge}`
+  const toolErrors = file.replace(
+    /`(<tool_use_error>)?Error: No such tool available: \$\{([$\w.]+)\}(?:\$\{([$\w.]+)\})?(?:<\/tool_use_error>)?`/g,
+    (original, open, name, hint) => {
+      const message = `globalThis.__tweakcc_toolErrorMsg?.(${name},${hint ?? '""'})`;
+      return open
+        ? `((tweakccMessage)=>tweakccMessage?"<tool_use_error>"+tweakccMessage+"</tool_use_error>":${original})(${message})`
+        : `(${message}??${original})`;
+    }
+  );
+  if (toolErrors !== file) {
+    showDiff(file, toolErrors, '__tweakcc_toolErrorMsg', 0, 0);
+    file = toolErrors;
   }
 
   // Mode status line: `⏸ plan mode on` → `⏸ plan mode on [readonly]`.
