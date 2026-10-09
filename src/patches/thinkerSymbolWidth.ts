@@ -2,6 +2,7 @@
 
 import { showDiff } from './index';
 import stringWidth from 'string-width';
+import { exportedNameOf, graphSources } from './graphContext';
 
 /** The width Claude Code ships, and what the box keeps when there is nothing to size. */
 const VANILLA_BOX_WIDTH = 2;
@@ -45,8 +46,9 @@ const widthPattern = /flexWrap:"wrap",height:1,width:2/;
 // backwards off the match. Starting this backreferenced pattern with `[$\w]+`
 // makes the engine retry it at every offset of a 22MB bundle: 600ms, against
 // 8ms anchored on the literal. See the note about word boundaries in ./index.
+// CC 2.1.2xx writes the reverse as `X.toReversed()`.
 const frameArrayPattern =
-  /=\[\.\.\.([$\w]+),\.\.\.\[\.\.\.\1\]\.reverse\(\)\]/g;
+  /=\[\.\.\.([$\w]+),\.\.\.(?:\[\.\.\.\1\]\.reverse\(\)|\1\.toReversed\(\))\]/g;
 
 const spinnerFrameVars = (file: string): string[] => {
   const names = new Set<string>();
@@ -57,6 +59,43 @@ const spinnerFrameVars = (file: string): string[] => {
     if (start < end) names.add(file.slice(start, end));
   }
   return [...names];
+};
+
+const escapeRegExp = (name: string): string =>
+  name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Code-split builds (CC 2.1.2xx) define the frame arrays in one module and
+ * hand them out through getters (2.1.295, chunk-9ne577yj):
+ *   function YPe(){if(a.TERM==="xterm-ghostty")return d;return f}
+ * Spinner components elsewhere import the getter, so for them the frame
+ * reference is the getter's local name in `file`.
+ */
+const importedFrameGetters = (file: string): string[] => {
+  const sources = graphSources();
+  if (!sources) return [];
+  const names: string[] = [];
+  for (const [, items, module] of file.matchAll(
+    /import\{([^}]*)\}from"([^"]+)"/g
+  )) {
+    const owner = sources.get(module);
+    if (!owner) continue;
+    const frameVars = spinnerFrameVars(owner);
+    if (frameVars.length === 0) continue;
+    const returnsFrames = new RegExp(
+      `return (?:${frameVars.map(escapeRegExp).join('|')})(?![$\\w])`
+    );
+    const getters = new Set(
+      [...owner.matchAll(/function ([$\w]+)\(\)\{([^{}]*)\}/g)]
+        .filter(([, , body]) => returnsFrames.test(body))
+        .map(([, getter]) => exportedNameOf(module, getter))
+    );
+    for (const item of items.split(',')) {
+      const [exported, local = exported] = item.trim().split(/\s+as\s+/);
+      if (getters.has(exported)) names.push(local);
+    }
+  }
+  return names;
 };
 
 /**
@@ -105,16 +144,17 @@ export const writeThinkerSymbolWidthLocation = (
   // array. If the frame arrays cannot be located, fall back to resizing every
   // box, which is what this patch did before the scoping: an upstream shape
   // change then costs the extra box again rather than the whole patch.
-  const frameVars = spinnerFrameVars(oldFile);
+  const frameNames = [
+    ...spinnerFrameVars(oldFile),
+    ...importedFrameGetters(oldFile),
+  ];
   let targets = boxes;
-  if (frameVars.length > 0) {
+  if (frameNames.length > 0) {
     // `$` is a valid identifier and minifiers do emit it. Interpolated raw into
     // the alternation it would become the end-of-input anchor, so no reference
     // would be found and every box would fall through to the fallback.
     const framePattern = new RegExp(
-      `(?<![$\\w])(?:${frameVars
-        .map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-        .join('|')})(?![$\\w])`,
+      `(?<![$\\w])(?:${frameNames.map(escapeRegExp).join('|')})(?![$\\w])`,
       'g'
     );
     const frameRefs = [...oldFile.matchAll(framePattern)].map(m => m.index);
