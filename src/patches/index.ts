@@ -98,6 +98,7 @@ import { assertPatchedModuleParses } from './moduleParseGate';
 import { writeClearScreen } from './clearScreen';
 import { writeSessionColor } from './sessionColor';
 import { writeKeybindingCustomization } from './keybindingCustomization';
+import { writePlanExitCommand } from './planExitCommand';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -223,6 +224,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.ALWAYS_APPLIED,
     description:
       'Force-enable custom keybindings when CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1',
+  },
+  {
+    id: 'plan-exit-command',
+    name: '/plan exit command',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description:
+      'Add /plan exit to open the plan approval dialog without a model turn',
   },
   // Misc Configurable
   {
@@ -672,6 +680,9 @@ export const buildPatchImplementations = (
     },
     'keybinding-customization': {
       fn: c => writeKeybindingCustomization(c),
+    },
+    'plan-exit-command': {
+      fn: c => writePlanExitCommand(c),
     },
     // Misc Configurable
     'patches-applied-indication': {
