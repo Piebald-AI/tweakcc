@@ -187,7 +187,9 @@ export const writeUserMessageDisplay = (
   } else {
     // Memoized child pattern (CC 2.1.138)
     createElementFn = match[3];
-    messageVar = match[4];
+    // CC 2.1.2xx truncates prompts over 10k chars to {head,hiddenChars,tail,...}.
+    const v = match[4];
+    messageVar = `(typeof ${v}=="object"?${v}.head+"\\n\\u2026 +"+${v}.hiddenChars+" chars\\n"+${v}.tail:${v})`;
   }
 
   const resolvedBoxComponent = localBoxComponent ?? boxComponent;
@@ -293,7 +295,13 @@ export const writeUserMessageDisplay = (
     elementTree = `${createElementFn}(${resolvedBoxComponent},${boxAttrsObjStr},${createElementFn}(${textComponent},null,${chalkFormattedString}))`;
   }
 
-  const replacement = match[1] + `${replacementPrefix}${elementTree}`;
+  // The parent Box paints the theme's userMessageBackground; keep it only for
+  // the 'default' background (null = none, custom = painted by chalk).
+  const prefix =
+    config.backgroundColor === 'default'
+      ? match[1]
+      : match[1].replace('"userMessageBackground"', 'void 0');
+  const replacement = prefix + `${replacementPrefix}${elementTree}`;
 
   const startIndex = match.index;
   const endIndex = startIndex + match[0].length;
