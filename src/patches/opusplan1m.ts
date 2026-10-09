@@ -10,7 +10,8 @@
 //
 // See: https://github.com/Piebald-AI/tweakcc/issues/108
 
-import { escapeIdent, showDiff } from './index';
+import { showDiff } from './index';
+import { isGraphContextActive } from './graphContext';
 
 /**
  * Patch 1: Fix the mode-switching function (bF) to recognize opusplan[1m]
@@ -213,8 +214,10 @@ const patchModelSelectorOptions = (oldFile: string): string | null => {
   // New pattern: if (K === "opusplan") return v1A([...A, Mm3()]);
   // We need to add a similar case for opusplan[1m]
   // Capture groups: 1=fullMatch, 2=conditionVar (K), 3=listVar (A), 4=funcName (Mm3)
+  // CC 2.1.2xx passes a second argument to the wrapper:
+  // if(R==="opusplan")return Yt([...s,Vh()],r);
   const pattern =
-    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*(?:[$\w]+\()?\[\s*\.\.\.([$\w]+)\s*,\s*([$\w]+)\(\)\s*\]\)?;)/;
+    /(if\s*\(\s*([$\w]+)\s*===\s*"opusplan"\s*\)\s*return\s*(?:[$\w]+\()?\[\s*\.\.\.([$\w]+)\s*,\s*([$\w]+)\(\)\s*\](?:,[$\w]+)?\)?;)/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
@@ -224,20 +227,14 @@ const patchModelSelectorOptions = (oldFile: string): string | null => {
     return null;
   }
 
-  const [fullMatch, , varName, listVar] = match;
-
-  const wrapperMatch = fullMatch.match(
-    new RegExp(`return\\s*([$\\w]+)\\(\\s*\\[\\.\\.\\.${escapeIdent(listVar)}`)
-  );
-  const wrapFn = wrapperMatch ? wrapperMatch[1] : null;
+  const [fullMatch, , , , optionFn] = match;
 
   const newEntry = `{value:"opusplan[1m]",label:"Opus Plan Mode 1M",description:"Use Opus in plan mode, Sonnet (1M context) otherwise"}`;
-  const returnExpr = wrapFn
-    ? `${wrapFn}([...${listVar},${newEntry}])`
-    : `[...${listVar},${newEntry}]`;
-
   const replacement =
-    fullMatch + `if(${varName}==="opusplan[1m]")return ${returnExpr};`;
+    fullMatch +
+    fullMatch
+      .replace('"opusplan"', '"opusplan[1m]"')
+      .replace(`${optionFn}()`, newEntry);
 
   const newFile =
     oldFile.slice(0, match.index) +
@@ -267,7 +264,7 @@ const patchAlwaysShowInModelSelector = (oldFile: string): string | null => {
   // Find the pattern: if(K===null||A.some((VAR)=>VAR.value===K))return A;
   // This is right before the opusplan conditional, and we want to inject pushes before this
   const pattern =
-    /(if\s*\(\s*[$\w]+\s*===\s*null\s*\|\|\s*([$\w]+)\.some\s*\(\s*\(\s*[$\w]+\s*\)\s*=>\s*[$\w]+\.value\s*===\s*[$\w]+\s*\)\s*\)\s*return\s*(?:[$\w]+\()?[$\w]+\)?\s*;)/;
+    /(if\s*\(\s*[$\w]+\s*===\s*null\s*\|\|\s*([$\w]+)\.some\s*\(\s*\(\s*[$\w]+\s*\)\s*=>\s*[$\w]+\.value\s*===\s*[$\w]+\s*\)\s*\)\s*return\s*(?:[$\w]+\()?[$\w]+(?:,[$\w]+)?\)?\s*;)/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
@@ -293,17 +290,43 @@ const patchAlwaysShowInModelSelector = (oldFile: string): string | null => {
 };
 
 /**
+ * Applies every step in order; null as soon as one of them does not match.
+ */
+const applyAll = (
+  oldFile: string,
+  steps: ((file: string) => string | null)[]
+): string | null =>
+  steps.reduce<string | null>(
+    (file, step) => (file === null ? null : step(file)),
+    oldFile
+  );
+
+/**
  * Main entry point: Apply all opusplan[1m] patches
  */
 export const writeOpusplan1m = (oldFile: string): string | null => {
-  // CC 2.1.2xx supports "opusplan[1m]" natively: its plan-mode resolver maps
+  // CC 2.1.2xx resolves "opusplan[1m]" natively: its plan-mode resolver maps
   // it to Opus 1M (`if(e==="opusplan"||e==="opusplan[1m]")return"opus"` plus
-  // `e==="opusplan[1m]"||…` when choosing opus[1m]). Nothing to patch there;
-  // report the module as already satisfied rather than failing.
-  if (
-    /==="opusplan"\|\|[$\w]+==="opusplan\[1m\]"\)return"opus"/.test(oldFile)
-  ) {
-    return oldFile;
+  // `e==="opusplan[1m]"||…` when choosing opus[1m]) and the alias otherwise
+  // resolves to Sonnet 1M. Its label and description still fall through to
+  // the raw alias and the Sonnet name, and the /model picker (another chunk
+  // on code-split builds) only lists "opusplan", and only while it is the
+  // current model.
+  const native =
+    /==="opusplan"\|\|[$\w]+==="opusplan\[1m\]"\)return"opus"/.test(oldFile);
+  if (native || isGraphContextActive()) {
+    let file = oldFile;
+    let matched = native;
+    for (const steps of [
+      [patchDescriptionFunction, patchLabelFunction],
+      [patchModelSelectorOptions, patchAlwaysShowInModelSelector],
+    ]) {
+      const next = applyAll(file, steps);
+      if (next === null) continue;
+      file = next;
+      matched = true;
+    }
+    return matched ? file : null;
   }
 
   let newFile = oldFile;
