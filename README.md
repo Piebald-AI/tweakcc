@@ -1145,6 +1145,8 @@ When Claude finishes writing a plan and calls `ExitPlanMode`, you're normally sh
 }
 ```
 
+To auto-accept only for some runs, leave `autoAcceptPlanMode` off and set `settings.misc.autoAcceptPlanModeEnv` to `true` (UI: `Auto-accept plan mode via env`). Plans are then auto-accepted only when Claude Code starts with `TWEAKCC_AUTO_ACCEPT_PLAN=1`, e.g. `TWEAKCC_AUTO_ACCEPT_PLAN=1 claude --permission-mode plan`. Without the variable the normal dialog is shown.
+
 ## Feature: Suppress native installer warning
 
 When Claude Code detects that you've installed via npm, it warns you to use the native installer.

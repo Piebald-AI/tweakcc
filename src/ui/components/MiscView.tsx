@@ -77,6 +77,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableRememberSkill: false,
     tokenCountRounding: null as number | null,
     autoAcceptPlanMode: false,
+    autoAcceptPlanModeEnv: false,
     allowBypassPermissionsInSudo: false,
     suppressNativeInstallerWarning: false,
     filterScrollEscapeSequences: false,
@@ -610,6 +611,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.autoAcceptPlanMode =
               !settings.misc!.autoAcceptPlanMode;
+          });
+        },
+      },
+      {
+        id: 'autoAcceptPlanModeEnv',
+        title: 'Auto-accept plan mode via env',
+        description:
+          'Auto-accept plans only when TWEAKCC_AUTO_ACCEPT_PLAN=1 is set. Ignored when auto-accept plan mode is on.',
+        getValue: () => settings.misc?.autoAcceptPlanModeEnv ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.autoAcceptPlanModeEnv =
+              !settings.misc!.autoAcceptPlanModeEnv;
           });
         },
       },

@@ -129,6 +129,7 @@ export interface MiscConfig {
   enableRememberSkill: boolean;
   tokenCountRounding: number | null;
   autoAcceptPlanMode: boolean;
+  autoAcceptPlanModeEnv: boolean;
   allowBypassPermissionsInSudo: boolean | null;
   suppressNativeInstallerWarning: boolean;
   filterScrollEscapeSequences: boolean;

@@ -403,6 +403,13 @@ const PATCH_DEFINITIONS = [
       'Automatically accept plans without the "Ready to code?" confirmation prompt',
   },
   {
+    id: 'auto-accept-plan-env',
+    name: 'Auto-accept plan mode via env',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Auto-accept plans only when TWEAKCC_AUTO_ACCEPT_PLAN is set (used when "Auto-accept plan mode" is off)',
+  },
+  {
     id: 'allow-sudo-bypass-permissions',
     name: 'Allow bypassing permissions with --dangerously-skip-permissions in sudo',
     group: PatchGroup.MISC_CONFIGURABLE,
@@ -836,6 +843,12 @@ export const buildPatchImplementations = (
     'auto-accept-plan-mode': {
       fn: c => writeAutoAcceptPlanMode(c),
       condition: !!config.settings.misc?.autoAcceptPlanMode,
+    },
+    'auto-accept-plan-env': {
+      fn: c => writeAutoAcceptPlanMode(c, true),
+      condition:
+        !config.settings.misc?.autoAcceptPlanMode &&
+        !!config.settings.misc?.autoAcceptPlanModeEnv,
     },
     'allow-sudo-bypass-permissions': {
       fn: c => writeAllowBypassPermsInSudo(c),
