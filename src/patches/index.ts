@@ -75,7 +75,7 @@ import { writeIncreaseFileReadLimit } from './increaseFileReadLimit';
 import { writeSuppressLineNumbers } from './suppressLineNumbers';
 import { writeSuppressRateLimitOptions } from './suppressRateLimitOptions';
 import { writeSuppressRateLimitWarning } from './suppressRateLimitWarning';
-import { writeSessionMemory } from './sessionMemory';
+import { writeSessionMemory, writeSessionMemoryModules } from './sessionMemory';
 import { writeRememberSkill } from './rememberSkill';
 import { writeThinkingBlockStyling } from './thinkingBlockStyling';
 import { writeMcpNonBlocking, writeMcpBatchSize } from './mcpStartup';
@@ -1070,6 +1070,7 @@ export const applyCustomization = async (
     },
     'session-memory': {
       fn: c => writeSessionMemory(c),
+      modules: m => writeSessionMemoryModules(m),
       condition: !!config.settings.misc?.enableSessionMemory,
     },
     toolsets: {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { writeSessionMemory } from './sessionMemory';
+import { writeSessionMemory, writeSessionMemoryModules } from './sessionMemory';
 
 describe('writeSessionMemory', () => {
   // Claude Code >= 2.1.217 refactored the session-memory config: the extraction
@@ -91,8 +91,8 @@ describe('writeSessionMemory', () => {
   // CC 2.1.218 replaced the old `toolCallsBetweenUpdates:3` config field with a
   // GrowthBook-gated cadence `getFlag("tengu_bramble_lintel",null)??1`. It is the
   // one update-cadence knob that survived the memory-model refactor, so the
-  // CC_SM_TOOL_CALLS_BETWEEN_UPDATES env var must re-anchor onto it (preserving
-  // the flag's precedence and its numeric default).
+  // CC_SM_TOOL_CALLS_BETWEEN_UPDATES env var must re-anchor onto it (taking
+  // precedence when set, and keeping the flag and its numeric default otherwise).
   it('re-anchors CC_SM_TOOL_CALLS_BETWEEN_UPDATES onto the 2.1.218 tengu_bramble_lintel cadence flag', () => {
     const input =
       // refactored extraction path (keeps usedLegacyExtraction false)
@@ -106,10 +106,10 @@ describe('writeSessionMemory', () => {
     const result = writeSessionMemory(input);
 
     expect(result).not.toBeNull();
-    // flag precedence preserved; only the numeric default becomes env-configurable.
+    // the env var wins when set; otherwise the flag and its default apply.
     // Assert through the trailing continuation so a comma-eating mutation is caught.
     expect(result).toContain(
-      'Xe("tengu_bramble_lintel",null)??Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES??1),y=mvo(p)'
+      'let g=(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES?Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES):Xe("tengu_bramble_lintel",null)??1),y=mvo(p)'
     );
   });
 
@@ -126,7 +126,7 @@ describe('writeSessionMemory', () => {
 
     expect(result).not.toBeNull();
     expect(result).toContain(
-      'Xe("tengu_bramble_lintel",null)??Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES??4),y=mvo(p)'
+      'Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES):Xe("tengu_bramble_lintel",null)??4),y=mvo(p)'
     );
   });
 
@@ -149,7 +149,7 @@ describe('writeSessionMemory', () => {
     );
     // and the real cadence flag is still re-anchored
     expect(result).toContain(
-      'Xe("tengu_bramble_lintel",null)??Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES??1)'
+      'Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES):Xe("tengu_bramble_lintel",null)??1)'
     );
   });
 
@@ -168,5 +168,55 @@ describe('writeSessionMemory', () => {
     // left untouched: no partial-number corruption
     expect(result).toContain('Xe("tengu_bramble_lintel",null)??1.5,');
     expect(result).not.toContain('CC_SM_TOOL_CALLS_BETWEEN_UPDATES');
+  });
+});
+
+// Real minified excerpts from CC 2.1.295 (split chunks).
+describe('writeSessionMemoryModules (CC 2.1.295)', () => {
+  const extractor =
+    'let le=b?.everyNTurns??k("tengu_bramble_lintel",null)??1,ke=_5(p);' +
+    'canUseTool:pt(Z,()=>{de++}),querySource:"extract_memories",forkLabel:"extract_memories",overrides:{};' +
+    'if(!w&&!k("tengu_passport_quail",!1)&&!Ge())return;if(!w&&!xu()){if(_Y())r=p.messages.at(-1)?.uuid??r;return}';
+  const predicate =
+    'function s6e(){if(r6e()!==null)return!0;if(!k("tengu_passport_quail",!1))return!1;return!ve()||k("tengu_slate_thimble",!1)}function SY(){}';
+  const mods = () =>
+    new Map([
+      ['/$bunfs/root/chunk-ptkrpzr4.js', extractor],
+      ['/$bunfs/root/chunk-sn362cnh.js', predicate],
+      ['/$bunfs/root/chunk-other.js', 'function foo(){return 1}'],
+    ]);
+
+  it('patches the extractor gate, cadence and extract-mode predicate in their own chunks', () => {
+    const result = writeSessionMemoryModules(mods());
+
+    expect(result).not.toBeNull();
+    expect([...result!.keys()].sort()).toEqual([
+      '/$bunfs/root/chunk-ptkrpzr4.js',
+      '/$bunfs/root/chunk-sn362cnh.js',
+    ]);
+    const ext = result!.get('/$bunfs/root/chunk-ptkrpzr4.js')!;
+    expect(ext).not.toContain('tengu_passport_quail');
+    expect(ext).toContain(
+      'overrides:{};if(!w&&!xu()){if(_Y())r=p.messages.at(-1)?.uuid??r;return}'
+    );
+    expect(ext).toContain(
+      'b?.everyNTurns??(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES?Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES):k("tengu_bramble_lintel",null)??1),ke=_5(p)'
+    );
+    expect(result!.get('/$bunfs/root/chunk-sn362cnh.js')).toBe(
+      'function s6e(){return!0}function SY(){}'
+    );
+  });
+
+  it('fails when the extract-mode predicate is missing from a split bundle', () => {
+    const m = mods();
+    m.delete('/$bunfs/root/chunk-sn362cnh.js');
+    expect(writeSessionMemoryModules(m)).toBeNull();
+  });
+
+  it('does not treat the hosted CLAUDE_CODE_POST_TURN_MEMORY env names as native support', () => {
+    const input =
+      'function r6e(){if(!a.CLAUDE_CODE_POST_TURN_MEMORY)return null;return hB("hosted")}' +
+      'mt(a.CLAUDE_CODE_POST_TURN_MEMORY_CONFIG,!1)';
+    expect(writeSessionMemory(input)).toBeNull();
   });
 });

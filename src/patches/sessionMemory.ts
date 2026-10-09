@@ -44,9 +44,22 @@
 //     re-anchors the same env var onto it (see below). The name is retained for
 //     continuity with the legacy knob; the flag gates an extraction-cycle cadence,
 //     not a literal tool-call count.
+//
+// CC 2.1.280+ (split chunks, verified on 2.1.295): the background extraction pass
+// ("[extractMemories]", writes notes into the auto-memory dir) is still gated by
+// GrowthBook `tengu_passport_quail` (default off), in two separate chunks:
+//   - the extract-mode predicate (exported as isExtractModeActive), which the
+//     turn-end hook, the headless drain and the extractor itself all consult:
+//       function s6e(){if(r6e()!==null)return!0;if(!k("tengu_passport_quail",!1))return!1;
+//       return!ve()||k("tengu_slate_thimble",!1)}
+//   - the extractor's own early return, next to the extract_memories fork:
+//       if(!w&&!k("tengu_passport_quail",!1)&&!Ge())return;
+// `CLAUDE_CODE_POST_TURN_MEMORY` (r6e above) is a hosted/CCR mode that needs a
+// JSON `CLAUDE_CODE_POST_TURN_MEMORY_CONFIG`; it is not on by default, so its
+// presence is not treated as native support. The `tengu_coral_fern` past-sessions
+// prompt section no longer exists there, so there is nothing to port for it.
 
 import { showDiff, globalReplace } from './index';
-import { debug } from '../utils';
 
 const LEGACY_EXTRACTION_GATE =
   /function [$\w]+\(\)\{return [$\w]+\("tengu_session_memory"/;
@@ -74,7 +87,9 @@ const patchExtraction = (file: string): string | null => {
   if (anchorIndex !== -1) {
     const windowEnd = Math.min(file.length, anchorIndex + 8000);
     const window = file.slice(anchorIndex, windowEnd);
-    const gatePattern = /if\(![$\w]+\("tengu_passport_quail",!1\)\)return;/;
+    // CC 2.1.295 adds hosted/promoter escapes: `if(!w&&!k("tengu_passport_quail",!1)&&!Ge())return;`
+    const gatePattern =
+      /if\(!(?:[$\w]+&&!)?[$\w]+\("tengu_passport_quail",!1\)(?:&&![$\w]+\(\))?\)return;/;
     const gateMatch = window.match(gatePattern);
 
     if (gateMatch && gateMatch.index !== undefined) {
@@ -89,6 +104,25 @@ const patchExtraction = (file: string): string | null => {
 
   console.error('patch: sessionMemory: failed to find extraction gate');
   return null;
+};
+
+/**
+ * Force the extract-mode predicate (isExtractModeActive) to true. CC 2.1.295
+ * prefixes it with the hosted-mode check `if(r6e()!==null)return!0;`.
+ */
+const EXTRACT_MODE_PATTERN =
+  /(function [$\w]+\(\))\{(?:if\([$\w]+\(\)!==null\)return!0;)?if\(![$\w]+\("tengu_passport_quail",!1\)\)return!1;return![$\w]+\(\)\|\|[$\w]+\("tengu_slate_thimble",!1\)\}/;
+
+const patchExtractMode = (file: string): string | null => {
+  const match = file.match(EXTRACT_MODE_PATTERN);
+  if (!match || match.index === undefined) return null;
+
+  const replacement = `${match[1]}{return!0}`;
+  const endIndex = match.index + match[0].length;
+  const newFile =
+    file.slice(0, match.index) + replacement + file.slice(endIndex);
+  showDiff(file, newFile, replacement, match.index, endIndex);
+  return newFile;
 };
 
 /**
@@ -233,12 +267,12 @@ const patchUpdateThresholds = (
   // CC >= 2.1.218: the update-cadence role is served by a GrowthBook-gated flag
   // `getFlag("tengu_bramble_lintel",null)??<n>` (the one update-cadence knob that
   // remains after the memory-model refactor removed the declarative object above).
-  // Re-anchor the same env var onto it, keeping the flag's precedence and carrying
-  // the upstream numeric default ($2) through rather than hard-coding it.
+  // The server does set this flag (e.g. 7), so the env var must win when it is set;
+  // otherwise the flag and the upstream numeric default stay as they were.
   newFile = globalReplace(
     newFile,
-    /([$\w]+\("tengu_bramble_lintel",null\)\?\?)(\d+)(?![\d.eExX])/g,
-    '$1Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES??$2)'
+    /([$\w]+\("tengu_bramble_lintel",null\)\?\?\d+)(?![\d.eExX])/g,
+    '(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES?Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES):$1)'
   );
 
   // Check if any replacements were made
@@ -258,18 +292,6 @@ const patchUpdateThresholds = (
  * Combined patch - applies extraction, past sessions, token limits, and update thresholds
  */
 export const writeSessionMemory = (oldFile: string): string | null => {
-  // CC 2.1.295+ has native session memory support via CLAUDE_CODE_POST_TURN_MEMORY
-  // Check if the native memory infrastructure exists
-  if (
-    oldFile.includes('CLAUDE_CODE_POST_TURN_MEMORY') &&
-    oldFile.includes('CLAUDE_CODE_POST_TURN_MEMORY_CONFIG')
-  ) {
-    debug(
-      'patch: sessionMemory: native session memory support detected, skipping patch'
-    );
-    return oldFile;
-  }
-
   let newFile = patchExtraction(oldFile);
   if (!newFile) return null;
 
@@ -281,24 +303,7 @@ export const writeSessionMemory = (oldFile: string): string | null => {
   }
   newFile = withPastSessions;
 
-  const extractModePattern =
-    /(function [$\w]+\(\))\{if\(![$\w]+\("tengu_passport_quail",!1\)\)return!1;return![$\w]+\(\)\|\|[$\w]+\("tengu_slate_thimble",!1\)\}/;
-  const extractModeMatch = newFile.match(extractModePattern);
-  if (extractModeMatch && extractModeMatch.index !== undefined) {
-    const replacement = `${extractModeMatch[1]}{return!0}`;
-    const beforePatch = newFile;
-    newFile =
-      newFile.slice(0, extractModeMatch.index) +
-      replacement +
-      newFile.slice(extractModeMatch.index + extractModeMatch[0].length);
-    showDiff(
-      beforePatch,
-      newFile,
-      replacement,
-      extractModeMatch.index,
-      extractModeMatch.index + extractModeMatch[0].length
-    );
-  }
+  newFile = patchExtractMode(newFile) ?? newFile;
 
   const tokenLimitsFile = patchTokenLimits(newFile, usedLegacyExtraction);
   if (tokenLimitsFile) {
@@ -318,4 +323,44 @@ export const writeSessionMemory = (oldFile: string): string | null => {
   }
 
   return newFile;
+};
+
+/**
+ * CC 2.1.280+ split bundles: the extractor (with its gate and cadence) and the
+ * extract-mode predicate live in different chunks, so both must be patched
+ * together. Older single bundles keep going through writeSessionMemory.
+ */
+export const writeSessionMemoryModules = (
+  modules: Map<string, string>
+): Map<string, string> | null => {
+  const entries = [...modules];
+  const extractor = entries.find(([, c]) =>
+    c.includes('querySource:"extract_memories",forkLabel:"extract_memories"')
+  );
+  const mode = entries.find(([, c]) => EXTRACT_MODE_PATTERN.test(c));
+
+  if (!extractor || !mode || extractor[0] === mode[0]) {
+    for (const [name, content] of entries) {
+      if (
+        !content.includes('tengu_session_memory') &&
+        content !== extractor?.[1]
+      )
+        continue;
+      const result = writeSessionMemory(content);
+      if (result !== null) return new Map([[name, result]]);
+    }
+    return null;
+  }
+
+  const extractorFile = patchExtraction(extractor[1]);
+  const modeFile = patchExtractMode(mode[1]);
+  if (!extractorFile || !modeFile) return null;
+
+  return new Map([
+    [
+      extractor[0],
+      patchUpdateThresholds(extractorFile, false) ?? extractorFile,
+    ],
+    [mode[0], modeFile],
+  ]);
 };
