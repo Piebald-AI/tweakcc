@@ -1,5 +1,6 @@
 // Please see the note about writing patches in ./index
 import {
+  escapeNonAscii,
   findBoxComponent,
   findChalkVar,
   findTextComponent,
@@ -117,22 +118,56 @@ import { UserMessageDisplayConfig } from '../types';
  *    return $;
  *  }
  *  ```
+ *
+ * CC 2.1.295 (chunk-88x0yy2z.js; Text `n`, Box `s` and jsx `e` are local import
+ * aliases, chalk is not in scope, and `Z` may be a truncated {head,hiddenLines,tail}):
+ * ```diff
+ *  const z=l?1:0,re=q?void 0:"userMessageBackground",X=q?0:1,me=q?h:void 0;let ce;
+ * -if(K[13]!==B||...)ce=e(VLt,{text:Z,useBriefLayout:q,timestamp:me,awaitingModel:B}),...
+ * +if(K[13]!==B||...)ce=e(s,{children:e(n,{color:"rgb(..)",bold:!0,children:`format ${Z}`})}),...
+ *  ```
  */
+
+/**
+ * Most frequently used first argument of `jsx(X,{prop:` calls. CC >=2.1.280
+ * chunks import Ink's Text/Box under per-chunk aliases and do not define them.
+ */
+const mostUsedComponent = (file: string, pattern: RegExp): string | undefined =>
+  Object.entries(
+    Array.from(file.matchAll(pattern)).reduce<Record<string, number>>(
+      (counts, m) => ({ ...counts, [m[1]]: (counts[m[1]] ?? 0) + 1 }),
+      {}
+    )
+  ).sort((a, b) => b[1] - a[1])[0]?.[0];
 
 export const writeUserMessageDisplay = (
   oldFile: string,
   config: UserMessageDisplayConfig
 ): string | null => {
-  const textComponent = findTextComponent(oldFile);
+  // CC >=2.1.280 runs this on every chunk; only one renders user prompts.
+  if (!oldFile.includes('No content found in user prompt message')) {
+    return null;
+  }
+
+  const isChunk = oldFile.includes('from"/$bunfs/root/');
+  const textComponent = isChunk
+    ? mostUsedComponent(
+        oldFile,
+        /[(,]([$\w]+),\{(?:dimColor|color|bold|wrap):/g
+      )
+    : findTextComponent(oldFile);
   if (!textComponent) {
     console.error('patch: userMessageDisplay: failed to find Text component');
     return null;
   }
 
-  const boxComponent = findBoxComponent(oldFile);
+  const boxComponent = isChunk
+    ? mostUsedComponent(oldFile, /[(,]([$\w]+),\{flexDirection:/g)
+    : findBoxComponent(oldFile);
 
-  const chalkVar = findChalkVar(oldFile);
-  if (!chalkVar) {
+  // Chunks have no chalk in scope; style through Text props there instead.
+  const chalkVar = isChunk ? undefined : findChalkVar(oldFile);
+  if (!isChunk && !chalkVar) {
     console.error('patch: userMessageDisplay: failed to find chalk variable');
     return null;
   }
@@ -149,11 +184,12 @@ export const writeUserMessageDisplay = (
     /(No content found in user prompt message.{0,50}?\b)(([$\w]+(?:\.default)?)\.createElement\([$\w]+,\{flexDirection:"column"[^}]*\},([$\w]+(?:\.default)?\.createElement)\([$\w]+,\{text:([$\w]+)[^}]*\}\)\))/;
 
   // CC 2.1.138: child display is memoized before the parent Box call.
+  // CC 2.1.295 adds `awaitingModel` and calls the jsx runtime via a bare alias.
   // Replace only the child assignment so React compiler cache bookkeeping remains intact.
   // CC >=2.1.x renders via the JSX automatic runtime, so the assignment is
   // `B=X.jsx(SUB,{text:VAR,...})` rather than `B=X.createElement(SUB,{text:VAR,...})`.
   const memoizedChildPattern =
-    /(No content found in user prompt message.{0,1200}?)([$\w]+)=([$\w]+(?:\.default)?\.(?:createElement|jsxs?))\([$\w]+,\{text:([$\w]+),useBriefLayout:[$\w]+,timestamp:[$\w]+\}\)/;
+    /(No content found in user prompt message.{0,1200}?)([$\w]+)=([$\w]+(?:\.default)?\.(?:createElement|jsxs?)|[$\w]+)\([$\w]+,\{text:([$\w]+),useBriefLayout:[$\w]+,timestamp:[$\w]+(?:,awaitingModel:[$\w]+)?\}\)/;
 
   const oldMatch = oldFile.match(pattern);
   const newMatch = oldMatch ? null : oldFile.match(newPattern);
@@ -165,7 +201,7 @@ export const writeUserMessageDisplay = (
     console.error(
       'patch: userMessageDisplay: failed to find user message display pattern'
     );
-    return oldFile;
+    return null;
   }
 
   let createElementFn: string;
@@ -184,7 +220,9 @@ export const writeUserMessageDisplay = (
   } else {
     // Memoized child pattern (CC 2.1.138)
     createElementFn = match[3];
-    messageVar = match[4];
+    // CC 2.1.295 truncates long prompts to {head,hiddenLines,tail} before display.
+    const v = match[4];
+    messageVar = `(typeof ${v}=="object"?${v}.head+"\\n\\u2026 +"+${v}.hiddenLines+" lines\\n"+${v}.tail:${v})`;
   }
 
   const resolvedBoxComponent = localBoxComponent ?? boxComponent;
@@ -238,57 +276,74 @@ export const writeUserMessageDisplay = (
   const boxAttrsObjStr =
     boxAttrs.length > 0 ? `{${boxAttrs.join(',')}}` : 'null';
 
-  // Build chalk chain for custom colors and styling
-  let chalkChain = chalkVar;
-
-  // Only add color methods for custom (non-default, non-null) colors
-  if (config.foregroundColor !== 'default') {
-    const fgMatch = config.foregroundColor.match(/\d+/g);
-    if (fgMatch) {
-      chalkChain += `.rgb(${fgMatch.join(',')})`;
-    }
-  }
-
-  if (config.backgroundColor !== 'default' && config.backgroundColor !== null) {
-    const bgMatch = config.backgroundColor.match(/\d+/g);
-    if (bgMatch) {
-      chalkChain += `.bgRgb(${bgMatch.join(',')})`;
-    }
-  }
-
-  // Apply styling
-  if (config.styling.includes('bold')) chalkChain += '.bold';
-  if (config.styling.includes('italic')) chalkChain += '.italic';
-  if (config.styling.includes('underline')) chalkChain += '.underline';
-  if (config.styling.includes('strikethrough')) chalkChain += '.strikethrough';
-  if (config.styling.includes('inverse')) chalkChain += '.inverse';
+  // Custom (non-default, non-null) colors and styling
+  const rgb = (color: string) => color.match(/\d+/g)?.join(',');
+  const fg =
+    config.foregroundColor !== 'default'
+      ? rgb(config.foregroundColor)
+      : undefined;
+  const bg =
+    config.backgroundColor !== 'default' && config.backgroundColor !== null
+      ? rgb(config.backgroundColor)
+      : undefined;
+  const stylings = [
+    'bold',
+    'italic',
+    'underline',
+    'strikethrough',
+    'inverse',
+  ].filter(s => config.styling.includes(s));
 
   // Replace {} in format string with the message variable
   const formattedMessage =
-    '`' + config.format.replace(/\{\}/g, '${' + messageVar + '}') + '`';
+    '`' +
+    escapeNonAscii(config.format).replace(/\{\}/g, '${' + messageVar + '}') +
+    '`';
 
-  const chalkFormattedString = `${chalkChain}(${formattedMessage})`;
+  let textProps: string[] = [];
+  let textChild = formattedMessage;
+  if (chalkVar) {
+    const chalkChain =
+      chalkVar +
+      (fg ? `.rgb(${fg})` : '') +
+      (bg ? `.bgRgb(${bg})` : '') +
+      stylings.map(s => `.${s}`).join('');
+    textChild = `${chalkChain}(${formattedMessage})`;
+  } else {
+    textProps = [
+      ...(fg ? [`color:"rgb(${fg})"`] : []),
+      ...(bg ? [`backgroundColor:"rgb(${bg})"`] : []),
+      ...stylings.map(s => `${s}:!0`),
+    ];
+  }
 
-  // Build replacement: Box(border/padding) wrapping Text(chalk-formatted message).
+  // Build replacement: Box(border/padding) wrapping Text(styled message).
   const replacementPrefix = memoizedChildMatch ? `${match[2]}=` : '';
 
-  // CC's JSX automatic runtime (jsx/jsxs) passes children as a prop, and the
-  // captured call var has no `.createElement`, so emit jsx-convention calls
-  // there. Older bundles use the classic createElement(type, props, ...children).
-  const isJsxRuntime = /\.jsxs?$/.test(createElementFn);
+  // CC's JSX automatic runtime (jsx/jsxs, or a bare imported alias in chunks)
+  // passes children as a prop, so emit jsx-convention calls there. Older
+  // bundles use the classic createElement(type, props, ...children).
+  const isJsxRuntime =
+    /\.jsxs?$/.test(createElementFn) || !createElementFn.includes('.');
   let elementTree: string;
   if (isJsxRuntime) {
-    const textEl = `${createElementFn}(${textComponent},{children:${chalkFormattedString}})`;
+    const textEl = `${createElementFn}(${textComponent},{${[...textProps, `children:${textChild}`].join(',')}})`;
     const boxProps =
       boxAttrsObjStr === 'null'
         ? `{children:${textEl}}`
         : `${boxAttrsObjStr.slice(0, -1)},children:${textEl}}`;
     elementTree = `${createElementFn}(${resolvedBoxComponent},${boxProps})`;
   } else {
-    elementTree = `${createElementFn}(${resolvedBoxComponent},${boxAttrsObjStr},${createElementFn}(${textComponent},null,${chalkFormattedString}))`;
+    elementTree = `${createElementFn}(${resolvedBoxComponent},${boxAttrsObjStr},${createElementFn}(${textComponent},null,${textChild}))`;
   }
 
-  const replacement = match[1] + `${replacementPrefix}${elementTree}`;
+  // The parent Box paints the theme's userMessageBackground; keep it only for
+  // the 'default' background (null = none, custom = painted on the Text).
+  const prefix =
+    config.backgroundColor === 'default'
+      ? match[1]
+      : match[1].replace('"userMessageBackground"', 'void 0');
+  const replacement = prefix + `${replacementPrefix}${elementTree}`;
 
   const startIndex = match.index;
   const endIndex = startIndex + match[0].length;
