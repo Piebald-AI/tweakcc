@@ -14,6 +14,7 @@ import {
   PatchGroup,
   PatchId,
 } from './patches/index';
+import { isUserMessageDisplayCustomized } from './patches/userMessageDisplay';
 import { TweakccConfig } from './types';
 import { compareVersions } from './systemPromptSync';
 
@@ -177,7 +178,7 @@ export function isPatchEnabledByConfig(
     case 'mcp-batch-size':
       return !!misc?.mcpServerBatchSize;
     case 'user-message-display':
-      return !!config.settings.userMessageDisplay;
+      return isUserMessageDisplayCustomized(config.settings.userMessageDisplay);
     case 'input-pattern-highlighters':
       return !!(
         config.settings.inputPatternHighlighters &&

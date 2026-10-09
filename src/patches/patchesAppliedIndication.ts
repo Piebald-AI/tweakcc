@@ -7,6 +7,7 @@ import {
   getReactVar,
   showDiff,
 } from './index';
+import { findStartupBannerWrapper } from './hideStartupBanner';
 
 const VERSION_PATTERN = '}.VERSION} (Claude Code)';
 
@@ -46,7 +47,8 @@ const writeJsxHeader = (
   tweakccVersion: string,
   patchesApplies: string[],
   showTweakccVersion: boolean,
-  showPatchesApplied: boolean
+  showPatchesApplied: boolean,
+  hideStartupBanner: boolean
 ): string | null => {
   const hdrMatch = fileContents.match(
     /(?<![$\w.])([$\w]+)=([$\w]+(?:\.jsxs)?)\(([$\w]+),\{children:\[[$\w]+," ",\2\(\3,\{dimColor:!0,children:\["v",[$\w]+\]\}\)/
@@ -72,22 +74,54 @@ const writeJsxHeader = (
   const box = colMatch[1];
   const listIndex = versionIndex + colMatch.index + colMatch[0].length - 1;
 
+  const row = (mark: string, label: string) =>
+    `${jsxs}(${box},{children:[${jsxs}(${text},{color:"success",bold:!0,children:["┃ "]}),${jsxs}(${text},{${mark},children:[${label}]})]})`;
+  const listCode = `${jsxs}(${box},{flexDirection:"column",children:[${[
+    row('color:"success",bold:!0', '"✓ tweakcc patches are applied"'),
+    ...patchesApplies.map(item => row('dimColor:!0', `\`  * ${item}\``)),
+  ].join(',')}]})`;
+  const tweakccText = `${jsxs}(${text},{color:"#FF8400",bold:!0,children:["+ tweakcc v${tweakccVersion}"]})`;
+
+  // With the startup banner hidden (CC >=2.1.282 wrapper form) the card never
+  // renders, so show the indicator on its own lines next to the wrapper call:
+  //   _=!v&&e(sa,{})  ->  _=!v&&r(s,{flexDirection:"column",children:[e(sa,{}),IND]})
+  if (hideStartupBanner) {
+    const wrapper = findStartupBannerWrapper(fileContents);
+    const callMatch =
+      wrapper &&
+      fileContents.match(
+        new RegExp(
+          `(?<![$\\w.])[$\\w]+(?:\\.jsx)?\\(${escapeIdent(wrapper.name)},\\{\\}\\)`
+        )
+      );
+    if (callMatch && callMatch.index !== undefined) {
+      const parts = [
+        ...(showTweakccVersion ? [tweakccText] : []),
+        ...(showPatchesApplied ? [listCode] : []),
+      ];
+      const replacement = `${jsxs}(${box},{flexDirection:"column",children:[${callMatch[0]},${parts.join(',')}]})`;
+      const start = callMatch.index;
+      const end = start + callMatch[0].length;
+      const content =
+        fileContents.slice(0, start) + replacement + fileContents.slice(end);
+      showDiff(fileContents, content, replacement, start, end);
+      return content;
+    }
+    console.error(
+      'patch: patchesAppliedIndication: startup banner wrapper call not found; indicator stays in the (hidden) card'
+    );
+  }
+
   let content = fileContents;
   // Insert at the later index first so the earlier one stays valid.
   if (showPatchesApplied) {
-    const row = (mark: string, label: string) =>
-      `${jsxs}(${box},{children:[${jsxs}(${text},{color:"success",bold:!0,children:["┃ "]}),${jsxs}(${text},{${mark},children:[${label}]})]})`;
-    const rows = [
-      row('color:"success",bold:!0', '"✓ tweakcc patches are applied"'),
-      ...patchesApplies.map(item => row('dimColor:!0', `\`  * ${item}\``)),
-    ];
-    const listCode = `,${jsxs}(${box},{flexDirection:"column",children:[${rows.join(',')}]})`;
     const old = content;
-    content = content.slice(0, listIndex) + listCode + content.slice(listIndex);
-    showDiff(old, content, listCode, listIndex, listIndex);
+    content =
+      content.slice(0, listIndex) + ',' + listCode + content.slice(listIndex);
+    showDiff(old, content, ',' + listCode, listIndex, listIndex);
   }
   if (showTweakccVersion) {
-    const versionCode = `," ",${jsxs}(${text},{color:"#FF8400",bold:!0,children:["+ tweakcc v${tweakccVersion}"]})`;
+    const versionCode = `," ",${tweakccText}`;
     const old = content;
     content =
       content.slice(0, versionIndex) +
@@ -498,7 +532,8 @@ export const writePatchesAppliedIndication = (
   tweakccVersion: string,
   patchesApplies: string[],
   showTweakccVersion: boolean = true,
-  showPatchesApplied: boolean = true
+  showPatchesApplied: boolean = true,
+  hideStartupBanner: boolean = false
 ): string | null => {
   // PATCH 1: Version output modification. Code-split builds (CC >=2.1.280)
   // keep the version printers and the startup header in different modules, so
@@ -534,7 +569,8 @@ export const writePatchesAppliedIndication = (
       tweakccVersion,
       patchesApplies,
       showTweakccVersion,
-      showPatchesApplied
+      showPatchesApplied,
+      hideStartupBanner
     );
     if (jsxContent) return jsxContent;
   }

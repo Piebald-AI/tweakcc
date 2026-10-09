@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { PatchGroup } from './index';
 import { applyPatchImplementationsToGraph } from './nativeGraphDispatcher';
-import { writeUserMessageDisplay } from './userMessageDisplay';
+import {
+  isUserMessageDisplayCustomized,
+  writeUserMessageDisplay,
+} from './userMessageDisplay';
+import { isPatchEnabledByConfig } from '../applyPlan';
+import { DEFAULT_SETTINGS } from '../defaultSettings';
 import type { UserMessageDisplayConfig } from '../types';
 
 const config: UserMessageDisplayConfig = {
@@ -57,5 +62,29 @@ describe('writeUserMessageDisplay on CC 2.1.295', () => {
     expect(sources.get('/user.js')).toContain(
       're=q?void 0:"userMessageBackground"'
     );
+  });
+});
+
+describe('user-message-display enablement (#567)', () => {
+  const configWith = (userMessageDisplay: UserMessageDisplayConfig) => ({
+    ccVersion: '2.1.295',
+    lastModified: '',
+    changesApplied: false,
+    settings: { ...DEFAULT_SETTINGS, userMessageDisplay },
+  });
+
+  it('skips the patch for the default config so stock rendering is kept', () => {
+    const umd = { ...DEFAULT_SETTINGS.userMessageDisplay, styling: [] };
+    expect(isUserMessageDisplayCustomized(umd)).toBe(false);
+    expect(
+      isPatchEnabledByConfig('user-message-display', configWith(umd), '2.1.295')
+    ).toBe(false);
+  });
+
+  it('applies the patch once any field differs from the default', () => {
+    const umd = { ...DEFAULT_SETTINGS.userMessageDisplay, format: ' ❯ {} ' };
+    expect(
+      isPatchEnabledByConfig('user-message-display', configWith(umd), '2.1.295')
+    ).toBe(true);
   });
 });

@@ -50,7 +50,10 @@ import {
   writeThinkerSymbolWidthLocation,
 } from './thinkerSymbolWidth';
 import { writeThinkingVerbs } from './thinkingVerbs';
-import { writeUserMessageDisplay } from './userMessageDisplay';
+import {
+  isUserMessageDisplayCustomized,
+  writeUserMessageDisplay,
+} from './userMessageDisplay';
 import { writeInputPatternHighlighters } from './inputPatternHighlighters';
 import { writeVerboseProperty } from './verboseProperty';
 import { writeModelCustomizations } from './modelSelector';
@@ -678,7 +681,8 @@ export const buildPatchImplementations = (
           '4.3.3',
           legacyItems,
           showTweakccVersion,
-          showPatchesApplied
+          showPatchesApplied,
+          !!config.settings.misc?.hideStartupBanner
         ),
     },
     'model-customizations': {
@@ -881,7 +885,9 @@ export const buildPatchImplementations = (
     },
     'user-message-display': {
       fn: c => writeUserMessageDisplay(c, config.settings.userMessageDisplay!),
-      condition: !!config.settings.userMessageDisplay,
+      condition: isUserMessageDisplayCustomized(
+        config.settings.userMessageDisplay
+      ),
     },
     'input-pattern-highlighters': {
       fn: c =>
