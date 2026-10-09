@@ -635,3 +635,96 @@ describe('LSP native file sync detection', () => {
     expect(writeFixLspSupport(src)).toBe(src);
   });
 });
+
+describe('Claude Code 2.1.295 toolsets', () => {
+  // Fixtures trimmed from real Claude Code 2.1.295 chunks (catalog and store
+  // shapes are unchanged from 2.1.281).
+  const catalog =
+    'function AC(){return[]}var tP=(e,r)=>{return r},Y1r=3;function ept(e,r,n){let s=tP(e,n);return s}var K5={getAllBaseTools:AC,getTools:tP,assembleToolPool:ept};';
+  const store =
+    'class St{computeToolPool(h,M,E){let K={toolPermissionContext:h.toolPermissionContext,x:1};return{tools:M,k:K}}}';
+  const toolsets = [
+    { name: 'ro', allowedTools: ['Read', 'mcp__*'] },
+    { name: 'none', allowedTools: [] },
+    { name: 'all', allowedTools: '*' as const },
+  ];
+
+  it('drops tools outside the toolset from the held declared-tool set', async () => {
+    const { writeToolsets } = await import('./toolsets');
+    // chunk-w00n4xbx: the set of tools already declared in the conversation.
+    const held =
+      'var ha="ToolSearch";class aye{names;recordedOnly;recordOrder;#e;constructor(e,n={only:new Map,order:[]}){this.names=n.names??[...e.map((o)=>o.name),...n.only.keys()],this.recordedOnly=n.only,this.recordOrder=n.order,this.#e=new Map(e.map((o)=>[o.name,o]))}has(e){return this.#e.has(e)||this.recordedOnly.has(e)}keeps(e){return this.has(e)&&e!==ha}toolFor(e){return this.#e.get(e)}}';
+    const { sources } = onGraph(
+      { '/catalog.js': catalog, '/store.js': store, '/held.js': held },
+      s => writeToolsets(s, toolsets, 'all')
+    );
+    const run = new Function(
+      `${sources.get('/catalog.js')};${sources.get('/store.js')};${sources.get('/held.js')};` +
+        'const names=["Read","Bash","mcp__x__y"],set=new aye(names.map(name=>({name}))),keeps=()=>names.filter(n=>set.keeps(n));' +
+        'new St().computeToolPool({toolPermissionContext:{mode:"default"}},[]);const all=keeps();' +
+        'globalThis.__tweakccToolset="ro";const ro=keeps();delete globalThis.__tweakccToolset;' +
+        'delete globalThis.__tweakccMainToolContext;return[all,ro]'
+    );
+    expect(run()).toEqual([
+      ['Read', 'Bash', 'mcp__x__y'],
+      ['Read', 'mcp__x__y'],
+    ]);
+  });
+
+  it('Shift+Tab drops the explicit /toolset choice so mode bindings apply', async () => {
+    const { writeToolsets } = await import('./toolsets');
+    // chunk-tjhhhqzz: the teammate branch, then the main-session mode cycle.
+    const cycle =
+      'function cyc(fq,dy){let kS=xBt(fq,void 0);i("tengu_mode_cycle",{to:d(kS),trigger:d("shift_tab")}),g("mode_switch");OV(`[${IF(dy)} on]`);if(i("tengu_mode_cycle",{to:d(dy),trigger:d("shift_tab")}),!Ka())g("mode_switch")}';
+    const { sources } = onGraph({ '/cycle.js': cycle }, s =>
+      writeToolsets(s, toolsets, 'all', null, 'ro')
+    );
+    const out = sources.get('/cycle.js')!;
+    expect(out.match(/__tweakccToolset=void 0/g)).toHaveLength(1);
+    const run = new Function(
+      'function xBt(){}function i(){}function d(){}function g(){}function OV(){}function IF(){}function Ka(){return!0}' +
+        `${out};globalThis.__tweakccToolset="ro";cyc({},"plan");return globalThis.__tweakccToolset`
+    );
+    expect(run()).toBeUndefined();
+
+    // Without mode bindings an explicit choice is kept across modes.
+    const unbound = onGraph({ '/cycle.js': cycle }, s =>
+      writeToolsets(s, toolsets, 'all')
+    );
+    expect(unbound.sources.get('/cycle.js')).toBe(cycle);
+  });
+
+  it('/toolset refreshes the permission context and honours a toolset named "none"', async () => {
+    const { writeToolsets } = await import('./toolsets');
+    const react =
+      'var K={H:null},us=function(e){return K.H.useState(e)},ce=function(t,n,r){var o,i={},a=null;if(n!=null)a=1;return{t,n,r}};export{us as useState,ce as createElement};';
+    const ui =
+      'function B(o){let q=w(4),x;return x.createElement("ink-box",o)}function T(o){let r=w(31),d;if(r[0]!==o)({color:d,backgroundColor:l,dimColor:m}=o);return d}function S(o){return o}export{B,T,S};';
+    const picker =
+      'import{S as Q}from"/ui.js";function P(){return e(Q,{options:a,onChange:b,visibleOptionCount:3})}';
+    const commands =
+      'var GBt=()=>({type:"local-jsx",name:"login",description:"x"});var list=[GBt(),WBt()];';
+    const { sources } = onGraph(
+      {
+        '/react.js': react,
+        '/ui.js': ui,
+        '/picker.js': picker,
+        '/cmds.js': commands,
+      },
+      s => writeToolsets(s, toolsets, 'all')
+    );
+    const run = new Function(
+      `function WBt(){}${sources.get('/cmds.js')};const cmd=list.find(c=>c?.name==="toolset");` +
+        'return(async()=>{const {call}=await cmd.load(),said=[],ctx0={mode:"default"};let state={toolPermissionContext:ctx0};' +
+        'const ctx={setAppState:f=>{state=f(state)}},done=m=>said.push(m);' +
+        'await call(done,ctx,"none");const picked=globalThis.__tweakccToolset,fresh=state.toolPermissionContext!==ctx0;' +
+        'await call(done,ctx,"default");return[picked,fresh,globalThis.__tweakccToolset,said]})()'
+    );
+    expect(await run()).toEqual([
+      'none',
+      true,
+      undefined,
+      ['Toolset changed to none.', 'Toolset cleared; using the mode default.'],
+    ]);
+  });
+});
