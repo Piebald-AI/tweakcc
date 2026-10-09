@@ -107,6 +107,12 @@ export interface InputBoxConfig {
 
 export type TableFormat = 'default' | 'ascii' | 'clean' | 'clean-top-bottom';
 
+export interface ShimmerConfig {
+  enabled: boolean;
+  stepMs: number | null; // null = CC default (50ms requesting, 200ms otherwise)
+  width: number | null; // null = CC default (3 cells)
+}
+
 export interface MiscConfig {
   showTweakccVersion: boolean;
   showPatchesApplied: boolean;
@@ -140,6 +146,7 @@ export interface MiscConfig {
   enableVoiceConciseOutput: boolean;
   enableChannelsMode: boolean;
   preventUpdateToUnsupportedVersions: boolean;
+  shimmer: ShimmerConfig;
 }
 
 export interface InputPatternHighlighter {

@@ -88,6 +88,7 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
+import { isShimmerCustomized, writeShimmerStyle } from './shimmerStyle';
 import {
   applyPatchImplementationsToGraph,
   changedModuleSources,
@@ -493,6 +494,12 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Enable MCP channel notifications (--channels without allowlist or dev flag)',
+  },
+  {
+    id: 'shimmer-style',
+    name: 'Shimmer style',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Spinner message shimmer will be toggled, sped up, or widened',
   },
   {
     id: 'prevent-unsupported-updates',
@@ -920,6 +927,10 @@ export const buildPatchImplementations = (
     'channels-mode': {
       fn: c => writeChannelsMode(c),
       condition: !!config.settings.misc?.enableChannelsMode,
+    },
+    'shimmer-style': {
+      fn: c => writeShimmerStyle(c, config.settings.misc!.shimmer),
+      condition: isShimmerCustomized(config.settings.misc?.shimmer),
     },
     // npm monolith only. Native builds spread the updater over several
     // modules; applyCustomization patches the whole module graph at once.

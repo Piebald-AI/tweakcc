@@ -15,6 +15,7 @@ import {
   PatchId,
 } from './patches/index';
 import { isUserMessageDisplayCustomized } from './patches/userMessageDisplay';
+import { isShimmerCustomized } from './patches/shimmerStyle';
 import { TweakccConfig } from './types';
 import { compareVersions } from './systemPromptSync';
 
@@ -193,6 +194,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.enableVoiceMode;
     case 'channels-mode':
       return !!misc?.enableChannelsMode;
+    case 'shimmer-style':
+      return isShimmerCustomized(misc?.shimmer);
     case 'prevent-unsupported-updates':
       return !!misc?.preventUpdateToUnsupportedVersions;
     default:

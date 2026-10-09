@@ -722,6 +722,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
     preventUpdateToUnsupportedVersions: false,
+    shimmer: { enabled: true, stepMs: null, width: null },
   },
   toolsets: [],
   defaultToolset: null,
