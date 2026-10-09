@@ -47,4 +47,20 @@ describe('writeSuppressRateLimitOptions', () => {
   it('returns null when no call site is present', () => {
     expect(writeSuppressRateLimitOptions('no relevant content')).toBeNull();
   });
+
+  it('nulls the CC 2.1.295 context-object opener but not the memo deps', () => {
+    // Real CC 2.1.295 excerpt (chunk-7ytk1pm2): the message row reads the
+    // opener from the prompt host; the memo cache compares the same member.
+    const input =
+      'if(ue[205]!==D?.armRateLimitAutoContinue||ue[206]!==D?.openRateLimitOptions)xx=(Ln,Un)=>e(Ns,{' +
+      'sToolUseIDs:h,streamingToolUseIDs:jl,screen:C,canAnimate:Tp,onOpenRateLimitOptions:D?.openRateLimitOptions,onRateLimitAutoQueueContinue:D?.armRateLimitAutoContinue,latestBashOutput' +
+      '},Mx);ue[206]=D?.openRateLimitOptions,ue[209]=xx;';
+    const result = writeSuppressRateLimitOptions(input);
+    expect(result).not.toBeNull();
+    expect(result).toContain(
+      'canAnimate:Tp,onOpenRateLimitOptions:()=>{},onRateLimitAutoQueueContinue:D?.armRateLimitAutoContinue,'
+    );
+    expect(result).toContain('ue[206]!==D?.openRateLimitOptions)');
+    expect(result).toContain('ue[206]=D?.openRateLimitOptions,');
+  });
 });
