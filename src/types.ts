@@ -141,6 +141,7 @@ export interface MiscConfig {
   enableChannelsMode: boolean;
   disableCtrlZSuspend: boolean;
   preventUpdateToUnsupportedVersions: boolean;
+  webFetchUserAgent: string | null;
 }
 
 export interface InputPatternHighlighter {

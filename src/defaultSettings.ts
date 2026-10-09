@@ -723,6 +723,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableChannelsMode: false,
     disableCtrlZSuspend: false,
     preventUpdateToUnsupportedVersions: false,
+    webFetchUserAgent: null,
   },
   toolsets: [],
   defaultToolset: null,

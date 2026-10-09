@@ -197,6 +197,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.disableCtrlZSuspend;
     case 'prevent-unsupported-updates':
       return !!misc?.preventUpdateToUnsupportedVersions;
+    case 'webfetch-user-agent':
+      return !!misc?.webFetchUserAgent;
     default:
       // New PatchIds should get an explicit case above.
       return true;

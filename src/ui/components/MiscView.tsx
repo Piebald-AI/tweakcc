@@ -89,6 +89,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableChannelsMode: false,
     disableCtrlZSuspend: false,
     preventUpdateToUnsupportedVersions: false,
+    webFetchUserAgent: null as string | null,
   };
 
   const ensureMisc = () => {
@@ -701,6 +702,21 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.preventUpdateToUnsupportedVersions =
               !settings.misc!.preventUpdateToUnsupportedVersions;
+          });
+        },
+      },
+      {
+        id: 'webFetchUserAgent',
+        title: 'WebFetch User-Agent',
+        description:
+          'Set misc.webFetchUserAgent in config.json to replace the "Claude-User (...)" User-Agent WebFetch sends. Space resets to default.',
+        getValue: () => settings.misc?.webFetchUserAgent ?? null,
+        getDisplayValue: () =>
+          settings.misc?.webFetchUserAgent ?? 'Default (Claude-User)',
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.webFetchUserAgent = null;
           });
         },
       },
