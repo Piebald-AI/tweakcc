@@ -530,6 +530,13 @@ export const getAllPatchDefinitions = (): PatchDefinition[] => {
 /** Patch implementation with function and optional condition */
 interface PatchImplementation {
   fn: (content: string) => string | null;
+  /**
+   * Corpus-level variant for CC 2.1.280+ split bundles, used when a patch must
+   * read or edit more than one module (e.g. a component in one chunk and the
+   * slash-command list in another). Receives every JS module keyed by name and
+   * returns only the modules it changed, or null on failure.
+   */
+  modules?: (modules: Map<string, string>) => Map<string, string> | null;
   condition?: boolean;
 }
 
@@ -618,8 +625,35 @@ const applyPatchImplementations = (
       content = result;
     }
 
-    // If failed on entrypoint and we have a corpus, try each JS module
-    if (failed && corpus && moduleContents.size > 0) {
+    if (failed && corpus && moduleContents.size > 0 && impl.modules) {
+      const jsModules = corpus.modules.filter(m => m.isJavaScript);
+      const byName = new Map<string, string>();
+      for (const mod of jsModules) {
+        byName.set(
+          mod.name,
+          moduleContents.get(mod.index) ?? nativeSource(mod)
+        );
+      }
+      let changed: Map<string, string> | null = null;
+      try {
+        changed = impl.modules(byName);
+      } catch (e) {
+        debug(`patch: ${def.id}: corpus patch threw: ${e}`);
+      }
+      if (changed && changed.size > 0) {
+        for (const mod of jsModules) {
+          const next = changed.get(mod.name);
+          if (next !== undefined && next !== byName.get(mod.name)) {
+            debug(
+              `patch: ${def.id}: modified module ${mod.index} (${mod.name})`
+            );
+            moduleContents.set(mod.index, next);
+          }
+        }
+        failed = false;
+        applied = true;
+      }
+    } else if (failed && corpus && moduleContents.size > 0) {
       const jsModules = corpus.modules.filter(m => m.isJavaScript);
 
       for (const mod of jsModules) {
