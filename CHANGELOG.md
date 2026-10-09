@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Verify native update-guard source decoding for Bun's UTF-8, Latin-1, and UTF-16LE encodings (#408) - @mike1858
 - Preserve build-specific hook worker paths and capture the directory-sync formatter in 2.1.282 prompts (#1012) - @mike1858
 - Support code-split native builds (Claude Code 2.1.2xx) and fix patches for Claude Code 2.1.281-2.1.288 (#1023) - @basekevin
+- Keep `\\`, `\"` and `\'` in an edited quoted system prompt meaning what they meant in Claude Code, and decode quote escapes in the template text of prompts with interpolations (#922)
+- Skip a system prompt whose edited `${...}` names an undefined variable or no longer parses, instead of leaving Claude Code unable to answer or refusing the whole apply (#872)
+- Document which main-prompt parts the lean prompt leaves out, and `CLAUDE_CODE_SIMPLE_SYSTEM_PROMPT=0` (#526)
 
 ## [v4.3.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.3) - 2026-08-13
 

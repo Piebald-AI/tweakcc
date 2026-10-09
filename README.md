@@ -671,6 +671,9 @@ When tweakcc starts up, it downloads a list of system prompt parts for your Clau
 
 :star: **To customize any part of the system prompt,** simply edit the markdown files in `~/.tweakcc/system-prompts` (or `$XDG_CONFIG_HOME/tweakcc/system-prompts`) and then run `npx tweakcc --apply`.
 
+> [!note]
+> Claude Code does not send every part to every model. On recent models it uses a short "lean" main prompt: the `Harness instructions` part replaces the `System section`, `Doing tasks`, `Executing actions with care`, `Tone and style` and `Communication style` parts, so edits to those have no effect there. To get the full main prompt back, start Claude Code with `CLAUDE_CODE_SIMPLE_SYSTEM_PROMPT=0`.
+
 #### What happens when Anthropic changes the prompts?
 
 When your Claude Code installation is updated, tweakcc will automatically update all of your markdown files that correspond to parts of the system prompt that were changed in the new version, unless you've modified any of them. But if you _did_ modify ones that Anthropic has also modified, then tweakcc will leave the ones you modified unchanged, and rely on you to resolve the conflict.

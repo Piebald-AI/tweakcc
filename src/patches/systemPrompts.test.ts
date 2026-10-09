@@ -201,7 +201,7 @@ describe('systemPrompts.ts', () => {
       expect(result.newContent).toBe('msg:"Say \\"Hello\\""');
     });
 
-    it('should escape backslashes before quotes to preserve literal backslash-quotes (#660)', async () => {
+    it('should keep an escaped quote escaped, so the literal stays valid (#660) and means what the bundle meant (#922)', async () => {
       const mockPromptData = buildMockPromptData({
         content: 'Say \\"Hello\\"',
         regex: 'Say \\\\"Hello\\\\"',
@@ -215,7 +215,7 @@ describe('systemPrompts.ts', () => {
 
       const result = await applySystemPrompts(cliContent, '1.0.0', false);
 
-      expect(result.newContent).toBe('msg:"Say \\\\\\"Hello\\\\\\""');
+      expect(result.newContent).toBe(cliContent);
     });
 
     it('should escape non-ASCII after doubling backslashes so the \\uXXXX is not itself double-escaped (#920)', async () => {
@@ -408,7 +408,7 @@ describe('systemPrompts.ts', () => {
       expect(result.newContent).not.toContain('STALE_UPKEEP_FLAG');
       expect(result.results).toHaveLength(1);
       expect(result.results[0].applied).toBe(false);
-      expect(result.results[0].details).toMatch(/stale identifier/i);
+      expect(result.results[0].details).toMatch(/undefined identifier/i);
       expect(result.results[0].details).toContain('STALE_UPKEEP_FLAG');
     });
 
@@ -475,6 +475,70 @@ describe('systemPrompts.ts', () => {
       expect(result.newContent).toBe(cliContent);
       expect(result.results[0].applied).toBe(false);
       expect(result.results[0].details).toContain('TOOLS');
+    });
+
+    it('should skip an edit whose interpolation names an undefined lowercase variable (#872)', async () => {
+      // `${oops}` parses, so the parse gate passes it, but Claude Code then
+      // throws "oops is not defined" on every turn and cannot answer.
+      setupMocks(
+        buildMockPromptData({
+          promptId: 'typo-lowercase',
+          regex: 'Memory \\$\\{([\\w$]+)\\} tail',
+          getInterpolatedContent: () => 'Memory ${Q1} ${oops} tail',
+          pieces: ['Memory ${', '} tail'],
+          identifiers: [1],
+          identifierMap: { '1': 'MEMORY_DIR' },
+        })
+      );
+      const cliContent = 'desc:`Memory ${Q1} tail`';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe(cliContent);
+      expect(result.results[0].applied).toBe(false);
+      expect(result.results[0].details).toBe('undefined identifier: oops');
+    });
+
+    it('should skip only an edit that no longer parses, naming the prompt (#872)', async () => {
+      setupMocks(
+        buildMockPromptData({
+          promptId: 'syntax-error',
+          regex: 'Memory \\$\\{([\\w$]+)\\} tail',
+          getInterpolatedContent: () => 'Memory ${Q1} ${Q1 Q1} tail',
+          pieces: ['Memory ${', '} tail'],
+          identifiers: [1],
+          identifierMap: { '1': 'MEMORY_DIR' },
+        })
+      );
+      const cliContent = 'desc:`Memory ${Q1} tail`';
+
+      const result = await applySystemPrompts(cliContent, '1.0.0', false);
+
+      expect(result.newContent).toBe(cliContent);
+      expect(result.results[0].applied).toBe(false);
+      expect(result.results[0].details).toBe('edited prompt does not parse');
+    });
+
+    it('should accept new interpolation code that uses globals, arrow parameters and properties', async () => {
+      setupMocks(
+        buildMockPromptData({
+          promptId: 'new-code',
+          regex: 'List \\$\\{([\\w$]+)\\} end',
+          getInterpolatedContent: () =>
+            'List ${Q1.map((x, i) => JSON.stringify(x) + i).join(", ")} end',
+          pieces: ['List ${', '} end'],
+          identifiers: [1],
+          identifierMap: { '1': 'ITEMS' },
+        })
+      );
+
+      const result = await applySystemPrompts(
+        'desc:`List ${Q1} end`',
+        '1.0.0',
+        false
+      );
+
+      expect(result.results[0].applied).toBe(true);
     });
 
     it('should apply normally when an ALL-CAPS interpolation identifier is present in the bundle match (no false positive)', async () => {
@@ -704,7 +768,7 @@ describe('systemPrompts.ts', () => {
       expect(result.newContent).toBe("msg:'It\\'s working'");
     });
 
-    it('should escape backslashes before single quotes to preserve literal backslash-quotes (#660)', async () => {
+    it('should keep an escaped single quote escaped (#660, #922)', async () => {
       const mockPromptData = buildMockPromptData({
         content: "It\\'s working",
         regex: "It\\\\'s working",
@@ -718,7 +782,7 @@ describe('systemPrompts.ts', () => {
 
       const result = await applySystemPrompts(cliContent, '1.0.0', false);
 
-      expect(result.newContent).toBe("msg:'It\\\\\\'s working'");
+      expect(result.newContent).toBe(cliContent);
     });
 
     it('should set applied:true when auto-escape changes content even if char delta is 0', async () => {
@@ -945,21 +1009,21 @@ describe('systemPrompts.ts', () => {
       expect(newContent).toBe('x:`Use \\`foo\\``');
     });
 
-    it('still doubles backslashes for single-quoted (#660) prompts', async () => {
+    it('still doubles a literal backslash for single-quoted (#660) prompts', async () => {
       setupMocks(
         buildMockPromptData({
-          content: "It\\'s working",
-          regex: "It\\\\'s working",
-          getInterpolatedContent: () => "It\\'s working",
-          pieces: ["It\\'s working"],
+          content: 'C:\\temp',
+          regex: 'C:\\\\\\\\temp',
+          getInterpolatedContent: () => 'C:\\temp',
+          pieces: ['C:\\\\temp'],
         })
       );
       const result = await applySystemPrompts(
-        "msg:'It\\'s working'",
+        "msg:'C:\\\\temp'",
         '1.0.0',
         false
       );
-      expect(result.newContent).toBe("msg:'It\\\\\\'s working'");
+      expect(result.newContent).toBe("msg:'C:\\\\temp'");
     });
 
     it('emits a template literal that evaluates back to the intended prompt text', async () => {
@@ -1092,16 +1156,30 @@ describe('systemPrompts.ts', () => {
 
     it('leaves the escaping path intact for a customized prompt', async () => {
       // The skip is keyed on "the user changed nothing", so any real edit must
-      // still go through delimiter escaping. (That escaping is still not an
-      // exact inverse of the .md's hybrid encoding, which is why the doubled
-      // backslash below survives — the remaining half of #922.)
+      // still go through delimiter escaping.
       const { newContent, cliContent } = await applyQuoted(
         'use A\\\\Client;',
         '"',
         baseline => baseline + ' EDITED'
       );
       expect(newContent).not.toBe(cliContent);
-      expect(newContent).toBe('x:"use A\\\\\\\\Client; EDITED"');
+      expect(newContent).toBe('x:"use A\\\\Client; EDITED"');
+    });
+
+    it('keeps the meaning of escapes in an edited quoted prompt (#922)', async () => {
+      // From 2.1.295's Artifact REPL description (a double-quoted literal) and
+      // a 2.1.221 quoted data prompt with inert `${...}` text.
+      const source =
+        'escapes inside a string (\\"\\\\u2764\\\\uFE0F\\"), \\"pkg\\" ${VERSION}';
+      const { newContent } = await applyQuoted(
+        source,
+        '"',
+        baseline => baseline.replace('pkg', 'pkg2') + ' C:\\temp'
+      );
+      const evaluate = (literal: string) => new Function(`return ${literal}`)();
+      expect(evaluate(newContent.slice(2))).toBe(
+        evaluate('"' + source + '"').replace('pkg', 'pkg2') + ' C:\\temp'
+      );
     });
 
     it('reports an uncustomized prompt as unchanged rather than applied', async () => {
