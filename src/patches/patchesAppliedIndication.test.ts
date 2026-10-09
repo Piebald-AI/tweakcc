@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { writePatchesAppliedIndication } from './patchesAppliedIndication';
 import { applyPatchImplementationsToGraph } from './nativeGraphDispatcher';
 import { PatchGroup } from './index';
+import { writeHideStartupBanner } from './hideStartupBanner';
 
 vi.spyOn(console, 'error').mockImplementation(() => {});
 vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -22,6 +23,21 @@ const HEADER_295 =
   ':[We," \\xB7 "]}),e(Mu,{status:ie})]}):We&&e(n,{dimColor:!0,children:We}),u[20]=We,u[21]=ie' +
   ',u[22]=mt;else mt=u[22];let Xe;if(u[23]!==it||u[24]!==mt||u[25]!==Ye)Xe=r(s,{flexDirection' +
   ':"column",children:[Ye,it,mt]}),u[23]=it,u[24]=mt,u[25]=Ye,u[26]=Xe;else Xe=u[26];';
+
+// CC 2.1.295 chunk-7ytk1pm2.js startup banner wrapper (sa) and its call site in Gse (trimmed).
+const BANNER_WRAPPER_295 =
+  'function sa(){let f=w(16),{storageV5:l}=Ce(),u=ss(),m=wt(),h;if(f[0]!==u||f[1]!==m)h=()=>!m||SU' +
+  '(u)||Lt()||J_()!==void 0,f[0]=u,f[1]=m,f[2]=h;else h=f[2];let[v]=y(h),T;if(f[3]!==v)T=()=>v||a.' +
+  'DEMO_VERSION?null:ku(),f[3]=v,f[4]=T;else T=f[4];let[C]=y(T),_,D;if(f[5]!==v||f[6]!==l)_=()=>{i' +
+  'f(v||!mo(ce().lastReleaseNotesSeen)){return}Ae(DM,l)},D=[v,l],f[5]=v,f[6]=l,f[7]=_,f[8]=D;else ' +
+  '_=f[7],D=f[8];P(_,D);const A=!v;let L;if(f[9]!==A)L=e(na,{oneShotsAllowed:A}),f[9]=A,f[10]=L;el' +
+  'se L=f[10];let O;if(f[11]!==C)O=C&&r(s,{paddingLeft:2,flexDirection:"column",children:[e(n,{bol' +
+  'd:!0,children:C}),r(n,{dimColor:!0,children:[e(jt,{url:g3n,children:hBr})," for details"]})]}),' +
+  'f[11]=C,f[12]=O;else O=f[12];let H;if(f[13]!==L||f[14]!==O)H=r(Y,{children:[L,O,!1]}),f[13]=L,f' +
+  '[14]=O,f[15]=H;else H=f[15];return H}';
+const BANNER_CALL_295 =
+  'var Gse=wm(function(u){let C=w(11),{latchAnnouncementSlot:m,hideWelcomeChrome:f}=u,v=f===void 0' +
+  '?!1:f,_;if(C[0]!==v)_=!v&&e(sa,{}),C[0]=v,C[1]=_;else _=C[1];return _});';
 
 // CC 2.1.295 chunk-2bt2v8q0.js background-agents header: must not be touched.
 const BG_HEADER_295 =
@@ -110,5 +126,28 @@ describe('patchesAppliedIndication', () => {
     expect(result).toContain(
       'children:[WTc,qTc,VTc,zy.jsxs(R,{flexDirection:"column",children:[zy.jsxs(R,{children:[zy.jsxs(v,{color:"success"'
     );
+  });
+
+  it('renders the indicator on its own lines when the startup banner is hidden (#291)', () => {
+    const module = HEADER_295 + BANNER_WRAPPER_295 + BANNER_CALL_295;
+    const patched = writeHideStartupBanner(
+      writePatchesAppliedIndication(
+        module,
+        '4.3.3',
+        ['Foo: bar'],
+        true,
+        true,
+        true
+      )!
+    )!;
+    expect(patched).toContain('function sa(){return null;');
+    expect(patched).toContain(
+      '_=!v&&r(s,{flexDirection:"column",children:[e(sa,{}),r(n,{color:"#FF8400",bold:!0,children:["+ tweakcc v4.3.3"]}),r(s,{flexDirection:"column",children:[r(s,{children:[r(n,{color:"success",bold:!0,children:["┃ "]}),r(n,{color:"success",bold:!0,children:["✓ tweakcc patches are applied"]})]})'
+    );
+    // The hidden card is left alone.
+    expect(patched).toContain(
+      'Xe=r(s,{flexDirection:"column",children:[Ye,it,mt]})'
+    );
+    expect(() => new Function(patched)).not.toThrow();
   });
 });
