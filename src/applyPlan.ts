@@ -192,6 +192,10 @@ export function isPatchEnabledByConfig(
       return !!misc?.enableVoiceMode;
     case 'channels-mode':
       return !!misc?.enableChannelsMode;
+    case 'skip-dev-channels-dialog':
+      return !!misc?.skipDevChannelsDialog;
+    case 'skip-trust-dialog':
+      return !!misc?.skipTrustDialog;
     case 'prevent-unsupported-updates':
       return !!misc?.preventUpdateToUnsupportedVersions;
     default:
