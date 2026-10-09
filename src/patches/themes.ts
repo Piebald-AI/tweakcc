@@ -1,13 +1,16 @@
 // Please see the note about writing patches in ./index
 
 import { Theme } from '../types';
+import { isGraphContextActive } from './graphContext';
 import { LocationResult, showDiff } from './index';
 
-function getThemesLocation(oldFile: string): {
-  switchStatement: LocationResult;
-  objArr: LocationResult;
-  obj: LocationResult;
-} | null {
+type ThemesLocation = {
+  switchStatement: LocationResult | null;
+  objArr: LocationResult | null;
+  obj: LocationResult | null;
+};
+
+function findSwitchStatement(oldFile: string): LocationResult | null {
   // === Switch Statement ===
   // CC >=2.1.83: switch(A){case"light":return LX9;...default:return CX9}
   // CC <2.1.83: switch(A){case"light":return{...};...}
@@ -69,6 +72,14 @@ function getThemesLocation(oldFile: string): {
     return null;
   }
 
+  return {
+    startIndex: switchStart,
+    endIndex: switchEnd,
+    identifiers: [switchIdent],
+  };
+}
+
+function findObjArr(oldFile: string): LocationResult | null {
   // === Theme Options Array ===
   // Old form (CC ≤2.1.138): inline array literal
   //   [{label:"Dark mode",value:"dark"},{label:"Light mode",value:"light"},...]
@@ -115,6 +126,16 @@ function getThemesLocation(oldFile: string): {
     objArrTrailingSpreads = arrayMatch[1];
   }
 
+  return {
+    startIndex: objArrStart,
+    endIndex: objArrEnd,
+    // Stash the trailing `,...spread,...spread` so the writer can preserve it
+    // (only present in the new var-collected form; empty string for old form).
+    identifiers: [objArrTrailingSpreads],
+  };
+}
+
+function findNameObject(oldFile: string): LocationResult | null {
   // === Theme Name Mapping Object ===
   // {dark:"Dark mode",...} or {"dark":"Dark mode",...}
   const objPat =
@@ -127,26 +148,35 @@ function getThemesLocation(oldFile: string): {
   }
 
   return {
-    switchStatement: {
-      startIndex: switchStart,
-      endIndex: switchEnd,
-      identifiers: [switchIdent],
-    },
-    objArr: {
-      startIndex: objArrStart,
-      endIndex: objArrEnd,
-      // Stash the trailing `,...spread,...spread` so the writer can preserve it
-      // (only present in the new var-collected form; empty string for old form).
-      identifiers: [objArrTrailingSpreads],
-    },
-    obj: {
-      startIndex: objMatch.index,
-      endIndex: objMatch.index + objMatch[0].length,
-    },
+    startIndex: objMatch.index,
+    endIndex: objMatch.index + objMatch[0].length,
+    // `return` or `X=` — the replacement must keep whichever form it was.
+    identifiers: [objMatch[0].slice(0, objMatch[0].indexOf('{'))],
   };
 }
 
-function patchThemeSchema(file: string, themes: Theme[]): string {
+/**
+ * Finds the three theme sites. A single-file bundle must contain all three.
+ * Code-split native builds (CC 2.1.2xx) put the colour switch, the /theme
+ * picker options and the id→name map in three different modules, so on a
+ * module graph each module patches whichever sites it contains.
+ */
+function getThemesLocation(oldFile: string): ThemesLocation | null {
+  const location: ThemesLocation = {
+    switchStatement: findSwitchStatement(oldFile),
+    objArr: findObjArr(oldFile),
+    obj: findNameObject(oldFile),
+  };
+  const found = Object.values(location).filter(Boolean).length;
+  if (found === 3 || (found > 0 && isGraphContextActive())) return location;
+  return null;
+}
+
+function patchThemeSchema(
+  file: string,
+  themes: Theme[],
+  quiet = false
+): string {
   if (themes.length === 0) return file;
 
   const customStr = themes.map(t => `"${t.id}"`).join(',');
@@ -154,9 +184,11 @@ function patchThemeSchema(file: string, themes: Theme[]): string {
   const anchor = '"dark","light","light-daltonized","dark-daltonized"';
   const anchorIdx = file.indexOf(anchor);
   if (anchorIdx === -1) {
-    console.warn(
-      'patch: themes: settings schema enum not found — custom theme IDs may be flagged invalid in settings.json'
-    );
+    // On a module graph the enum is normally in a different module.
+    if (!quiet)
+      console.warn(
+        'patch: themes: settings schema enum not found — custom theme IDs may be flagged invalid in settings.json'
+      );
     return file;
   }
 
@@ -177,6 +209,11 @@ export const writeThemes = (
 ): string | null => {
   const locations = getThemesLocation(oldFile);
   if (!locations) {
+    // On a module graph the settings-schema enum lives in its own module.
+    if (isGraphContextActive() && themes.length > 0) {
+      const withSchema = patchThemeSchema(oldFile, themes, true);
+      return withSchema === oldFile ? null : withSchema;
+    }
     return null;
   }
 
@@ -189,67 +226,73 @@ export const writeThemes = (
   // Process in reverse order to avoid index shifting
 
   // Update theme mapping object (obj)
-  const obj =
-    'return' +
-    JSON.stringify(
-      Object.fromEntries(themes.map(theme => [theme.id, theme.name]))
+  if (locations.obj) {
+    const obj =
+      (locations.obj.identifiers?.[0] ?? 'return') +
+      JSON.stringify(
+        Object.fromEntries(themes.map(theme => [theme.id, theme.name]))
+      );
+    newFile =
+      newFile.slice(0, locations.obj.startIndex) +
+      obj +
+      newFile.slice(locations.obj.endIndex);
+    showDiff(
+      oldFile,
+      newFile,
+      obj,
+      locations.obj.startIndex,
+      locations.obj.endIndex
     );
-  newFile =
-    newFile.slice(0, locations.obj.startIndex) +
-    obj +
-    newFile.slice(locations.obj.endIndex);
-  showDiff(
-    oldFile,
-    newFile,
-    obj,
-    locations.obj.startIndex,
-    locations.obj.endIndex
-  );
-  oldFile = newFile;
+    oldFile = newFile;
+  }
 
   // Update theme options array (objArr).
   // For 2.1.140+ var-collected form, preserve trailing `,...m.map(...),...mH`
   // spreads so users can still add custom themes through CC's UI.
-  const trailingSpreads = locations.objArr.identifiers?.[0] ?? '';
-  const objArrInner = themes
-    .map(theme => JSON.stringify({ label: theme.name, value: theme.id }))
-    .join(',');
-  const objArr = `[${objArrInner}${trailingSpreads}]`;
-  newFile =
-    newFile.slice(0, locations.objArr.startIndex) +
-    objArr +
-    newFile.slice(locations.objArr.endIndex);
-  showDiff(
-    oldFile,
-    newFile,
-    objArr,
-    locations.objArr.startIndex,
-    locations.objArr.endIndex
-  );
-  oldFile = newFile;
+  if (locations.objArr) {
+    const trailingSpreads = locations.objArr.identifiers?.[0] ?? '';
+    const objArrInner = themes
+      .map(theme => JSON.stringify({ label: theme.name, value: theme.id }))
+      .join(',');
+    const objArr = `[${objArrInner}${trailingSpreads}]`;
+    newFile =
+      newFile.slice(0, locations.objArr.startIndex) +
+      objArr +
+      newFile.slice(locations.objArr.endIndex);
+    showDiff(
+      oldFile,
+      newFile,
+      objArr,
+      locations.objArr.startIndex,
+      locations.objArr.endIndex
+    );
+    oldFile = newFile;
+  }
 
   // Update switch statement
-  let switchStatement = `switch(${locations.switchStatement.identifiers?.[0]}){\n`;
-  themes.forEach(theme => {
-    switchStatement += `case"${theme.id}":return${JSON.stringify(
-      theme.colors
-    )};\n`;
-  });
-  switchStatement += `default:return${JSON.stringify(themes[0].colors)};\n}`;
+  if (locations.switchStatement) {
+    let switchStatement = `switch(${locations.switchStatement.identifiers?.[0]}){\n`;
+    themes.forEach(theme => {
+      switchStatement += `case"${theme.id}":return${JSON.stringify(
+        theme.colors
+      )};\n`;
+    });
+    switchStatement += `default:return${JSON.stringify(themes[0].colors)};\n}`;
 
-  newFile =
-    newFile.slice(0, locations.switchStatement.startIndex) +
-    switchStatement +
-    newFile.slice(locations.switchStatement.endIndex);
-  showDiff(
-    oldFile,
-    newFile,
-    switchStatement,
-    locations.switchStatement.startIndex,
-    locations.switchStatement.endIndex
-  );
+    newFile =
+      newFile.slice(0, locations.switchStatement.startIndex) +
+      switchStatement +
+      newFile.slice(locations.switchStatement.endIndex);
+    showDiff(
+      oldFile,
+      newFile,
+      switchStatement,
+      locations.switchStatement.startIndex,
+      locations.switchStatement.endIndex
+    );
+  }
 
-  newFile = patchThemeSchema(newFile, themes);
+  newFile = patchThemeSchema(newFile, themes, isGraphContextActive());
 
   return newFile;
 };

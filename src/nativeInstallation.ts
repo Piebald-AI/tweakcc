@@ -160,8 +160,8 @@ const SIZEOF_STRING_POINTER = 8;
 // Module struct sizes vary by Bun version:
 // - Old format (pre-ESM bytecode, before Bun ~1.3.7): 4 StringPointers + 4 u8s = 36 bytes
 // - New format (ESM bytecode, Bun ~1.3.7+): 6 StringPointers + 4 u8s = 52 bytes
-const SIZEOF_MODULE_OLD = 4 * SIZEOF_STRING_POINTER + 4;
-const SIZEOF_MODULE_NEW = 6 * SIZEOF_STRING_POINTER + 4;
+const SIZEOF_MODULE_OLD: NativeBunModuleRecordSize = 36;
+const SIZEOF_MODULE_NEW: NativeBunModuleRecordSize = 52;
 
 // Types
 interface StringPointer {
@@ -188,6 +188,33 @@ interface BunModule {
   loader: number;
   moduleFormat: number;
   side: number;
+}
+
+export interface NativeBunModule {
+  index: number;
+  name: string;
+  contents: Buffer;
+  sourcemap: Buffer;
+  bytecode: Buffer;
+  bytecodeOffset?: number;
+  moduleInfo: Buffer;
+  bytecodeOriginPath: Buffer;
+  encoding: number;
+  loader: number;
+  moduleFormat: number;
+  side: number;
+  isEntryPoint: boolean;
+}
+
+export type NativeBunModuleRecordSize = 36 | 52;
+
+export interface NativeBunGraph {
+  modules: NativeBunModule[];
+  entryPointIndex: number;
+  flags: number;
+  compileExecArgv: Buffer;
+  moduleRecordSize: NativeBunModuleRecordSize;
+  originalPayload?: Buffer;
 }
 
 interface BunData {
@@ -279,6 +306,8 @@ function isClaudeModule(moduleName: string): boolean {
   return (
     moduleName.endsWith('/claude') ||
     moduleName === 'claude' ||
+    moduleName.endsWith('/cli') ||
+    moduleName === 'cli' ||
     moduleName.endsWith('/claude.exe') ||
     moduleName === 'claude.exe' ||
     moduleName.endsWith('/src/entrypoints/cli.js') ||
@@ -444,7 +473,7 @@ function parseCompiledModuleGraphFile(
 function parseBunDataBlob(bunDataContent: Buffer): {
   bunOffsets: BunOffsets;
   bunData: Buffer;
-  moduleStructSize: number;
+  moduleStructSize: NativeBunModuleRecordSize;
 } {
   if (bunDataContent.length < SIZEOF_OFFSETS + BUN_TRAILER.length) {
     throw new Error('BUN data is too small to contain trailer and offsets');
@@ -482,6 +511,401 @@ function parseBunDataBlob(bunDataContent: Buffer): {
     moduleStructSize,
   };
 }
+
+const assertPointerInBounds = (
+  pointer: StringPointer,
+  payloadLength: number,
+  label: string
+): void => {
+  if (
+    pointer.offset < 0 ||
+    pointer.length < 0 ||
+    pointer.offset > payloadLength ||
+    pointer.length > payloadLength - pointer.offset
+  ) {
+    throw new Error(`${label} pointer is outside the Bun graph payload`);
+  }
+};
+
+export const parseNativeBunGraphPayload = (payload: Buffer): NativeBunGraph => {
+  const { bunOffsets, bunData, moduleStructSize } = parseBunDataBlob(payload);
+  assertPointerInBounds(bunOffsets.modulesPtr, bunData.length, 'Modules');
+  assertPointerInBounds(
+    bunOffsets.compileExecArgvPtr,
+    bunData.length,
+    'compileExecArgv'
+  );
+  if (bunOffsets.modulesPtr.length % moduleStructSize !== 0) {
+    throw new Error('Bun module table length is not record-aligned');
+  }
+  const table = getStringPointerContent(bunData, bunOffsets.modulesPtr);
+  const count = table.length / moduleStructSize;
+  if (bunOffsets.entryPointId >= count) {
+    throw new Error('Bun entrypoint index is outside the module table');
+  }
+  const names = new Set<string>();
+  const modules: NativeBunModule[] = [];
+  for (let index = 0; index < count; index++) {
+    const module = parseCompiledModuleGraphFile(
+      table,
+      index * moduleStructSize,
+      moduleStructSize
+    );
+    for (const [field, pointer] of Object.entries({
+      name: module.name,
+      contents: module.contents,
+      sourcemap: module.sourcemap,
+      bytecode: module.bytecode,
+      moduleInfo: module.moduleInfo,
+      bytecodeOriginPath: module.bytecodeOriginPath,
+    })) {
+      assertPointerInBounds(
+        pointer,
+        bunData.length,
+        `Module ${index} ${field}`
+      );
+    }
+    const name = getStringPointerContent(bunData, module.name).toString('utf8');
+    if (!name || names.has(name)) {
+      throw new Error(`Duplicate or empty Bun module name: ${name}`);
+    }
+    names.add(name);
+    modules.push({
+      index,
+      name,
+      contents: Buffer.from(getStringPointerContent(bunData, module.contents)),
+      sourcemap: Buffer.from(
+        getStringPointerContent(bunData, module.sourcemap)
+      ),
+      bytecode: Buffer.from(getStringPointerContent(bunData, module.bytecode)),
+      bytecodeOffset: module.bytecode.offset,
+      moduleInfo: Buffer.from(
+        getStringPointerContent(bunData, module.moduleInfo)
+      ),
+      bytecodeOriginPath: Buffer.from(
+        getStringPointerContent(bunData, module.bytecodeOriginPath)
+      ),
+      encoding: module.encoding,
+      loader: module.loader,
+      moduleFormat: module.moduleFormat,
+      side: module.side,
+      isEntryPoint: index === bunOffsets.entryPointId,
+    });
+  }
+  return {
+    modules,
+    entryPointIndex: bunOffsets.entryPointId,
+    flags: bunOffsets.flags,
+    moduleRecordSize: moduleStructSize,
+    originalPayload: Buffer.from(payload),
+    compileExecArgv: Buffer.from(
+      getStringPointerContent(bunData, bunOffsets.compileExecArgvPtr)
+    ),
+  };
+};
+
+const appendGraphField = (
+  chunks: Buffer[],
+  currentLength: { value: number },
+  value: Buffer,
+  options: { bytecode?: boolean } = {}
+): StringPointer => {
+  if (value.length === 0) return { offset: 0, length: 0 };
+  if (options.bytecode) {
+    const remainder = currentLength.value % 128;
+    const padding = (120 - remainder + 128) % 128;
+    if (padding > 0) {
+      chunks.push(Buffer.alloc(padding));
+      currentLength.value += padding;
+    }
+  }
+  const pointer = { offset: currentLength.value, length: value.length };
+  chunks.push(value, Buffer.from([0]));
+  currentLength.value += value.length + 1;
+  return pointer;
+};
+
+function serializePreservingNativeBunGraphPayload(
+  graph: NativeBunGraph,
+  replacements: ReadonlyMap<string, Buffer>
+): Buffer {
+  const originalPayload = graph.originalPayload!;
+  const { bunOffsets, bunData, moduleStructSize } =
+    parseBunDataBlob(originalPayload);
+  let output = Buffer.from(originalPayload);
+  const tableOffset = bunOffsets.modulesPtr.offset;
+  // Flag bit 4: module sources form one contiguous run (Bun may drop those
+  // pages once bytecode is loaded). Bit 5: a u32 source-hash table follows
+  // the module table (oven-sh/bun StandaloneModuleGraph).
+  const CONTIGUOUS_SOURCES = 1 << 4;
+  const SOURCE_HASHES = 1 << 5;
+  let flags = bunOffsets.flags;
+  const overflow: Array<{ index: number; replacement: Buffer }> = [];
+
+  // Invalidate everything derived from the old source: sourcemap, bytecode,
+  // moduleInfo, bytecodeOriginPath and the cached source hash. Bun's module
+  // loader otherwise reuses stale imports/exports even after a cache miss.
+  const invalidateDerived = (buffer: Buffer, index: number) => {
+    const record = tableOffset + index * moduleStructSize;
+    buffer.fill(
+      0,
+      record + 16,
+      record + (moduleStructSize === SIZEOF_MODULE_NEW ? 48 : 32)
+    );
+    // Replacement sources are UTF-8; tag 0 reads as UTF-8 in old and new Bun
+    // runtimes (tag 1 is Latin-1, tag 2 UTF-16 since Bun 1.4.1).
+    buffer.writeUInt8(0, record + moduleStructSize - 4);
+    if (flags & SOURCE_HASHES) {
+      const hash =
+        bunOffsets.modulesPtr.offset + bunOffsets.modulesPtr.length + index * 4;
+      if (hash + 4 <= buffer.length) buffer.writeUInt32LE(0, hash);
+    }
+  };
+
+  // Every region a replaced module owned (old source, sourcemap, bytecode,
+  // moduleInfo, bytecodeOriginPath) is dead once its derived data is
+  // invalidated, so pool them and best-fit the new sources into the pool,
+  // largest first. This keeps the payload size (and so the section layout)
+  // unchanged even when one module grows past every region it owned, as long
+  // as the modules being replaced freed enough space between them.
+  const free: StringPointer[] = [];
+  const pending: Array<{ index: number; replacement: Buffer }> = [];
+  graph.modules.forEach((module, index) => {
+    const replacement = replacements.get(module.name);
+    if (!replacement) return;
+    const tableRecordOffset = tableOffset + index * moduleStructSize;
+    const originalRecord = parseCompiledModuleGraphFile(
+      bunData,
+      tableRecordOffset,
+      moduleStructSize
+    );
+    free.push(
+      ...[
+        originalRecord.contents,
+        originalRecord.sourcemap,
+        originalRecord.bytecode,
+        originalRecord.moduleInfo,
+        originalRecord.bytecodeOriginPath,
+      ].filter(pointer => pointer.length > 0)
+    );
+    pending.push({ index, replacement });
+  });
+  pending.sort((a, b) => b.replacement.length - a.replacement.length);
+
+  for (const { index, replacement } of pending) {
+    const tableRecordOffset = tableOffset + index * moduleStructSize;
+    const originalContents = parseCompiledModuleGraphFile(
+      bunData,
+      tableRecordOffset,
+      moduleStructSize
+    ).contents;
+    // Prefer the module's own source region when it still fits (keeps the
+    // contiguous source run intact); otherwise the smallest region that fits.
+    let slot = free.findIndex(
+      region =>
+        region.offset === originalContents.offset &&
+        region.length >= replacement.length
+    );
+    if (slot < 0) {
+      let best = -1;
+      free.forEach((region, i) => {
+        if (
+          region.length >= replacement.length &&
+          (best < 0 || region.length < free[best].length)
+        )
+          best = i;
+      });
+      slot = best;
+    }
+    if (slot < 0) {
+      overflow.push({ index, replacement });
+      continue;
+    }
+    const target = free[slot];
+    if (target.offset !== originalContents.offset) flags &= ~CONTIGUOUS_SOURCES;
+    output.fill(0, target.offset, target.offset + target.length);
+    replacement.copy(output, target.offset);
+    output.writeUInt32LE(target.offset, tableRecordOffset + 8);
+    output.writeUInt32LE(replacement.length, tableRecordOffset + 12);
+    invalidateDerived(output, index);
+    // Keep the unused tail (after a NUL terminator) available.
+    const used = replacement.length + 1;
+    if (target.length > used) {
+      free[slot] = {
+        offset: target.offset + used,
+        length: target.length - used,
+      };
+    } else {
+      free.splice(slot, 1);
+    }
+  }
+
+  if (overflow.length > 0) {
+    // Append overflowing sources just before the offsets struct + trailer,
+    // leaving every existing payload (notably aligned bytecode) in place.
+    const offsetsStart = output.length - SIZEOF_OFFSETS - BUN_TRAILER.length;
+    const added = overflow.reduce(
+      (sum, item) => sum + item.replacement.length + 1,
+      0
+    );
+    const newOffsetsStart = offsetsStart + added;
+    if (newOffsetsStart > 0xffffffff) {
+      throw new Error('Bun module replacement exceeds u32 offsets');
+    }
+    const grown = Buffer.alloc(output.length + added);
+    output.copy(grown, 0, 0, offsetsStart);
+    output.copy(grown, newOffsetsStart, offsetsStart);
+    let cursor = offsetsStart;
+    for (const { index, replacement } of overflow) {
+      const record = tableOffset + index * moduleStructSize;
+      replacement.copy(grown, cursor);
+      grown.writeUInt32LE(cursor, record + 8);
+      grown.writeUInt32LE(replacement.length, record + 12);
+      invalidateDerived(grown, index);
+      cursor += replacement.length + 1;
+    }
+    grown.writeBigUInt64LE(BigInt(newOffsetsStart), newOffsetsStart);
+    flags &= ~CONTIGUOUS_SOURCES;
+    output = grown;
+  }
+
+  if (flags !== bunOffsets.flags) {
+    const offsetsStart = output.length - SIZEOF_OFFSETS - BUN_TRAILER.length;
+    output.writeUInt32LE(flags >>> 0, offsetsStart + 28);
+  }
+
+  return output;
+}
+
+export const serializeNativeBunGraphPayload = (
+  graph: NativeBunGraph,
+  replacements: ReadonlyMap<string, Buffer>
+): Buffer => {
+  if (
+    graph.entryPointIndex < 0 ||
+    graph.entryPointIndex >= graph.modules.length
+  ) {
+    throw new Error('Bun entrypoint index is outside the module list');
+  }
+  const moduleNames = new Set(graph.modules.map(module => module.name));
+  if (moduleNames.size !== graph.modules.length) {
+    throw new Error('Bun module names must be unique');
+  }
+  for (const name of replacements.keys()) {
+    if (!moduleNames.has(name)) {
+      throw new Error(`Unknown module replacement: ${name}`);
+    }
+  }
+  if (replacements.size === 0 && graph.originalPayload) {
+    return Buffer.from(graph.originalPayload);
+  }
+  if (graph.originalPayload) {
+    return serializePreservingNativeBunGraphPayload(graph, replacements);
+  }
+  const chunks: Buffer[] = [];
+  const currentLength = { value: 0 };
+  const records: Array<{
+    module: NativeBunModule;
+    name: StringPointer;
+    contents: StringPointer;
+    sourcemap: StringPointer;
+    bytecode: StringPointer;
+    moduleInfo: StringPointer;
+    bytecodeOriginPath: StringPointer;
+  }> = [];
+  for (const module of graph.modules) {
+    const changed = replacements.has(module.name);
+    records.push({
+      module,
+      name: appendGraphField(chunks, currentLength, Buffer.from(module.name)),
+      contents: appendGraphField(
+        chunks,
+        currentLength,
+        changed ? Buffer.from(replacements.get(module.name)!) : module.contents
+      ),
+      sourcemap: appendGraphField(
+        chunks,
+        currentLength,
+        changed ? Buffer.alloc(0) : module.sourcemap
+      ),
+      bytecode: appendGraphField(
+        chunks,
+        currentLength,
+        changed ? Buffer.alloc(0) : module.bytecode,
+        { bytecode: true }
+      ),
+      moduleInfo: appendGraphField(
+        chunks,
+        currentLength,
+        changed ? Buffer.alloc(0) : module.moduleInfo
+      ),
+      bytecodeOriginPath: appendGraphField(
+        chunks,
+        currentLength,
+        changed ? Buffer.alloc(0) : module.bytecodeOriginPath
+      ),
+    });
+  }
+  const moduleStructSize = graph.moduleRecordSize;
+  if (
+    moduleStructSize !== SIZEOF_MODULE_OLD &&
+    moduleStructSize !== SIZEOF_MODULE_NEW
+  ) {
+    throw new Error(`Unsupported Bun module record size: ${moduleStructSize}`);
+  }
+  const moduleTableOffset = currentLength.value;
+  const moduleTable = Buffer.alloc(records.length * moduleStructSize);
+  const writePointer = (
+    buffer: Buffer,
+    offset: number,
+    pointer: StringPointer
+  ) => {
+    buffer.writeUInt32LE(pointer.offset, offset);
+    buffer.writeUInt32LE(pointer.length, offset + 4);
+  };
+  records.forEach((record, index) => {
+    let position = index * moduleStructSize;
+    const pointers = [
+      record.name,
+      record.contents,
+      record.sourcemap,
+      record.bytecode,
+    ];
+    if (moduleStructSize === SIZEOF_MODULE_NEW) {
+      pointers.push(record.moduleInfo, record.bytecodeOriginPath);
+    }
+    for (const pointer of pointers) {
+      writePointer(moduleTable, position, pointer);
+      position += SIZEOF_STRING_POINTER;
+    }
+    moduleTable.writeUInt8(
+      replacements.has(record.module.name) ? 0 : record.module.encoding,
+      position++
+    );
+    moduleTable.writeUInt8(record.module.loader, position++);
+    moduleTable.writeUInt8(record.module.moduleFormat, position++);
+    moduleTable.writeUInt8(record.module.side, position);
+  });
+  chunks.push(moduleTable);
+  currentLength.value += moduleTable.length;
+  const compileExecArgv = appendGraphField(
+    chunks,
+    currentLength,
+    graph.compileExecArgv
+  );
+  const offsets = Buffer.alloc(SIZEOF_OFFSETS);
+  const byteCount = currentLength.value + SIZEOF_OFFSETS;
+  offsets.writeBigUInt64LE(BigInt(byteCount), 0);
+  writePointer(offsets, 8, {
+    offset: moduleTableOffset,
+    length: moduleTable.length,
+  });
+  offsets.writeUInt32LE(graph.entryPointIndex, 16);
+  writePointer(offsets, 20, compileExecArgv);
+  offsets.writeUInt32LE(graph.flags, 28);
+  chunks.push(offsets, BUN_TRAILER);
+  return Buffer.concat(chunks);
+};
 
 /**
  * Section format helper (for Mach-O and PE):
@@ -837,6 +1261,20 @@ export function extractClaudeJsModulesFromNativeInstallation(
  * real binary path here. This is handled at detection time in
  * `installationDetection.ts`.
  */
+export function extractNativeInstallationModules(
+  nativeInstallationPath: string
+): NativeBunGraph | null {
+  try {
+    LIEF.logging.disable();
+    const binary = LIEF.parse(nativeInstallationPath);
+    const { bunData } = getBunData(binary);
+    return parseNativeBunGraphPayload(bunData);
+  } catch (error) {
+    debug('extractNativeInstallationModules: Error during extraction:', error);
+    return null;
+  }
+}
+
 export function extractClaudeJsFromNativeInstallation(
   nativeInstallationPath: string
 ): Buffer | null {
@@ -1473,11 +1911,35 @@ function repackPE(
   }
 }
 
-/**
- * Alignment constant used by BUN_COMPILED in c-bindings.cpp.
- * The BUN_COMPILED symbol is placed with __attribute__((aligned(BLOB_HEADER_ALIGNMENT))).
- */
-const BLOB_HEADER_ALIGNMENT = 16384;
+export function findUniqueBufferPointer(
+  buffers: ReadonlyArray<{ content: Buffer; virtualAddress: bigint }>,
+  pointer: bigint
+): bigint {
+  const needle = Buffer.alloc(8);
+  needle.writeBigUInt64LE(pointer);
+  const matches: bigint[] = [];
+
+  for (const buffer of buffers) {
+    let offset = -1;
+    while ((offset = buffer.content.indexOf(needle, offset + 1)) !== -1) {
+      matches.push(buffer.virtualAddress + BigInt(offset));
+      if (matches.length > 1) break;
+    }
+    if (matches.length > 1) break;
+  }
+
+  if (matches.length === 0) {
+    throw new Error(
+      `Could not find BUN_COMPILED pointer to 0x${pointer.toString(16)}`
+    );
+  }
+  if (matches.length > 1) {
+    throw new Error(
+      `Found multiple BUN_COMPILED pointers to 0x${pointer.toString(16)}`
+    );
+  }
+  return matches[0];
+}
 
 function alignBigInt(value: bigint, alignment: bigint): bigint {
   return ((value + alignment - 1n) / alignment) * alignment;
@@ -1809,35 +2271,25 @@ function repackELFSection(
       'repackELFSection: .bun is not a replaceable tail allocation; falling back to relocation'
     );
     const oldBunSectionVaddr = bunSection.virtualAddress;
-    const vaddrBytes = Buffer.alloc(8);
-    vaddrBytes.writeBigUInt64LE(oldBunSectionVaddr);
 
-    let bunCompiledVaddr: bigint | null = null;
-    const rwContent = rwSegment.content;
-    const rwVaddrStart = rwSegment.virtualAddress;
-    const firstAligned = alignBigInt(
-      rwVaddrStart,
-      BigInt(BLOB_HEADER_ALIGNMENT)
+    if (newSectionData.length <= Number(bunSection.size)) {
+      bunSection.content = newSectionData;
+      bunSection.size = BigInt(newSectionData.length);
+      atomicWriteBinary(elfBinary, outputPath, binPath);
+      debug('repackELFSection: Reused existing .bun section location');
+      return;
+    }
+
+    const bunCompiledVaddr = findUniqueBufferPointer(
+      elfBinary
+        .segments()
+        .filter(segment => segment.type === 'LOAD' && (segment.flags & 2) !== 0)
+        .map(segment => ({
+          content: segment.content,
+          virtualAddress: segment.virtualAddress,
+        })),
+      oldBunSectionVaddr
     );
-    const lastCandidate = rwVaddrStart + BigInt(rwContent.length) - 8n;
-
-    for (
-      let va = firstAligned;
-      va <= lastCandidate;
-      va += BigInt(BLOB_HEADER_ALIGNMENT)
-    ) {
-      const off = Number(va - rwVaddrStart);
-      if (rwContent.subarray(off, off + 8).equals(vaddrBytes)) {
-        bunCompiledVaddr = va;
-        break;
-      }
-    }
-
-    if (bunCompiledVaddr === null) {
-      throw new Error(
-        `Could not find original BUN_COMPILED location in binary (searched for 0x${oldBunSectionVaddr.toString(16)})`
-      );
-    }
 
     const pageSize = elfBinary.pageSize();
     const newContentSize = BigInt(newSectionData.length);
@@ -1949,6 +2401,26 @@ function repackELFOverlay(
  * @param modifiedClaudeJs - Modified claude.js contents as a Buffer
  * @param outputPath - Where to write the repacked binary
  */
+export function repackNativeInstallationModuleGraph(
+  binPath: string,
+  replacements: ReadonlyMap<string, Buffer>,
+  outputPath: string
+): void {
+  LIEF.logging.disable();
+  const binary = LIEF.parse(binPath);
+  const { bunData, sectionHeaderSize } = getBunData(binary);
+  const graph = parseNativeBunGraphPayload(bunData);
+  const newBuffer = serializeNativeBunGraphPayload(graph, replacements);
+  parseNativeBunGraphPayload(newBuffer);
+  writeRepackedBunData(
+    binary,
+    binPath,
+    newBuffer,
+    outputPath,
+    sectionHeaderSize
+  );
+}
+
 export function repackNativeInstallation(
   binPath: string,
   modifiedClaudeJs: Buffer,
@@ -1956,8 +2428,6 @@ export function repackNativeInstallation(
 ): void {
   LIEF.logging.disable();
   const binary = LIEF.parse(binPath);
-
-  // Extract Bun data and rebuild with modified claude.js
   const { bunOffsets, bunData, sectionHeaderSize, moduleStructSize } =
     getBunData(binary);
   const newBuffer = rebuildBunData(
@@ -1966,7 +2436,6 @@ export function repackNativeInstallation(
     modifiedClaudeJs,
     moduleStructSize
   );
-
   writeRepackedBunData(
     binary,
     binPath,

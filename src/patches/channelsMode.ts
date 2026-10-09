@@ -53,13 +53,17 @@
 // Replaces the "Experimental · prompt injection risks" banner text with
 // a short neutral message.
 
+import { isGraphContextActive } from './graphContext';
 import { showDiff } from './index';
 
 /**
  * Patch 1: Bypass tengu_harbor flag — force isChannelsEnabled() to return true
  */
 const patchChannelsEnabled = (file: string): string | null => {
-  const pattern = /function [$\w]+\(\)\{return [$\w]+\("tengu_harbor",!1\)/;
+  // CC 2.1.290+ checks a policy before the flag:
+  //   function nL(){return nn("allow_channels")&&T("tengu_harbor",!1)}
+  const pattern =
+    /function [$\w]+\(\)\{return (?:[$\w]+\("allow_channels"\)&&)?[$\w]+\("tengu_harbor",!1\)/;
   const match = file.match(pattern);
 
   if (!match || match.index === undefined) {
@@ -220,6 +224,31 @@ const patchServerDevWarning = (file: string): string | null => {
  * 5. ChannelsNotice server dev-flag warning → removed
  */
 export const writeChannelsMode = (oldFile: string): string | null => {
+  // Code-split builds (CC 2.1.2xx) spread the channel gates over separate
+  // modules; on a module graph apply whichever of them this module contains.
+  if (isGraphContextActive()) {
+    const quiet = <T>(fn: () => T): T => {
+      const saved = console.error;
+      console.error = () => {};
+      try {
+        return fn();
+      } finally {
+        console.error = saved;
+      }
+    };
+    let file = oldFile;
+    for (const step of [
+      patchChannelsEnabled,
+      patchGateFunction,
+      patchPermissionRelay,
+      patchChannelsNotice,
+      patchServerDevWarning,
+    ]) {
+      file = quiet(() => step(file)) ?? file;
+    }
+    return file === oldFile ? null : file;
+  }
+
   let newFile = patchChannelsEnabled(oldFile);
   if (!newFile) return null;
 

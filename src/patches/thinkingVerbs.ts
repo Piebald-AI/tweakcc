@@ -89,15 +89,17 @@ export const writeThinkingVerbs = (
   oldFile: string,
   verbs: string[]
 ): string | null => {
+  // Code-split builds (CC 2.1.2xx) keep the present-tense spinner verbs and
+  // the past-tense "Worked for 3s" verbs in different modules, so patch
+  // whichever lists this source contains; fail only if it has neither.
   const afterPresentTense = patchPresentTenseVerbs(oldFile, verbs);
-  if (afterPresentTense === null) {
+  const afterPastTense = patchPastTenseVerbs(
+    afterPresentTense ?? oldFile,
+    verbs
+  );
+  if (afterPresentTense === null && afterPastTense === null) {
     return null;
   }
 
-  const afterPastTense = patchPastTenseVerbs(afterPresentTense, verbs);
-  if (afterPastTense === null) {
-    return null;
-  }
-
-  return afterPastTense;
+  return afterPastTense ?? afterPresentTense;
 };

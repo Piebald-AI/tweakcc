@@ -72,9 +72,43 @@ const findCustomModelListInsertionPoint = (
   return { insertionIndex, modelListVar };
 };
 
+/**
+ * CC 2.1.2xx builds the /model options from a served catalog, then appends
+ * env/settings extras and finally sorts disabled entries last before
+ * resolving the current selection:
+ *   …s.push({…ml(N)…,sessionTail:!0})}s=i2(s,n);let E=null,T=oh(),A=y0();…
+ *   …return s.push({...ml(E)??{value:E,label:E,description:"Custom model"},sessionTail:!0}),xo(s,n)}}
+ * Append the extra models (skipping any already offered) just before that
+ * sort, so they go through the same disabled-last ordering.
+ */
+const writeModelCustomizationsServedCatalog = (
+  oldFile: string
+): string | null => {
+  const sortPattern =
+    /([;}])([$\w]+)=[$\w]+\(\2,[$\w]+\);let [$\w]+=null,[$\w]+=[$\w]+\(\),[$\w]+=[$\w]+\(\);/g;
+  const candidates = [...oldFile.matchAll(sortPattern)].filter(match =>
+    oldFile
+      .slice(match.index!, match.index! + 2500)
+      .includes('description:"Custom model"')
+  );
+  if (candidates.length !== 1) {
+    console.error(
+      'patch: findCustomModelListInsertionPoint: failed to find custom model push'
+    );
+    return null;
+  }
+  const [, delimiter, listVar] = candidates[0];
+  const insertionIndex = candidates[0].index! + delimiter.length;
+  const inject = `for(const tweakccModel of ${JSON.stringify(CUSTOM_MODELS)})if(!${listVar}.some(tweakccExisting=>tweakccExisting.value===tweakccModel.value))${listVar}.push(tweakccModel);`;
+  const newFile =
+    oldFile.slice(0, insertionIndex) + inject + oldFile.slice(insertionIndex);
+  showDiff(oldFile, newFile, inject, insertionIndex, insertionIndex);
+  return newFile;
+};
+
 export const writeModelCustomizations = (oldFile: string): string | null => {
   const found = findCustomModelListInsertionPoint(oldFile);
-  if (!found) return null;
+  if (!found) return writeModelCustomizationsServedCatalog(oldFile);
 
   const { insertionIndex, modelListVar } = found;
 

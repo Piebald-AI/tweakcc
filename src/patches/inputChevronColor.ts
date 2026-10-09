@@ -8,7 +8,14 @@ export const writeInputChevronColor = (
   const pattern =
     /,\{isLoading:([$\w]+),(?:[$\w]+:[$\w]+,)*themeColor:([$\w]+)\}=[$\w]+,([$\w]+)=\2\?\?void 0[,;][\s\S]*?if\([^)]*!==\3[^)]*\|\|[^)]*!==\1[^)]*\)[$\w]+=[$\w]+\.jsxs?\([$\w]+,\{color:\3,dimColor:\1,children:/;
 
-  const match = file.match(pattern);
+  // CC 2.1.2xx: an isScreenReader prop builds the chevron children (with
+  // nested `{…}` object literals) between the destructure and the Text call,
+  // and the JSX runtime is called through a bare minified import:
+  //   {isLoading:M,isScreenReader:E,themeColor:K}=h,Se=K??void 0,Ce;if(…)…;let Me;if(…)Me=e(n,{color:Se,dimColor:M,children:Ce})
+  const codeSplitPattern =
+    /\{isLoading:([$\w]+),(?:[$\w]+:[$\w]+,)*themeColor:([$\w]+)\}=[$\w]+,([$\w]+)=\2\?\?void 0[,;].{0,400}?(?:[$\w]+\.jsxs?|[$\w]+)\([$\w]+,\{color:\3,dimColor:\1,children:/;
+
+  const match = file.match(pattern) ?? file.match(codeSplitPattern);
 
   if (!match || match.index === undefined) {
     debug('patch: inputChevronColor: failed to find chevron component pattern');

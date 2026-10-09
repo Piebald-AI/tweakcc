@@ -296,6 +296,16 @@ const patchAlwaysShowInModelSelector = (oldFile: string): string | null => {
  * Main entry point: Apply all opusplan[1m] patches
  */
 export const writeOpusplan1m = (oldFile: string): string | null => {
+  // CC 2.1.2xx supports "opusplan[1m]" natively: its plan-mode resolver maps
+  // it to Opus 1M (`if(e==="opusplan"||e==="opusplan[1m]")return"opus"` plus
+  // `e==="opusplan[1m]"||…` when choosing opus[1m]). Nothing to patch there;
+  // report the module as already satisfied rather than failing.
+  if (
+    /==="opusplan"\|\|[$\w]+==="opusplan\[1m\]"\)return"opus"/.test(oldFile)
+  ) {
+    return oldFile;
+  }
+
   let newFile = oldFile;
 
   // Patch 1: Mode switching function

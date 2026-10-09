@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  findSlashCommandListBounds,
   findSlashCommandListEndPosition,
   writeSlashCommandDefinition,
 } from './slashCommands';
@@ -69,5 +70,45 @@ describe('writeSlashCommandDefinition', () => {
 
   it('returns null when the command list cannot be located', () => {
     expect(writeSlashCommandDefinition('var a=1;', ',NEW_CMD')).toBeNull();
+  });
+});
+
+describe('findSlashCommandListBounds', () => {
+  it('finds identifier-only builtins through the exported getter', () => {
+    const items = Array.from({ length: 31 }, (_, index) => `C${index}`).join(
+      ','
+    );
+    const source =
+      'var exports={};exporter(exports,{getBuiltinCommands:()=>getBuiltins,builtInCommandNames:()=>names});' +
+      'function getBuiltins(){return commandList()}' +
+      `commandList=memo(()=>[${items}]),` +
+      'names=memo(()=>new Set(commandList().flatMap((command)=>[command.name])));';
+    const bounds = findSlashCommandListBounds(source);
+    expect(bounds).not.toBeNull();
+    expect(source[bounds!.openBracket]).toBe('[');
+    expect(source[bounds!.closingBracket]).toBe(']');
+  });
+
+  it('handles spread ternaries with nested arrays and calls', () => {
+    const items = Array.from({ length: 29 }, (_, index) => `C${index}`).join(
+      ','
+    );
+    const source =
+      'var exports={};exporter(exports,{getBuiltinCommands:()=>getBuiltins,builtInCommandNames:()=>names});' +
+      'function getBuiltins(){return commandList()}' +
+      `commandList=memo(()=>[${items},...flag?[Optional]:[],factory({nested:[1,2]})]),` +
+      'names=memo(()=>new Set(commandList().flatMap((command)=>[command.name])));';
+    expect(findSlashCommandListBounds(source)).not.toBeNull();
+  });
+
+  it('rejects an identifier array without the builtins adjacency guard', () => {
+    const items = Array.from({ length: 31 }, (_, index) => `C${index}`).join(
+      ','
+    );
+    const source =
+      'var exports={};exporter(exports,{getBuiltinCommands:()=>getBuiltins});' +
+      'function getBuiltins(){return commandList()}' +
+      `commandList=memo(()=>[${items}]);`;
+    expect(findSlashCommandListBounds(source)).toBeNull();
   });
 });

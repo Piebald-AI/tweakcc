@@ -101,10 +101,13 @@ describe('tableFormat patch', () => {
       expect(result).not.toContain('+_6n(z,rn(z),K,Z)+" \\u2502"');
     });
 
-    it('leaves the row-leading bar untouched (out of scope)', () => {
+    // Leaving the row-leading `│` rendered rows as `│ A | B |` instead of the
+    // documented `| A | B |`.
+    it('converts the row-leading bar too, so rows read | A | B |', () => {
       const result = writeTableFormat(jsxRendererCode, 'ascii');
       expect(result).not.toBeNull();
-      expect(result).toContain('let $="\\u2502"');
+      expect(result).toContain('let $="|"');
+      expect(result).not.toContain('\\u2502');
     });
   });
 });

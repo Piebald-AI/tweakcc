@@ -22,6 +22,17 @@ const getFileReadLimitLocation = (oldFile: string): LocationResult | null => {
     }
   }
 
+  // CC 2.1.2xx: the default lives beside the MaxFileReadTokenExceededError
+  // class and the CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS reader:
+  //   var kTr=25000,TTr=128;class bEe extends Error{…File content (${e} tokens) exceeds maximum allowed tokens…
+  const errorClassRegion = oldFile.match(
+    /=25000,[$\w]+=\d+;class [$\w]+ extends Error\{[^]{0,200}?exceeds maximum allowed tokens/
+  );
+  if (errorClassRegion && errorClassRegion.index !== undefined) {
+    const startIndex = errorClassRegion.index + 1;
+    return { startIndex, endIndex: startIndex + 5 };
+  }
+
   // Try anchors in order of preference
   const anchors = ['<system-reminder>', 'tengu_amber_wren'];
 

@@ -120,6 +120,30 @@ const getThinkerFormatLocation = (oldFile: string): LocationResult | null => {
     };
   }
 
+  // CC 2.1.2xx: the ellipsis became a `suffix` prop (default "…") appended
+  // unless the verb already ends in one:
+  //   at=y??(…activeForm…)??(I||lt),Wt=H===Yt&&Be.test(at)?at:at+H
+  // where Yt="\u2026". Replace the default-suffix case with the user format
+  // and keep the original expression for callers passing a custom suffix.
+  const suffixPattern =
+    /,([$\w]+)=(([$\w]+)===([$\w]+)&&[$\w]+\.test\(([$\w]+)\)\?\5:\5\+\3)(?=[,;])/g;
+  const suffixMatches = [...oldFile.matchAll(suffixPattern)].filter(match => {
+    const context = oldFile.slice(
+      Math.max(0, match.index! - 1500),
+      match.index
+    );
+    return context.includes('.activeForm') && context.includes('spinnerTip');
+  });
+  if (suffixMatches.length === 1) {
+    const match = suffixMatches[0];
+    const start = match.index! + 1 + match[1].length;
+    return {
+      startIndex: start,
+      endIndex: start + 1 + match[2].length,
+      identifiers: [match[5], `${match[3]}===${match[4]}`, `(${match[2]})`],
+    };
+  }
+
   if (searchStart === undefined) {
     console.error('patch: thinker format: failed to find approxAreaMatch');
   }
@@ -142,7 +166,11 @@ export const writeThinkerFormat = (
   const curExpr = fmtLocation.identifiers?.[0];
   const curFmt =
     '`' + serializedFormat.replace(/\{\}/g, '${' + curExpr + '}') + '`';
-  const formatDecl = `=${curFmt}`;
+  const [, defaultSuffixCondition, originalExpr] =
+    fmtLocation.identifiers ?? [];
+  const formatDecl = defaultSuffixCondition
+    ? `=${defaultSuffixCondition}?${curFmt}:${originalExpr}`
+    : `=${curFmt}`;
 
   const newFile =
     oldFile.slice(0, fmtLocation.startIndex) +

@@ -32,7 +32,8 @@ vi.mock('../config', () => ({
   }),
 }));
 
-vi.mock('../utils', () => ({
+vi.mock('../utils', async importOriginal => ({
+  ...(await importOriginal<typeof import('../utils')>()),
   debug: vi.fn(),
   replaceFileBreakingHardLinks: vi.fn(),
 }));
@@ -143,6 +144,8 @@ describe('model customization toggle patch conditions', () => {
 
     expect(modelResult).toMatchObject({ applied: true, failed: false });
     expect(showMoreResult).toMatchObject({ applied: true, failed: false });
+    const savedConfig = await vi.mocked(updateConfigFile).mock.results[0].value;
+    expect(savedConfig.changesApplied).toBe(true);
     expect(vi.mocked(writeModelCustomizations)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(writeShowMoreItemsInSelectMenus)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(replaceFileBreakingHardLinks)).toHaveBeenCalledWith(
@@ -170,6 +173,8 @@ describe('model customization toggle patch conditions', () => {
 
     expect(modelResult).toMatchObject({ applied: false, failed: true });
     expect(showMoreResult).toMatchObject({ applied: false, failed: true });
+    const savedConfig = await vi.mocked(updateConfigFile).mock.results[0].value;
+    expect(savedConfig.changesApplied).toBe(false);
     expect(vi.mocked(replaceFileBreakingHardLinks)).toHaveBeenCalledWith(
       '/tmp/claude-cli.js',
       'base-content',

@@ -36,7 +36,9 @@ export const getConfigDir = (): string => {
   // Check TWEAKCC_CONFIG_DIR first (explicit override)
   const tweakccConfigDir = process.env.TWEAKCC_CONFIG_DIR?.trim();
   if (tweakccConfigDir && tweakccConfigDir.length > 0) {
-    return expandTilde(tweakccConfigDir);
+    return tweakccConfigDir.startsWith('~')
+      ? expandTilde(tweakccConfigDir)
+      : tweakccConfigDir;
   }
 
   const defaultDir = path.join(os.homedir(), '.tweakcc');

@@ -45,8 +45,10 @@ const getBatchSizeLocation = (oldFile: string): LocationResult | null => {
   // Match the full pattern and capture position of the default "3".
   // Old CC: parseInt(process.env.MCP_SERVER_CONNECTION_BATCH_SIZE||"",10)||3
   // CC ≥2.1.140: parseInt(process.env.MCP_SERVER_CONNECTION_BATCH_SIZE||"",10);return H>0?H:3
+  // CC 2.1.2xx reads a typed env accessor instead of parseInt(process.env…):
+  //   function jr(){return a.MCP_SERVER_CONNECTION_BATCH_SIZE??3}
   const pattern =
-    /MCP_SERVER_CONNECTION_BATCH_SIZE\|\|"",10\)(?:\|\||;return [$\w]+>0\?[$\w]+:)(\d+)/;
+    /MCP_SERVER_CONNECTION_BATCH_SIZE(?:\|\|"",10\)(?:\|\||;return [$\w]+>0\?[$\w]+:)|\?\?)(\d+)/;
   const match = oldFile.match(pattern);
 
   if (!match || match.index === undefined) {

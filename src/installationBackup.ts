@@ -8,6 +8,7 @@ import {
 } from './config';
 import { clearAllAppliedHashes } from './systemPromptHashIndex';
 import { debug, replaceFileBreakingHardLinks, doesFileExist } from './utils';
+import { extractVersion } from './installationDetection';
 import { ClaudeCodeInstallationInfo } from './types';
 
 export const backupClijs = async (ccInstInfo: ClaudeCodeInstallationInfo) => {
@@ -103,6 +104,19 @@ export const restoreNativeBinaryFromBackup = async (
   if (!(await doesFileExist(NATIVE_BINARY_BACKUP_FILE))) {
     debug('restoreNativeBinaryFromBackup: No backup file exists, skipping');
     return false;
+  }
+
+  const installedVersion =
+    ccInstInfo.version ??
+    (await extractVersion(ccInstInfo.nativeInstallationPath, 'native-binary'));
+  const backupVersion = await extractVersion(
+    NATIVE_BINARY_BACKUP_FILE,
+    'native-binary'
+  );
+  if (backupVersion !== installedVersion) {
+    throw new Error(
+      `Native backup is Claude Code ${backupVersion}, but the installed binary is ${installedVersion}. Reinstall the latest Claude Code release and create a matching pristine backup before applying patches.`
+    );
   }
 
   debug(

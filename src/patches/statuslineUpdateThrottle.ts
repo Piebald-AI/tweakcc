@@ -3,6 +3,44 @@
 import { showDiff } from './index';
 
 /**
+ * CC 2.1.2xx moved the status line into a store class whose refresh is a
+ * 300ms *debounce* (every input change cancels and restarts the timer, so a
+ * busy session can starve the status line):
+ *   #y(){this.#l?.(),this.#l=this.#e.setTimeout(()=>{this.#l=null,this.#b()},Bjn)}
+ * Throttle mode keeps a pending refresh instead of restarting it, and fires
+ * no sooner than `intervalMs` after the previous refresh. Fixed-interval mode
+ * refreshes on a steady `intervalMs` cadence once the first change arrives.
+ */
+const writeClassBasedThrottle = (
+  oldFile: string,
+  intervalMs: number,
+  useFixedInterval: boolean
+): string | null => {
+  const debouncePattern =
+    /#([$\w]+)\(\)\{this\.#([$\w]+)\?\.\(\),this\.#\2=this\.#([$\w]+)\.setTimeout\(\(\)=>\{this\.#\2=null,this\.#([$\w]+)\(\)\},[$\w]+\)\}/g;
+  const matches = [...oldFile.matchAll(debouncePattern)].filter(match => {
+    const classStart = oldFile.lastIndexOf('class ', match.index);
+    const context = oldFile.slice(classStart, match.index! + 3000);
+    return (
+      classStart !== -1 &&
+      context.includes('statusLine') &&
+      context.includes('isTrustAccepted')
+    );
+  });
+  if (matches.length !== 1) return null;
+  const [whole, method, timer, host, refresh] = matches[0];
+  const replacement = useFixedInterval
+    ? `#${method}(){if(this.#${timer})return;let tick=()=>{this.#${timer}=this.#${host}.setTimeout(tick,${intervalMs}),this.#${refresh}()};this.#${timer}=this.#${host}.setTimeout(tick,0)}`
+    : `#${method}(){if(this.#${timer})return;let wait=Math.max(0,(this.__tweakccLastRefresh??0)+${intervalMs}-Date.now());this.#${timer}=this.#${host}.setTimeout(()=>{this.#${timer}=null,this.__tweakccLastRefresh=Date.now(),this.#${refresh}()},wait)}`;
+  const startIndex = matches[0].index!;
+  const endIndex = startIndex + whole.length;
+  const newFile =
+    oldFile.slice(0, startIndex) + replacement + oldFile.slice(endIndex);
+  showDiff(oldFile, newFile, replacement, startIndex, endIndex);
+  return newFile;
+};
+
+/**
  * Replaces the flawed debounced/throttled status line update with a proper throttle implementation,
  * or optionally a fixed-interval update.
  *
@@ -106,6 +144,12 @@ export const writeStatuslineUpdateThrottle = (
   const match = oldFile.match(pattern);
 
   if (!match || match.index === undefined) {
+    const classBased = writeClassBasedThrottle(
+      oldFile,
+      intervalMs,
+      useFixedInterval
+    );
+    if (classBased) return classBased;
     console.error(
       'patch: statuslineUpdateThrottle: failed to find statusline update throttle pattern'
     );

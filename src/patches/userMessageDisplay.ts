@@ -152,8 +152,11 @@ export const writeUserMessageDisplay = (
   // Replace only the child assignment so React compiler cache bookkeeping remains intact.
   // CC >=2.1.x renders via the JSX automatic runtime, so the assignment is
   // `B=X.jsx(SUB,{text:VAR,...})` rather than `B=X.createElement(SUB,{text:VAR,...})`.
+  // CC 2.1.2xx code-split builds call the JSX runtime through a bare minified
+  // import (`pe=e(Wpt,{text:te,useBriefLayout:z,timestamp:le,awaitingModel:H})`)
+  // and pass extra props after timestamp.
   const memoizedChildPattern =
-    /(No content found in user prompt message.{0,1200}?)([$\w]+)=([$\w]+(?:\.default)?\.(?:createElement|jsxs?))\([$\w]+,\{text:([$\w]+),useBriefLayout:[$\w]+,timestamp:[$\w]+\}\)/;
+    /(No content found in user prompt message.{0,1200}?)([$\w]+)=([$\w]+(?:\.default)?\.(?:createElement|jsxs?)|[$\w]+)\([$\w]+,\{text:([$\w]+),useBriefLayout:[$\w]+,timestamp:[$\w]+(?:,[$\w]+:[$\w]+)*\}\)/;
 
   const oldMatch = oldFile.match(pattern);
   const newMatch = oldMatch ? null : oldFile.match(newPattern);
@@ -165,7 +168,7 @@ export const writeUserMessageDisplay = (
     console.error(
       'patch: userMessageDisplay: failed to find user message display pattern'
     );
-    return oldFile;
+    return null;
   }
 
   let createElementFn: string;
@@ -275,7 +278,9 @@ export const writeUserMessageDisplay = (
   // CC's JSX automatic runtime (jsx/jsxs) passes children as a prop, and the
   // captured call var has no `.createElement`, so emit jsx-convention calls
   // there. Older bundles use the classic createElement(type, props, ...children).
-  const isJsxRuntime = /\.jsxs?$/.test(createElementFn);
+  // A bare minified callee (code-split builds) is the JSX runtime too.
+  const isJsxRuntime =
+    /\.jsxs?$/.test(createElementFn) || !createElementFn.includes('.');
   let elementTree: string;
   if (isJsxRuntime) {
     const textEl = `${createElementFn}(${textComponent},{children:${chalkFormattedString}})`;
