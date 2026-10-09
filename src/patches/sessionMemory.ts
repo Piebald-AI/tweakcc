@@ -264,12 +264,12 @@ const patchUpdateThresholds = (
   // CC >= 2.1.218: the update-cadence role is served by a GrowthBook-gated flag
   // `getFlag("tengu_bramble_lintel",null)??<n>` (the one update-cadence knob that
   // remains after the memory-model refactor removed the declarative object above).
-  // Re-anchor the same env var onto it, keeping the flag's precedence and carrying
-  // the upstream numeric default ($2) through rather than hard-coding it.
+  // The server does set this flag (e.g. 7), so the env var must win when it is set;
+  // otherwise the flag and the upstream numeric default stay as they were.
   newFile = globalReplace(
     newFile,
-    /([$\w]+\("tengu_bramble_lintel",null\)\?\?)(\d+)(?![\d.eExX])/g,
-    '$1Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES??$2)'
+    /([$\w]+\("tengu_bramble_lintel",null\)\?\?\d+)(?![\d.eExX])/g,
+    '(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES?Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES):$1)'
   );
 
   // Check if any replacements were made
@@ -296,14 +296,14 @@ export const writeSessionMemory = (oldFile: string): string | null => {
     console.error = () => {};
     try {
       let file = patchExtraction(oldFile) ?? oldFile;
+      // The cadence flag sits next to the extraction gate (CC 2.1.295:
+      // `b?.everyNTurns??k("tengu_bramble_lintel",null)??1`).
+      if (file !== oldFile) file = patchUpdateThresholds(file, false) ?? file;
       file = patchExtractMode(file) ?? file;
-      const pastSessions = patchPastSessions(file);
-      if (pastSessions && pastSessions !== file) file = pastSessions;
-      return file === oldFile
-        ? pastSessions === oldFile
-          ? oldFile
-          : null
-        : file;
+      file = patchPastSessions(file) ?? file;
+      // Only a rewrite counts: the session-search UI that patchPastSessions
+      // accepts unchanged is not proof that the extraction gates are open.
+      return file === oldFile ? null : file;
     } finally {
       console.error = saved;
     }
