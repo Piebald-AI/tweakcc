@@ -711,6 +711,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableRememberSkill: false,
     tokenCountRounding: null,
     autoAcceptPlanMode: false,
+    autoAcceptPlanModeEnv: false,
     allowBypassPermissionsInSudo: false,
     suppressNativeInstallerWarning: false,
     filterScrollEscapeSequences: false,

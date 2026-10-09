@@ -157,6 +157,8 @@ export function isPatchEnabledByConfig(
       );
     case 'auto-accept-plan-mode':
       return !!misc?.autoAcceptPlanMode;
+    case 'auto-accept-plan-env':
+      return !misc?.autoAcceptPlanMode && !!misc?.autoAcceptPlanModeEnv;
     case 'allow-sudo-bypass-permissions':
       return !!misc?.allowBypassPermissionsInSudo;
     case 'suppress-native-installer-warning':

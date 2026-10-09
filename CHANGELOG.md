@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replace the existing `.bun` payload for ELF binaries instead of appending a new one (#952) - @signadou
 - Preserve prompt identity across formatting-only interpolation source changes and correct the Claude Code 2.1.235 prompt archive (#958) - @mike1858
 - Fix the parse gate rejecting ESM native bundles on Claude Code 2.1.245+ (#978) - @aegntic
+- Add `autoAcceptPlanModeEnv` to auto-accept plans per invocation via `TWEAKCC_AUTO_ACCEPT_PLAN=1` (#627)
 
 - Add identity-validated native JavaScript module replacement for split Bun bundles (#408) - @mike1858
 - Gate native and npm automatic updates on published prompt snapshots, with fail-closed checks and unchanged manual updates (#408) - @mike1858

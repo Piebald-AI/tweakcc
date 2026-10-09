@@ -11,6 +11,11 @@
 // - CC <=2.1.69: onChange:(X)=>FUNC(X),onCancel pattern
 // - CC >=2.1.83: onChange:a or onChange:(X)=>void REF.current(X) pattern
 //   where 'a' is the async handler defined earlier in the component
+//
+// Env-gated variant (`envGated`): the auto-select and the permission default
+// only take effect when TWEAKCC_AUTO_ACCEPT_PLAN is set to a truthy value at
+// run time, so plans can be auto-accepted per invocation. The model-facing
+// prompt text is left alone because it cannot follow the env.
 
 import { isGraphContextActive } from './graphContext';
 import { showDiff } from './index';
@@ -114,7 +119,11 @@ const findComponentReturnInjectionPoint = (
   return lastTopLevelReturn === -1 ? null : lastTopLevelReturn;
 };
 
-const patchPlanModePrompts = (file: string): string => {
+/** JS expression: TWEAKCC_AUTO_ACCEPT_PLAN is set and not 0/false/no/off. */
+export const AUTO_ACCEPT_PLAN_ENV_CHECK =
+  '!/^(0|false|no|off)?$/i.test(process.env.TWEAKCC_AUTO_ACCEPT_PLAN??"")';
+
+const patchPlanModePrompts = (file: string, envGated = false): string => {
   const replacements: Array<
     [RegExp, string | ((...args: string[]) => string)]
   > = [
@@ -179,7 +188,7 @@ const patchPlanModePrompts = (file: string): string => {
   ];
 
   let newFile = file;
-  for (const [pattern, replacement] of replacements) {
+  for (const [pattern, replacement] of envGated ? [] : replacements) {
     const before = newFile;
     newFile = newFile.replace(pattern, replacement as never);
     if (newFile !== before) {
@@ -195,7 +204,9 @@ const patchPlanModePrompts = (file: string): string => {
   const beforePermissionDefault = newFile;
   newFile = newFile.replace(
     permissionDefaultPattern,
-    `kind:"permission_exit_plan_mode_v2",payload:$1,result:$2,default:{behavior:"allow",${planExitPermissionUpdate}}`
+    envGated
+      ? `kind:"permission_exit_plan_mode_v2",payload:$1,result:$2,default:${AUTO_ACCEPT_PLAN_ENV_CHECK}?{behavior:"allow",${planExitPermissionUpdate}}:{behavior:"cancelled"}`
+      : `kind:"permission_exit_plan_mode_v2",payload:$1,result:$2,default:{behavior:"allow",${planExitPermissionUpdate}}`
   );
   if (newFile !== beforePermissionDefault) {
     showDiff(file, newFile, 'permission_exit_plan_mode_v2 default allow', 0, 0);
@@ -206,7 +217,9 @@ const patchPlanModePrompts = (file: string): string => {
   const beforeCheckPermissions = newFile;
   newFile = newFile.replace(
     exitPlanCheckPermissionsPattern,
-    `async checkPermissions($1,$2){return{behavior:"allow",updatedInput:$1,${planExitPermissionUpdate}}}`
+    envGated
+      ? `async checkPermissions($1,$2){if(${AUTO_ACCEPT_PLAN_ENV_CHECK})return{behavior:"allow",updatedInput:$1,${planExitPermissionUpdate}};if($3())return{behavior:"allow",updatedInput:$1};return{behavior:"ask",message:"Exit plan mode?",updatedInput:$1}}`
+      : `async checkPermissions($1,$2){return{behavior:"allow",updatedInput:$1,${planExitPermissionUpdate}}}`
   );
   if (newFile !== beforeCheckPermissions) {
     showDiff(file, newFile, 'ExitPlanMode checkPermissions allow', 0, 0);
@@ -215,13 +228,16 @@ const patchPlanModePrompts = (file: string): string => {
   return newFile;
 };
 
-export const writeAutoAcceptPlanMode = (oldFile: string): string | null => {
+export const writeAutoAcceptPlanMode = (
+  oldFile: string,
+  envGated = false
+): string | null => {
   const readyIdx = oldFile.indexOf('title:"Ready to code?"');
   if (readyIdx === -1) {
     // Code-split builds (CC 2.1.2xx) keep the plan-mode prompts and the
     // ExitPlanMode permission defaults in other modules than the dialog.
     if (isGraphContextActive()) {
-      const promptsOnly = patchPlanModePrompts(oldFile);
+      const promptsOnly = patchPlanModePrompts(oldFile, envGated);
       return promptsOnly === oldFile ? null : promptsOnly;
     }
     console.error(
@@ -232,7 +248,7 @@ export const writeAutoAcceptPlanMode = (oldFile: string): string | null => {
 
   // Check if already patched
   const alreadyPatchedPattern =
-    /[$\w]+(?:\.current)?\("yes-accept-edits(?:-keep-context)?"\);return null;return|globalThis\.__tweakccPlanAccept=/;
+    /[$\w]+(?:\.current)?\("yes-accept-edits(?:-keep-context)?"\);return null;\}?return|globalThis\.__tweakccPlanAccept=/;
   if (alreadyPatchedPattern.test(oldFile)) {
     return oldFile;
   }
@@ -325,9 +341,14 @@ export const writeAutoAcceptPlanMode = (oldFile: string): string | null => {
       `if(Date.now()-tweakccStarted>10000||Date.now()-globalThis.__tweakccPlanAcceptSeen>2000){clearInterval(globalThis.__tweakccPlanAcceptTimer);globalThis.__tweakccPlanAcceptTimer=null;return}` +
       `try{globalThis.__tweakccPlanAccept?.()}catch{}},250)}`
     : `${acceptFuncName}("yes-accept-edits-keep-context");return null;`;
+  const gatedInsertion = envGated
+    ? `if(${AUTO_ACCEPT_PLAN_ENV_CHECK}){${insertion}}`
+    : insertion;
   const newFile =
-    oldFile.slice(0, injectionIdx) + insertion + oldFile.slice(injectionIdx);
+    oldFile.slice(0, injectionIdx) +
+    gatedInsertion +
+    oldFile.slice(injectionIdx);
 
-  showDiff(oldFile, newFile, insertion, injectionIdx, injectionIdx);
-  return patchPlanModePrompts(newFile);
+  showDiff(oldFile, newFile, gatedInsertion, injectionIdx, injectionIdx);
+  return patchPlanModePrompts(newFile, envGated);
 };
