@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keep `\\`, `\"` and `\'` in an edited quoted system prompt meaning what they meant in Claude Code, and decode quote escapes in the template text of prompts with interpolations (#922)
 - Skip a system prompt whose edited `${...}` names an undefined variable or no longer parses, instead of leaving Claude Code unable to answer or refusing the whole apply (#872)
 - Document which main-prompt parts the lean prompt leaves out, and `CLAUDE_CODE_SIMPLE_SYSTEM_PROMPT=0` (#526)
+- Add `inputBox.cursorColor` (`rgb(r,g,b)`) to color the input cursor instead of inverse video; has no effect when Claude Code draws the terminal's native cursor (`CLAUDE_CODE_NATIVE_CURSOR=1`) (#698)
 
 ## [v4.3.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.3) - 2026-08-13
 
