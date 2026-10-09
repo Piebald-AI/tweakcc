@@ -665,12 +665,14 @@ const applyPatchImplementations = (
           const modContent = moduleContents.get(mod.index)!;
           try {
             const modResult = impl.fn(modContent);
+            // Same contract as the single-bundle path: non-null means the patch
+            // is satisfied here (an unchanged result = already native/applied).
+            if (modResult !== null) failed = false;
             if (modResult !== null && modResult !== modContent) {
               debug(
                 `patch: ${def.id}: matched in module ${mod.index} (${mod.name})`
               );
               moduleContents.set(mod.index, modResult);
-              failed = false;
               applied = true;
             }
           } catch {
