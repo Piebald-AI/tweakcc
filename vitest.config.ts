@@ -9,5 +9,9 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    // Keep tests off the developer's real ~/.tweakcc (config.json, backups).
+    env: {
+      TWEAKCC_CONFIG_DIR: '/tmp/tweakcc-vitest-config',
+    },
   },
 });
