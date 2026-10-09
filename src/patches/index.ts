@@ -91,7 +91,7 @@ import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
 import { writeClearScreen, writeClearScreenModules } from './clearScreen';
-import { writeSessionColor } from './sessionColor';
+import { writeSessionColor, writeSessionColorModules } from './sessionColor';
 import { writeKeybindingCustomization } from './keybindingCustomization';
 import {
   restoreNativeBinaryFromBackup,
@@ -659,10 +659,14 @@ const applyPatchImplementations = (
         content = result;
         if (entry) moduleContents.set(entry.index, content);
       } else {
-        // Then every module; some patches legitimately touch several
+        // Then every module; some patches legitimately touch several. Most
+        // modules lack the anchor, so their expected misses are not reported;
+        // the entrypoint attempt above already logged any real failure.
         for (const mod of jsModules) {
           if (mod === entry) continue;
           const modContent = moduleContents.get(mod.index)!;
+          const consoleError = console.error;
+          console.error = () => {};
           try {
             const modResult = impl.fn(modContent);
             // Same contract as the single-bundle path: non-null means the patch
@@ -677,6 +681,8 @@ const applyPatchImplementations = (
             }
           } catch {
             // Patch threw on this module, try next
+          } finally {
+            console.error = consoleError;
           }
         }
       }
@@ -872,6 +878,7 @@ export const applyCustomization = async (
     },
     'session-color': {
       fn: c => writeSessionColor(c),
+      modules: m => writeSessionColorModules(m),
     },
     'keybinding-customization': {
       fn: c => writeKeybindingCustomization(c),

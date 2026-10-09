@@ -23,15 +23,10 @@ const INJECTION =
   `return{name:"",color:__c}` +
   `})()`;
 
-export const writeSessionColor = (oldFile: string): string | null => {
-  if (
-    oldFile.includes(
-      'standaloneAgentContext:(()=>{let __c=process.env.TWEAKCC_SESSION_COLOR;'
-    )
-  ) {
-    return oldFile;
-  }
+const ALREADY_PATCHED =
+  'standaloneAgentContext:(()=>{let __c=process.env.TWEAKCC_SESSION_COLOR;';
 
+const injectSessionColorState = (oldFile: string): string | null => {
   const patterns = [
     // CC 2.1.295+: activeOverlays at end of state object
     /,activeOverlays:new Set\}\}/,
@@ -64,20 +59,67 @@ export const writeSessionColor = (oldFile: string): string | null => {
     patched = true;
   }
 
-  if (!patched) {
+  return patched ? result : null;
+};
+
+export const writeSessionColor = (oldFile: string): string | null => {
+  if (oldFile.includes(ALREADY_PATCHED)) {
+    return oldFile;
+  }
+
+  const result = injectSessionColorState(oldFile);
+  if (!result) {
     debug('patch: sessionColor: failed to find app state init patterns');
     return null;
   }
 
   const saveColorResult = patchSaveAgentColor(result);
   if (!saveColorResult) {
-    // CC 2.1.295+ may have different saveAgentColor structure
-    // Return partial patch without the save hook
-    debug('patch: sessionColor: patchSaveAgentColor skipped (may be native)');
-    return result;
+    debug('patch: sessionColor: failed to find saveAgentColor');
+    return null;
   }
 
   return saveColorResult;
+};
+
+/**
+ * CC 2.1.280+ split bundles: the app state init and saveAgentColor live in
+ * different chunks (2.1.295: chunk-ehjd0wjr/chunk-e3h5551k and chunk-53bsrq2x).
+ * Both halves are required; a state-only patch would never persist the color.
+ */
+export const writeSessionColorModules = (
+  modules: Map<string, string>
+): Map<string, string> | null => {
+  const changed = new Map<string, string>();
+  let hasState = false;
+  let hasSave = false;
+  for (const [name, source] of modules) {
+    if (source.includes(ALREADY_PATCHED)) {
+      hasState = true;
+      if (source.includes('globalThis.__tweakccSaveAgentColor='))
+        hasSave = true;
+      continue;
+    }
+    let next = injectSessionColorState(source);
+    if (next) hasState = true;
+    if (source.includes('globalThis.__tweakccSaveAgentColor=')) {
+      hasSave = true;
+    } else {
+      const saved = patchSaveAgentColor(next ?? source);
+      if (saved) {
+        hasSave = true;
+        next = saved;
+      }
+    }
+    if (next) changed.set(name, next);
+  }
+  if (!hasState || !hasSave) {
+    debug(
+      `patch: sessionColor: missing ${hasState ? 'saveAgentColor' : 'app state init'}`
+    );
+    return null;
+  }
+  return changed;
 };
 
 export const patchSaveAgentColor = (oldFile: string): string | null => {

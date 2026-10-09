@@ -24,29 +24,25 @@ import { showDiff } from './index';
  *   GV=["sonnet","opus","haiku","fable","best","sonnet[1m]","opus[1m]","fable[1m]","opusplan","opusplan[1m]"]
  */
 const patchModelAliasesList = (oldFile: string): string | null => {
-  // Match the GV array ending with "opusplan"]
-  const pattern = /("opusplan"\])/;
+  // Match the end of the GV alias array: a "[1m]" alias followed by "opusplan"]
+  const pattern = /"[a-z]+\[1m\]",("opusplan"\])/;
 
   const match = oldFile.match(pattern);
   if (!match || match.index === undefined) {
     // Check if already patched
-    if (/"opusplan\[1m\]"\]/.test(oldFile)) return oldFile;
+    if (/"[a-z]+\[1m\]","opusplan","opusplan\[1m\]"\]/.test(oldFile))
+      return oldFile;
     return null; // This file doesn't have the GV array
   }
 
+  const start = match.index + match[0].length - match[1].length;
   const replacement = '"opusplan","opusplan[1m]"]';
   const newFile =
-    oldFile.slice(0, match.index) +
+    oldFile.slice(0, start) +
     replacement +
     oldFile.slice(match.index + match[0].length);
 
-  showDiff(
-    oldFile,
-    newFile,
-    replacement,
-    match.index,
-    match.index + match[0].length
-  );
+  showDiff(oldFile, newFile, replacement, start, match.index + match[0].length);
   return newFile;
 };
 

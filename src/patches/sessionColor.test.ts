@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { writeSessionColor, patchSaveAgentColor } from './sessionColor';
+import {
+  writeSessionColor,
+  writeSessionColorModules,
+  patchSaveAgentColor,
+} from './sessionColor';
 
 const makeSaveAgentColor = () =>
   ';async function Mr$(H,$,q){let K=q??sT(H);' +
@@ -142,6 +146,34 @@ describe('sessionColor', () => {
       const result = patchSaveAgentColor(makeSaveAgentColor())!;
       expect(result).toContain('async function Mr$');
       expect(result).toContain('type:"agent-color"');
+    });
+  });
+
+  describe('writeSessionColorModules', () => {
+    const state295 = 'x={effortValue:void 0,activeOverlays:new Set}}';
+
+    it('patches the state init and saveAgentColor in separate chunks', () => {
+      const mods = new Map([
+        ['/$bunfs/root/chunk-state.js', state295],
+        ['/$bunfs/root/chunk-save.js', makeTryCatchSaveAgentColor()],
+        ['/$bunfs/root/chunk-other.js', 'let a=1;'],
+      ]);
+      const changed = writeSessionColorModules(mods)!;
+      expect([...changed.keys()].sort()).toEqual([
+        '/$bunfs/root/chunk-save.js',
+        '/$bunfs/root/chunk-state.js',
+      ]);
+      expect(changed.get('/$bunfs/root/chunk-state.js')).toContain(
+        'TWEAKCC_SESSION_COLOR'
+      );
+      expect(changed.get('/$bunfs/root/chunk-save.js')).toContain(
+        'globalThis.__tweakccSaveAgentColor='
+      );
+    });
+
+    it('fails instead of applying only the state half', () => {
+      const mods = new Map([['/$bunfs/root/chunk-state.js', state295]]);
+      expect(writeSessionColorModules(mods)).toBeNull();
     });
   });
 });
