@@ -48,7 +48,18 @@ const USER_MESSAGE_PATTERN =
 /** JSX factory: e(b,{planContent:… */
 const JSX_PATTERN = /([$\w]+)\([$\w]+,\{planContent:/;
 
+/** Cloud-session branch: if(Ht()){if(!Ka())return i(d?"Enabled plan mode":"Already in plan mode."),null; */
+const CLOUD_PATTERN =
+  /if\(([$\w]+)\(\)\)\{if\(![$\w]+\(\)\)return [$\w]+\([$\w]+\?"Enabled plan mode":"Already in plan mode\."\),null;/;
+
 const PATCHED_MARKER = '.trim()==="exit"){if(';
+
+/** Everything patchHandler needs from the module that holds the handler. */
+const handlerReady = (file: string): boolean =>
+  HANDLER_PATTERN.test(file) &&
+  PLAN_PATTERN.test(file) &&
+  USER_MESSAGE_PATTERN.test(file) &&
+  JSX_PATTERN.test(file);
 
 const ARGUMENT_HINT =
   'name:"plan",description:"Enable plan mode or view the current session plan",argumentHint:"[open|';
@@ -94,9 +105,16 @@ const patchHandler = (file: string): string | null => {
 
   const [, done, ctx, args, setAppState, , notPlan] = handler;
   const [, , planPath, , readPlan] = plan;
+  // Cloud sessions keep the plan in the cloud workspace, and the dialog's
+  // answer queues a local message, so decline there instead of reading a
+  // stale or missing local plan.
+  const cloud = file.match(CLOUD_PATTERN)?.[1];
   const insertion =
     `if(${args}.trim()==="exit"){` +
     `if(${notPlan})return ${done}("Not in plan mode."),null;` +
+    (cloud
+      ? `if(${cloud}())return ${done}("/plan exit is not available in cloud sessions. Ask Claude to exit plan mode."),null;`
+      : '') +
     `let tccPath=${planPath}(),tccPlan=await ${readPlan}(void 0,${ctx}.storageV5);` +
     `if(!tccPlan)return ${done}("No plan written yet. Use shift+tab to leave plan mode."),null;` +
     `return ${jsx}(${dialog},{` +
@@ -133,18 +151,20 @@ export const writePlanExitCommand = (oldFile: string): string | null => {
     // The handler, the dialog and the command definition are separate
     // modules; patch whichever this module holds, but only if the handler
     // can be patched somewhere.
-    const hasHandler = graphMemo('plan-exit-handler', () =>
-      [...(graphSources()?.values() ?? [])].some(source =>
-        HANDLER_PATTERN.test(source)
-      )
-    );
-    if (!hasHandler) {
+    // Only advertise `exit` once the handler can really be patched: one
+    // module holds everything patchHandler needs, and the dialog exists.
+    const ready = graphMemo('plan-exit-handler', () => {
+      const sources = [...(graphSources()?.values() ?? [])];
+      return (
+        sources.some(handlerReady) &&
+        sources.some(source => DIALOG_PATTERN.test(source))
+      );
+    });
+    if (!ready) {
       console.error('patch: planExitCommand: failed to find the /plan handler');
       return null;
     }
-    const handled = HANDLER_PATTERN.test(oldFile)
-      ? patchHandler(oldFile)
-      : null;
+    const handled = handlerReady(oldFile) ? patchHandler(oldFile) : null;
     return patchArgumentHint(handled ?? oldFile) ?? handled;
   }
 

@@ -34,7 +34,9 @@ describe('writePlanExitCommand', () => {
     expect(onGraph(sources)).toMatchObject({ applied: true, failed: false });
     const handler = sources.get('/$bunfs/root/chunk-0ta1k7h1.js')!;
     expect(handler).toContain(
-      'd=h!=="plan";if(f.trim()==="exit"){if(d)return i("Not in plan mode."),null;let tccPath=gv(),tccPlan=await YKe(void 0,o.storageV5);'
+      'd=h!=="plan";if(f.trim()==="exit"){if(d)return i("Not in plan mode."),null;' +
+        'if(Ht())return i("/plan exit is not available in cloud sessions. Ask Claude to exit plan mode."),null;' +
+        'let tccPath=gv(),tccPlan=await YKe(void 0,o.storageV5);'
     );
     expect(handler).toContain(
       'return e(globalThis.__tweakccExports.chunk_tjhhhqzz_js__Bot,{payload:{plan:tccPlan,planFilePath:tccPath,'
@@ -67,5 +69,14 @@ describe('writePlanExitCommand', () => {
     sources.delete('/$bunfs/root/chunk-0ta1k7h1.js');
 
     expect(onGraph(sources)).toMatchObject({ applied: false, failed: true });
+  });
+
+  it('does not advertise exit when the dialog is missing', () => {
+    const sources = modules();
+    sources.delete('/$bunfs/root/chunk-tjhhhqzz.js');
+
+    expect(onGraph(sources)).toMatchObject({ applied: false, failed: true });
+    expect(sources.get('/$bunfs/root/chunk-53bsrq2x.js')).toBe(COMMAND);
+    expect(sources.get('/$bunfs/root/chunk-0ta1k7h1.js')).toBe(HANDLER);
   });
 });

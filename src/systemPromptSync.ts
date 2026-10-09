@@ -1495,22 +1495,50 @@ const JS_KEYWORDS = new Set(
  * template literals, not keywords, and not the parameters of an arrow function
  * written inside the interpolation.
  */
+const prevNonSpace = (s: string, i: number): string => {
+  while (--i >= 0 && /\s/.test(s[i]));
+  return i >= 0 ? s[i] : '';
+};
+
+const nextNonSpace = (s: string, i: number): string => {
+  while (i < s.length && /\s/.test(s[i])) i++;
+  return i < s.length ? s[i] : '';
+};
+
 export const interpolationReferences = (content: string): Set<string> => {
   const { kinds } = scanTemplateBody(content);
   let code = '';
   for (let i = 0; i < content.length; i++)
     code += kinds[i] === BodyChar.Code ? content[i] : ' ';
 
+  // Arrow parameters, including destructured ones like ({a, b: c}) => …;
+  // pattern keys (b:), default values (= x) and member names (.x) are not
+  // bindings.
   const params = new Set<string>();
-  for (const m of code.matchAll(
-    /\(([\w$\s,]*)\)\s*=>|([A-Za-z_$][\w$]*)\s*=>/g
-  ))
-    for (const name of (m[1] ?? m[2]).split(','))
-      if (name.trim()) params.add(name.trim());
+  for (const m of code.matchAll(/\(([^()]*)\)\s*=>|([A-Za-z_$][\w$]*)\s*=>/g)) {
+    const list = m[1] ?? m[2];
+    for (const id of list.matchAll(/[A-Za-z_$][\w$]*/g)) {
+      const before = prevNonSpace(list, id.index);
+      if (before === '=' || before === '.') continue;
+      if (nextNonSpace(list, id.index + id[0].length) === ':') continue;
+      params.add(id[0]);
+    }
+  }
 
   const refs = new Set<string>();
-  for (const [name] of code.matchAll(/(?<![\w$.])[A-Za-z_$][\w$]*(?!\{)/g))
-    if (!JS_KEYWORDS.has(name) && !params.has(name)) refs.add(name);
+  for (const m of code.matchAll(/(?<![\w$.])[A-Za-z_$][\w$]*(?!\{)/g)) {
+    const name = m[0];
+    if (JS_KEYWORDS.has(name) || params.has(name)) continue;
+    // Object-literal keys ({key: v}) are not references; a ternary operand
+    // (a ? b : c) is, and is preceded by `?` rather than `{` or `,`.
+    const before = prevNonSpace(code, m.index);
+    if (
+      (before === '{' || before === ',') &&
+      nextNonSpace(code, m.index + name.length) === ':'
+    )
+      continue;
+    refs.add(name);
+  }
   return refs;
 };
 

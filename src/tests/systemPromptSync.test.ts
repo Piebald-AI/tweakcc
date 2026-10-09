@@ -1735,3 +1735,26 @@ World`;
     });
   });
 });
+
+describe('interpolationReferences', () => {
+  const refs = (body: string) =>
+    [...promptSync.interpolationReferences(body)].sort();
+
+  it('keeps every operand of a ternary', () => {
+    expect(refs('A ${a ? b : c} Z')).toEqual(['a', 'b', 'c']);
+  });
+
+  it('does not treat object-literal keys as references', () => {
+    expect(refs('A ${f({key: v, other: w})} Z')).toEqual(['f', 'v', 'w']);
+  });
+
+  it('keeps shorthand object properties, which are references', () => {
+    expect(refs('A ${f({a, key: v})} Z')).toEqual(['a', 'f', 'v']);
+  });
+
+  it('treats names bound by a destructured arrow parameter as locals', () => {
+    expect(refs('A ${xs.map(({a}) => a).join(SEP)} Z')).toEqual(['SEP', 'xs']);
+    expect(refs('A ${xs.map(({a, b: c}) => c)} Z')).toEqual(['xs']);
+    expect(refs('A ${xs.map(([x, y]) => x + y)} Z')).toEqual(['xs']);
+  });
+});

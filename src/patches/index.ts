@@ -834,7 +834,14 @@ export const buildPatchImplementations = (
       condition: !!config.settings.inputBox?.chevronIdleThemeColor,
     },
     'input-cursor-color': {
-      fn: c => writeInputCursorColor(c, config.settings.inputBox!.cursorColor!),
+      fn: c => {
+        const cursorColor = config.settings.inputBox!.cursorColor!;
+        const theme = config.settings.themes?.[0];
+        const resolved =
+          (theme?.colors as Record<string, string>)?.[cursorColor] ??
+          cursorColor;
+        return writeInputCursorColor(c, resolved);
+      },
       condition: !!config.settings.inputBox?.cursorColor,
     },
     'subagent-models': {

@@ -88,4 +88,18 @@ describe('writeSuppressLineNumbers on a CC 2.1.295 module graph', () => {
     expect(result).toMatchObject({ applied: false, failed: true });
     expect(sources.get('/prompt.js')).toBe(promptModule);
   });
+
+  it('leaves the prompt alone when the formatter ends its module and cannot be rewritten', () => {
+    // The signature matches, but no top-level keyword follows the closing
+    // brace, so the formatter body cannot be located and stays unchanged.
+    const formatterAtEnd =
+      'function out({content:e,startLine:n,tabAwareSeparator:r=!1}){if(!e)return"";return e.split(`\n`).join(`\n`)}export{out};';
+    const { sources, result } = onGraph({
+      '/fmt.js': formatterAtEnd,
+      '/prompt.js': promptModule,
+    });
+    expect(result).toMatchObject({ applied: false, failed: true });
+    expect(sources.get('/fmt.js')).toBe(formatterAtEnd);
+    expect(sources.get('/prompt.js')).toBe(promptModule);
+  });
 });

@@ -36,6 +36,23 @@ describe('native content I/O', () => {
     expect(await readContent(installation)).toBe('entry');
   });
 
+  it('rejects when the native loader cannot extract a module graph', async () => {
+    vi.mocked(extractNativeInstallationModules).mockResolvedValueOnce(null);
+    await expect(readContent(installation)).rejects.toThrow(
+      'Failed to extract JavaScript from native installation: /tmp/claude'
+    );
+  });
+
+  it('rejects when the entry point index is out of range', async () => {
+    vi.mocked(extractNativeInstallationModules).mockResolvedValueOnce({
+      ...graph,
+      entryPointIndex: graph.modules.length,
+    } as NativeBunGraph);
+    await expect(readContent(installation)).rejects.toThrow(
+      'Failed to extract JavaScript from native installation: /tmp/claude'
+    );
+  });
+
   it('leaves the binary untouched when the entry is unchanged (#683)', async () => {
     await writeContent(installation, 'entry');
     expect(repackNativeInstallationModuleGraph).not.toHaveBeenCalled();
