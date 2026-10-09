@@ -5,6 +5,8 @@ import {
   findTextComponent,
   showDiff,
 } from './index';
+import { isDeepStrictEqual } from 'node:util';
+import { DEFAULT_SETTINGS } from '../defaultSettings';
 import { UserMessageDisplayConfig } from '../types';
 
 /**
@@ -118,6 +120,16 @@ import { UserMessageDisplayConfig } from '../types';
  *  }
  *  ```
  */
+
+/**
+ * The default config is a sentinel for "keep Claude Code's own rendering": it
+ * cannot express CC's two-color `❯ ` marker on the themed background, so
+ * applying it would restyle every user message (#567).
+ */
+export const isUserMessageDisplayCustomized = (
+  config: UserMessageDisplayConfig | undefined
+): config is UserMessageDisplayConfig =>
+  !!config && !isDeepStrictEqual(config, DEFAULT_SETTINGS.userMessageDisplay);
 
 export const writeUserMessageDisplay = (
   oldFile: string,
