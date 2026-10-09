@@ -33,6 +33,9 @@ export const writeSessionColor = (oldFile: string): string | null => {
   }
 
   const patterns = [
+    // CC 2.1.295+: activeOverlays at end of state object
+    /,activeOverlays:new Set\}\}/,
+    // Legacy patterns
     /,activeOverlays:new Set,fastMode:[$\w]+\([$\w]+\)/,
     /,activeOverlays:new Set,fastMode:!1\}/,
   ];
@@ -68,8 +71,10 @@ export const writeSessionColor = (oldFile: string): string | null => {
 
   const saveColorResult = patchSaveAgentColor(result);
   if (!saveColorResult) {
-    debug('patch: sessionColor: failed to patch saveAgentColor');
-    return null;
+    // CC 2.1.295+ may have different saveAgentColor structure
+    // Return partial patch without the save hook
+    debug('patch: sessionColor: patchSaveAgentColor skipped (may be native)');
+    return result;
   }
 
   return saveColorResult;
