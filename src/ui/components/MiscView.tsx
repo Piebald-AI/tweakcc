@@ -2,7 +2,7 @@ import { Box, Text, useInput } from 'ink';
 import { useContext, useState, useMemo } from 'react';
 import { SettingsContext } from '../App';
 import Header from './Header';
-import { TableFormat } from '../../types';
+import { Settings, TableFormat } from '../../types';
 import { DEFAULT_SETTINGS } from '../../defaultSettings';
 
 interface MiscViewProps {
@@ -42,6 +42,15 @@ const TOKEN_ROUNDING_OPTIONS: (number | null)[] = [
   500,
   1000,
 ];
+
+// Shimmer constraints (null = CC default)
+const SHIMMER_STEP_MIN = 10;
+const SHIMMER_STEP_MAX = 1000;
+const SHIMMER_STEP_DEFAULT = 200;
+const SHIMMER_STEP_STEP = 25;
+const SHIMMER_WIDTH_MIN = 1;
+const SHIMMER_WIDTH_MAX = 30;
+const SHIMMER_WIDTH_DEFAULT = 3;
 
 // Statusline throttle constraints
 const STATUSLINE_THROTTLE_MIN = 0;
@@ -92,12 +101,19 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     skipSkillShellValidation: false,
     preventUpdateToUnsupportedVersions: false,
     webFetchUserAgent: null as string | null,
+    shimmer: { ...DEFAULT_SETTINGS.misc.shimmer },
   };
 
   const ensureMisc = () => {
     if (!settings.misc) {
       settings.misc = { ...defaultMisc };
     }
+  };
+
+  const ensureShimmer = (settings: Settings) => {
+    settings.misc ??= { ...defaultMisc };
+    settings.misc.shimmer ??= { ...DEFAULT_SETTINGS.misc.shimmer };
+    return settings.misc.shimmer;
   };
 
   // Helper to cycle through table format options
@@ -480,6 +496,87 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.skipSkillShellValidation =
               !settings.misc!.skipSkillShellValidation;
+          });
+        },
+      },
+      {
+        id: 'shimmerEnabled',
+        title: 'Spinner shimmer',
+        description:
+          'Sweep a highlight across the spinner message while Claude works. Off = static color.',
+        getValue: () => settings.misc?.shimmer?.enabled ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            const shimmer = ensureShimmer(settings);
+            shimmer.enabled = !shimmer.enabled;
+          });
+        },
+      },
+      {
+        id: 'shimmerStepMs',
+        title: 'Shimmer speed',
+        description: `Milliseconds per shimmer step (${SHIMMER_STEP_MIN}-${SHIMMER_STEP_MAX}). Use ←/→ to adjust. Space resets to default (50ms requesting, 200ms otherwise).`,
+        getValue: () => settings.misc?.shimmer?.stepMs ?? null,
+        getDisplayValue: () => {
+          const stepMs = settings.misc?.shimmer?.stepMs ?? null;
+          return stepMs === null ? 'Default' : `${stepMs}ms`;
+        },
+        toggle: () => {
+          updateSettings(settings => {
+            ensureShimmer(settings).stepMs = null;
+          });
+        },
+        increment: () => {
+          updateSettings(settings => {
+            const shimmer = ensureShimmer(settings);
+            shimmer.stepMs = Math.min(
+              SHIMMER_STEP_MAX,
+              (shimmer.stepMs ?? SHIMMER_STEP_DEFAULT) + SHIMMER_STEP_STEP
+            );
+          });
+        },
+        decrement: () => {
+          updateSettings(settings => {
+            const shimmer = ensureShimmer(settings);
+            shimmer.stepMs = Math.max(
+              SHIMMER_STEP_MIN,
+              (shimmer.stepMs ?? SHIMMER_STEP_DEFAULT) - SHIMMER_STEP_STEP
+            );
+          });
+        },
+      },
+      {
+        id: 'shimmerWidth',
+        title: 'Shimmer width',
+        description: `Highlighted cells (${SHIMMER_WIDTH_MIN}-${SHIMMER_WIDTH_MAX}). Use ←/→ to adjust. Space resets to default (${SHIMMER_WIDTH_DEFAULT}).`,
+        getValue: () => settings.misc?.shimmer?.width ?? null,
+        getDisplayValue: () => {
+          const width = settings.misc?.shimmer?.width ?? null;
+          return width === null
+            ? `Default (${SHIMMER_WIDTH_DEFAULT})`
+            : `${width}`;
+        },
+        toggle: () => {
+          updateSettings(settings => {
+            ensureShimmer(settings).width = null;
+          });
+        },
+        increment: () => {
+          updateSettings(settings => {
+            const shimmer = ensureShimmer(settings);
+            shimmer.width = Math.min(
+              SHIMMER_WIDTH_MAX,
+              (shimmer.width ?? SHIMMER_WIDTH_DEFAULT) + 1
+            );
+          });
+        },
+        decrement: () => {
+          updateSettings(settings => {
+            const shimmer = ensureShimmer(settings);
+            shimmer.width = Math.max(
+              SHIMMER_WIDTH_MIN,
+              (shimmer.width ?? SHIMMER_WIDTH_DEFAULT) - 1
+            );
           });
         },
       },

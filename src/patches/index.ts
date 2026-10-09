@@ -92,6 +92,7 @@ import { writeChannelsMode } from './channelsMode';
 import { writeDisableCtrlZSuspend } from './disableCtrlZSuspend';
 import { writeWebFetchUserAgent } from './webFetchUserAgent';
 import { writeSkipSkillShellValidation } from './skipSkillShellValidation';
+import { isShimmerCustomized, writeShimmerStyle } from './shimmerStyle';
 import {
   applyPatchImplementationsToGraph,
   changedModuleSources,
@@ -524,6 +525,12 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.MISC_CONFIGURABLE,
     description:
       'Run !`...` commands in your own skills/commands without the permission check (SECURITY: includes project .claude skills; explicit deny rules still apply; plugins unaffected)',
+  },
+  {
+    id: 'shimmer-style',
+    name: 'Shimmer style',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Spinner message shimmer will be toggled, sped up, or widened',
   },
   {
     id: 'prevent-unsupported-updates',
@@ -975,6 +982,10 @@ export const buildPatchImplementations = (
     'skip-skill-shell-validation': {
       fn: c => writeSkipSkillShellValidation(c),
       condition: !!config.settings.misc?.skipSkillShellValidation,
+    },
+    'shimmer-style': {
+      fn: c => writeShimmerStyle(c, config.settings.misc!.shimmer),
+      condition: isShimmerCustomized(config.settings.misc?.shimmer),
     },
     // npm monolith only. Native builds spread the updater over several
     // modules; applyCustomization patches the whole module graph at once.

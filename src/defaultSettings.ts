@@ -727,6 +727,7 @@ export const DEFAULT_SETTINGS: Settings = {
     skipSkillShellValidation: false,
     preventUpdateToUnsupportedVersions: false,
     webFetchUserAgent: null,
+    shimmer: { enabled: true, stepMs: null, width: null },
   },
   toolsets: [],
   defaultToolset: null,

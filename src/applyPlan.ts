@@ -15,6 +15,7 @@ import {
   PatchId,
 } from './patches/index';
 import { isUserMessageDisplayCustomized } from './patches/userMessageDisplay';
+import { isShimmerCustomized } from './patches/shimmerStyle';
 import { TweakccConfig } from './types';
 import { compareVersions } from './systemPromptSync';
 
@@ -201,6 +202,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.disableCtrlZSuspend;
     case 'skip-skill-shell-validation':
       return !!misc?.skipSkillShellValidation;
+    case 'shimmer-style':
+      return isShimmerCustomized(misc?.shimmer);
     case 'prevent-unsupported-updates':
       return !!misc?.preventUpdateToUnsupportedVersions;
     case 'webfetch-user-agent':
