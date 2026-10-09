@@ -70,6 +70,20 @@ describe('writeInputChevronColor', () => {
     expect(result).not.toContain('color:JVf,dimColor:YVf');
   });
 
+  it('handles the CC 2.1.295 shape (bare imported jsx/jsxs calls)', () => {
+    const input =
+      'function xB(h){let Se=w(6),{isLoading:A,isScreenReader:L,themeColor:H}=h,he=H??void 0,Me;' +
+      'if(Se[0]!==L)Me=L?e(Y,{children:"$\\xA0"}):r(Y,{children:[te.pointer,"\\xA0"]}),Se[0]=L,Se[1]=Me;' +
+      'else Me=Se[1];let De;if(Se[2]!==he||Se[3]!==A||Se[4]!==Me)' +
+      'De=e(n,{color:he,dimColor:A,children:Me}),Se[2]=he,Se[3]=A,Se[4]=Me,Se[5]=De;else De=Se[5];return De}';
+    const result = writeInputChevronColor(input, 'red');
+
+    expect(result).not.toBeNull();
+    expect(result).toContain(
+      'De=e(n,{color:A?he:"red",dimColor:!1,children:Me})'
+    );
+  });
+
   it('rewrites the final chevron pair when the skipped block repeats it', () => {
     const input =
       'var z=1,{isLoading:YVf,isScreenReader:XVf,themeColor:VmI}=qmI,JVf=VmI??void 0,Ytl;' +
