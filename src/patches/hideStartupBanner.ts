@@ -29,6 +29,22 @@ export const writeHideStartupBanner = (oldFile: string): string | null => {
     return newFile;
   }
 
+  // CC >=2.1.282: the card is rendered by a wrapper that also prints the
+  // "Updated to latest. Got N features…" release-notes summary below it.
+  // Disable the wrapper so both are hidden:
+  //   function sa(){let f=w(16),{storageV5:l}=Ce(),…L=e(na,{oneShotsAllowed:A}),…
+  const wrapperPattern =
+    /(function [$\w]+\(\)\{)(?=(?:(?!function )[^]){0,1000}?\([$\w]+,\{oneShotsAllowed:[$\w]+\}\))/;
+  const wrapperMatch = oldFile.match(wrapperPattern);
+  if (wrapperMatch && wrapperMatch.index !== undefined) {
+    const insertIndex = wrapperMatch.index + wrapperMatch[1].length;
+    const insertion = 'return null;';
+    const newFile =
+      oldFile.slice(0, insertIndex) + insertion + oldFile.slice(insertIndex);
+    showDiff(oldFile, newFile, insertion, insertIndex, insertIndex);
+    return newFile;
+  }
+
   // CC >=2.1.156: the startup card component contains both the full-logo
   // branch and the compact/horizontal card branch. Disable the whole component.
   const modernCardPatterns = [

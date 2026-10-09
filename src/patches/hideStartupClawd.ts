@@ -1,6 +1,15 @@
 // Please see the note about writing patches in ./index
 
+import { graphMemo, graphSources } from './graphContext';
 import { showDiff } from './index';
+
+// CC 2.1.294+: the startup card renders the pose component (below) through a
+// host that boxes it at a fixed width and adds the entrance animation, so
+// nulling the pose component leaves a blank column before the card text. The
+// host already returns null in some modes, so null the host instead:
+//   function Yi(l){let X=w(21),{fullscreen:u,entrance:m,ultra:f}=l,…if(Zt(G,ie),v){return null}…
+const startupClawdHostPattern =
+  /function [$\w]+\([$\w]+\)\{(?=let [$\w]+=[$\w]+\(\d+\),\{fullscreen:[$\w]+,entrance:[$\w]+(?:,[$\w]+:[$\w]+)*\}=[$\w]+,)/;
 
 /**
  * Find the Clawd wrapper component function body start index.
@@ -19,6 +28,20 @@ import { showDiff } from './index';
  */
 const findStartupClawdComponents = (oldFile: string): number[] => {
   const indices: number[] = [];
+
+  const hostMatch = oldFile.match(startupClawdHostPattern);
+  if (hostMatch && hostMatch.index !== undefined) {
+    indices.push(hostMatch.index + hostMatch[0].length);
+    return indices;
+  }
+  // In a code-split build the host and the pose component live in different
+  // modules; the pose component is also used outside the startup card.
+  const graphHasHost = graphMemo('startup-clawd-host', () =>
+    [...(graphSources()?.values() ?? [])].some(source =>
+      startupClawdHostPattern.test(source)
+    )
+  );
+  if (graphHasHost) return indices;
 
   // CC 2.1.2xx: Clawd is one pose-aware component that already returns null
   // in some modes (so nulling it is layout-safe) and picks the Apple Terminal

@@ -146,6 +146,35 @@ describe('code-split (CC 2.1.2xx) writer forms', () => {
     expect(out).toContain('function Spe(){return a.terminal');
   });
 
+  // Fixtures below are trimmed from real Claude Code 2.1.295 chunks.
+  it('startup banner (2.1.295): nulls the wrapper that also renders the release-notes summary', () => {
+    const card =
+      'function na(l){let u=w(28),m;if(u[0]!==l)m=l===void 0?{}:l,u[0]=l,u[1]=m;else m=u[1];let{oneShotsAllowed:f}=m,h=f===void 0?!0:f,{columns:v}=ke(),T=tt(),C=V(yM),_=Jv(),D=qln(),A=Dt(D),L=iY(D),{version:O,cwd:H,billingType:W,agentName:j}=Tft(),ee=C??j,de;if(u[2]=}';
+    const wrapper =
+      'function sa(){let f=w(16),{storageV5:l}=Ce(),u=ss(),m=wt(),h;if(f[0]!==u||f[1]!==m)h=()=>!m||SU(u)||Lt()||J_()!==void 0,f[0]=u,f[1]=m,f[2]=h;else h=f[2];let[v]=y(h),T;if(f[3]!==v)T=()=>v||a.DEMO_VERSION?null:ku(),f[3]=v,f[4]=T;else T=f[4];let[C]=y(T),_,D;if(f[5]!==v||f[6]!==l)_=()=>{if(v||!mo(ce().lastReleaseNotesSeen)){return}Ae(DM,l)},D=[v,l],f[5]=v,f[6]=l,f[7]=_,f[8]=D;else _=f[7],D=f[8];P(_,D);const A=!v;let L;if(f[9]!==A)L=e(na,{oneShotsAllowed:A}),f[9]=A,f[10]=L;else L=f[10];let O;if(f[11]!==C)O=C&&r(s,{paddingLeft:2,flexDirection:"column",children:[e(n,{bold:!0,children:C}),r(n,{dimColor:!0,children:[e(jt,{url:g3n,children:hBr})," for details"]})]}),f[11]=C,f[12]=O;else O=f[12];let H;if(f[13]!==L||f[14]!==O)H=r(Y,{children:[L,O,!1]}),f[13]=L,f[14]=O,f[15]=H;else H=f[15];return H}';
+    const out = writeHideStartupBanner(card + wrapper)!;
+    expect(out).toContain('function sa(){return null;let f=w(16)');
+    // The card itself is left alone; the disabled wrapper never renders it.
+    expect(out).toContain('function na(l){let u=w(28)');
+  });
+
+  it('startup Clawd (2.1.295): nulls the fixed-width host, not the shared pose component', () => {
+    const { sources, result } = onGraph(
+      {
+        '/clawd.js':
+          'function kwe(o){let i=w(47),t;if(i[0]!==o)t=o===void 0?{}:o,i[0]=o,i[1]=t;else t=i[1];let{pose:c,color:l,paint:u}=t,d=c===void 0?"default":c,p=l===void 0?"clawd_body":l;if(tt()){return null}if(Vln(d)){let x;if(i[2]!==p||i[3]!==d)x=Ewe()?e(ie,{facing:d.facing,color:p}):e(Ct,{eyes:"open",color:p}),i[2]=p,i[3]=d,i[4]=x;else x=i[4];return x}let x;if(i[5]!==d)x=WKn(d),i[5]=d,i[6]=x;else x=i[6];let m=x;}',
+        '/card.js':
+          'function Yi(l){let X=w(21),{fullscreen:u,entrance:m,ultra:f}=l,h=_u(),v=tt(),T=rb(zb().effortUltra),C=vqe(ur()[0]),_=tie(),D=R(_),A=Te(Ym),L=A?.columns,O=A?.rows,[H,W,j]=m6(),{isVisible:ee}=W,[,de]=hh(YT,0),Se=f&&u&&QPe(ko)===ko&&_!=="blurred"&&!Lt()&&J_()===void 0&&!h&&!v&&T!==null&&ge.level>=3&&Ew}',
+      },
+      writeHideStartupClawd
+    );
+    expect(result.applied).toBe(true);
+    expect(sources.get('/card.js')).toContain(
+      'function Yi(l){return null;let X=w(21),{fullscreen:u,entrance:m,ultra:f}=l'
+    );
+    expect(sources.get('/clawd.js')).toContain('function kwe(o){let i=w(47)');
+  });
+
   it('input chevron: tolerates nested object literals and a bare JSX call', () => {
     const src =
       'function iF(h){let we=w(6),{isLoading:M,isScreenReader:E,themeColor:K}=h,Se=K??void 0,Ce;if(we[0]!==E)Ce=E?e(G,{children:"$"}):r(G,{children:[X.pointer]});let Me;if(we[2]!==Se||we[3]!==M)Me=e(n,{color:Se,dimColor:M,children:Ce});return Me}';
