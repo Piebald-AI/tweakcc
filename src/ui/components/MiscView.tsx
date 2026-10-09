@@ -87,6 +87,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableVoiceMode: false,
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
+    disableCtrlZSuspend: false,
     preventUpdateToUnsupportedVersions: false,
   };
 
@@ -671,6 +672,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.allowCustomAgentModels =
               !settings.misc!.allowCustomAgentModels;
+          });
+        },
+      },
+      {
+        id: 'disableCtrlZSuspend',
+        title: 'Disable Ctrl-Z suspend',
+        description:
+          'Ctrl-Z no longer suspends Claude Code to the background; it reaches keybindings like any other key.',
+        getValue: () => settings.misc?.disableCtrlZSuspend ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.disableCtrlZSuspend =
+              !settings.misc!.disableCtrlZSuspend;
           });
         },
       },
