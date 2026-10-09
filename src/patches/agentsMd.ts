@@ -1,6 +1,7 @@
 // Please see the note about writing patches in ./index
 
 import { showDiff } from './index';
+import { debug } from '../utils';
 
 /**
  * Patches the CLAUDE.md file reading function to also check for alternative
@@ -16,6 +17,17 @@ export const writeAgentsMd = (
   file: string,
   altNames: string[]
 ): string | null => {
+  // CC 2.1.295+ has native AGENTS.md support in the _bt array
+  // Check if AGENTS.md is already in the file paths array
+  if (
+    file.includes('["AGENTS.md"]') ||
+    file.includes('["AGENTS.md",') ||
+    file.includes('"AGENTS.md"],')
+  ) {
+    debug('patch: agentsMd: native AGENTS.md support detected, skipping patch');
+    return file;
+  }
+
   const async2214 = writeAgentsMdAsync2214(file, altNames);
   if (async2214) return async2214;
 

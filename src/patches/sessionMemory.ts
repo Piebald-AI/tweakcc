@@ -46,6 +46,7 @@
 //     not a literal tool-call count.
 
 import { showDiff, globalReplace } from './index';
+import { debug } from '../utils';
 
 const LEGACY_EXTRACTION_GATE =
   /function [$\w]+\(\)\{return [$\w]+\("tengu_session_memory"/;
@@ -257,6 +258,18 @@ const patchUpdateThresholds = (
  * Combined patch - applies extraction, past sessions, token limits, and update thresholds
  */
 export const writeSessionMemory = (oldFile: string): string | null => {
+  // CC 2.1.295+ has native session memory support via CLAUDE_CODE_POST_TURN_MEMORY
+  // Check if the native memory infrastructure exists
+  if (
+    oldFile.includes('CLAUDE_CODE_POST_TURN_MEMORY') &&
+    oldFile.includes('CLAUDE_CODE_POST_TURN_MEMORY_CONFIG')
+  ) {
+    debug(
+      'patch: sessionMemory: native session memory support detected, skipping patch'
+    );
+    return oldFile;
+  }
+
   let newFile = patchExtraction(oldFile);
   if (!newFile) return null;
 
