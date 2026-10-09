@@ -81,9 +81,7 @@ describe('code-split (CC 2.1.2xx) writer forms', () => {
     const names = sources.get('/names.js')!;
     expect(names).toBe('var pi="x",Ir={"dark":"Dark mode","mine":"Mine"};');
     expect(() => assertPatchedModuleParses('/names.js', names)).not.toThrow();
-    expect(sources.get('/schema.js')).toContain(
-      '"dark-daltonized","dark","mine"]'
-    );
+    expect(sources.get('/schema.js')).toContain('"dark-daltonized","mine"]');
   });
 
   it('thinker format: wraps the default-suffix branch only', () => {
