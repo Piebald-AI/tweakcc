@@ -12,77 +12,68 @@ import { showDiff, LocationResult } from './index';
 /**
  * Find the MCP non-blocking check location.
  *
- * Pattern: !someVar(process.env.MCP_CONNECTION_NONBLOCKING)
- * This check determines whether to block on MCP connections.
- * Replacing it with "false" forces non-blocking mode.
+ * Old CC: !someVar(process.env.MCP_CONNECTION_NONBLOCKING) decides whether to
+ * block on MCP connections; replacing it with "false" forces non-blocking.
+ *
+ * CC 2.1.295 (chunk with the headless MCP connect orchestrator):
+ *   g=a.MCP_CONNECTION_NONBLOCKING!==!1;ERo(g);
+ * `a` is the parsed env (MCP_CONNECTION_NONBLOCKING is a triBool), so
+ * non-blocking is already the default and only an explicit
+ * MCP_CONNECTION_NONBLOCKING=0/false opts back into blocking. Replacing the
+ * check with "!0" makes non-blocking unconditional, like the old patch.
  */
 const getNonBlockingCheckLocation = (
   oldFile: string
-): LocationResult | null => {
-  // Match: !VARNAME(process.env.MCP_CONNECTION_NONBLOCKING)
-  // The variable name changes between npm/native builds, so we match any identifier
-  const pattern = /![$\w]+\(process\.env\.MCP_CONNECTION_NONBLOCKING\)/;
-  const match = oldFile.match(pattern);
-
+): { location: LocationResult; newValue: string } | null => {
+  const match =
+    oldFile.match(/![$\w]+\(process\.env\.MCP_CONNECTION_NONBLOCKING\)/) ??
+    oldFile.match(/[$\w]+\.MCP_CONNECTION_NONBLOCKING!==!1/);
   if (!match || match.index === undefined) {
-    // CC ≥2.1.79 removed this env var — non-blocking is now the default.
     return null;
   }
 
   return {
-    startIndex: match.index,
-    endIndex: match.index + match[0].length,
+    location: {
+      startIndex: match.index,
+      endIndex: match.index + match[0].length,
+    },
+    newValue: match[0].startsWith('!') ? 'false' : '!0',
   };
 };
 
 /**
  * Find the MCP batch size default value location.
  *
- * Pattern: parseInt(process.env.MCP_SERVER_CONNECTION_BATCH_SIZE||"",10)||3
- * We want to replace the "3" with a higher value.
+ * Old CC: parseInt(process.env.MCP_SERVER_CONNECTION_BATCH_SIZE||"",10)||3
+ * CC ≥2.1.140: parseInt(process.env.MCP_SERVER_CONNECTION_BATCH_SIZE||"",10);return H>0?H:3
+ * CC 2.1.295: return a.MCP_SERVER_CONNECTION_BATCH_SIZE??3
  */
 const getBatchSizeLocation = (oldFile: string): LocationResult | null => {
-  // Match the full pattern and capture position of the default "3".
-  // Old CC: parseInt(process.env.MCP_SERVER_CONNECTION_BATCH_SIZE||"",10)||3
-  // CC ≥2.1.140: parseInt(process.env.MCP_SERVER_CONNECTION_BATCH_SIZE||"",10);return H>0?H:3
   const pattern =
-    /MCP_SERVER_CONNECTION_BATCH_SIZE\|\|"",10\)(?:\|\||;return [$\w]+>0\?[$\w]+:)(\d+)/;
+    /MCP_SERVER_CONNECTION_BATCH_SIZE(?:\|\|"",10\)(?:\|\||;return [$\w]+>0\?[$\w]+:)|\?\?)(\d+)/;
   const match = oldFile.match(pattern);
 
   if (!match || match.index === undefined) {
-    console.error(
-      'patch: mcpStartup: failed to find MCP_SERVER_CONNECTION_BATCH_SIZE default'
-    );
     return null;
   }
 
-  // Find the position of the default number (the captured group)
-  const fullMatch = match[0];
-  const defaultValue = match[1];
-  const defaultValueOffset = fullMatch.lastIndexOf(defaultValue);
-
-  const startIndex = match.index + defaultValueOffset;
-  const endIndex = startIndex + defaultValue.length;
-
+  const startIndex = match.index + match[0].length - match[1].length;
   return {
     startIndex,
-    endIndex,
+    endIndex: startIndex + match[1].length,
   };
 };
 
 /**
- * Apply non-blocking MCP startup by replacing the blocking check with "false".
+ * Apply non-blocking MCP startup by forcing the non-blocking check on.
  */
 export const writeMcpNonBlocking = (oldFile: string): string | null => {
-  const location = getNonBlockingCheckLocation(oldFile);
-  if (!location) {
-    // CC ≥2.1.79 removed MCP_CONNECTION_NONBLOCKING — non-blocking is now default.
-    // Return file unchanged (no-op) instead of failing.
-    return oldFile;
+  const found = getNonBlockingCheckLocation(oldFile);
+  if (!found) {
+    return null;
   }
 
-  // Replace the check with "false" to force non-blocking mode
-  const newValue = 'false';
+  const { location, newValue } = found;
   const newFile =
     oldFile.slice(0, location.startIndex) +
     newValue +
