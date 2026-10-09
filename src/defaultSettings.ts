@@ -722,6 +722,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
     preventUpdateToUnsupportedVersions: false,
+    webFetchUserAgent: null,
   },
   toolsets: [],
   defaultToolset: null,

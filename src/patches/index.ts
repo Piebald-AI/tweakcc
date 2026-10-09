@@ -88,6 +88,7 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
+import { writeWebFetchUserAgent } from './webFetchUserAgent';
 import {
   applyPatchImplementationsToGraph,
   changedModuleSources,
@@ -499,6 +500,12 @@ const PATCH_DEFINITIONS = [
     name: 'Prevent unsupported updates',
     group: PatchGroup.MISC_CONFIGURABLE,
     description: 'Native/npm auto-updates require a published prompt snapshot',
+  },
+  {
+    id: 'webfetch-user-agent',
+    name: 'WebFetch User-Agent',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'WebFetch sends the configured User-Agent string',
   },
 ] as const;
 
@@ -929,6 +936,11 @@ export const buildPatchImplementations = (
           ? null
           : writePreventUnsupportedUpdates(c),
       condition: !!config.settings.misc?.preventUpdateToUnsupportedVersions,
+    },
+    'webfetch-user-agent': {
+      fn: c =>
+        writeWebFetchUserAgent(c, config.settings.misc!.webFetchUserAgent!),
+      condition: !!config.settings.misc?.webFetchUserAgent,
     },
   };
 

@@ -140,6 +140,7 @@ export interface MiscConfig {
   enableVoiceConciseOutput: boolean;
   enableChannelsMode: boolean;
   preventUpdateToUnsupportedVersions: boolean;
+  webFetchUserAgent: string | null;
 }
 
 export interface InputPatternHighlighter {
