@@ -896,7 +896,7 @@ export function extractClaudeJsFromNativeInstallation(
 }
 
 /**
- * Replaces explicitly identified JavaScript sources in a normalized Bun blob.
+ * Replaces explicitly identified JavaScript or text-loader sources in a Bun blob.
  * Returns the original buffer for byte-identical edits. Throws before allocating
  * output for duplicate/missing targets, invalid UTF-8, or unsupported records.
  *
@@ -919,7 +919,7 @@ export function replaceBunModuleSources(
     }
     if (!isUtf8(replacement.contents) || replacement.contents.includes(0)) {
       throw new Error(
-        'Bun replacement must contain UTF-8 JavaScript without NUL bytes'
+        'Bun replacement must contain UTF-8 source text without NUL bytes'
       );
     }
     targets.set(replacement.index, replacement);
@@ -931,8 +931,14 @@ export function replaceBunModuleSources(
     if (replacement.name !== name) {
       throw new Error(`Bun replacement name mismatch at index ${index}`);
     }
-    if (module.loader !== 1) {
-      throw new Error(`Cannot replace non-JavaScript Bun module: ${name}`);
+    // Bun text-loader modules contain literal prompt assets. Permit only this
+    // explicit loader alongside JS; a .md/.js filename cannot authorize writes
+    // to a binary File/NAPI payload. Loader values are append-only:
+    // oven-sh/bun@4661e494, src/ast/loader.rs (Js=1, Text=13).
+    if (module.loader !== 1 && module.loader !== 13) {
+      throw new Error(
+        `Cannot replace non-JavaScript/non-text Bun module: ${name}`
+      );
     }
     if (![0, 1, 2].includes(module.encoding)) {
       throw new Error(`Unsupported Bun source encoding: ${module.encoding}`);

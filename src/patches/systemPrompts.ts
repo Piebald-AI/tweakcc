@@ -143,17 +143,43 @@ export const applySystemPrompts = async (
   escapeNonAscii?: boolean,
   patchFilter?: string[] | null
 ): Promise<SystemPromptsResult> => {
-  // Auto-detect if we should escape non-ASCII characters based on cli.js content
-  const shouldEscapeNonAscii = escapeNonAscii ?? detectUnicodeEscaping(content);
+  const result = await applySystemPromptsToSources(
+    [content],
+    version,
+    escapeNonAscii,
+    patchFilter
+  );
+  return { newContent: result.sources[0], results: result.results };
+};
 
-  if (shouldEscapeNonAscii) {
-    debug(
-      'Detected Unicode escaping in cli.js - will escape non-ASCII characters in prompts'
-    );
-  }
-
-  // Extract BUILD_TIME from cli.js content
-  const buildTime = extractBuildTime(content);
+/**
+ * Applies prompts to independent JavaScript sources, preserving array order.
+ * Loads Markdown once and reports a missing prompt only after searching every
+ * source. Sources must remain separate: captures and replacements belong to one
+ * module's lexical scope, never to a concatenated, synthetic bundle. Returns a
+ * new source array; never mutates the caller's array or writes executable files.
+ * Loading errors propagate, while unsafe replacements are reported and skipped.
+ * `textSourceIndices` identifies Bun text-loader payloads by array position;
+ * those contain literal prompt text and must bypass JavaScript escaping.
+ */
+export const applySystemPromptsToSources = async (
+  inputSources: readonly string[],
+  version: string,
+  escapeNonAscii?: boolean,
+  patchFilter?: string[] | null,
+  textSourceIndices: ReadonlySet<number> = new Set()
+): Promise<{ sources: string[]; results: PatchResult[] }> => {
+  const sources = [...inputSources];
+  // Match the original source's encoding convention throughout the run. A
+  // user's first edit must not change how later prompts in that module encode.
+  const escapeSource = sources.map(
+    (source, index) =>
+      !textSourceIndices.has(index) &&
+      (escapeNonAscii ?? detectUnicodeEscaping(source))
+  );
+  // Split builds can put build metadata outside the entrypoint. All modules
+  // belong to the same executable, so the first timestamp is the build's value.
+  const buildTime = sources.map(extractBuildTime).find(Boolean);
   if (buildTime) {
     debug(`Extracted BUILD_TIME from cli.js: ${buildTime}`);
   }
@@ -195,10 +221,8 @@ export const applySystemPrompts = async (
     // construction + match: an oversized pattern (e.g. the Model Migration Guide) can
     // overflow V8's regex stack on Node <=22 and abort the whole --apply (#753).
     let pattern: RegExp;
-    let matches: RegExpMatchArray[];
     try {
       pattern = new RegExp(regex, 'gsi');
-      matches = [...content.matchAll(pattern)];
     } catch (error) {
       console.log(
         chalk.yellow(
@@ -217,7 +241,32 @@ export const applySystemPrompts = async (
       continue;
     }
 
-    if (matches.length > 0) {
+    let found = false;
+    for (let sourceIndex = 0; sourceIndex < sources.length; sourceIndex++) {
+      let content = sources[sourceIndex];
+      let matches: RegExpMatchArray[];
+      try {
+        matches = [...content.matchAll(pattern)];
+      } catch (error) {
+        // V8 may defer regex compilation until execution. Preserve the source
+        // and report the failure instead of aborting unrelated prompt patches.
+        results.push({
+          id: promptId,
+          name: prompt.name,
+          group: PatchGroup.SYSTEM_PROMPTS,
+          applied: false,
+          failed: true,
+          details: `regex too complex: ${String(error)}`,
+        });
+        found = true;
+        break;
+      }
+      if (matches.length === 0) continue;
+      found = true;
+      // Text-loader modules are runtime strings, not JS string literals. Never
+      // escape their backticks, backslashes, Unicode, or literal ${...} prose.
+      const isTextSource = textSourceIndices.has(sourceIndex);
+      const shouldEscapeNonAscii = escapeSource[sourceIndex];
       const firstMatch = matches[0];
       const matchIndex = firstMatch.index!;
 
@@ -261,7 +310,8 @@ export const applySystemPrompts = async (
 
         // Check the delimiter character before this match to determine string type
         const mIndex = m.index!;
-        const delimiter = mIndex > 0 ? content[mIndex - 1] : '';
+        const delimiter =
+          !isTextSource && mIndex > 0 ? content[mIndex - 1] : '';
 
         // For backtick-delimited prompts, `${...}` is live interpolation. A stale
         // .md (identifier renamed upstream without a version bump, #899) leaves an
@@ -343,6 +393,7 @@ export const applySystemPrompts = async (
           name: prompt.name,
           group: PatchGroup.SYSTEM_PROMPTS,
           applied: false,
+          failed: true,
           details: abortDetails,
         });
         continue;
@@ -414,7 +465,9 @@ export const applySystemPrompts = async (
         ...(hashFailed && { failed: true }),
         details,
       });
-    } else {
+      sources[sourceIndex] = content;
+    }
+    if (!found) {
       // Temporarily skip patching these prompts because they're markdown in the npm install but HTML in the native.
       if (
         !prompt.name.startsWith('Data:') &&
@@ -433,7 +486,9 @@ export const applySystemPrompts = async (
       );
       verbose(`  Trying to match pattern in cli.js...`);
       try {
-        const testMatch = content.match(new RegExp(regex.substring(0, 100)));
+        const testMatch = sources.some(source =>
+          new RegExp(regex.substring(0, 100)).test(source)
+        );
         verbose(
           `  Partial match result: ${testMatch ? 'found partial' : 'no match'}`
         );
@@ -443,8 +498,24 @@ export const applySystemPrompts = async (
     }
   }
 
-  return {
-    newContent: content,
-    results,
-  };
+  // A prompt can occur in several modules. Keep one UI result, retaining any
+  // failed/skipped occurrence even if another module was successfully changed.
+  const merged = new Map<string, PatchResult>();
+  for (const result of results) {
+    const previous = merged.get(result.id);
+    merged.set(
+      result.id,
+      previous
+        ? {
+            ...result,
+            applied: previous.applied || result.applied,
+            failed: previous.failed || result.failed,
+            details: [
+              ...new Set([previous.details, result.details].filter(Boolean)),
+            ].join('; '),
+          }
+        : result
+    );
+  }
+  return { sources, results: [...merged.values()] };
 };
