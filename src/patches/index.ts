@@ -559,6 +559,29 @@ export interface PatchApplied {
 // Helper Functions
 // =============================================================================
 
+/**
+ * Runs `fn` while recording console.log/warn/error (patch diagnostics, debug
+ * lines and verbose diffs) so the caller can decide whether to print them.
+ */
+const withCapturedConsole = <T>(
+  fn: () => T
+): { value: T; replay: () => void } => {
+  const saved = { log: console.log, warn: console.warn, error: console.error };
+  const lines: [keyof typeof saved, unknown[]][] = [];
+  for (const level of Object.keys(saved) as (keyof typeof saved)[]) {
+    console[level] = (...args: unknown[]) => void lines.push([level, args]);
+  }
+  try {
+    const value = fn();
+    return {
+      value,
+      replay: () => lines.forEach(([level, args]) => saved[level](...args)),
+    };
+  } finally {
+    Object.assign(console, saved);
+  }
+};
+
 export const escapeIdent = (ident: string): string => {
   return ident.replace(/\$/g, '\\$');
 };
@@ -650,29 +673,36 @@ const applyPatchImplementations = (
           }
         }
       }
-    } else {
-      // Try the entrypoint first (the whole bundle on npm / older native builds)
+    } else if (!corpus) {
+      // npm / single-bundle install: one attempt on the whole bundle
       const result = impl.fn(content);
       if (result !== null) {
         failed = false;
         applied = result !== content;
         content = result;
-        if (entry) moduleContents.set(entry.index, content);
+      }
+    } else {
+      // Entrypoint first, then every chunk; some patches touch several. Most
+      // chunks lack the anchor, so each attempt's console output is kept only
+      // when it matched. The entrypoint's miss is reported if nothing matched.
+      const entryAttempt = withCapturedConsole(() => impl.fn(content));
+      if (entryAttempt.value !== null) {
+        entryAttempt.replay();
+        failed = false;
+        applied = entryAttempt.value !== content;
+        moduleContents.set(entry!.index, entryAttempt.value);
       } else {
-        // Then every module; some patches legitimately touch several. Most
-        // modules lack the anchor, so their expected misses are not reported;
-        // the entrypoint attempt above already logged any real failure.
         for (const mod of jsModules) {
           if (mod === entry) continue;
           const modContent = moduleContents.get(mod.index)!;
-          const consoleError = console.error;
-          console.error = () => {};
           try {
-            const modResult = impl.fn(modContent);
+            const attempt = withCapturedConsole(() => impl.fn(modContent));
+            const modResult = attempt.value;
             // Same contract as the single-bundle path: non-null means the patch
             // is satisfied here (an unchanged result = already native/applied).
             if (modResult !== null) failed = false;
             if (modResult !== null && modResult !== modContent) {
+              attempt.replay();
               debug(
                 `patch: ${def.id}: matched in module ${mod.index} (${mod.name})`
               );
@@ -681,10 +711,9 @@ const applyPatchImplementations = (
             }
           } catch {
             // Patch threw on this module, try next
-          } finally {
-            console.error = consoleError;
           }
         }
+        if (failed) entryAttempt.replay();
       }
     }
     if (entry) content = moduleContents.get(entry.index)!;
