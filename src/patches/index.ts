@@ -88,6 +88,7 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
+import { writeSkipSkillShellValidation } from './skipSkillShellValidation';
 import {
   applyPatchImplementationsToGraph,
   changedModuleSources,
@@ -493,6 +494,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Enable MCP channel notifications (--channels without allowlist or dev flag)',
+  },
+  {
+    id: 'skip-skill-shell-validation',
+    name: 'Skip skill shell validation',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Run !`...` commands in your own skills/commands without the permission check (SECURITY: includes project .claude skills; explicit deny rules still apply; plugins unaffected)',
   },
   {
     id: 'prevent-unsupported-updates',
@@ -920,6 +928,10 @@ export const buildPatchImplementations = (
     'channels-mode': {
       fn: c => writeChannelsMode(c),
       condition: !!config.settings.misc?.enableChannelsMode,
+    },
+    'skip-skill-shell-validation': {
+      fn: c => writeSkipSkillShellValidation(c),
+      condition: !!config.settings.misc?.skipSkillShellValidation,
     },
     // npm monolith only. Native builds spread the updater over several
     // modules; applyCustomization patches the whole module graph at once.

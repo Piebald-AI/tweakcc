@@ -721,6 +721,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableVoiceMode: false,
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
+    skipSkillShellValidation: false,
     preventUpdateToUnsupportedVersions: false,
   },
   toolsets: [],
