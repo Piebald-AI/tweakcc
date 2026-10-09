@@ -86,7 +86,7 @@ import { writeAutoAcceptPlanMode } from './autoAcceptPlanMode';
 import { writeAllowBypassPermsInSudo } from './allowBypassPermsInSudo';
 import { writeSuppressNativeInstallerWarning } from './suppressNativeInstallerWarning';
 import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
-import { writeWorktreeMode } from './worktreeMode';
+import { writeWorktreeMode, writeWorktreeModeModules } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
@@ -1066,6 +1066,7 @@ export const applyCustomization = async (
     },
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),
+      modules: m => writeWorktreeModeModules(m),
       condition: !!config.settings.misc?.enableWorktreeMode,
     },
     'session-memory': {
