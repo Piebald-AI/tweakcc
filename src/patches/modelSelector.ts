@@ -24,9 +24,14 @@ export const CUSTOM_MODELS: { value: string; label: string; description: string 
 const findCustomModelListInsertionPoint = (
   fileContents: string
 ): { insertionIndex: number; modelListVar: string } | null => {
-  // 1. Find the custom model push pattern
+  // 1. Find the custom model push pattern. CC <= 2.1.2xx pushes a plain
+  // `{value,label,description:"Custom model"}`; CC 2.1.295 no longer does, but the
+  // option list builder (chunk-75cm4bmg.js `lg`) starts with the
+  // ANTHROPIC_CUSTOM_MODEL_OPTION push onto the same list:
+  //   function lg(e,r){let n=ig(e,r),s=n??Zh(e),h=a.ANTHROPIC_CUSTOM_MODEL_OPTION;
+  //   if(h&&!s.some((M)=>M.value===h))s.push({value:h,label:a.ANTHROPIC_CUSTOM_MODEL_OPTION_NAME??...
   const pushPattern =
-    /[,;{} ]([$\w]+)\.push\(\{value:[$\w]+,label:[$\w]+,description:"Custom model"\}\)/;
+    /[,;{} )]([$\w]+)\.push\(\{value:[$\w]+,label:(?:[$\w]+,description:"Custom model"\}\)|[$\w]+\.ANTHROPIC_CUSTOM_MODEL_OPTION_NAME\b)/;
   const pushMatch = fileContents.match(pushPattern);
   if (!pushMatch || pushMatch.index === undefined) {
     console.error(

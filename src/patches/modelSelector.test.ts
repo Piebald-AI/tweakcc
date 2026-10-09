@@ -37,4 +37,18 @@ describe('writeModelCustomizations', () => {
     const out = writeModelCustomizations(memberExpr);
     expect(out).toBeNull();
   });
+  // Real CC 2.1.295 excerpt (chunk-75cm4bmg.js): no plain "Custom model" push any
+  // more; the option list builder opens with the ANTHROPIC_CUSTOM_MODEL_OPTION push.
+  const chunk295 =
+    'function Zh(e=!1){return[Mi(e)]}' +
+    'function lg(e,r){let n=ig(e,r),s=n??Zh(e),h=a.ANTHROPIC_CUSTOM_MODEL_OPTION;if(h&&!s.some((M)=>M.value===h))s.push({value:h,label:a.ANTHROPIC_CUSTOM_MODEL_OPTION_NAME??MPt(h)??h,description:a.ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION??`Custom model (${h})`,sessionTail:!0});' +
+    'return Yt(s,r)}';
+
+  it('injects the custom model list on CC 2.1.295 (ANTHROPIC_CUSTOM_MODEL_OPTION push)', () => {
+    const out = writeModelCustomizations(chunk295);
+    expect(out).not.toBeNull();
+    expect(out).toContain(
+      'h=a.ANTHROPIC_CUSTOM_MODEL_OPTION;s.push({"value":"claude-opus-4-6"'
+    );
+  });
 });
