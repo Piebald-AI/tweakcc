@@ -142,6 +142,7 @@ export interface MiscConfig {
   enableVoiceConciseOutput: boolean;
   enableChannelsMode: boolean;
   disableCtrlZSuspend: boolean;
+  skipSkillShellValidation: boolean;
   preventUpdateToUnsupportedVersions: boolean;
   webFetchUserAgent: string | null;
 }

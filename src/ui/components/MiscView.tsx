@@ -89,6 +89,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
     disableCtrlZSuspend: false,
+    skipSkillShellValidation: false,
     preventUpdateToUnsupportedVersions: false,
     webFetchUserAgent: null as string | null,
   };
@@ -465,6 +466,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.enableChannelsMode =
               !settings.misc!.enableChannelsMode;
+          });
+        },
+      },
+      {
+        id: 'skipSkillShellValidation',
+        title: 'Skip shell permission check in your skills/commands',
+        description:
+          'SECURITY: !`...` commands in your user and project skills/commands run without a permission prompt. Explicit deny rules still apply.',
+        getValue: () => settings.misc?.skipSkillShellValidation ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.skipSkillShellValidation =
+              !settings.misc!.skipSkillShellValidation;
           });
         },
       },

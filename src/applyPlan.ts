@@ -199,6 +199,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.enableChannelsMode;
     case 'disable-ctrl-z':
       return !!misc?.disableCtrlZSuspend;
+    case 'skip-skill-shell-validation':
+      return !!misc?.skipSkillShellValidation;
     case 'prevent-unsupported-updates':
       return !!misc?.preventUpdateToUnsupportedVersions;
     case 'webfetch-user-agent':
