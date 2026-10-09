@@ -220,3 +220,64 @@ describe('agentsMd', () => {
     });
   });
 });
+
+describe('agentsMd CC 2.1.295', () => {
+  // Real excerpts of /$bunfs/root/chunk-53bsrq2x.js from CC 2.1.295: the per-file
+  // reader (now with a fifth, held-read parameter) and the project walk's file list.
+  const reader295 =
+    'async function EOe(e,n,r,s,h){try{let y,S=!1;if(h){let w=await h(e,lU);return w===void 0?{info:null,includePaths:[]}:TOe(w,e,n,r)}if(s){let w=await X7n(s);switch(w.kind){case"absent":return{info:null,includePaths:[]};case"error":return PTt(w.code,e),{info:null,includePaths:[]};case"skipped":S=w.isDirectory,y=null;break;case"content":y=w.content;break}}else{let w=ie();y=await Uk(w,e,lU,(H)=>{S=H.isDirectory()})}if(y===null){t(`[CLAUDE.md] skipping ${e}: not a regular file or exceeds ${lU} byte limit`);let w=ROe();if(!w.skip&&!S)w.skip=!0,f("context_claude_md_load","file_skipped_special_or_oversize");return{info:null,includePaths:[]}}return TOe(y,e,n,r)}catch(y){return Y7n(y,e),{info:null,includePaths:[]}}}';
+  const projectFiles295 =
+    'let Tt=ct.map((An)=>{let no=ySt(An,nt),io=Ge&&!no,lo=Km(An,"CLAUDE.local.md");return{dir:An,project:io,projectFiles:io?[Km(An,"CLAUDE.md"),Km(An,".claude","CLAUDE.md")].filter((Vo)=>!_e(Vo,"Project")):[],rulesDir:io?Km(An,".claude","rules"):void 0,localFile:Je&&!_e(lo,"Local")?lo:void 0}})';
+
+  it('adds the prologue to the five-parameter reader', () => {
+    const result = writeAgentsMd(reader295, altNames)!;
+    expect(result).toContain(
+      'async function EOe(e,n,r,s,h,tweakccAltPass){if(!tweakccAltPass&&'
+    );
+    expect(result).toContain('await EOe(e.slice(0,-9)+tweakccAlt,n,r,s,h,!0)');
+  });
+
+  it('patches the reader and the project walk in the same chunk', () => {
+    const result = writeAgentsMd(reader295 + projectFiles295, altNames)!;
+    expect(result).toContain('tweakccAltPass');
+    expect(result).toContain(
+      'projectFiles:io?(()=>{let tweakccBase=[Km(An,"CLAUDE.md"),Km(An,".claude","CLAUDE.md")];'
+    );
+  });
+
+  type Reader = (
+    path: string,
+    type: string
+  ) => Promise<{ info: { path: string; content: string } | null }>;
+  const buildReader = (files: Record<string, string>): Reader => {
+    const body =
+      'const lU=1048576,t=()=>{},f=()=>{},ROe=()=>({}),Y7n=()=>{},ie=()=>null;' +
+      'const TOe=(content,path)=>({info:{path,content},includePaths:[]});' +
+      'async function Uk(fs,p){if(!(p in files)){let e=new Error("ENOENT");e.code="ENOENT";throw e}return files[p]}' +
+      writeAgentsMd(reader295, altNames)! +
+      'return EOe;';
+    return new Function('files', body)(files) as Reader;
+  };
+
+  it('loads the first existing alternative when CLAUDE.md is missing (executes)', async () => {
+    const read = buildReader({
+      '/proj/GEMINI.md': 'GEM',
+      '/proj/QWEN.md': 'QW',
+    });
+    expect((await read('/proj/CLAUDE.md', 'Project')).info).toEqual({
+      path: '/proj/GEMINI.md',
+      content: 'GEM',
+    });
+  });
+
+  it('keeps CLAUDE.md when it exists and never reroutes other files (executes)', async () => {
+    const read = buildReader({
+      '/proj/CLAUDE.md': 'CLA',
+      '/proj/GEMINI.md': 'GEM',
+    });
+    expect((await read('/proj/CLAUDE.md', 'Project')).info?.content).toBe(
+      'CLA'
+    );
+    expect((await read('/proj/AGENTS.md', 'Project')).info).toBeNull();
+  });
+});
