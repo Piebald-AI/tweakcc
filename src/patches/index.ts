@@ -54,7 +54,10 @@ import { writeInputPatternHighlighters } from './inputPatternHighlighters';
 import { writeVerboseProperty } from './verboseProperty';
 import { writeModelCustomizations } from './modelSelector';
 import { writeOpusplan1m } from './opusplan1m';
-import { writeThinkingVisibility } from './thinkingVisibility';
+import {
+  writeThinkingVisibility,
+  writeThinkingVisibilityModules,
+} from './thinkingVisibility';
 import { writeSubagentModels } from './subagentModels';
 import { writePatchesAppliedIndication } from './patchesAppliedIndication';
 import { applySystemPrompts } from './systemPrompts';
@@ -982,6 +985,7 @@ export const applyCustomization = async (
     },
     'thinking-visibility': {
       fn: c => writeThinkingVisibility(c),
+      modules: writeThinkingVisibilityModules,
       condition: config.settings.misc?.expandThinkingBlocks ?? true,
     },
     'hide-startup-banner': {
