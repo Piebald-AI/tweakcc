@@ -592,6 +592,52 @@ describe('scroll escape filter on a module graph', () => {
     ) as () => boolean;
     expect(SY()).toBe(false);
   });
+
+  it('turns off the scroll-region renderer on CC 2.1.295', () => {
+    // chunk-x31wb8sb.js
+    const renderer =
+      'function zq(){let n=wo();if(n.decstbmRendererEnabled!==void 0)return n.decstbmRendererEnabled;' +
+      'if(!process.stdout.isTTY)return n.decstbmRendererEnabled=!1;if(Sle())return n.decstbmRendererEnabled=!1;' +
+      'if(!oYn(Fwe()))return n.decstbmRendererEnabled=!1;if(Tc())return n.decstbmRendererEnabled=!1;' +
+      'if(dm())return n.decstbmRendererEnabled=!1;if(Le(a.CLAUDE_CODE_DECSTBM))return n.decstbmRendererEnabled=!0;' +
+      'return n.decstbmRendererEnabled=k("tengu_marlin_porch",!1),n.decstbmRendererEnabled}' +
+      'process.stdout.write("");export{zq};';
+    const { sources } = onGraph(
+      { '/ink.js': renderer },
+      writeScrollEscapeSequenceFilter
+    );
+    const out = sources.get('/ink.js')!;
+    const body = out.slice(
+      out.indexOf('function zq'),
+      out.indexOf('process.stdout.write("")')
+    );
+    const no = () => false;
+    const zq = new Function(
+      'wo',
+      'process',
+      'Sle',
+      'oYn',
+      'Fwe',
+      'Tc',
+      'dm',
+      'Le',
+      'a',
+      'k',
+      `${body}return zq;`
+    )(
+      () => ({}) as Record<string, unknown>,
+      { stdout: { isTTY: true } },
+      no,
+      () => true,
+      () => true,
+      no,
+      no,
+      () => true,
+      { CLAUDE_CODE_DECSTBM: '1' },
+      () => true
+    ) as () => boolean;
+    expect(zq()).toBe(false);
+  });
 });
 
 describe('thinker symbol speed on CC 2.1.2xx (breathing spinner)', () => {
@@ -617,6 +663,32 @@ describe('thinker symbol speed on CC 2.1.2xx (breathing spinner)', () => {
 describe('allow bypass permissions as root on CC 2.1.2xx', () => {
   const MSG =
     '"--dangerously-skip-permissions cannot be used with root/sudo privileges for security reasons"';
+  it('fails when no module refuses root, instead of reporting it as satisfied', () => {
+    const { result } = onGraph(
+      { '/a.js': 'var z=1;export{z};' },
+      writeAllowBypassPermsInSudo
+    );
+    expect(result).toMatchObject({ applied: false, failed: true });
+  });
+
+  it('removes both refusals in the CC 2.1.295 forms', () => {
+    // chunk-gq5s7t2h.js and chunk-rhc48ngb.js
+    const { sources, result } = onGraph(
+      {
+        '/gq5s7t2h.js': `function g(s){if(!i(s))return;if(OT.isRootOutsideDeliberateSandbox())console.error(${MSG}),process.exit(1)}`,
+        '/rhc48ngb.js': `if(r==="bypassPermissions"||s){if(typeof process.getuid==="function"&&process.getuid()===0&&process.env.IS_SANDBOX!=="1"&&!a.CLAUDE_CODE_BUBBLEWRAP)console.error(${MSG}),await DY({sessionId:K(),message:${MSG},reason:"bypass_root"}),process.exit(1)}let w=Ki();`,
+      },
+      writeAllowBypassPermsInSudo
+    );
+    expect(result).toMatchObject({ applied: true, failed: false });
+    expect(sources.get('/gq5s7t2h.js')).toBe(
+      'function g(s){if(!i(s))return;if(OT.isRootOutsideDeliberateSandbox()){}}'
+    );
+    expect(sources.get('/rhc48ngb.js')).toBe(
+      'if(r==="bypassPermissions"||s){if(typeof process.getuid==="function"&&process.getuid()===0&&process.env.IS_SANDBOX!=="1"&&!a.CLAUDE_CODE_BUBBLEWRAP){}}let w=Ki();'
+    );
+  });
+
   it('removes both refusals: the flag validator and the setup check', async () => {
     const { sources, result } = onGraph(
       {

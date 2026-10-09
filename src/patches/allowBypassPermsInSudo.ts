@@ -26,9 +26,6 @@ export const writeAllowBypassPermsInSudo = (file: string): string | null => {
   const matches = [...file.matchAll(pattern)];
 
   if (matches.length === 0) {
-    if (!file.includes('root/sudo privileges')) {
-      return file;
-    }
     console.error('patch: allowBypassPermsInSudo: failed to find pattern');
     return null;
   }
