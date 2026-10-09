@@ -1110,4 +1110,60 @@ describe('systemPrompts.ts', () => {
       expect(result.results[0].details).toBe('unchanged');
     });
   });
+
+  describe('code-split native builds (2.1.295 excerpts)', () => {
+    // A prompt a user edited: the .md body differs from the pieces.
+    const edited = (pieces: string[], content: string) =>
+      buildMockPromptData({
+        prompt: { content },
+        regex: promptSync.buildSearchRegexFromPieces(pieces, '2.1.295'),
+        getInterpolatedContent: () => content,
+        pieces,
+      });
+
+    it('patches a prompt in every module that repeats it', async () => {
+      const pieces = [
+        'If you must sleep, keep the duration short to avoid blocking the user.',
+      ];
+      setupMocks(edited(pieces, 'Never sleep.'));
+      // The Bash tool module (string array) and the PowerShell tool module
+      // (template literal) both carry the guidance.
+      const bash =
+        '["If you must poll an external process, use a check command (e.g. `gh run view`) rather than sleeping first.","If you must sleep, keep the duration short to avoid blocking the user."]';
+      const powershell =
+        'return`- If you must poll an external process, use a check command rather than sleeping first.\n    - If you must sleep, keep the duration short to avoid blocking the user.`}';
+
+      const result = await applySystemPrompts(
+        [bash, 'var other=1;', powershell],
+        '2.1.295',
+        false
+      );
+
+      expect(result.newContents[0]).toContain('"Never sleep."]');
+      expect(result.newContents[1]).toBe('var other=1;');
+      expect(result.newContents[2]).toContain('- Never sleep.`}');
+      expect(result.results[0]).toMatchObject({ applied: true });
+      expect(result.results[0].details).toContain('(2 occurrences)');
+    });
+
+    it('writes into embedded .md modules verbatim, without JS escaping', async () => {
+      const pieces = [
+        "# Example: CLI tool\n\nCLIs are the simplest case - there's usually no background process to\nmanage, no ports, no lifecycle.",
+      ];
+      const content =
+        '# Example: CLI tool\n\nSay "PERSIMMON" — once.\nCLIs are the simplest case.';
+      setupMocks(edited(pieces, content));
+
+      const result = await applySystemPrompts(
+        ['var a="\\u2014";', pieces[0]],
+        '2.1.295',
+        true,
+        null,
+        new Set([1])
+      );
+
+      expect(result.newContents[1]).toBe(content);
+      expect(result.newContents[0]).toBe('var a="\\u2014";');
+    });
+  });
 });

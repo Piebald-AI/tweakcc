@@ -1081,7 +1081,8 @@ export const applyCustomization = async (
       names.map(name => promptSources.get(name)!),
       ccInstInfo.version,
       undefined, // escapeNonAscii - auto-detect
-      patchFilter
+      patchFilter,
+      new Set(names.flatMap((name, i) => (textSources.has(name) ? [i] : [])))
     );
     systemPromptsResult.newContents.forEach((source, i) => {
       if (source === promptSources.get(names[i])) return;

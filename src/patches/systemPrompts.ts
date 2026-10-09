@@ -140,13 +140,17 @@ const escapeUnescapedChar = (str: string, char: string): string => {
  * @param version - The Claude Code version
  * @param escapeNonAscii - Whether to escape non-ASCII characters (auto-detected if not specified)
  * @param patchFilter - Optional list of patch/prompt IDs to apply (if provided, only matching prompts are applied)
+ * @param textSourceIndices - Indices of sources that are Bun text-loader
+ *   (.md) modules rather than JavaScript; prompts are written into them
+ *   verbatim, without string-literal or `\uXXXX` escaping
  * @returns SystemPromptsResult with modified content and per-prompt results
  */
 export const applySystemPrompts = async (
   input: string | readonly string[],
   version: string,
   escapeNonAscii?: boolean,
-  patchFilter?: string[] | null
+  patchFilter?: string[] | null,
+  textSourceIndices: ReadonlySet<number> = new Set()
 ): Promise<SystemPromptsResult> => {
   const contents = typeof input === 'string' ? [input] : [...input];
   const allSource = contents.length === 1 ? contents[0] : contents.join('\n');
@@ -204,16 +208,17 @@ export const applySystemPrompts = async (
     // construction + match: an oversized pattern (e.g. the Model Migration Guide) can
     // overflow V8's regex stack on Node <=22 and abort the whole --apply (#753).
     let pattern: RegExp;
-    // Code-split native builds pass every module: patch the first module that
-    // contains the prompt, at every occurrence within it.
-    let matches: RegExpMatchArray[] = [];
-    let moduleIndex = 0;
+    // Code-split native builds pass every module, and a prompt can be repeated
+    // across modules just as it is within one bundle (e.g. 2.1.295's Bash sleep
+    // guidance in both the Bash and PowerShell tool modules): patch every
+    // occurrence in every module that contains it.
+    const found: { index: number; matches: RegExpMatchArray[] }[] = [];
     try {
       pattern = new RegExp(regex, 'gsi');
-      for (let i = 0; i < contents.length && matches.length === 0; i++) {
-        matches = [...contents[i].matchAll(pattern)];
-        if (matches.length > 0) moduleIndex = i;
-      }
+      contents.forEach((source, index) => {
+        const matches = [...source.matchAll(pattern)];
+        if (matches.length > 0) found.push({ index, matches });
+      });
     } catch (error) {
       console.log(
         chalk.yellow(
@@ -232,9 +237,8 @@ export const applySystemPrompts = async (
       continue;
     }
 
-    if (matches.length > 0) {
-      let content = contents[moduleIndex];
-      const firstMatch = matches[0];
+    if (found.length > 0) {
+      const firstMatch = found[0].matches[0];
       const matchIndex = firstMatch.index!;
 
       // cli.js sometimes repeats the exact same prompt text at more than one
@@ -244,7 +248,7 @@ export const applySystemPrompts = async (
       // each site — and therefore the delimiter/escaping rules that apply —
       // can differ between occurrences even though the surrounding prompt
       // text is identical.
-      const replacements: string[] = [];
+      const replacements: string[][] = found.map(() => []);
       let abortDetails: string | undefined;
 
       // reconstructContentFromPieces produced the .md body in the first place,
@@ -265,15 +269,31 @@ export const applySystemPrompts = async (
       ).trim();
       const isUncustomized = prompt.content.trim() === originalBaselineContent;
 
-      for (const m of matches) {
+      const occurrences = found.flatMap(({ index, matches }, f) =>
+        matches.map(m => ({
+          f,
+          content: contents[index],
+          plainText: textSourceIndices.has(index),
+          m,
+        }))
+      );
+      for (const { f, content, plainText, m } of occurrences) {
         // Each occurrence keeps its own text: cli.js can repeat a prompt with
         // different minified variables at each site (#678).
         if (isUncustomized) {
-          replacements.push(m[0]);
+          replacements[f].push(m[0]);
           continue;
         }
 
         const interpolatedContent = getInterpolatedContent(m);
+
+        // An embedded .md module holds the prompt as plain text: there is no
+        // string literal to escape for, and no Latin-1 module to encode
+        // non-ASCII for, so the text is written exactly as the user wrote it.
+        if (plainText) {
+          replacements[f].push(interpolatedContent);
+          continue;
+        }
 
         // Check the delimiter character before this match to determine string type
         const mIndex = m.index!;
@@ -350,7 +370,7 @@ export const applySystemPrompts = async (
           replacementContent = escapeNonAsciiChars(replacementContent);
         }
 
-        replacements.push(replacementContent);
+        replacements[f].push(replacementContent);
       }
 
       if (abortDetails) {
@@ -369,19 +389,20 @@ export const applySystemPrompts = async (
       const originalLength = originalBaselineContent.length;
       const newLength = prompt.content.trim().length;
 
-      const oldContent = content;
+      const oldContents = found.map(({ index }) => contents[index]);
       const matchLength = firstMatch[0].length;
 
       // Replace every occurrence with its own interpolated content — not the
       // same string reused for all of them — using a replacer function both to
       // consume `replacements` in match order and to avoid special replacement
       // pattern interpretation (e.g., $$ -> $), see #237.
-      let replacementIndex = 0;
-      content = content.replace(
-        pattern,
-        () => replacements[replacementIndex++]
-      );
-      contents[moduleIndex] = content;
+      found.forEach(({ index }, f) => {
+        let replacementIndex = 0;
+        contents[index] = contents[index].replace(
+          pattern,
+          () => replacements[f][replacementIndex++]
+        );
+      });
 
       // Store the hash of the applied prompt content
       const appliedHash = computeMD5Hash(prompt.content);
@@ -395,16 +416,18 @@ export const applySystemPrompts = async (
 
       // Show diff in debug mode
       showDiff(
-        oldContent,
-        content,
-        replacements[0],
+        oldContents[0],
+        contents[found[0].index],
+        replacements[0][0],
         matchIndex,
         matchIndex + matchLength
       );
 
       // Track this prompt's result
       const charDiff = originalLength - newLength;
-      const applied = oldContent !== content;
+      const applied = found.some(
+        ({ index }, f) => contents[index] !== oldContents[f]
+      );
 
       let details: string;
       if (charDiff > 0) {
@@ -415,8 +438,8 @@ export const applySystemPrompts = async (
         details = 'unchanged';
       }
 
-      if (matches.length > 1) {
-        details += ` (${matches.length} occurrences)`;
+      if (occurrences.length > 1) {
+        details += ` (${occurrences.length} occurrences)`;
       }
 
       if (hashFailed) {
