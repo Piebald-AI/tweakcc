@@ -11,7 +11,7 @@ export const writeClearScreen = (oldFile: string): string | null => {
   }
 
   const redrawPattern =
-    /([,;{}])(function [$\w]+\(\)\{)([$\w]+)\.get\(process\.stdout\)\?\.forceRedraw\(\)\}/;
+    /([,;{}])(function [$\w]+\(\)\{)([$\w]+(?:\(\))?)\.get\(process\.stdout\)\?\.forceRedraw\(\)\}/;
   const redrawMatch = oldFile.match(redrawPattern);
   if (!redrawMatch || redrawMatch.index === undefined) {
     debug('patch: clearScreen: failed to find forceRedraw function');
