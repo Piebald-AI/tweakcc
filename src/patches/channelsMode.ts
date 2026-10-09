@@ -53,14 +53,19 @@
 // Replaces the "Experimental · prompt injection risks" banner text with
 // a short neutral message.
 
-import { isGraphContextActive } from './graphContext';
+import { graphMemo, graphSources, isGraphContextActive } from './graphContext';
 import { showDiff } from './index';
 
 /**
  * Patch 1: Bypass tengu_harbor flag — force isChannelsEnabled() to return true
  */
+const CHANNELS_ENABLED_PATTERN =
+  /function [$\w]+\(\)\{return (?:[$\w]+\("allow_channels"\)&&)?[$\w]+\("tengu_harbor",!1\)/;
+
 const patchChannelsEnabled = (file: string): string | null => {
-  const pattern = /function [$\w]+\(\)\{return [$\w]+\("tengu_harbor",!1\)/;
+  // CC >=2.1.29x also checks the org's allow_channels policy limit:
+  //   function WN(){return on("allow_channels")&&k("tengu_harbor",!1)}
+  const pattern = CHANNELS_ENABLED_PATTERN;
   const match = file.match(pattern);
 
   if (!match || match.index === undefined) {
@@ -70,6 +75,31 @@ const patchChannelsEnabled = (file: string): string | null => {
 
   const insertIndex = match.index + match[0].indexOf('{') + 1;
   const insertion = 'return !0;';
+
+  const newFile =
+    file.slice(0, insertIndex) + insertion + file.slice(insertIndex);
+
+  showDiff(file, newFile, insertion, insertIndex, insertIndex);
+  return newFile;
+};
+
+/**
+ * Patch 1b: CC >=2.1.29x has a second tengu_harbor check, "channels are not
+ * currently available", used by gateChannelServer() and the ChannelsNotice:
+ *   function Pht(){if(!k("tengu_harbor",!1))return!0;let e=rm("allow_channels");...}
+ * Force it to report "available". Absent on older versions.
+ */
+const patchChannelsUnavailable = (file: string): string | null => {
+  const pattern =
+    /function [$\w]+\(\)\{if\(![$\w]+\("tengu_harbor",!1\)\)return!0;/;
+  const match = file.match(pattern);
+
+  if (!match || match.index === undefined) {
+    return null;
+  }
+
+  const insertIndex = match.index + match[0].indexOf('{') + 1;
+  const insertion = 'return!1;';
 
   const newFile =
     file.slice(0, insertIndex) + insertion + file.slice(insertIndex);
@@ -214,7 +244,8 @@ const patchServerDevWarning = (file: string): string | null => {
 
 /**
  * Combined patch — bypasses all channel gates and suppresses warnings:
- * 1. isChannelsEnabled() → true (tengu_harbor)
+ * 1. isChannelsEnabled() → true (tengu_harbor), and the "not currently
+ *    available" check → false (CC >=2.1.29x)
  * 2. gateChannelServer() → register after capability check
  * 3. isChannelPermissionRelayEnabled() → true (tengu_harbor_permissions)
  * 4. ChannelsNotice "Experimental" warning → neutral text
@@ -224,6 +255,17 @@ export const writeChannelsMode = (oldFile: string): string | null => {
   // Code-split builds (CC 2.1.2xx) spread the channel gates over separate
   // modules; on a module graph apply whichever of them this module contains.
   if (isGraphContextActive()) {
+    // Without the master gate the other parts change nothing visible, so
+    // fail instead of reporting the patch as applied.
+    const hasMasterGate = graphMemo('channels-master-gate', () =>
+      [...(graphSources()?.values() ?? [])].some(source =>
+        CHANNELS_ENABLED_PATTERN.test(source)
+      )
+    );
+    if (!hasMasterGate) {
+      console.error('patch: channelsMode: failed to find tengu_harbor gate');
+      return null;
+    }
     const quiet = <T>(fn: () => T): T => {
       const saved = console.error;
       console.error = () => {};
@@ -236,6 +278,7 @@ export const writeChannelsMode = (oldFile: string): string | null => {
     let file = oldFile;
     for (const step of [
       patchChannelsEnabled,
+      patchChannelsUnavailable,
       patchGateFunction,
       patchPermissionRelay,
       patchChannelsNotice,
@@ -248,6 +291,8 @@ export const writeChannelsMode = (oldFile: string): string | null => {
 
   let newFile = patchChannelsEnabled(oldFile);
   if (!newFile) return null;
+
+  newFile = patchChannelsUnavailable(newFile) ?? newFile;
 
   newFile = patchGateFunction(newFile);
   if (!newFile) return null;
