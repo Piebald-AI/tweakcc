@@ -41,6 +41,7 @@ import { writeThemes } from './themes';
 import { writeContextLimit } from './contextLimit';
 import { writeInputBoxBorder } from './inputBorderBox';
 import { writeInputChevronColor } from './inputChevronColor';
+import { writeInputCursorColor } from './inputCursorColor';
 import { writeThinkerFormat } from './thinkerFormat';
 import { writeThinkerSymbolMirrorOption } from './thinkerMirrorOption';
 import { writeThinkerSymbolChars } from './thinkerSymbolChars';
@@ -313,6 +314,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.MISC_CONFIGURABLE,
     description:
       'The input chevron changes color based on loading state (e.g. green when idle)',
+  },
+  {
+    id: 'input-cursor-color',
+    name: 'Input cursor color',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'The input cursor uses your color instead of inverse video (not with CLAUDE_CODE_NATIVE_CURSOR=1)',
   },
   {
     id: 'subagent-models',
@@ -777,6 +785,10 @@ export const buildPatchImplementations = (
         return writeInputChevronColor(c, resolved);
       },
       condition: !!config.settings.inputBox?.chevronIdleThemeColor,
+    },
+    'input-cursor-color': {
+      fn: c => writeInputCursorColor(c, config.settings.inputBox!.cursorColor!),
+      condition: !!config.settings.inputBox?.cursorColor,
     },
     'subagent-models': {
       fn: c => writeSubagentModels(c, config.settings.subagentModels!),

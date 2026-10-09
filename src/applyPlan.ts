@@ -124,6 +124,8 @@ export function isPatchEnabledByConfig(
       );
     case 'input-chevron-color':
       return !!config.settings.inputBox?.chevronIdleThemeColor;
+    case 'input-cursor-color':
+      return !!config.settings.inputBox?.cursorColor;
     case 'subagent-models':
       return (
         !!config.settings.subagentModels &&

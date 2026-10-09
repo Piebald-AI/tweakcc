@@ -55,7 +55,11 @@ describe('applyPlan', () => {
         expandThinkingBlocks: false,
       },
       claudeMdAltNames: [],
-      inputBox: { removeBorder: false, chevronIdleThemeColor: null },
+      inputBox: {
+        removeBorder: false,
+        chevronIdleThemeColor: null,
+        cursorColor: null,
+      },
     });
 
     expect(isPatchEnabledByConfig('session-memory', config, '2.1.200')).toBe(
