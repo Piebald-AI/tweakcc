@@ -80,6 +80,10 @@ import { writeAutoAcceptPlanMode } from './autoAcceptPlanMode';
 import { writeAllowBypassPermsInSudo } from './allowBypassPermsInSudo';
 import { writeSuppressNativeInstallerWarning } from './suppressNativeInstallerWarning';
 import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
+import {
+  writeTmuxGraphicsPassthrough,
+  writeTmuxGraphicsPassthroughModules,
+} from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
@@ -428,6 +432,13 @@ const PATCH_DEFINITIONS = [
     description:
       'Filter out terminal escape sequences that cause unwanted scrolling',
   },
+  {
+    id: 'tmux-graphics-passthrough',
+    name: 'tmux graphics passthrough',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Images show inside tmux (needs allow-passthrough on and CLAUDE_CODE_FORCE_TERMINAL_IMAGES=1)',
+  },
   // Features
   {
     id: 'allow-custom-agent-models',
@@ -625,10 +636,23 @@ export const applyCustomization = async (
   let content: string;
   let nativeCorpus: ExtractedBunCorpus | null = null;
   let nativeSourcePath: string | undefined;
-  let nativeGuardEdits: BunModuleReplacement[] = [];
-  const needsNativeGuard =
-    !!config.settings.misc?.preventUpdateToUnsupportedVersions &&
-    (!patchFilter || patchFilter.includes('prevent-unsupported-updates'));
+  // Module-aware patches edit chunks the generic runner never sees. Each one
+  // reads the current sources through nativeModuleSources and stages its
+  // changes here, keyed by module index, so later patches build on them.
+  const stagedModuleSources = new Map<number, string>();
+  const modulePatchesApplied = new Set<PatchId>();
+  const wants = (id: PatchId, enabled: boolean) =>
+    enabled && (!patchFilter || patchFilter.includes(id));
+  const needsNativeGuard = wants(
+    'prevent-unsupported-updates',
+    !!config.settings.misc?.preventUpdateToUnsupportedVersions
+  );
+  const needsNativeCorpus =
+    needsNativeGuard ||
+    wants(
+      'tmux-graphics-passthrough',
+      !!config.settings.misc?.tmuxGraphicsPassthrough
+    );
 
   if (ccInstInfo.nativeInstallationPath) {
     // For native installations: restore the binary, then extract to memory
@@ -651,20 +675,20 @@ export const applyCustomization = async (
       `Extracting claude.js from ${backupExists ? 'backup' : 'native installation'}: ${pathToExtractFrom}`
     );
 
-    // Only this explicitly selected feature opts into module-aware application;
-    // it must patch the actual installer chunk rather than a tiny import stub.
-    if (needsNativeGuard) {
+    // Only explicitly selected module-aware patches pay for extracting every
+    // module; they edit chunks rather than the entrypoint.
+    if (needsNativeCorpus) {
       nativeCorpus =
         await extractClaudeJsModulesFromNativeInstallation(pathToExtractFrom);
       if (nativeCorpus) {
         nativeSourcePath = pathToExtractFrom;
       } else {
-        // This feature is optional. If ordinary extraction can still recover
-        // an entrypoint, keep unrelated patches available and report only the
-        // guard as failed. A missing native dependency still fails below when
-        // neither extractor can produce usable source.
+        // These features are optional. If ordinary extraction can still
+        // recover an entrypoint, keep unrelated patches available and report
+        // only the module-aware ones as failed. A missing native dependency
+        // still fails below when neither extractor can produce usable source.
         debug(
-          'Native module corpus unavailable; the update guard will be reported as failed.'
+          'Native module corpus unavailable; module-aware patches will be reported as failed.'
         );
       }
     }
@@ -736,6 +760,37 @@ export const applyCustomization = async (
   // Disabling model customizations should restore both selectors to vanilla CC behavior.
   const modelCustomizationsEnabled =
     config.settings.misc?.enableModelCustomizations ?? true;
+
+  const nativeJsModules = () =>
+    nativeCorpus?.modules.filter(module => module.isJavaScript) ?? [];
+  /** Current source of each JavaScript module, entrypoint included. */
+  const nativeModuleSources = (entrypoint: string) =>
+    nativeJsModules().map(module =>
+      module.isEntrypoint
+        ? entrypoint
+        : (stagedModuleSources.get(module.index) ?? nativeSource(module))
+    );
+  /**
+   * Stages a module-aware patch's output and returns the new entrypoint, or
+   * null if the patch failed or the corpus has no entrypoint.
+   */
+  const stageModulePatch = (
+    id: PatchId,
+    entrypoint: string,
+    patched: string[] | null
+  ): string | null => {
+    if (!patched) return null;
+    const modules = nativeJsModules();
+    const entryIndex = modules.findIndex(module => module.isEntrypoint);
+    if (entryIndex < 0) return null;
+    const sources = nativeModuleSources(entrypoint);
+    modules.forEach((module, index) => {
+      if (module.isEntrypoint || patched[index] === sources[index]) return;
+      stagedModuleSources.set(module.index, patched[index]);
+      modulePatchesApplied.add(id);
+    });
+    return patched[entryIndex];
+  };
   const patchImplementations: Record<PatchId, PatchImplementation> = {
     // Always Applied
     'verbose-property': {
@@ -949,6 +1004,23 @@ export const applyCustomization = async (
       fn: c => writeScrollEscapeSequenceFilter(c),
       condition: !!config.settings.misc?.filterScrollEscapeSequences,
     },
+    'tmux-graphics-passthrough': {
+      fn: c => {
+        if (!nativeCorpus) {
+          // A native extraction fallback only has the entrypoint, which no
+          // longer holds the graphics code; npm's cli.js holds everything.
+          return ccInstInfo.nativeInstallationPath
+            ? null
+            : writeTmuxGraphicsPassthrough(c);
+        }
+        return stageModulePatch(
+          'tmux-graphics-passthrough',
+          c,
+          writeTmuxGraphicsPassthroughModules(nativeModuleSources(c))
+        );
+      },
+      condition: !!config.settings.misc?.tmuxGraphicsPassthrough,
+    },
     // Features
     'allow-custom-agent-models': {
       fn: c => writeAllowCustomAgentModels(c),
@@ -1029,30 +1101,13 @@ export const applyCustomization = async (
             ? null
             : writePreventUnsupportedUpdates(c);
         }
-        const modules = nativeCorpus.modules.filter(
-          module => module.isJavaScript
-        );
-        const sources = modules.map(module =>
-          module.isEntrypoint ? c : nativeSource(module)
-        );
-        const patched = writePreventUnsupportedUpdatesModules(sources);
-        if (!patched) return null;
-        const entryIndex = modules.findIndex(module => module.isEntrypoint);
-        if (entryIndex < 0) return null;
         // Stage the complete pair atomically. The binary is written only after
         // every changed source passes parsing; no half-installed guard is saved.
-        nativeGuardEdits = modules.flatMap((module, index) =>
-          patched[index] === sources[index]
-            ? []
-            : [
-                {
-                  index: module.index,
-                  name: module.name,
-                  contents: Buffer.from(patched[index], 'utf8'),
-                },
-              ]
+        return stageModulePatch(
+          'prevent-unsupported-updates',
+          c,
+          writePreventUnsupportedUpdatesModules(nativeModuleSources(c))
         );
-        return patched[entryIndex];
       },
       condition: !!config.settings.misc?.preventUpdateToUnsupportedVersions,
     },
@@ -1064,15 +1119,26 @@ export const applyCustomization = async (
   const { content: patchedContent, results: patchResults } =
     applyPatchImplementations(content, patchImplementations, patchFilter);
   content = patchedContent;
-  if (nativeGuardEdits.length) {
-    // Chunk-only edits do not change the entrypoint string used by the generic
-    // runner, but must still be reported as a successfully applied patch.
-    const guardResult = patchResults.find(
-      result => result.id === 'prevent-unsupported-updates'
-    );
-    if (guardResult) guardResult.applied = true;
+  // Chunk-only edits do not change the entrypoint string used by the generic
+  // runner, but must still be reported as successfully applied patches.
+  for (const result of patchResults) {
+    if (modulePatchesApplied.has(result.id as PatchId)) result.applied = true;
   }
   allResults.push(...patchResults);
+  const nativeModuleEdits: BunModuleReplacement[] = nativeJsModules().flatMap(
+    module => {
+      const staged = stagedModuleSources.get(module.index);
+      return staged === undefined
+        ? []
+        : [
+            {
+              index: module.index,
+              name: module.name,
+              contents: Buffer.from(staged, 'utf8'),
+            },
+          ];
+    }
+  );
 
   // ==========================================================================
   // Verify the patched bundle parses before writing it
@@ -1083,7 +1149,7 @@ export const applyCustomization = async (
     if (
       !ccInstInfo.nativeInstallationPath ||
       content !== originalContent ||
-      nativeGuardEdits.length
+      nativeModuleEdits.length
     ) {
       assertPatchedBundleParses(
         content,
@@ -1096,7 +1162,7 @@ export const applyCustomization = async (
             : 'module'
       );
     }
-    for (const edit of nativeGuardEdits) {
+    for (const edit of nativeModuleEdits) {
       const module = nativeCorpus!.modules[edit.index];
       assertPatchedBundleParses(
         edit.contents.toString('utf8'),
@@ -1118,7 +1184,7 @@ export const applyCustomization = async (
   // Write the modified content back
   // ==========================================================================
   const nativeChanged =
-    content !== originalContent || nativeGuardEdits.length > 0;
+    content !== originalContent || nativeModuleEdits.length > 0;
   // Restoring the backup already removes a disabled/filtered guard. Repacking
   // an untouched modern graph through the legacy entrypoint writer would lose
   // metadata tables that only the module-aware writer preserves.
@@ -1136,7 +1202,9 @@ export const applyCustomization = async (
     const modifiedBuffer = Buffer.from(content, 'utf8');
     if (nativeCorpus && nativeSourcePath) {
       const entry = nativeCorpus.modules.find(module => module.isEntrypoint)!;
-      const edits = nativeGuardEdits.filter(edit => edit.index !== entry.index);
+      const edits = nativeModuleEdits.filter(
+        edit => edit.index !== entry.index
+      );
       if (content !== nativeSource(entry)) {
         edits.push({
           index: entry.index,

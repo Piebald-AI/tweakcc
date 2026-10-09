@@ -148,6 +148,7 @@ $ pnpm dlx tweakcc
   - [Auto-accept plan mode](#feature-auto-accept-plan-mode)
   - [Suppress native installer warning](#feature-suppress-native-installer-warning)
   - [Scroll escape sequence filter](#feature-scroll-escape-sequence-filter)
+  - [tmux graphics passthrough](#feature-tmux-graphics-passthrough)
   - _Missing documentation for above features coming soon_
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
@@ -1172,6 +1173,32 @@ Some terminals may experience unwanted scrolling behavior caused by certain curs
   "settings": {
     "misc": {
       "filterScrollEscapeSequences": true
+    }
+  }
+}
+```
+
+## Feature: tmux graphics passthrough
+
+Claude Code draws images with the kitty graphics protocol, which works in kitty and Ghostty. Inside tmux, the images show as blank boxes: tmux drops the escape sequence that carries the picture and only lets the placeholder characters through. This patch wraps that sequence in tmux's passthrough, so the image reaches the outer terminal.
+
+It needs tmux 3.3 or later with passthrough enabled in `~/.tmux.conf`:
+
+```
+set -g allow-passthrough on
+```
+
+Claude Code also turns images off inside tmux by default, so set `CLAUDE_CODE_FORCE_TERMINAL_IMAGES=1` in your environment.
+
+**Via the UI:** Run `npx tweakcc`, go to **Misc**, and toggle **tmux graphics passthrough**.
+
+**Via `config.json`:**
+
+```json
+{
+  "settings": {
+    "misc": {
+      "tmuxGraphicsPassthrough": true
     }
   }
 }

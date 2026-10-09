@@ -132,6 +132,7 @@ export interface MiscConfig {
   allowBypassPermissionsInSudo: boolean | null;
   suppressNativeInstallerWarning: boolean;
   filterScrollEscapeSequences: boolean;
+  tmuxGraphicsPassthrough: boolean;
   enableWorktreeMode: boolean;
   allowCustomAgentModels: boolean;
   enableContextLimitOverride: boolean;
