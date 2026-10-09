@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replace the existing `.bun` payload for ELF binaries instead of appending a new one (#952) - @signadou
 - Preserve prompt identity across formatting-only interpolation source changes and correct the Claude Code 2.1.235 prompt archive (#958) - @mike1858
 - Fix the parse gate rejecting ESM native bundles on Claude Code 2.1.245+ (#978) - @aegntic
+- Add `autoAcceptPlanModeEnv` to auto-accept plans per invocation via `TWEAKCC_AUTO_ACCEPT_PLAN=1` (#627)
 
 - Add identity-validated native JavaScript module replacement for split Bun bundles (#408) - @mike1858
 - Gate native and npm automatic updates on published prompt snapshots, with fail-closed checks and unchanged manual updates (#408) - @mike1858
@@ -19,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Verify native update-guard source decoding for Bun's UTF-8, Latin-1, and UTF-16LE encodings (#408) - @mike1858
 - Preserve build-specific hook worker paths and capture the directory-sync formatter in 2.1.282 prompts (#1012) - @mike1858
 - Support code-split native builds (Claude Code 2.1.2xx) and fix patches for Claude Code 2.1.281-2.1.292 (#1034) - @basekevin
+- Keep `\\`, `\"` and `\'` in an edited quoted system prompt meaning what they meant in Claude Code, and decode quote escapes in the template text of prompts with interpolations (#922)
+- Skip a system prompt whose edited `${...}` names an undefined variable or no longer parses, instead of leaving Claude Code unable to answer or refusing the whole apply (#872)
+- Document which main-prompt parts the lean prompt leaves out, and `CLAUDE_CODE_SIMPLE_SYSTEM_PROMPT=0` (#526)
+- Add `inputBox.cursorColor` (`rgb(r,g,b)`) to color the input cursor instead of inverse video; has no effect when Claude Code draws the terminal's native cursor (`CLAUDE_CODE_NATIVE_CURSOR=1`) (#698)
 
 ## [v4.3.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.3) - 2026-08-13
 

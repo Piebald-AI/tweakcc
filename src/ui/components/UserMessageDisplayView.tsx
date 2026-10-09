@@ -4,6 +4,7 @@ import { Box, BoxProps, Text, useInput } from 'ink';
 import { UserMessageDisplayConfig } from '@/types';
 import { getCurrentClaudeCodeTheme } from '@/utils';
 import { DEFAULT_SETTINGS } from '@/defaultSettings';
+import { isUserMessageDisplayCustomized } from '@/patches/userMessageDisplay';
 
 import { ColorPicker } from './ColorPicker';
 import { SettingsContext } from '../App';
@@ -114,6 +115,16 @@ export function UserMessageDisplayView({
   const currentThemeId = getCurrentClaudeCodeTheme();
   const currentTheme =
     settings.themes?.find(t => t.id === currentThemeId) || settings.themes?.[0];
+
+  const customized = isUserMessageDisplayCustomized(
+    settings.userMessageDisplay
+  );
+  const stockPreview = (
+    <Text backgroundColor={currentTheme?.colors?.userMessageBackground}>
+      <Text color={currentTheme?.colors?.inactive}>❯ </Text>
+      <Text color={currentTheme?.colors?.text}>list the dir </Text>
+    </Text>
+  );
 
   // Track which column is active
   const [activeColumn, setActiveColumn] = useState<'text' | 'border'>('text');
@@ -877,15 +888,7 @@ export function UserMessageDisplayView({
             <Box marginBottom={1}>
               <Text underline>Before (Claude Code default):</Text>
             </Box>
-            <Box marginLeft={1}>
-              <Text
-                backgroundColor={currentTheme?.colors?.userMessageBackground}
-                color={currentTheme?.colors?.text}
-              >
-                {' '}
-                &gt; list the dir{' '}
-              </Text>
-            </Box>
+            <Box marginLeft={1}>{stockPreview}</Box>
             <Box marginLeft={1} marginTop={1}>
               <Text>
                 <Text color={currentTheme?.colors?.inactive || '#888888'}>
@@ -905,10 +908,14 @@ export function UserMessageDisplayView({
           {/* After (Customized) */}
           <Box flexDirection="column" width="50%">
             <Box marginBottom={1}>
-              <Text underline>After (Your customization):</Text>
+              <Text underline>
+                {customized
+                  ? 'After (Your customization):'
+                  : 'After (not customized, patch skipped):'}
+              </Text>
             </Box>
             <Box marginLeft={1} flexDirection="row">
-              {createPreview()}
+              {customized ? createPreview() : stockPreview}
             </Box>
             <Box marginLeft={1} marginTop={1}>
               <Text>

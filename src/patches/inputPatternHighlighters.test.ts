@@ -100,4 +100,30 @@ describe('writeInputPatternHighlighters', () => {
       'children:e(Zr,{children:m.highlight?.style?m.highlight.style(m.text):m.text})'
     );
   });
+
+  it('adds ranges in the CC 2.1.295 range builder (React-compiler memo, draft store)', () => {
+    // chunk-tjhhhqzz.js: component header and the highlight-range memo block
+    // (prop list shortened).
+    const builder =
+      'function kQe(h){let rr=w(499),{ref:A,draft:L,transcript:H,scope:Z,turn:he}=h,' +
+      'let Bl;if(rr[98]!==cl||rr[99]!==yn||rr[100]!==Kt||rr[101]!==Et||rr[102]!==At||rr[103]!==_t||rr[104]!==_d||rr[105]!==ms||rr[106]!==tu||rr[107]!==Xu||rr[108]!==pi||rr[109]!==ua||rr[110]!==Cl||rr[111]!==Fn||rr[112]!==ba||rr[113]!==zi){let rd=[];if(_t&&Et&&!Kt)rd.push({start:yn,end:yn+At.length,color:"warning",priority:20});';
+    beginGraphContext(new Map([['/$bunfs/root/chunk-b.js', builder]]));
+    enterGraphModule('/$bunfs/root/chunk-b.js');
+    let result: string | null;
+    try {
+      result = writeInputPatternHighlighters(builder, [
+        baseHighlighter({ name: 'todo', regex: 'TODO', styling: ['bold'] }),
+      ]);
+    } finally {
+      leaveGraphModule();
+      endGraphContext();
+    }
+    expect(result).toContain('let Bl;if(!0||rr[98]!==cl||');
+    expect(result).toContain(
+      '{let rd=[];if(typeof L.value==="string"){for(let m of L.value.matchAll(new RegExp("TODO", "g"))){rd.push({start:m.index,end:m.index+m[0].length,color:"#ffffff",bold:!0,'
+    );
+    expect(result).toContain(
+      'priority:100})}}if(_t&&Et&&!Kt)rd.push({start:yn,end:yn+At.length,color:"warning",priority:20});'
+    );
+  });
 });

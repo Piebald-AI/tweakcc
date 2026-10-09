@@ -103,9 +103,16 @@ export interface UserMessageDisplayConfig {
 export interface InputBoxConfig {
   removeBorder: boolean;
   chevronIdleThemeColor: string | null;
+  cursorColor: string | null;
 }
 
 export type TableFormat = 'default' | 'ascii' | 'clean' | 'clean-top-bottom';
+
+export interface ShimmerConfig {
+  enabled: boolean;
+  stepMs: number | null; // null = CC default (50ms requesting, 200ms otherwise)
+  width: number | null; // null = CC default (3 cells)
+}
 
 export interface MiscConfig {
   showTweakccVersion: boolean;
@@ -129,6 +136,7 @@ export interface MiscConfig {
   enableRememberSkill: boolean;
   tokenCountRounding: number | null;
   autoAcceptPlanMode: boolean;
+  autoAcceptPlanModeEnv: boolean;
   allowBypassPermissionsInSudo: boolean | null;
   suppressNativeInstallerWarning: boolean;
   filterScrollEscapeSequences: boolean;
@@ -139,7 +147,11 @@ export interface MiscConfig {
   enableVoiceMode: boolean;
   enableVoiceConciseOutput: boolean;
   enableChannelsMode: boolean;
+  disableCtrlZSuspend: boolean;
+  skipSkillShellValidation: boolean;
   preventUpdateToUnsupportedVersions: boolean;
+  webFetchUserAgent: string | null;
+  shimmer: ShimmerConfig;
 }
 
 export interface InputPatternHighlighter {

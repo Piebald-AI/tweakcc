@@ -1,7 +1,7 @@
 // Please see the note about writing patches in ./index
 
 import { isGraphContextActive } from './graphContext';
-import { LocationResult, showDiff } from './index';
+import { escapeIdent, LocationResult, showDiff } from './index';
 
 const getShowMoreItemsInSelectMenusLocation = (
   oldFile: string
@@ -18,6 +18,23 @@ const getShowMoreItemsInSelectMenusLocation = (
     results.push({
       startIndex: numberStart,
       endIndex: numberStart + match[1].length,
+    });
+  }
+
+  // React-compiled components (CC 2.1.295 Select) apply the default after
+  // destructuring: `{…,visibleOptionCount:l,…}=o,…,pe=l===void 0?5:l`
+  const compiledPattern = /visibleOptionCount:([\w$]+)[,}]/g;
+  while ((match = compiledPattern.exec(oldFile)) !== null) {
+    const v = escapeIdent(match[1]);
+    const window = oldFile.slice(match.index, match.index + 3000);
+    const def = window.match(
+      new RegExp(`[,;][\\w$]+=${v}===void 0\\?(\\d+):${v}[,;]`)
+    );
+    if (!def || def.index === undefined) continue;
+    const numberStart = match.index + def.index + def[0].indexOf('?') + 1;
+    results.push({
+      startIndex: numberStart,
+      endIndex: numberStart + def[1].length,
     });
   }
 
@@ -90,7 +107,9 @@ const patchHelpMenuHeight = (file: string): string | null => {
  * The original divides by 2 again, severely limiting visible items.
  */
 const patchCommandsVisibleCount = (file: string): string | null => {
-  const pattern = /Math\.max\(1,Math\.floor\(\(([\w$]+)-10\)\/2\)\)/;
+  // CC 2.1.295 counts lines, not items: `t=2*Math.max(1,Math.floor((a-10)/2))`
+  // already fills the help dialog, so only the item-count form is patched.
+  const pattern = /(?<!2\*)Math\.max\(1,Math\.floor\(\(([\w$]+)-10\)\/2\)\)/;
   const match = file.match(pattern);
 
   if (!match || match.index === undefined) {

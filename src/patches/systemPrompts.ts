@@ -6,6 +6,7 @@ import {
   reconstructContentFromPieces,
   escapeDepthZeroBackticks,
   escapeNonAsciiChars,
+  interpolationReferences,
 } from '../systemPromptSync';
 import { setAppliedHash, computeMD5Hash } from '../systemPromptHashIndex';
 
@@ -43,71 +44,61 @@ const extractBuildTime = (content: string): string | undefined => {
 };
 
 /**
- * Collects the ALL-CAPS identifier tokens used inside `${...}` interpolations of
- * a string. Escaped interpolations (`\${...}`) are inert (even in a backtick
- * literal) and skipped; only ALL-CAPS tokens are collected because Claude Code's
- * minified variables are lowercase while its prompt identifiers are ALL-CAPS, so
- * ordinary lowercase code and method names inside an interpolation are ignored.
- */
-const capsTokensInInterpolations = (s: string): Set<string> => {
-  const found = new Set<string>();
-  const capsToken = /\b[A-Z][A-Z0-9_]*\b/g;
-
-  for (let i = 0; i < s.length - 1; i++) {
-    if (s[i] === '$' && s[i + 1] === '{') {
-      // Skip escaped interpolations (\${...}); inert even in a backtick literal.
-      let backslashes = 0;
-      let k = i - 1;
-      while (k >= 0 && s[k] === '\\') {
-        backslashes++;
-        k--;
-      }
-      if (backslashes % 2 === 1) continue;
-
-      // Walk to the matching close brace, tracking nested braces.
-      let depth = 1;
-      let j = i + 2;
-      const start = j;
-      while (j < s.length && depth > 0) {
-        if (s[j] === '{') depth++;
-        else if (s[j] === '}') depth--;
-        j++;
-      }
-      for (const m of s.slice(start, j - 1).matchAll(capsToken))
-        found.add(m[0]);
-      i = j - 1;
-    }
-  }
-
-  return found;
-};
-
-/**
  * Detects identifiers a prompt's interpolated replacement would introduce into a
  * live `${...}` interpolation that the original matched bundle text never
- * defined.
+ * referenced, and that are not JavaScript globals.
  *
- * This catches a stale prompt .md whose interpolation identifier was renamed
- * upstream without a per-prompt version bump (#899): applyIdentifierMapping
- * leaves the old human-name unmapped, so the replacement references a variable
- * that does not exist. That is a runtime ReferenceError which `node --check`
- * cannot catch (it parses fine) and which crashes Claude Code on the first turn
- * (#900).
+ * Such a name is a runtime ReferenceError when Claude Code builds the prompt.
+ * `node --check` cannot see it (it parses fine), and Claude Code then fails
+ * every turn: the input looks blocked and nothing is sent (#872, `oops is not
+ * defined`). It arises from a typo in an edited interpolation, or from a stale
+ * prompt .md whose interpolation identifier was renamed upstream without a
+ * per-prompt version bump (#899): applyIdentifierMapping leaves the old
+ * human-name unmapped (#900).
  *
  * Callers must invoke this only for backtick-delimited prompts, where `${...}`
  * is real interpolation; in quoted/JSON string literals `${...}` is inert text.
- * Interpolation-identifier sets are compared like-for-like, so a name that also
- * appears in the prompt's ALL-CAPS prose (e.g. a "## TOOLS" heading) does not
- * mask a genuinely drifted `${TOOLS}` interpolation.
+ * Only interpolation code is compared, so a name that also appears in the
+ * prompt's prose (e.g. a "## TOOLS" heading) does not mask a genuinely drifted
+ * `${TOOLS}` interpolation.
  */
 const findIntroducedInterpolationIdentifiers = (
   replacement: string,
   originalMatch: string
 ): string[] => {
-  const inMatch = capsTokensInInterpolations(originalMatch);
-  return [...capsTokensInInterpolations(replacement)].filter(
-    tok => !inMatch.has(tok)
+  const inMatch = interpolationReferences(originalMatch);
+  return [...interpolationReferences(replacement)].filter(
+    name => !inMatch.has(name) && !(name in globalThis)
   );
+};
+
+/**
+ * Prepares a prompt's markdown for a quoted string literal by doubling the
+ * backslashes that are the user's literal text.
+ *
+ * The markdown shows `\\`, and any `\"` or `\'` that sits inside an
+ * interpolation, in JavaScript source form, because that is how a template
+ * literal prompt needs them written back (#870). They mean the same in a quoted
+ * prompt, so those pairs are kept as they are: doubling them too shipped
+ * `use A\\Client` to Claude Code where the bundle had `use A\Client`, for
+ * every quoted prompt the user had edited (#922).
+ */
+const escapeLiteralBackslashes = (str: string): string =>
+  str.replace(/\\([\\"'])|\\/g, (pair, escaped?: string) =>
+    escaped ? pair : '\\\\'
+  );
+
+/**
+ * Whether `body` compiles as a string literal with the given delimiter. The
+ * Function constructor only compiles its body; nothing is executed.
+ */
+const literalParses = (delimiter: string, body: string): boolean => {
+  try {
+    new Function(`return ${delimiter}${body}${delimiter}`);
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 const escapeUnescapedChar = (str: string, char: string): string => {
@@ -140,13 +131,17 @@ const escapeUnescapedChar = (str: string, char: string): string => {
  * @param version - The Claude Code version
  * @param escapeNonAscii - Whether to escape non-ASCII characters (auto-detected if not specified)
  * @param patchFilter - Optional list of patch/prompt IDs to apply (if provided, only matching prompts are applied)
+ * @param textSourceIndices - Indices of sources that are Bun text-loader
+ *   (.md) modules rather than JavaScript; prompts are written into them
+ *   verbatim, without string-literal or `\uXXXX` escaping
  * @returns SystemPromptsResult with modified content and per-prompt results
  */
 export const applySystemPrompts = async (
   input: string | readonly string[],
   version: string,
   escapeNonAscii?: boolean,
-  patchFilter?: string[] | null
+  patchFilter?: string[] | null,
+  textSourceIndices: ReadonlySet<number> = new Set()
 ): Promise<SystemPromptsResult> => {
   const contents = typeof input === 'string' ? [input] : [...input];
   const allSource = contents.length === 1 ? contents[0] : contents.join('\n');
@@ -204,16 +199,17 @@ export const applySystemPrompts = async (
     // construction + match: an oversized pattern (e.g. the Model Migration Guide) can
     // overflow V8's regex stack on Node <=22 and abort the whole --apply (#753).
     let pattern: RegExp;
-    // Code-split native builds pass every module: patch the first module that
-    // contains the prompt, at every occurrence within it.
-    let matches: RegExpMatchArray[] = [];
-    let moduleIndex = 0;
+    // Code-split native builds pass every module, and a prompt can be repeated
+    // across modules just as it is within one bundle (e.g. 2.1.295's Bash sleep
+    // guidance in both the Bash and PowerShell tool modules): patch every
+    // occurrence in every module that contains it.
+    const found: { index: number; matches: RegExpMatchArray[] }[] = [];
     try {
       pattern = new RegExp(regex, 'gsi');
-      for (let i = 0; i < contents.length && matches.length === 0; i++) {
-        matches = [...contents[i].matchAll(pattern)];
-        if (matches.length > 0) moduleIndex = i;
-      }
+      contents.forEach((source, index) => {
+        const matches = [...source.matchAll(pattern)];
+        if (matches.length > 0) found.push({ index, matches });
+      });
     } catch (error) {
       console.log(
         chalk.yellow(
@@ -232,9 +228,8 @@ export const applySystemPrompts = async (
       continue;
     }
 
-    if (matches.length > 0) {
-      let content = contents[moduleIndex];
-      const firstMatch = matches[0];
+    if (found.length > 0) {
+      const firstMatch = found[0].matches[0];
       const matchIndex = firstMatch.index!;
 
       // cli.js sometimes repeats the exact same prompt text at more than one
@@ -244,7 +239,7 @@ export const applySystemPrompts = async (
       // each site — and therefore the delimiter/escaping rules that apply —
       // can differ between occurrences even though the surrounding prompt
       // text is identical.
-      const replacements: string[] = [];
+      const replacements: string[][] = found.map(() => []);
       let abortDetails: string | undefined;
 
       // reconstructContentFromPieces produced the .md body in the first place,
@@ -265,27 +260,43 @@ export const applySystemPrompts = async (
       ).trim();
       const isUncustomized = prompt.content.trim() === originalBaselineContent;
 
-      for (const m of matches) {
+      const occurrences = found.flatMap(({ index, matches }, f) =>
+        matches.map(m => ({
+          f,
+          content: contents[index],
+          plainText: textSourceIndices.has(index),
+          m,
+        }))
+      );
+      for (const { f, content, plainText, m } of occurrences) {
         // Each occurrence keeps its own text: cli.js can repeat a prompt with
         // different minified variables at each site (#678).
         if (isUncustomized) {
-          replacements.push(m[0]);
+          replacements[f].push(m[0]);
           continue;
         }
 
         const interpolatedContent = getInterpolatedContent(m);
 
+        // An embedded .md module holds the prompt as plain text: there is no
+        // string literal to escape for, and no Latin-1 module to encode
+        // non-ASCII for, so the text is written exactly as the user wrote it.
+        if (plainText) {
+          replacements[f].push(interpolatedContent);
+          continue;
+        }
+
         // Check the delimiter character before this match to determine string type
         const mIndex = m.index!;
         const delimiter = mIndex > 0 ? content[mIndex - 1] : '';
 
-        // For backtick-delimited prompts, `${...}` is live interpolation. A stale
-        // .md (identifier renamed upstream without a version bump, #899) leaves an
-        // old human-name unmapped in applyIdentifierMapping, so the replacement
-        // references a variable the bundle never defines; writing it would throw
-        // ReferenceError at runtime, which node --check cannot catch (#900). Skip
-        // the prompt rather than corrupt cli.js. Quoted/JSON prompts are inert
-        // here and are left to the escaping paths below.
+        // For backtick-delimited prompts, `${...}` is live interpolation. A name
+        // the bundle never defines there (a typo in an edit, or a stale .md
+        // whose identifier was renamed upstream, #899) would throw
+        // ReferenceError at runtime, which node --check cannot catch and which
+        // leaves Claude Code unable to answer (#872, #900). Skip the prompt
+        // rather than corrupt cli.js. Quoted/JSON prompts are inert here and are
+        // left to the escaping paths below.
         if (delimiter === '`') {
           const introduced = findIntroducedInterpolationIdentifiers(
             interpolatedContent,
@@ -294,12 +305,12 @@ export const applySystemPrompts = async (
           if (introduced.length > 0) {
             console.log(
               chalk.yellow(
-                `Skipped "${prompt.name}": replacement references ${introduced.join(
+                `Skipped "${prompt.name}": its \${...} references ${introduced.join(
                   ', '
-                )} not found in cli.js (stale prompt file — re-sync it, e.g. delete the prompt's .md in your system-prompts directory and re-run --apply)`
+                )}, which Claude Code does not define there. Fix the name in the prompt's .md; if you did not edit it, the file is stale (delete it and re-run --apply).`
               )
             );
-            abortDetails = `stale identifier: ${introduced.join(', ')}`;
+            abortDetails = `undefined identifier: ${introduced.join(', ')}`;
             break;
           }
         }
@@ -307,7 +318,7 @@ export const applySystemPrompts = async (
         let replacementContent = interpolatedContent;
 
         if (delimiter === '"' || delimiter === "'") {
-          replacementContent = replacementContent.replace(/\\/g, '\\\\');
+          replacementContent = escapeLiteralBackslashes(replacementContent);
         }
 
         if (delimiter === '"') {
@@ -350,7 +361,24 @@ export const applySystemPrompts = async (
           replacementContent = escapeNonAsciiChars(replacementContent);
         }
 
-        replacements.push(replacementContent);
+        // An edit can still be invalid JavaScript inside a template literal,
+        // e.g. `${a b}`. The module parse gate would then refuse the whole
+        // apply; checking the literal here names the prompt and skips only it.
+        if (
+          ['"', "'", '`'].includes(delimiter) &&
+          !literalParses(delimiter, replacementContent) &&
+          literalParses(delimiter, m[0])
+        ) {
+          console.log(
+            chalk.red(
+              `Skipped "${prompt.name}": the edited prompt is not valid JavaScript where Claude Code embeds it; check its \${...} expressions`
+            )
+          );
+          abortDetails = 'edited prompt does not parse';
+          break;
+        }
+
+        replacements[f].push(replacementContent);
       }
 
       if (abortDetails) {
@@ -369,19 +397,20 @@ export const applySystemPrompts = async (
       const originalLength = originalBaselineContent.length;
       const newLength = prompt.content.trim().length;
 
-      const oldContent = content;
+      const oldContents = found.map(({ index }) => contents[index]);
       const matchLength = firstMatch[0].length;
 
       // Replace every occurrence with its own interpolated content — not the
       // same string reused for all of them — using a replacer function both to
       // consume `replacements` in match order and to avoid special replacement
       // pattern interpretation (e.g., $$ -> $), see #237.
-      let replacementIndex = 0;
-      content = content.replace(
-        pattern,
-        () => replacements[replacementIndex++]
-      );
-      contents[moduleIndex] = content;
+      found.forEach(({ index }, f) => {
+        let replacementIndex = 0;
+        contents[index] = contents[index].replace(
+          pattern,
+          () => replacements[f][replacementIndex++]
+        );
+      });
 
       // Store the hash of the applied prompt content
       const appliedHash = computeMD5Hash(prompt.content);
@@ -395,16 +424,18 @@ export const applySystemPrompts = async (
 
       // Show diff in debug mode
       showDiff(
-        oldContent,
-        content,
-        replacements[0],
+        oldContents[0],
+        contents[found[0].index],
+        replacements[0][0],
         matchIndex,
         matchIndex + matchLength
       );
 
       // Track this prompt's result
       const charDiff = originalLength - newLength;
-      const applied = oldContent !== content;
+      const applied = found.some(
+        ({ index }, f) => contents[index] !== oldContents[f]
+      );
 
       let details: string;
       if (charDiff > 0) {
@@ -415,8 +446,8 @@ export const applySystemPrompts = async (
         details = 'unchanged';
       }
 
-      if (matches.length > 1) {
-        details += ` (${matches.length} occurrences)`;
+      if (occurrences.length > 1) {
+        details += ` (${occurrences.length} occurrences)`;
       }
 
       if (hashFailed) {

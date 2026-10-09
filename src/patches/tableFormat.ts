@@ -90,8 +90,9 @@ const INTER_ROW_SEP_PATTERN_FORMATTED =
 // We match the R.push(T("top")), prefix and remove it
 const PUSH_TOP_PATTERN_MINIFIED = /([$\w]+)\.push\(([$\w]+)\("top"\)\),/g;
 // Minified: ),R.push(T("bottom")),Math  ->  ),Math
+// CC 2.1.295 ends the statement there: ),V.push(Z("bottom"));let  ->  );let
 const PUSH_BOTTOM_PATTERN_MINIFIED =
-  /,([$\w]+)\.push\(([$\w]+)\("bottom"\)\),/g;
+  /,([$\w]+)\.push\(([$\w]+)\("bottom"\)\)([,;])/g;
 
 // Formatted versions
 const PUSH_TOP_PATTERN_FORMATTED =
@@ -197,7 +198,7 @@ function removeTopBottomPushes(content: string): {
 
   // Remove T("bottom") push - minified
   const beforeBottomMinified = result;
-  result = result.replace(PUSH_BOTTOM_PATTERN_MINIFIED, ',');
+  result = result.replace(PUSH_BOTTOM_PATTERN_MINIFIED, '$3');
   if (result !== beforeBottomMinified) {
     success = true;
   }

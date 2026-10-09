@@ -81,9 +81,7 @@ describe('code-split (CC 2.1.2xx) writer forms', () => {
     const names = sources.get('/names.js')!;
     expect(names).toBe('var pi="x",Ir={"dark":"Dark mode","mine":"Mine"};');
     expect(() => assertPatchedModuleParses('/names.js', names)).not.toThrow();
-    expect(sources.get('/schema.js')).toContain(
-      '"dark-daltonized","dark","mine"]'
-    );
+    expect(sources.get('/schema.js')).toContain('"dark-daltonized","mine"]');
   });
 
   it('thinker format: wraps the default-suffix branch only', () => {
@@ -146,6 +144,35 @@ describe('code-split (CC 2.1.2xx) writer forms', () => {
     // The preceding helpers are left alone.
     expect(out).toContain('function Uqt(o){return typeof o');
     expect(out).toContain('function Spe(){return a.terminal');
+  });
+
+  // Fixtures below are trimmed from real Claude Code 2.1.295 chunks.
+  it('startup banner (2.1.295): nulls the wrapper that also renders the release-notes summary', () => {
+    const card =
+      'function na(l){let u=w(28),m;if(u[0]!==l)m=l===void 0?{}:l,u[0]=l,u[1]=m;else m=u[1];let{oneShotsAllowed:f}=m,h=f===void 0?!0:f,{columns:v}=ke(),T=tt(),C=V(yM),_=Jv(),D=qln(),A=Dt(D),L=iY(D),{version:O,cwd:H,billingType:W,agentName:j}=Tft(),ee=C??j,de;if(u[2]=}';
+    const wrapper =
+      'function sa(){let f=w(16),{storageV5:l}=Ce(),u=ss(),m=wt(),h;if(f[0]!==u||f[1]!==m)h=()=>!m||SU(u)||Lt()||J_()!==void 0,f[0]=u,f[1]=m,f[2]=h;else h=f[2];let[v]=y(h),T;if(f[3]!==v)T=()=>v||a.DEMO_VERSION?null:ku(),f[3]=v,f[4]=T;else T=f[4];let[C]=y(T),_,D;if(f[5]!==v||f[6]!==l)_=()=>{if(v||!mo(ce().lastReleaseNotesSeen)){return}Ae(DM,l)},D=[v,l],f[5]=v,f[6]=l,f[7]=_,f[8]=D;else _=f[7],D=f[8];P(_,D);const A=!v;let L;if(f[9]!==A)L=e(na,{oneShotsAllowed:A}),f[9]=A,f[10]=L;else L=f[10];let O;if(f[11]!==C)O=C&&r(s,{paddingLeft:2,flexDirection:"column",children:[e(n,{bold:!0,children:C}),r(n,{dimColor:!0,children:[e(jt,{url:g3n,children:hBr})," for details"]})]}),f[11]=C,f[12]=O;else O=f[12];let H;if(f[13]!==L||f[14]!==O)H=r(Y,{children:[L,O,!1]}),f[13]=L,f[14]=O,f[15]=H;else H=f[15];return H}';
+    const out = writeHideStartupBanner(card + wrapper)!;
+    expect(out).toContain('function sa(){return null;let f=w(16)');
+    // The card itself is left alone; the disabled wrapper never renders it.
+    expect(out).toContain('function na(l){let u=w(28)');
+  });
+
+  it('startup Clawd (2.1.295): nulls the fixed-width host, not the shared pose component', () => {
+    const { sources, result } = onGraph(
+      {
+        '/clawd.js':
+          'function kwe(o){let i=w(47),t;if(i[0]!==o)t=o===void 0?{}:o,i[0]=o,i[1]=t;else t=i[1];let{pose:c,color:l,paint:u}=t,d=c===void 0?"default":c,p=l===void 0?"clawd_body":l;if(tt()){return null}if(Vln(d)){let x;if(i[2]!==p||i[3]!==d)x=Ewe()?e(ie,{facing:d.facing,color:p}):e(Ct,{eyes:"open",color:p}),i[2]=p,i[3]=d,i[4]=x;else x=i[4];return x}let x;if(i[5]!==d)x=WKn(d),i[5]=d,i[6]=x;else x=i[6];let m=x;}',
+        '/card.js':
+          'function Yi(l){let X=w(21),{fullscreen:u,entrance:m,ultra:f}=l,h=_u(),v=tt(),T=rb(zb().effortUltra),C=vqe(ur()[0]),_=tie(),D=R(_),A=Te(Ym),L=A?.columns,O=A?.rows,[H,W,j]=m6(),{isVisible:ee}=W,[,de]=hh(YT,0),Se=f&&u&&QPe(ko)===ko&&_!=="blurred"&&!Lt()&&J_()===void 0&&!h&&!v&&T!==null&&ge.level>=3&&Ew}',
+      },
+      writeHideStartupClawd
+    );
+    expect(result.applied).toBe(true);
+    expect(sources.get('/card.js')).toContain(
+      'function Yi(l){return null;let X=w(21),{fullscreen:u,entrance:m,ultra:f}=l'
+    );
+    expect(sources.get('/clawd.js')).toContain('function kwe(o){let i=w(47)');
   });
 
   it('input chevron: tolerates nested object literals and a bare JSX call', () => {
@@ -565,6 +592,52 @@ describe('scroll escape filter on a module graph', () => {
     ) as () => boolean;
     expect(SY()).toBe(false);
   });
+
+  it('turns off the scroll-region renderer on CC 2.1.295', () => {
+    // chunk-x31wb8sb.js
+    const renderer =
+      'function zq(){let n=wo();if(n.decstbmRendererEnabled!==void 0)return n.decstbmRendererEnabled;' +
+      'if(!process.stdout.isTTY)return n.decstbmRendererEnabled=!1;if(Sle())return n.decstbmRendererEnabled=!1;' +
+      'if(!oYn(Fwe()))return n.decstbmRendererEnabled=!1;if(Tc())return n.decstbmRendererEnabled=!1;' +
+      'if(dm())return n.decstbmRendererEnabled=!1;if(Le(a.CLAUDE_CODE_DECSTBM))return n.decstbmRendererEnabled=!0;' +
+      'return n.decstbmRendererEnabled=k("tengu_marlin_porch",!1),n.decstbmRendererEnabled}' +
+      'process.stdout.write("");export{zq};';
+    const { sources } = onGraph(
+      { '/ink.js': renderer },
+      writeScrollEscapeSequenceFilter
+    );
+    const out = sources.get('/ink.js')!;
+    const body = out.slice(
+      out.indexOf('function zq'),
+      out.indexOf('process.stdout.write("")')
+    );
+    const no = () => false;
+    const zq = new Function(
+      'wo',
+      'process',
+      'Sle',
+      'oYn',
+      'Fwe',
+      'Tc',
+      'dm',
+      'Le',
+      'a',
+      'k',
+      `${body}return zq;`
+    )(
+      () => ({}) as Record<string, unknown>,
+      { stdout: { isTTY: true } },
+      no,
+      () => true,
+      () => true,
+      no,
+      no,
+      () => true,
+      { CLAUDE_CODE_DECSTBM: '1' },
+      () => true
+    ) as () => boolean;
+    expect(zq()).toBe(false);
+  });
 });
 
 describe('thinker symbol speed on CC 2.1.2xx (breathing spinner)', () => {
@@ -590,6 +663,32 @@ describe('thinker symbol speed on CC 2.1.2xx (breathing spinner)', () => {
 describe('allow bypass permissions as root on CC 2.1.2xx', () => {
   const MSG =
     '"--dangerously-skip-permissions cannot be used with root/sudo privileges for security reasons"';
+  it('fails when no module refuses root, instead of reporting it as satisfied', () => {
+    const { result } = onGraph(
+      { '/a.js': 'var z=1;export{z};' },
+      writeAllowBypassPermsInSudo
+    );
+    expect(result).toMatchObject({ applied: false, failed: true });
+  });
+
+  it('removes both refusals in the CC 2.1.295 forms', () => {
+    // chunk-gq5s7t2h.js and chunk-rhc48ngb.js
+    const { sources, result } = onGraph(
+      {
+        '/gq5s7t2h.js': `function g(s){if(!i(s))return;if(OT.isRootOutsideDeliberateSandbox())console.error(${MSG}),process.exit(1)}`,
+        '/rhc48ngb.js': `if(r==="bypassPermissions"||s){if(typeof process.getuid==="function"&&process.getuid()===0&&process.env.IS_SANDBOX!=="1"&&!a.CLAUDE_CODE_BUBBLEWRAP)console.error(${MSG}),await DY({sessionId:K(),message:${MSG},reason:"bypass_root"}),process.exit(1)}let w=Ki();`,
+      },
+      writeAllowBypassPermsInSudo
+    );
+    expect(result).toMatchObject({ applied: true, failed: false });
+    expect(sources.get('/gq5s7t2h.js')).toBe(
+      'function g(s){if(!i(s))return;if(OT.isRootOutsideDeliberateSandbox()){}}'
+    );
+    expect(sources.get('/rhc48ngb.js')).toBe(
+      'if(r==="bypassPermissions"||s){if(typeof process.getuid==="function"&&process.getuid()===0&&process.env.IS_SANDBOX!=="1"&&!a.CLAUDE_CODE_BUBBLEWRAP){}}let w=Ki();'
+    );
+  });
+
   it('removes both refusals: the flag validator and the setup check', async () => {
     const { sources, result } = onGraph(
       {
@@ -635,5 +734,98 @@ describe('LSP native file sync detection', () => {
       'async function a(s){await s.sendNotification("textDocument/didOpen",{})}' +
       'var m={openFile:a,changeFile:b,saveFile:c,isFileOpen:d};';
     expect(writeFixLspSupport(src)).toBe(src);
+  });
+});
+
+describe('Claude Code 2.1.295 toolsets', () => {
+  // Fixtures trimmed from real Claude Code 2.1.295 chunks (catalog and store
+  // shapes are unchanged from 2.1.281).
+  const catalog =
+    'function AC(){return[]}var tP=(e,r)=>{return r},Y1r=3;function ept(e,r,n){let s=tP(e,n);return s}var K5={getAllBaseTools:AC,getTools:tP,assembleToolPool:ept};';
+  const store =
+    'class St{computeToolPool(h,M,E){let K={toolPermissionContext:h.toolPermissionContext,x:1};return{tools:M,k:K}}}';
+  const toolsets = [
+    { name: 'ro', allowedTools: ['Read', 'mcp__*'] },
+    { name: 'none', allowedTools: [] },
+    { name: 'all', allowedTools: '*' as const },
+  ];
+
+  it('drops tools outside the toolset from the held declared-tool set', async () => {
+    const { writeToolsets } = await import('./toolsets');
+    // chunk-w00n4xbx: the set of tools already declared in the conversation.
+    const held =
+      'var ha="ToolSearch";class aye{names;recordedOnly;recordOrder;#e;constructor(e,n={only:new Map,order:[]}){this.names=n.names??[...e.map((o)=>o.name),...n.only.keys()],this.recordedOnly=n.only,this.recordOrder=n.order,this.#e=new Map(e.map((o)=>[o.name,o]))}has(e){return this.#e.has(e)||this.recordedOnly.has(e)}keeps(e){return this.has(e)&&e!==ha}toolFor(e){return this.#e.get(e)}}';
+    const { sources } = onGraph(
+      { '/catalog.js': catalog, '/store.js': store, '/held.js': held },
+      s => writeToolsets(s, toolsets, 'all')
+    );
+    const run = new Function(
+      `${sources.get('/catalog.js')};${sources.get('/store.js')};${sources.get('/held.js')};` +
+        'const names=["Read","Bash","mcp__x__y"],set=new aye(names.map(name=>({name}))),keeps=()=>names.filter(n=>set.keeps(n));' +
+        'new St().computeToolPool({toolPermissionContext:{mode:"default"}},[]);const all=keeps();' +
+        'globalThis.__tweakccToolset="ro";const ro=keeps();delete globalThis.__tweakccToolset;' +
+        'delete globalThis.__tweakccMainToolContext;return[all,ro]'
+    );
+    expect(run()).toEqual([
+      ['Read', 'Bash', 'mcp__x__y'],
+      ['Read', 'mcp__x__y'],
+    ]);
+  });
+
+  it('Shift+Tab drops the explicit /toolset choice so mode bindings apply', async () => {
+    const { writeToolsets } = await import('./toolsets');
+    // chunk-tjhhhqzz: the teammate branch, then the main-session mode cycle.
+    const cycle =
+      'function cyc(fq,dy){let kS=xBt(fq,void 0);i("tengu_mode_cycle",{to:d(kS),trigger:d("shift_tab")}),g("mode_switch");OV(`[${IF(dy)} on]`);if(i("tengu_mode_cycle",{to:d(dy),trigger:d("shift_tab")}),!Ka())g("mode_switch")}';
+    const { sources } = onGraph({ '/cycle.js': cycle }, s =>
+      writeToolsets(s, toolsets, 'all', null, 'ro')
+    );
+    const out = sources.get('/cycle.js')!;
+    expect(out.match(/__tweakccToolset=void 0/g)).toHaveLength(1);
+    const run = new Function(
+      'function xBt(){}function i(){}function d(){}function g(){}function OV(){}function IF(){}function Ka(){return!0}' +
+        `${out};globalThis.__tweakccToolset="ro";cyc({},"plan");return globalThis.__tweakccToolset`
+    );
+    expect(run()).toBeUndefined();
+
+    // Without mode bindings an explicit choice is kept across modes.
+    const unbound = onGraph({ '/cycle.js': cycle }, s =>
+      writeToolsets(s, toolsets, 'all')
+    );
+    expect(unbound.sources.get('/cycle.js')).toBe(cycle);
+  });
+
+  it('/toolset refreshes the permission context and honours a toolset named "none"', async () => {
+    const { writeToolsets } = await import('./toolsets');
+    const react =
+      'var K={H:null},us=function(e){return K.H.useState(e)},ce=function(t,n,r){var o,i={},a=null;if(n!=null)a=1;return{t,n,r}};export{us as useState,ce as createElement};';
+    const ui =
+      'function B(o){let q=w(4),x;return x.createElement("ink-box",o)}function T(o){let r=w(31),d;if(r[0]!==o)({color:d,backgroundColor:l,dimColor:m}=o);return d}function S(o){return o}export{B,T,S};';
+    const picker =
+      'import{S as Q}from"/ui.js";function P(){return e(Q,{options:a,onChange:b,visibleOptionCount:3})}';
+    const commands =
+      'var GBt=()=>({type:"local-jsx",name:"login",description:"x"});var list=[GBt(),WBt()];';
+    const { sources } = onGraph(
+      {
+        '/react.js': react,
+        '/ui.js': ui,
+        '/picker.js': picker,
+        '/cmds.js': commands,
+      },
+      s => writeToolsets(s, toolsets, 'all')
+    );
+    const run = new Function(
+      `function WBt(){}${sources.get('/cmds.js')};const cmd=list.find(c=>c?.name==="toolset");` +
+        'return(async()=>{const {call}=await cmd.load(),said=[],ctx0={mode:"default"};let state={toolPermissionContext:ctx0};' +
+        'const ctx={setAppState:f=>{state=f(state)}},done=m=>said.push(m);' +
+        'await call(done,ctx,"none");const picked=globalThis.__tweakccToolset,fresh=state.toolPermissionContext!==ctx0;' +
+        'await call(done,ctx,"default");return[picked,fresh,globalThis.__tweakccToolset,said]})()'
+    );
+    expect(await run()).toEqual([
+      'none',
+      true,
+      undefined,
+      ['Toolset changed to none.', 'Toolset cleared; using the mode default.'],
+    ]);
   });
 });

@@ -7,27 +7,129 @@ import {
   getReactVar,
   showDiff,
 } from './index';
+import { findStartupBannerWrapper } from './hideStartupBanner';
+
+const VERSION_PATTERN = '}.VERSION} (Claude Code)';
 
 /**
- * PATCH 1: Finds the location of the version output pattern in Claude Code's cli.js
+ * PATCH 1: Appends the tweakcc version to every `claude --version` printer
+ * (commander's .version() text and the early-exit console.log).
  */
-export const findVersionOutputLocation = (
-  fileContents: string
-): LocationResult | null => {
-  // Pattern: }.VERSION} (Claude Code)
-  const versionPattern = '}.VERSION} (Claude Code)';
-  const versionIndex = fileContents.indexOf(versionPattern);
-  if (versionIndex == -1) {
+const writeVersionOutput = (
+  fileContents: string,
+  tweakccVersion: string
+): string | null => {
+  const versionIndex = fileContents.indexOf(VERSION_PATTERN);
+  if (versionIndex === -1) return null;
+
+  const newText = `\\n${tweakccVersion} (tweakcc)`;
+  const content = fileContents.replaceAll(
+    VERSION_PATTERN,
+    VERSION_PATTERN + newText
+  );
+  const at = versionIndex + VERSION_PATTERN.length;
+  showDiff(fileContents, content, newText, at, at);
+  return content;
+};
+
+/**
+ * PATCHES 2+3 for headers compiled with the React JSX automatic runtime. The
+ * jsxs callee is `X.jsxs` in single-file bundles and a bare imported alias in
+ * the CC >=2.1.280 split chunks:
+ *   HDR=J(TEXT,{children:[BOLD," ",J(TEXT,{dimColor:!0,children:["v",VER]})]})
+ *   ...J(BOX,{flexDirection:"column",children:[HDR,...]})
+ * The tweakcc version becomes a sibling after the version element and the
+ * patches list becomes the last child of the column. Returns null when the
+ * header row is not in this file.
+ */
+const writeJsxHeader = (
+  fileContents: string,
+  tweakccVersion: string,
+  patchesApplies: string[],
+  showTweakccVersion: boolean,
+  showPatchesApplied: boolean,
+  hideStartupBanner: boolean
+): string | null => {
+  const hdrMatch = fileContents.match(
+    /(?<![$\w.])([$\w]+)=([$\w]+(?:\.jsxs)?)\(([$\w]+),\{children:\[[$\w]+," ",\2\(\3,\{dimColor:!0,children:\["v",[$\w]+\]\}\)/
+  );
+  if (!hdrMatch || hdrMatch.index === undefined) return null;
+  const [, hdrVar, jsxs, text] = hdrMatch;
+  const versionIndex = hdrMatch.index + hdrMatch[0].length;
+
+  // The column whose first child is exactly the header row var; scoped to a
+  // window after the header so a far-away column can't be picked.
+  const colRe = new RegExp(
+    `${jsxs.replace(/[$.]/g, '\\$&')}\\(([$\\w]+),\\{flexDirection:"column",children:\\[${escapeIdent(hdrVar)}(?:,[^\\]]*)?\\]`
+  );
+  const colMatch = fileContents
+    .slice(versionIndex, versionIndex + 6000)
+    .match(colRe);
+  if (!colMatch || colMatch.index === undefined) {
     console.error(
-      'patch: patchesAppliedIndication: failed to find versionIndex'
+      'patch: patchesAppliedIndication: failed to find the header column'
     );
     return null;
   }
+  const box = colMatch[1];
+  const listIndex = versionIndex + colMatch.index + colMatch[0].length - 1;
 
-  return {
-    startIndex: 0,
-    endIndex: versionIndex + versionPattern.length,
-  };
+  const row = (mark: string, label: string) =>
+    `${jsxs}(${box},{children:[${jsxs}(${text},{color:"success",bold:!0,children:["┃ "]}),${jsxs}(${text},{${mark},children:[${label}]})]})`;
+  const listCode = `${jsxs}(${box},{flexDirection:"column",children:[${[
+    row('color:"success",bold:!0', '"✓ tweakcc patches are applied"'),
+    ...patchesApplies.map(item => row('dimColor:!0', `\`  * ${item}\``)),
+  ].join(',')}]})`;
+  const tweakccText = `${jsxs}(${text},{color:"#FF8400",bold:!0,children:["+ tweakcc v${tweakccVersion}"]})`;
+
+  // With the startup banner hidden (CC >=2.1.282 wrapper form) the card never
+  // renders, so show the indicator on its own lines next to the wrapper call:
+  //   _=!v&&e(sa,{})  ->  _=!v&&r(s,{flexDirection:"column",children:[e(sa,{}),IND]})
+  if (hideStartupBanner) {
+    const wrapper = findStartupBannerWrapper(fileContents);
+    const callMatch =
+      wrapper &&
+      fileContents.match(
+        new RegExp(
+          `(?<![$\\w.])[$\\w]+(?:\\.jsx)?\\(${escapeIdent(wrapper.name)},\\{\\}\\)`
+        )
+      );
+    if (callMatch && callMatch.index !== undefined) {
+      const parts = [
+        ...(showTweakccVersion ? [tweakccText] : []),
+        ...(showPatchesApplied ? [listCode] : []),
+      ];
+      const replacement = `${jsxs}(${box},{flexDirection:"column",children:[${callMatch[0]},${parts.join(',')}]})`;
+      const start = callMatch.index;
+      const end = start + callMatch[0].length;
+      const content =
+        fileContents.slice(0, start) + replacement + fileContents.slice(end);
+      showDiff(fileContents, content, replacement, start, end);
+      return content;
+    }
+    console.error(
+      'patch: patchesAppliedIndication: startup banner wrapper call not found; indicator stays in the (hidden) card'
+    );
+  }
+
+  let content = fileContents;
+  // Insert at the later index first so the earlier one stays valid.
+  if (showPatchesApplied) {
+    const old = content;
+    content =
+      content.slice(0, listIndex) + ',' + listCode + content.slice(listIndex);
+    showDiff(old, content, ',' + listCode, listIndex, listIndex);
+  }
+  if (showTweakccVersion) {
+    const versionCode = `," ",${tweakccText}`;
+    const old = content;
+    content =
+      content.slice(0, versionIndex) +
+      versionCode +
+      content.slice(versionIndex);
+    showDiff(old, content, versionCode, versionIndex, versionIndex);
+  }
+  return content;
 };
 
 /**
@@ -37,32 +139,12 @@ export const findVersionOutputLocation = (
  */
 const findTweakccVersionLocations = (
   fileContents: string
-):
-  | { jsx: true; insertIndex: number; jsxVar: string; textComponent: string }
-  | {
-      jsx?: false;
-      varInsertIndex: number;
-      refInsertIndex: number;
-      reactVar: string;
-      textComponent: string;
-    }
-  | null => {
-  // CC >=2.1.x compiles the header with the React JSX automatic runtime:
-  //   _=X.jsxs(TEXT,{children:[BOLD," ",X.jsxs(TEXT,{dimColor:!0,children:["v",VER]})]})
-  // Insert the tweakcc version as a sibling child right after the version element
-  // (before the outer children-array `]`).
-  const jsxVersionPattern =
-    /([$\w]+)\.jsxs?\(([$\w]+),\{dimColor:!0,children:\["v",[$\w]+\]\}\)/;
-  const jsxMatch = fileContents.match(jsxVersionPattern);
-  if (jsxMatch && jsxMatch.index !== undefined) {
-    return {
-      jsx: true,
-      insertIndex: jsxMatch.index + jsxMatch[0].length,
-      jsxVar: jsxMatch[1],
-      textComponent: jsxMatch[2],
-    };
-  }
-
+): {
+  varInsertIndex: number;
+  refInsertIndex: number;
+  reactVar: string;
+  textComponent: string;
+} | null => {
   // Find: createElement(TEXT,{bold:!0},"Claude Code"),CACHE[N]=x;else x=CACHE[N];
   // This gives us the position right after the x assignment block — where we insert our var
   const boldPattern =
@@ -342,52 +424,6 @@ const applyIndicatorPatchesListPatch = (
 const findPatchesListLocation = (
   fileContents: string
 ): LocationResult | null => {
-  // CC >=2.1.x JSX automatic runtime: the header row lives inside a column box
-  //   HDR=X.jsxs(TEXT,{children:[...,X.jsxs(TEXT,{dimColor:!0,children:["v",VER]})...]})
-  //   ...X.jsxs(BOX,{flexDirection:"column",children:[HDR,...]})
-  // Insert the patches list as the last child of that column array. identifiers
-  // carries [jsxVar, boxVar] to signal jsx mode to the codegen.
-  const jsxVerMatch = fileContents.match(
-    /([$\w]+)\.jsxs?\([$\w]+,\{dimColor:!0,children:\["v",[$\w]+\]\}\)/
-  );
-  if (jsxVerMatch && jsxVerMatch.index !== undefined) {
-    const jsxVar = jsxVerMatch[1];
-    // Header row var = nearest `VAR=<jsxVar>.jsxs(TEXT,{children:[` before the version element.
-    const hdrAssignRe = new RegExp(
-      `([$\\w]+)=${escapeIdent(jsxVar)}\\.jsxs\\([$\\w]+,\\{children:\\[`,
-      'g'
-    );
-    let hdrVar: string | undefined;
-    let m: RegExpExecArray | null;
-    while ((m = hdrAssignRe.exec(fileContents)) !== null) {
-      if (m.index > jsxVerMatch.index) break;
-      hdrVar = m[1];
-    }
-    if (hdrVar) {
-      // Match the column box whose FIRST child is exactly the header row var
-      // (require `,`/`]` after it so we don't match a longer var like `_A`).
-      // Scope to a window just after the header so a far-away `[_,...]` column
-      // (e.g. the IDE-warning box) can't be picked instead.
-      const colRe = new RegExp(
-        `${escapeIdent(jsxVar)}\\.jsxs\\(([$\\w]+),\\{flexDirection:"column",children:\\[${escapeIdent(hdrVar)}(?:,[^\\]]*)?\\]`
-      );
-      const windowStart = jsxVerMatch.index;
-      const windowStr = fileContents.slice(windowStart, windowStart + 6000);
-      const colMatch = windowStr.match(colRe);
-      if (colMatch && colMatch.index !== undefined) {
-        const boxVar = colMatch[1];
-        // Insert before the `]` that closes the column children array.
-        const insertIndex =
-          windowStart + colMatch.index + colMatch[0].length - 1;
-        return {
-          startIndex: insertIndex,
-          endIndex: insertIndex,
-          identifiers: [jsxVar, boxVar],
-        };
-      }
-    }
-  }
-
   // 1. Find the version display area (may already be modified by PATCH 2)
   // Find the "Claude Code" that's near dimColor:!0},"v" (the header version display)
   const versionDisplayPattern =
@@ -496,62 +532,16 @@ export const writePatchesAppliedIndication = (
   tweakccVersion: string,
   patchesApplies: string[],
   showTweakccVersion: boolean = true,
-  showPatchesApplied: boolean = true
+  showPatchesApplied: boolean = true,
+  hideStartupBanner: boolean = false
 ): string | null => {
-  // PATCH 1: Version output modification
-  const versionOutputLocation = findVersionOutputLocation(fileContents);
-  if (!versionOutputLocation) {
-    console.error(
-      'patch: patchesAppliedIndication: failed to version output location'
-    );
-    return null;
-  }
+  // PATCH 1: Version output modification. Code-split builds (CC >=2.1.280)
+  // keep the version printers and the startup header in different modules, so
+  // the version and the JSX header each match on their own.
+  const versioned = writeVersionOutput(fileContents, tweakccVersion);
+  let content = versioned ?? fileContents;
 
-  const newText = `\\n${tweakccVersion} (tweakcc)`;
-  // Patch ALL occurrences of the version pattern (commander help text + console.log early exit)
-  const versionPattern = '}.VERSION} (Claude Code)';
-  let content = fileContents.replaceAll(
-    versionPattern,
-    versionPattern + newText
-  );
-
-  showDiff(
-    fileContents,
-    content,
-    newText,
-    versionOutputLocation.endIndex,
-    versionOutputLocation.endIndex
-  );
-
-  // Find shared components needed by multiple patches
-  const chalkVar = findChalkVar(fileContents);
-  if (!chalkVar) {
-    console.error(
-      'patch: patchesAppliedIndication: failed to find chalk variable'
-    );
-    return null;
-  }
-
-  const textComponent = findTextComponent(fileContents);
-  if (!textComponent) {
-    console.error(
-      'patch: patchesAppliedIndication: failed to find text component'
-    );
-    return null;
-  }
-
-  const reactVar = getReactVar(fileContents);
-  if (!reactVar) {
-    console.error(
-      'patch: patchesAppliedIndication: failed to find React variable'
-    );
-    return null;
-  }
-
-  // PATCH 2: Add tweakcc version to all header paths.
-  // Path A: SyK banner borderText (chalk template literal)
-  // Path B: SyK compact borderText (chalk call)
-  // Path C: VyK compact React createElement (separate variable, like CC does)
+  // Banner borderText paths (chalk template literals, no component lookup).
   if (showTweakccVersion) {
     // Path A: Banner borderText — ` ${N7("claude",e)("Claude Code")} ${N7("inactive",e)(`v${x}`)} `
     const bannerPattern =
@@ -570,28 +560,47 @@ export const writePatchesAppliedIndication = (
       /([$\w]+\("claude",[$\w]+\)\(" Claude Code) ("\))/,
       `$1 + tweakcc v${tweakccVersion} $2`
     );
+  }
+
+  // PATCHES 2+3 on JSX-runtime headers (CC >=2.1.x).
+  if (showTweakccVersion || showPatchesApplied) {
+    const jsxContent = writeJsxHeader(
+      content,
+      tweakccVersion,
+      patchesApplies,
+      showTweakccVersion,
+      showPatchesApplied,
+      hideStartupBanner
+    );
+    if (jsxContent) return jsxContent;
+  }
+
+  if (!versioned) {
+    console.error(
+      'patch: patchesAppliedIndication: failed to find version output location'
+    );
+    return null;
+  }
+
+  // Find shared components needed by the createElement header patches. Without
+  // them (e.g. a code-split module that only prints the version) only the
+  // version output is patched.
+  const chalkVar = findChalkVar(fileContents);
+  const textComponent = findTextComponent(fileContents);
+  const reactVar = getReactVar(fileContents);
+  if (!chalkVar || !textComponent || !reactVar) {
+    console.error(
+      'patch: patchesAppliedIndication: header patches skipped (chalk, Text or React not found)'
+    );
+    return content;
+  }
+
+  // PATCH 2 (createElement headers): VyK compact header, a separate variable like CC does
+  if (showTweakccVersion) {
     const locs = findTweakccVersionLocations(content);
     if (!locs) {
       console.error(
         'patch: patchesAppliedIndication: patch 2 skipped (header version pattern changed)'
-      );
-    } else if (locs.jsx) {
-      // JSX runtime: insert the tweakcc version as a sibling child in the header
-      // children array, right after the version element (jsx takes children as a
-      // prop, so we can't reuse the classic createElement(type,props,...children)).
-      const tweakccEl = `${locs.jsxVar}.jsx(${locs.textComponent},{children:${chalkVar}.hex("#FF8400").bold("+ tweakcc v${tweakccVersion}")})`;
-      const refCode = `," ",${tweakccEl}`;
-      const oldContent2 = content;
-      content =
-        content.slice(0, locs.insertIndex) +
-        refCode +
-        content.slice(locs.insertIndex);
-      showDiff(
-        oldContent2,
-        content,
-        refCode,
-        locs.insertIndex,
-        locs.insertIndex
       );
     } else {
       // Step 1: Insert variable declaration after the "Claude Code" bold element
@@ -646,39 +655,6 @@ export const writePatchesAppliedIndication = (
     if (!patchesListLoc) {
       console.error(
         'patch: patchesAppliedIndication: patch 3 skipped (version display pattern changed by PATCH 2)'
-      );
-    } else if (
-      patchesListLoc.identifiers &&
-      patchesListLoc.identifiers.length === 2
-    ) {
-      // JSX automatic runtime: build the list with jsx-convention calls (children
-      // as a prop) using the module's jsx var and the column's box, since the
-      // React var has no `.createElement` on these bundles. Insert as the last
-      // child of the header's column array.
-      const [jsxVar, listBox] = patchesListLoc.identifiers;
-      const rows: string[] = [];
-      rows.push(
-        `${jsxVar}.jsxs(${listBox},{children:[${jsxVar}.jsx(${textComponent},{color:"success",bold:true,children:"┃ "}),${jsxVar}.jsx(${textComponent},{color:"success",bold:true,children:"✓ tweakcc patches are applied"})]})`
-      );
-      for (let item of patchesApplies) {
-        item = item.replace('CHALK_VAR', chalkVar);
-        rows.push(
-          `${jsxVar}.jsxs(${listBox},{children:[${jsxVar}.jsx(${textComponent},{color:"success",bold:true,children:"┃ "}),${jsxVar}.jsx(${textComponent},{dimColor:true,children:\`  * ${item}\`})]})`
-        );
-      }
-      const listEl = `${jsxVar}.jsxs(${listBox},{flexDirection:"column",children:[${rows.join(',')}]})`;
-      const patchesListCode = `,${listEl}`;
-      const oldContent3 = content;
-      content =
-        content.slice(0, patchesListLoc.startIndex) +
-        patchesListCode +
-        content.slice(patchesListLoc.endIndex);
-      showDiff(
-        oldContent3,
-        content,
-        patchesListCode,
-        patchesListLoc.startIndex,
-        patchesListLoc.endIndex
       );
     } else {
       const lines = [];

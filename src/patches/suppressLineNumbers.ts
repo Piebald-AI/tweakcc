@@ -1,5 +1,6 @@
 // Please see the note about writing patches in ./index
 
+import { graphMemo, isGraphContextActive, graphSources } from './graphContext';
 import { showDiff } from './index';
 
 const patchReadToolPrompt = (file: string): string => {
@@ -11,7 +12,7 @@ const patchReadToolPrompt = (file: string): string => {
     ],
     [
       /`\$\{[$\w]+\}\. Each line is the line number, a single separator \(a tab or \\?`:\\?`\), then the verbatim file content \(including any leading whitespace\)\.`/g,
-      '`Results are raw file content without line-number prefixes.`',
+      '`- Results are returned as raw file content without line-number prefixes`',
     ],
   ];
 
@@ -25,6 +26,12 @@ const patchReadToolPrompt = (file: string): string => {
 
   return newFile;
 };
+
+// CC 2.1.140+ adds an optional `tabAwareSeparator:VAR=!1` param and replaces
+// the `split(/\r?\n/)` body with an indexOf-based loop, so we only anchor on
+// the destructured-params + empty-guard prefix (which is still unique).
+const FORMATTER_SIGNATURE =
+  /\{content:([$\w]+),startLine:[$\w]+(?:,tabAwareSeparator:[$\w]+=!1)?\}\)\{if\(!\1\)return"";/;
 
 /**
  * Find the location of the line number formatting function.
@@ -49,12 +56,7 @@ export const writeSuppressLineNumbers = (oldFile: string): string | null => {
   // if(VAR.length>=N)return`...→...`;return`...→...`
 
   // Find the function by its unique signature.
-  // CC 2.1.140+ adds an optional `tabAwareSeparator:VAR=!1` param and replaces
-  // the `split(/\r?\n/)` body with an indexOf-based loop, so we only anchor on
-  // the destructured-params + empty-guard prefix (which is still unique).
-  const funcSig =
-    /\{content:([$\w]+),startLine:[$\w]+(?:,tabAwareSeparator:[$\w]+=!1)?\}\)\{if\(!\1\)return"";/;
-  const sigMatch = oldFile.match(funcSig);
+  const sigMatch = oldFile.match(FORMATTER_SIGNATURE);
 
   if (sigMatch && sigMatch.index !== undefined) {
     const contentVar = sigMatch[1];
@@ -119,8 +121,23 @@ export const writeSuppressLineNumbers = (oldFile: string): string | null => {
     return newFile;
   }
 
+  // Code-split builds (CC 2.1.2xx) keep the Read tool prompt in a different
+  // module from the formatter; patch it there, but only when the formatter
+  // itself exists somewhere in the graph.
+  if (isGraphContextActive() && graphHasFormatter()) {
+    const newFile = patchReadToolPrompt(oldFile);
+    if (newFile !== oldFile) return newFile;
+  }
+
   console.error(
     'patch: suppressLineNumbers: failed to find line number formatter pattern'
   );
   return null;
 };
+
+const graphHasFormatter = (): boolean =>
+  !!graphMemo('suppressLineNumbers:formatter', () =>
+    [...(graphSources()?.values() ?? [])].some(source =>
+      FORMATTER_SIGNATURE.test(source)
+    )
+  );
