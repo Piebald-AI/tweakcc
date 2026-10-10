@@ -733,7 +733,7 @@ export const buildPatchImplementations = (
       fn: c =>
         writePatchesAppliedIndication(
           c,
-          '4.4.0',
+          '4.3.3',
           legacyItems,
           showTweakccVersion,
           showPatchesApplied,
