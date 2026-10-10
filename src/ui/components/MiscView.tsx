@@ -2,7 +2,7 @@ import { Box, Text, useInput } from 'ink';
 import { useContext, useState, useMemo } from 'react';
 import { SettingsContext } from '../App';
 import Header from './Header';
-import { TableFormat } from '../../types';
+import { Settings, TableFormat } from '../../types';
 import { DEFAULT_SETTINGS } from '../../defaultSettings';
 
 interface MiscViewProps {
@@ -43,6 +43,15 @@ const TOKEN_ROUNDING_OPTIONS: (number | null)[] = [
   1000,
 ];
 
+// Shimmer constraints (null = CC default)
+const SHIMMER_STEP_MIN = 10;
+const SHIMMER_STEP_MAX = 1000;
+const SHIMMER_STEP_DEFAULT = 200;
+const SHIMMER_STEP_STEP = 25;
+const SHIMMER_WIDTH_MIN = 1;
+const SHIMMER_WIDTH_MAX = 30;
+const SHIMMER_WIDTH_DEFAULT = 3;
+
 // Statusline throttle constraints
 const STATUSLINE_THROTTLE_MIN = 0;
 const STATUSLINE_THROTTLE_MAX = 1000;
@@ -77,6 +86,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableRememberSkill: false,
     tokenCountRounding: null as number | null,
     autoAcceptPlanMode: false,
+    autoAcceptPlanModeEnv: false,
     allowBypassPermissionsInSudo: false,
     suppressNativeInstallerWarning: false,
     filterScrollEscapeSequences: false,
@@ -87,13 +97,23 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableVoiceMode: false,
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
+    disableCtrlZSuspend: false,
+    skipSkillShellValidation: false,
     preventUpdateToUnsupportedVersions: false,
+    webFetchUserAgent: null as string | null,
+    shimmer: { ...DEFAULT_SETTINGS.misc.shimmer },
   };
 
   const ensureMisc = () => {
     if (!settings.misc) {
       settings.misc = { ...defaultMisc };
     }
+  };
+
+  const ensureShimmer = (settings: Settings) => {
+    settings.misc ??= { ...defaultMisc };
+    settings.misc.shimmer ??= { ...DEFAULT_SETTINGS.misc.shimmer };
+    return settings.misc.shimmer;
   };
 
   // Helper to cycle through table format options
@@ -466,6 +486,101 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         },
       },
       {
+        id: 'skipSkillShellValidation',
+        title: 'Skip shell permission check in your skills/commands',
+        description:
+          'SECURITY: !`...` commands in your user and project skills/commands run without a permission prompt. Explicit deny rules still apply.',
+        getValue: () => settings.misc?.skipSkillShellValidation ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.skipSkillShellValidation =
+              !settings.misc!.skipSkillShellValidation;
+          });
+        },
+      },
+      {
+        id: 'shimmerEnabled',
+        title: 'Spinner shimmer',
+        description:
+          'Sweep a highlight across the spinner message while Claude works. Off = static color.',
+        getValue: () => settings.misc?.shimmer?.enabled ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            const shimmer = ensureShimmer(settings);
+            shimmer.enabled = !shimmer.enabled;
+          });
+        },
+      },
+      {
+        id: 'shimmerStepMs',
+        title: 'Shimmer speed',
+        description: `Milliseconds per shimmer step (${SHIMMER_STEP_MIN}-${SHIMMER_STEP_MAX}). Use ←/→ to adjust. Space resets to default (50ms requesting, 200ms otherwise).`,
+        getValue: () => settings.misc?.shimmer?.stepMs ?? null,
+        getDisplayValue: () => {
+          const stepMs = settings.misc?.shimmer?.stepMs ?? null;
+          return stepMs === null ? 'Default' : `${stepMs}ms`;
+        },
+        toggle: () => {
+          updateSettings(settings => {
+            ensureShimmer(settings).stepMs = null;
+          });
+        },
+        increment: () => {
+          updateSettings(settings => {
+            const shimmer = ensureShimmer(settings);
+            shimmer.stepMs = Math.min(
+              SHIMMER_STEP_MAX,
+              (shimmer.stepMs ?? SHIMMER_STEP_DEFAULT) + SHIMMER_STEP_STEP
+            );
+          });
+        },
+        decrement: () => {
+          updateSettings(settings => {
+            const shimmer = ensureShimmer(settings);
+            shimmer.stepMs = Math.max(
+              SHIMMER_STEP_MIN,
+              (shimmer.stepMs ?? SHIMMER_STEP_DEFAULT) - SHIMMER_STEP_STEP
+            );
+          });
+        },
+      },
+      {
+        id: 'shimmerWidth',
+        title: 'Shimmer width',
+        description: `Highlighted cells (${SHIMMER_WIDTH_MIN}-${SHIMMER_WIDTH_MAX}). Use ←/→ to adjust. Space resets to default (${SHIMMER_WIDTH_DEFAULT}).`,
+        getValue: () => settings.misc?.shimmer?.width ?? null,
+        getDisplayValue: () => {
+          const width = settings.misc?.shimmer?.width ?? null;
+          return width === null
+            ? `Default (${SHIMMER_WIDTH_DEFAULT})`
+            : `${width}`;
+        },
+        toggle: () => {
+          updateSettings(settings => {
+            ensureShimmer(settings).width = null;
+          });
+        },
+        increment: () => {
+          updateSettings(settings => {
+            const shimmer = ensureShimmer(settings);
+            shimmer.width = Math.min(
+              SHIMMER_WIDTH_MAX,
+              (shimmer.width ?? SHIMMER_WIDTH_DEFAULT) + 1
+            );
+          });
+        },
+        decrement: () => {
+          updateSettings(settings => {
+            const shimmer = ensureShimmer(settings);
+            shimmer.width = Math.max(
+              SHIMMER_WIDTH_MIN,
+              (shimmer.width ?? SHIMMER_WIDTH_DEFAULT) - 1
+            );
+          });
+        },
+      },
+      {
         id: 'enableContextLimitOverride',
         title: 'Override context limit',
         description:
@@ -614,6 +729,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         },
       },
       {
+        id: 'autoAcceptPlanModeEnv',
+        title: 'Auto-accept plan mode via env',
+        description:
+          'Auto-accept plans only when TWEAKCC_AUTO_ACCEPT_PLAN=1 is set. Ignored when auto-accept plan mode is on.',
+        getValue: () => settings.misc?.autoAcceptPlanModeEnv ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.autoAcceptPlanModeEnv =
+              !settings.misc!.autoAcceptPlanModeEnv;
+          });
+        },
+      },
+      {
         id: 'allowBypassPermissionsInSudo',
         title: 'Allow bypassing permissions in sudo',
         description:
@@ -675,6 +804,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         },
       },
       {
+        id: 'disableCtrlZSuspend',
+        title: 'Disable Ctrl-Z suspend',
+        description:
+          'Ctrl-Z no longer suspends Claude Code to the background; it reaches keybindings like any other key.',
+        getValue: () => settings.misc?.disableCtrlZSuspend ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.disableCtrlZSuspend =
+              !settings.misc!.disableCtrlZSuspend;
+          });
+        },
+      },
+      {
         id: 'preventUnsupportedUpdates',
         title: 'Prevent updates to unsupported versions',
         description:
@@ -686,6 +829,21 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.preventUpdateToUnsupportedVersions =
               !settings.misc!.preventUpdateToUnsupportedVersions;
+          });
+        },
+      },
+      {
+        id: 'webFetchUserAgent',
+        title: 'WebFetch User-Agent',
+        description:
+          'Set misc.webFetchUserAgent in config.json to replace the "Claude-User (...)" User-Agent WebFetch sends. Space resets to default.',
+        getValue: () => settings.misc?.webFetchUserAgent ?? null,
+        getDisplayValue: () =>
+          settings.misc?.webFetchUserAgent ?? 'Default (Claude-User)',
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.webFetchUserAgent = null;
           });
         },
       },

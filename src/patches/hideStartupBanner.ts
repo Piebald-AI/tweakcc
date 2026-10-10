@@ -18,6 +18,21 @@ const getStartupBannerLocation = (oldFile: string): LocationResult | null => {
   return null;
 };
 
+/**
+ * CC >=2.1.282: the zero-arg wrapper that renders the startup card and the
+ * release-notes summary:
+ *   function sa(){let f=w(16),{storageV5:l}=Ce(),…L=e(na,{oneShotsAllowed:A}),…
+ */
+export const findStartupBannerWrapper = (
+  oldFile: string
+): { name: string; bodyIndex: number } | null => {
+  const match = oldFile.match(
+    /(function ([$\w]+)\(\)\{)(?=(?:(?!function )[^]){0,1000}?\([$\w]+,\{oneShotsAllowed:[$\w]+\}\))/
+  );
+  if (!match || match.index === undefined) return null;
+  return { name: match[2], bodyIndex: match.index + match[1].length };
+};
+
 export const writeHideStartupBanner = (oldFile: string): string | null => {
   const location = getStartupBannerLocation(oldFile);
   if (location) {
@@ -26,6 +41,19 @@ export const writeHideStartupBanner = (oldFile: string): string | null => {
       ',' +
       oldFile.slice(location.endIndex);
     showDiff(oldFile, newFile, ',', location.startIndex, location.endIndex);
+    return newFile;
+  }
+
+  // CC >=2.1.282: the card is rendered by a wrapper that also prints the
+  // "Updated to latest. Got N features…" release-notes summary below it.
+  // Disable the wrapper so both are hidden.
+  const wrapper = findStartupBannerWrapper(oldFile);
+  if (wrapper) {
+    const insertIndex = wrapper.bodyIndex;
+    const insertion = 'return null;';
+    const newFile =
+      oldFile.slice(0, insertIndex) + insertion + oldFile.slice(insertIndex);
+    showDiff(oldFile, newFile, insertion, insertIndex, insertIndex);
     return newFile;
   }
 

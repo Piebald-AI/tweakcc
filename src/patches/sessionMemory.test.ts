@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { PatchGroup } from './index';
+import { applyPatchImplementationsToGraph } from './nativeGraphDispatcher';
 import { writeSessionMemory } from './sessionMemory';
 
 describe('writeSessionMemory', () => {
@@ -91,8 +93,8 @@ describe('writeSessionMemory', () => {
   // CC 2.1.218 replaced the old `toolCallsBetweenUpdates:3` config field with a
   // GrowthBook-gated cadence `getFlag("tengu_bramble_lintel",null)??1`. It is the
   // one update-cadence knob that survived the memory-model refactor, so the
-  // CC_SM_TOOL_CALLS_BETWEEN_UPDATES env var must re-anchor onto it (preserving
-  // the flag's precedence and its numeric default).
+  // CC_SM_TOOL_CALLS_BETWEEN_UPDATES env var must re-anchor onto it (taking
+  // precedence when set, and keeping the flag and its numeric default otherwise).
   it('re-anchors CC_SM_TOOL_CALLS_BETWEEN_UPDATES onto the 2.1.218 tengu_bramble_lintel cadence flag', () => {
     const input =
       // refactored extraction path (keeps usedLegacyExtraction false)
@@ -106,10 +108,10 @@ describe('writeSessionMemory', () => {
     const result = writeSessionMemory(input);
 
     expect(result).not.toBeNull();
-    // flag precedence preserved; only the numeric default becomes env-configurable.
+    // the env var wins when set; otherwise the flag and its default apply.
     // Assert through the trailing continuation so a comma-eating mutation is caught.
     expect(result).toContain(
-      'Xe("tengu_bramble_lintel",null)??Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES??1),y=mvo(p)'
+      'let g=(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES?Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES):Xe("tengu_bramble_lintel",null)??1),y=mvo(p)'
     );
   });
 
@@ -126,7 +128,7 @@ describe('writeSessionMemory', () => {
 
     expect(result).not.toBeNull();
     expect(result).toContain(
-      'Xe("tengu_bramble_lintel",null)??Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES??4),y=mvo(p)'
+      'Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES):Xe("tengu_bramble_lintel",null)??4),y=mvo(p)'
     );
   });
 
@@ -149,7 +151,7 @@ describe('writeSessionMemory', () => {
     );
     // and the real cadence flag is still re-anchored
     expect(result).toContain(
-      'Xe("tengu_bramble_lintel",null)??Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES??1)'
+      'Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES):Xe("tengu_bramble_lintel",null)??1)'
     );
   });
 
@@ -168,5 +170,74 @@ describe('writeSessionMemory', () => {
     // left untouched: no partial-number corruption
     expect(result).toContain('Xe("tengu_bramble_lintel",null)??1.5,');
     expect(result).not.toContain('CC_SM_TOOL_CALLS_BETWEEN_UPDATES');
+  });
+});
+
+// Real minified excerpts from CC 2.1.295 (code-split native build).
+describe('writeSessionMemory on a CC 2.1.295 module graph', () => {
+  const EXTRACTOR = '/$bunfs/root/chunk-ptkrpzr4.js';
+  const PREDICATE = '/$bunfs/root/chunk-sn362cnh.js';
+  const SEARCH_UI = '/$bunfs/root/chunk-7xbpds5t.js';
+  const graph = () =>
+    new Map([
+      [
+        EXTRACTOR,
+        'let le=b?.everyNTurns??k("tengu_bramble_lintel",null)??1,ke=_5(p);' +
+          'canUseTool:pt(Z,()=>{de++}),querySource:"extract_memories",forkLabel:"extract_memories",overrides:{};' +
+          'if(!w&&!k("tengu_passport_quail",!1)&&!Ge())return;if(!w&&!xu()){if(_Y())r=p.messages.at(-1)?.uuid??r;return}',
+      ],
+      [
+        PREDICATE,
+        'function s6e(){if(r6e()!==null)return!0;if(!k("tengu_passport_quail",!1))return!1;return!ve()||k("tengu_slate_thimble",!1)}function SY(){}',
+      ],
+      [
+        SEARCH_UI,
+        'onExit:()=>{D("list"),i("tengu_session_search_toggled",{enabled:!1})}',
+      ],
+    ]);
+  const run = (sources: Map<string, string>) =>
+    applyPatchImplementationsToGraph(
+      sources,
+      { 'session-memory': { fn: writeSessionMemory } },
+      [
+        {
+          id: 'session-memory',
+          name: 'session-memory',
+          group: PatchGroup.FEATURES,
+        },
+      ]
+    );
+
+  it('opens both extraction gates and makes the cadence env-configurable', () => {
+    const sources = graph();
+    const out = run(sources);
+
+    expect(out.results[0]).toMatchObject({ applied: true, failed: false });
+    expect(out.owners.get('session-memory')!.sort()).toEqual([
+      EXTRACTOR,
+      PREDICATE,
+    ]);
+    const extractor = sources.get(EXTRACTOR)!;
+    expect(extractor).not.toContain('tengu_passport_quail');
+    expect(extractor).toContain(
+      'overrides:{};if(!w&&!xu()){if(_Y())r=p.messages.at(-1)?.uuid??r;return}'
+    );
+    expect(extractor).toContain(
+      'b?.everyNTurns??(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES?Number(process.env.CC_SM_TOOL_CALLS_BETWEEN_UPDATES):k("tengu_bramble_lintel",null)??1),ke=_5(p)'
+    );
+    expect(sources.get(PREDICATE)).toBe(
+      'function s6e(){return!0}function SY(){}'
+    );
+  });
+
+  it('fails instead of reporting success from the session-search UI alone', () => {
+    const sources = graph();
+    sources.delete(EXTRACTOR);
+    sources.delete(PREDICATE);
+
+    expect(run(sources).results[0]).toMatchObject({
+      applied: false,
+      failed: true,
+    });
   });
 });

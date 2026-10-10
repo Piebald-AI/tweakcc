@@ -88,11 +88,12 @@ set(fn){_tweakccScrollWrite=_tweakccScrollWrap(fn);}
  * sequences leaves the reply invisible, so turn that renderer off and let
  * the classic one draw:
  *   function SY(){{let n=bo();if(n.decstbmRendererEnabled!==void 0)...
+ *   function zq(){let n=wo();if(n.decstbmRendererEnabled!==void 0)... (2.1.295)
  */
 const disableScrollRegionRenderer = (file: string): string =>
   file.replace(
-    /\{\{let ([$\w]+)=([$\w]+)\(\);if\(\1\.decstbmRendererEnabled!==void 0\)/,
-    '{{let $1=$2();$1.decstbmRendererEnabled=!1;if($1.decstbmRendererEnabled!==void 0)'
+    /\{let ([$\w]+)=([$\w]+)\(\);if\(\1\.decstbmRendererEnabled!==void 0\)/,
+    '{let $1=$2();$1.decstbmRendererEnabled=!1;if($1.decstbmRendererEnabled!==void 0)'
   );
 
 export const writeScrollEscapeSequenceFilter = (

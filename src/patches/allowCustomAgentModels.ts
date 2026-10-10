@@ -13,6 +13,9 @@
 // The model resolver function already passes through unknown names unchanged,
 // so these validations are the only barriers.
 //
+// Newer CC (2.1.88 through at least 2.1.295) has neither barrier. The patch
+// reports that as satisfied only after it finds the pass-through parser.
+//
 // CC 2.1.69:
 // ```diff
 // Patch 1 (Zod schema):
@@ -26,6 +29,9 @@
 
 import { showDiff } from './index';
 
+const NATIVE_PASSTHROUGH_PATTERN =
+  /let\{color:[$\w]+,model:([$\w]+)\}=[$\w]+,([$\w]+);if\(typeof \1==="string"&&\1\.trim\(\)\.length>0\)\{let ([$\w]+)=\1\.trim\(\);\2=\3\.toLowerCase\(\)==="inherit"\?"inherit":\3\}/;
+
 export const writeAllowCustomAgentModels = (file: string): string | null => {
   let newFile = file;
 
@@ -33,11 +39,11 @@ export const writeAllowCustomAgentModels = (file: string): string | null => {
 
   const zodMatch = newFile.match(zodPattern);
   if (!zodMatch || zodMatch.index === undefined) {
-    // CC >=2.1.83 already uses z.string().optional() for agent models.
-    // Check if validation flag still exists; if not, patch is not needed.
-    const validPatternAny =
-      /let\s+[$\w]+\s*=\s*([$\w]+)\s*&&\s*typeof\s+\1\s*===\s*"string"\s*&&\s*[$\w]+\.includes\(\1\)/;
-    if (!newFile.match(validPatternAny)) {
+    // Newer CC (seen in 2.1.88 through 2.1.295) keeps any non-empty model
+    // string from agent frontmatter and only normalizes "inherit":
+    //   let{color:w,model:H}=r,G;if(typeof H==="string"&&H.trim().length>0){let sn=H.trim();G=sn.toLowerCase()==="inherit"?"inherit":sn}
+    // The feature is native there.
+    if (NATIVE_PASSTHROUGH_PATTERN.test(newFile)) {
       return newFile;
     }
     console.error(

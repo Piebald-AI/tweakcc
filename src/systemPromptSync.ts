@@ -163,55 +163,33 @@ export const generateMarkdownFromPrompt = (
  * - `\${` an escaped interpolation is inert on purpose; decoding it would turn
  *         inert text into a live interpolation.
  *
- * Single left-to-right walk rather than sequential replaces, so `\\"` reads as
- * an escaped backslash followed by a quote, not a backslash followed by an
- * escaped quote.
+ * Only template text is decoded, including the text of a template literal
+ * nested in an interpolation. Elsewhere inside a `${...}` interpolation the
+ * text is JavaScript, where `\'` escapes a quote of a nested string literal;
+ * decoding it there would leave escapeDepthZeroBackticks with an unclosed
+ * string, and applySystemPrompts would then skip the prompt. Where the
+ * interpolations are is decided by scanTemplateBody, the walker
+ * escapeDepthZeroBackticks itself uses (#922). Decoding a quote in template
+ * text cannot change that walker's state: in template text it reacts only to
+ * `${` and backticks.
  */
 const decodeQuoteEscapes = (text: string): string => {
+  const { kinds } = scanTemplateBody(text);
   let out = '';
   for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
     const next = text[i + 1];
-    if (ch === '\\' && next !== undefined) {
-      if (next === '\\') {
-        // Keep the pair intact so a quote after it is not misread as escaped.
-        out += '\\\\';
-        i++;
-        continue;
-      }
-      if (next === '"' || next === "'") {
-        out += next;
-        i++;
-        continue;
-      }
-      // Any other escape (including `` \` ``) is copied verbatim.
-      out += ch + next;
-      i++;
+    if (
+      text[i] === '\\' &&
+      (next === '"' || next === "'") &&
+      (kinds[i] === BodyChar.Text || kinds[i] === BodyChar.NestedText) &&
+      countPrecedingBackslashes(text, i) % 2 === 0
+    ) {
       continue;
     }
-    out += ch;
+    out += text[i];
   }
   return out;
 };
-
-/**
- * True when a prompt is plain text end to end: no interpolation slots between
- * pieces and no `${` inside them.
- *
- * Quote decoding is only applied to these. Once a prompt contains `${...}`, the
- * text inside it is JavaScript source where `\'` is genuine escaping for a
- * nested string literal, and decoding it leaves escapeDepthZeroBackticks with
- * an unclosed string. That makes it report the prompt as incomplete, and
- * applySystemPrompts then skips the prompt entirely - silently dropping a
- * customization to fix a cosmetic one. Deciding "am I inside an interpolation"
- * correctly means running that parser's exact state machine, so prompts with
- * interpolations are left alone here rather than tracked by a second,
- * divergent copy of it.
- */
-const isPlainTextPrompt = (
-  pieces: string[],
-  identifiers: (number | string)[]
-): boolean => identifiers.length === 0 && !pieces.some(p => p.includes('${'));
 
 /**
  * Reconstructs full content string from pieces array with ${HUMAN_NAME} placeholders
@@ -219,7 +197,7 @@ const isPlainTextPrompt = (
  * Pieces are raw JavaScript string-literal source. Quote escapes are decoded
  * here so that every representation derived from them (the generated markdown,
  * the diff baselines, and the content hashes used for conflict detection) shows
- * the prompt text rather than JS syntax (#921). The raw `pieces` are untouched,
+ * the prompt text rather than JS syntax (#921, #922). The raw `pieces` are untouched,
  * so buildSearchRegexFromPieces still matches the bundle's escaped form.
  */
 export const reconstructContentFromPieces = (
@@ -228,10 +206,9 @@ export const reconstructContentFromPieces = (
   identifierMap: Record<string, string>
 ): string => {
   let result = '';
-  const decode = isPlainTextPrompt(pieces, identifiers);
 
   for (let i = 0; i < pieces.length; i++) {
-    result += decode ? decodeQuoteEscapes(pieces[i]) : pieces[i];
+    result += pieces[i];
 
     // Add the identifier placeholder if there's a corresponding identifier
     if (i < identifiers.length) {
@@ -242,7 +219,7 @@ export const reconstructContentFromPieces = (
     }
   }
 
-  return result;
+  return decodeQuoteEscapes(result);
 };
 
 /**
@@ -1396,12 +1373,35 @@ const countPrecedingBackslashes = (content: string, pos: number): number => {
 };
 
 /**
- * Escapes unescaped backticks at depth 0 (outside ${...} interpolations).
+ * What a character of a prompt body is, read the way the template literal
+ * holding it reads it: template text, or JavaScript inside a `${...}`
+ * interpolation (code, or a quoted string literal within it). Text of a
+ * template literal nested inside an interpolation is kept apart from top-level
+ * text because only top-level backticks get escaped.
  */
-export const escapeDepthZeroBackticks = (
+const enum BodyChar {
+  Code,
+  String,
+  Text,
+  NestedText,
+}
+
+/**
+ * Classifies every character of a prompt body as template text or
+ * interpolation code. Nested string and template literals inside an
+ * interpolation are tracked so a quote or brace within one cannot end the
+ * interpolation early.
+ *
+ * This is the one walker behind both escapeDepthZeroBackticks (apply) and
+ * decodeQuoteEscapes (markdown generation). #922 records three attempts at a
+ * second, hand-mirrored copy for the decode side; every one desynchronised
+ * from this state machine and made the escape pass drop the prompt as
+ * incomplete. Sharing it keeps the two directions consistent.
+ */
+const scanTemplateBody = (
   content: string
-): { content: string; incomplete: boolean } => {
-  let out = '';
+): { kinds: BodyChar[]; incomplete: boolean } => {
+  const kinds: BodyChar[] = new Array(content.length);
   let depth = 0;
   let inString = '';
   const templateStack: number[] = [];
@@ -1415,26 +1415,24 @@ export const escapeDepthZeroBackticks = (
       const inTemplate =
         templateStack.length > 0 &&
         depth === templateStack[templateStack.length - 1];
+      kinds[i] = inTemplate ? BodyChar.NestedText : BodyChar.Code;
       if (inTemplate) {
         if (ch === '`' && unescaped) {
           templateStack.pop();
         } else if (ch === '$' && next === '{') {
           if (unescaped) depth++;
-          out += '${';
-          i++;
-          continue;
+          kinds[++i] = BodyChar.NestedText;
         }
-        out += ch;
         continue;
       }
+      if (inString) kinds[i] = BodyChar.String;
       if (!inString) {
         if (ch === '$' && next === '{') {
           if (unescaped) depth++;
-          out += '${';
-          i++;
-          continue;
+          kinds[++i] = BodyChar.Code;
         } else if (ch === '"' || ch === "'") {
           inString = ch;
+          kinds[i] = BodyChar.String;
         } else if (ch === '`' && unescaped) {
           templateStack.push(depth);
         } else if (ch === '{') {
@@ -1445,32 +1443,103 @@ export const escapeDepthZeroBackticks = (
       } else if (ch === inString && unescaped) {
         inString = '';
       }
-      out += ch;
       continue;
     }
 
-    if (ch === '$' && next === '{' && !inString) {
+    kinds[i] = BodyChar.Text;
+    if (ch === '$' && next === '{') {
       if (unescaped) depth++;
-      out += '${';
-      i++;
-      continue;
-    }
-
-    if (ch === '`' && unescaped) {
-      out += '\\`';
-    } else {
-      out += ch;
+      kinds[++i] = BodyChar.Text;
     }
   }
 
-  const incomplete = depth > 0 || templateStack.length > 0;
+  return { kinds, incomplete: depth > 0 || templateStack.length > 0 };
+};
+
+/**
+ * Escapes unescaped backticks at depth 0 (outside ${...} interpolations).
+ */
+export const escapeDepthZeroBackticks = (
+  content: string
+): { content: string; incomplete: boolean } => {
+  const { kinds, incomplete } = scanTemplateBody(content);
+  let out = '';
+  for (let i = 0; i < content.length; i++) {
+    const ch = content[i];
+    out +=
+      ch === '`' &&
+      kinds[i] === BodyChar.Text &&
+      countPrecedingBackslashes(content, i) % 2 === 0
+        ? '\\`'
+        : ch;
+  }
+
   if (incomplete) {
     debug(
-      `escapeDepthZeroBackticks: unclosed interpolation detected (depth=${depth}). Some backticks may not have been escaped.`
+      'escapeDepthZeroBackticks: unclosed interpolation detected. Some backticks may not have been escaped.'
     );
   }
 
   return { content: out, incomplete };
+};
+
+const JS_KEYWORDS = new Set(
+  'await break case catch class const continue debugger default delete do else export extends false finally for function if import in instanceof let new null of return static super switch this throw true try typeof undefined var void while with yield async'.split(
+    ' '
+  )
+);
+
+/**
+ * Names a prompt body's live `${...}` interpolations read: identifiers in code
+ * position, not property names after a dot, not text inside string or
+ * template literals, not keywords, and not the parameters of an arrow function
+ * written inside the interpolation.
+ */
+const prevNonSpace = (s: string, i: number): string => {
+  while (--i >= 0 && /\s/.test(s[i]));
+  return i >= 0 ? s[i] : '';
+};
+
+const nextNonSpace = (s: string, i: number): string => {
+  while (i < s.length && /\s/.test(s[i])) i++;
+  return i < s.length ? s[i] : '';
+};
+
+export const interpolationReferences = (content: string): Set<string> => {
+  const { kinds } = scanTemplateBody(content);
+  let code = '';
+  for (let i = 0; i < content.length; i++)
+    code += kinds[i] === BodyChar.Code ? content[i] : ' ';
+
+  // Arrow parameters, including destructured ones like ({a, b: c}) => …;
+  // pattern keys (b:), default values (= x) and member names (.x) are not
+  // bindings.
+  const params = new Set<string>();
+  for (const m of code.matchAll(/\(([^()]*)\)\s*=>|([A-Za-z_$][\w$]*)\s*=>/g)) {
+    const list = m[1] ?? m[2];
+    for (const id of list.matchAll(/[A-Za-z_$][\w$]*/g)) {
+      const before = prevNonSpace(list, id.index);
+      if (before === '=' || before === '.') continue;
+      if (nextNonSpace(list, id.index + id[0].length) === ':') continue;
+      params.add(id[0]);
+    }
+  }
+
+  const refs = new Set<string>();
+  for (const m of code.matchAll(/(?<![\w$.])[A-Za-z_$][\w$]*(?!\{)/g)) {
+    const name = m[0];
+    if (JS_KEYWORDS.has(name) || params.has(name)) continue;
+    // Object-literal keys ({key: v}) are not references; a ternary operand
+    // (a ? b : c) is, and is preceded by `?` rather than `{` or `,`.
+    const before = prevNonSpace(code, m.index);
+    if (
+      (before === '{' || before === ',') &&
+      nextNonSpace(code, m.index + name.length) === ':'
+    )
+      continue;
+    refs.add(name);
+  }
+  return refs;
 };
 
 /**

@@ -128,6 +128,8 @@ const writeAgentsMdProjectFiles = (
  * without throwing, so a catch-block reroute would never run:
  *   async function pye(e,n,r,s){try{let g,h=!1;if(s){…case"absent":return{info:null,includePaths:[]};…}
  *     …if(g===null){t(`[CLAUDE.md] skipping ${e}: …`);…}return GJe(g,e,n,r)}catch(g){return awn(g,e),{info:null,includePaths:[]}}}
+ * CC 2.1.295 adds a fifth (held-read) parameter:
+ *   async function EOe(e,n,r,s,h){try{let y,S=!1;if(h){…}if(s){…case"absent":…}…}
  * Add a prologue instead: read CLAUDE.md as before and, when that yields no
  * info, try each alternative name in the same directory.
  */
@@ -136,11 +138,10 @@ const writeAgentsMdPrologue = (
   altNames: string[]
 ): string | null => {
   const pattern =
-    /async function ([$\w]+)\(([$\w]+),([$\w]+),([$\w]+),([$\w]+)\)\{(?=try\{[^]{0,1200}?`\[CLAUDE\.md\] skipping \$\{\2\}[^]{0,400}?\}catch\([$\w]+\)\{return [$\w]+\([$\w]+,\2\),\{info:null,includePaths:\[\]\}\}\})/;
+    /async function ([$\w]+)\(([$\w]+),((?:[$\w]+,){2,3}[$\w]+)\)\{(?=try\{[^]{0,1200}?`\[CLAUDE\.md\] skipping \$\{\2\}[^]{0,400}?\}catch\([$\w]+\)\{return [$\w]+\([$\w]+,\2\),\{info:null,includePaths:\[\]\}\}\})/;
   const m = file.match(pattern);
   if (!m || m.index === undefined) return null;
-  const [head, fn, path, a, b, c] = m;
-  const args = `${a},${b},${c}`;
+  const [head, fn, path, args] = m;
   const prologue =
     `if(!tweakccAltPass&&(${path}.endsWith("/CLAUDE.md")||${path}.endsWith("\\\\CLAUDE.md"))){` +
     `let tweakccPrimary=await ${fn}(${path},${args},!0);if(tweakccPrimary.info)return tweakccPrimary;` +

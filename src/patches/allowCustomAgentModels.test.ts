@@ -99,10 +99,20 @@ describe('allowCustomAgentModels', () => {
       expect(result).not.toContain('hWH.includes(E)');
     });
 
-    it('should return file unchanged when no patterns found (CC >=2.1.83)', () => {
-      const input = 'totally unrelated code with no patterns';
+    it('should leave native pass-through parsing unchanged (CC 2.1.295)', () => {
+      // chunk-53bsrq2x.js, the custom agent .md parser
+      const input =
+        'if(BP("agent",r),!S||typeof S!=="string")return t(`Agent file ${e} is missing required \'description\' in frontmatter`),null;' +
+        'S=S.replaceAll("\\n",`\n`);let{color:w,model:H}=r,G;if(typeof H==="string"&&H.trim().length>0){let sn=H.trim();G=sn.toLowerCase()==="inherit"?"inherit":sn}let V=r.background;';
       const result = writeAllowCustomAgentModels(input);
       expect(result).toBe(input);
+    });
+
+    it('should return null when no patterns found', () => {
+      const result = writeAllowCustomAgentModels(
+        'totally unrelated code with no patterns'
+      );
+      expect(result).toBeNull();
     });
 
     it('should return null when only Zod pattern found', () => {

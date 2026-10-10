@@ -41,6 +41,7 @@ import { writeThemes } from './themes';
 import { writeContextLimit } from './contextLimit';
 import { writeInputBoxBorder } from './inputBorderBox';
 import { writeInputChevronColor } from './inputChevronColor';
+import { writeInputCursorColor } from './inputCursorColor';
 import { writeThinkerFormat } from './thinkerFormat';
 import { writeThinkerSymbolMirrorOption } from './thinkerMirrorOption';
 import { writeThinkerSymbolChars } from './thinkerSymbolChars';
@@ -50,7 +51,10 @@ import {
   writeThinkerSymbolWidthLocation,
 } from './thinkerSymbolWidth';
 import { writeThinkingVerbs } from './thinkingVerbs';
-import { writeUserMessageDisplay } from './userMessageDisplay';
+import {
+  isUserMessageDisplayCustomized,
+  writeUserMessageDisplay,
+} from './userMessageDisplay';
 import { writeInputPatternHighlighters } from './inputPatternHighlighters';
 import { writeVerboseProperty } from './verboseProperty';
 import { writeModelCustomizations } from './modelSelector';
@@ -85,6 +89,10 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
+import { writeDisableCtrlZSuspend } from './disableCtrlZSuspend';
+import { writeWebFetchUserAgent } from './webFetchUserAgent';
+import { writeSkipSkillShellValidation } from './skipSkillShellValidation';
+import { isShimmerCustomized, writeShimmerStyle } from './shimmerStyle';
 import {
   applyPatchImplementationsToGraph,
   changedModuleSources,
@@ -95,6 +103,7 @@ import { assertPatchedModuleParses } from './moduleParseGate';
 import { writeClearScreen } from './clearScreen';
 import { writeSessionColor } from './sessionColor';
 import { writeKeybindingCustomization } from './keybindingCustomization';
+import { writePlanExitCommand } from './planExitCommand';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -221,6 +230,13 @@ const PATCH_DEFINITIONS = [
     description:
       'Force-enable custom keybindings when CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1',
   },
+  {
+    id: 'plan-exit-command',
+    name: '/plan exit command',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description:
+      'Add /plan exit to open the plan approval dialog without a model turn',
+  },
   // Misc Configurable
   {
     id: 'model-customizations',
@@ -312,6 +328,13 @@ const PATCH_DEFINITIONS = [
       'The input chevron changes color based on loading state (e.g. green when idle)',
   },
   {
+    id: 'input-cursor-color',
+    name: 'Input cursor color',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'The input cursor uses your color instead of inverse video (not with CLAUDE_CODE_NATIVE_CURSOR=1)',
+  },
+  {
     id: 'subagent-models',
     name: 'Subagent models',
     group: PatchGroup.MISC_CONFIGURABLE,
@@ -398,6 +421,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.MISC_CONFIGURABLE,
     description:
       'Automatically accept plans without the "Ready to code?" confirmation prompt',
+  },
+  {
+    id: 'auto-accept-plan-env',
+    name: 'Auto-accept plan mode via env',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Auto-accept plans only when TWEAKCC_AUTO_ACCEPT_PLAN is set (used when "Auto-accept plan mode" is off)',
   },
   {
     id: 'allow-sudo-bypass-permissions',
@@ -492,10 +522,35 @@ const PATCH_DEFINITIONS = [
       'Enable MCP channel notifications (--channels without allowlist or dev flag)',
   },
   {
+    id: 'disable-ctrl-z',
+    name: 'Disable Ctrl-Z suspend',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Ctrl-Z will no longer suspend Claude Code',
+  },
+  {
+    id: 'skip-skill-shell-validation',
+    name: 'Skip skill shell validation',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Run !`...` commands in your own skills/commands without the permission check (SECURITY: includes project .claude skills; explicit deny rules still apply; plugins unaffected)',
+  },
+  {
+    id: 'shimmer-style',
+    name: 'Shimmer style',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'Spinner message shimmer will be toggled, sped up, or widened',
+  },
+  {
     id: 'prevent-unsupported-updates',
     name: 'Prevent unsupported updates',
     group: PatchGroup.MISC_CONFIGURABLE,
     description: 'Native/npm auto-updates require a published prompt snapshot',
+  },
+  {
+    id: 'webfetch-user-agent',
+    name: 'WebFetch User-Agent',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description: 'WebFetch sends the configured User-Agent string',
   },
 ] as const;
 
@@ -670,6 +725,9 @@ export const buildPatchImplementations = (
     'keybinding-customization': {
       fn: c => writeKeybindingCustomization(c),
     },
+    'plan-exit-command': {
+      fn: c => writePlanExitCommand(c),
+    },
     // Misc Configurable
     'patches-applied-indication': {
       fn: c =>
@@ -678,7 +736,8 @@ export const buildPatchImplementations = (
           '4.3.3',
           legacyItems,
           showTweakccVersion,
-          showPatchesApplied
+          showPatchesApplied,
+          !!config.settings.misc?.hideStartupBanner
         ),
     },
     'model-customizations': {
@@ -774,6 +833,17 @@ export const buildPatchImplementations = (
       },
       condition: !!config.settings.inputBox?.chevronIdleThemeColor,
     },
+    'input-cursor-color': {
+      fn: c => {
+        const cursorColor = config.settings.inputBox!.cursorColor!;
+        const theme = config.settings.themes?.[0];
+        const resolved =
+          (theme?.colors as Record<string, string>)?.[cursorColor] ??
+          cursorColor;
+        return writeInputCursorColor(c, resolved);
+      },
+      condition: !!config.settings.inputBox?.cursorColor,
+    },
     'subagent-models': {
       fn: c => writeSubagentModels(c, config.settings.subagentModels!),
       condition:
@@ -833,6 +903,12 @@ export const buildPatchImplementations = (
       fn: c => writeAutoAcceptPlanMode(c),
       condition: !!config.settings.misc?.autoAcceptPlanMode,
     },
+    'auto-accept-plan-env': {
+      fn: c => writeAutoAcceptPlanMode(c, true),
+      condition:
+        !config.settings.misc?.autoAcceptPlanMode &&
+        !!config.settings.misc?.autoAcceptPlanModeEnv,
+    },
     'allow-sudo-bypass-permissions': {
       fn: c => writeAllowBypassPermsInSudo(c),
       condition: !!config.settings.misc?.allowBypassPermissionsInSudo,
@@ -881,7 +957,9 @@ export const buildPatchImplementations = (
     },
     'user-message-display': {
       fn: c => writeUserMessageDisplay(c, config.settings.userMessageDisplay!),
-      condition: !!config.settings.userMessageDisplay,
+      condition: isUserMessageDisplayCustomized(
+        config.settings.userMessageDisplay
+      ),
     },
     'input-pattern-highlighters': {
       fn: c =>
@@ -915,6 +993,18 @@ export const buildPatchImplementations = (
       fn: c => writeChannelsMode(c),
       condition: !!config.settings.misc?.enableChannelsMode,
     },
+    'disable-ctrl-z': {
+      fn: c => writeDisableCtrlZSuspend(c),
+      condition: !!config.settings.misc?.disableCtrlZSuspend,
+    },
+    'skip-skill-shell-validation': {
+      fn: c => writeSkipSkillShellValidation(c),
+      condition: !!config.settings.misc?.skipSkillShellValidation,
+    },
+    'shimmer-style': {
+      fn: c => writeShimmerStyle(c, config.settings.misc!.shimmer),
+      condition: isShimmerCustomized(config.settings.misc?.shimmer),
+    },
     // npm monolith only. Native builds spread the updater over several
     // modules; applyCustomization patches the whole module graph at once.
     'prevent-unsupported-updates': {
@@ -923,6 +1013,11 @@ export const buildPatchImplementations = (
           ? null
           : writePreventUnsupportedUpdates(c),
       condition: !!config.settings.misc?.preventUpdateToUnsupportedVersions,
+    },
+    'webfetch-user-agent': {
+      fn: c =>
+        writeWebFetchUserAgent(c, config.settings.misc!.webFetchUserAgent!),
+      condition: !!config.settings.misc?.webFetchUserAgent,
     },
   };
 
@@ -1081,7 +1176,8 @@ export const applyCustomization = async (
       names.map(name => promptSources.get(name)!),
       ccInstInfo.version,
       undefined, // escapeNonAscii - auto-detect
-      patchFilter
+      patchFilter,
+      new Set(names.flatMap((name, i) => (textSources.has(name) ? [i] : [])))
     );
     systemPromptsResult.newContents.forEach((source, i) => {
       if (source === promptSources.get(names[i])) return;

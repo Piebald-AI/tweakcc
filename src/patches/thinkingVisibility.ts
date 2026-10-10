@@ -60,6 +60,29 @@ export const writeThinkingVisibility = (oldFile: string): string | null => {
       foldMatch.index + foldMatch[0].length
     );
   }
+  // CC 2.1.295 asks the API to omit thinking text (blocks arrive with an empty
+  // `thinking` and only a signature) unless `showThinkingSummaries` is set:
+  //   function fUn(){return ft().showThinkingSummaries??!1}
+  // Default it to true; an explicit `false` in settings still wins. This lives
+  // in a third module.
+  const summariesPattern =
+    /(function [$\w]+\(\)\{return [$\w]+\(\)\.showThinkingSummaries\?\?)!1\}/;
+  const summariesMatch = file.match(summariesPattern);
+  if (summariesMatch && summariesMatch.index !== undefined) {
+    const replacement = summariesMatch[1] + '!0}';
+    const before = file;
+    file =
+      before.slice(0, summariesMatch.index) +
+      replacement +
+      before.slice(summariesMatch.index + summariesMatch[0].length);
+    showDiff(
+      before,
+      file,
+      replacement,
+      summariesMatch.index,
+      summariesMatch.index + summariesMatch[0].length
+    );
+  }
   const rendered = writeThinkingRenderer(file);
   if (rendered) return rendered;
   if (file !== oldFile && isGraphContextActive()) return file;

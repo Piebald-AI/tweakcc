@@ -1,5 +1,6 @@
 // Please see the note about writing patches in ./index
 
+import { graphMemo, isGraphContextActive, graphSources } from './graphContext';
 import { showDiff } from './index';
 
 const patchReadToolPrompt = (file: string): string => {
@@ -11,7 +12,7 @@ const patchReadToolPrompt = (file: string): string => {
     ],
     [
       /`\$\{[$\w]+\}\. Each line is the line number, a single separator \(a tab or \\?`:\\?`\), then the verbatim file content \(including any leading whitespace\)\.`/g,
-      '`Results are raw file content without line-number prefixes.`',
+      '`- Results are returned as raw file content without line-number prefixes`',
     ],
   ];
 
@@ -24,6 +25,27 @@ const patchReadToolPrompt = (file: string): string => {
   }
 
   return newFile;
+};
+
+// CC 2.1.140+ adds an optional `tabAwareSeparator:VAR=!1` param and replaces
+// the `split(/\r?\n/)` body with an indexOf-based loop, so we only anchor on
+// the destructured-params + empty-guard prefix (which is still unique).
+const FORMATTER_SIGNATURE =
+  /\{content:([$\w]+),startLine:[$\w]+(?:,tabAwareSeparator:[$\w]+=!1)?\}\)\{if\(!\1\)return"";/;
+
+// The `}` closing the formatter, found by the top-level keyword that follows it.
+const FORMATTER_END = /\}(?=function |var |let |const |[$\w]+=[$\w]+\()/;
+
+/** The formatter body to replace, or null when it cannot be rewritten. */
+const formatterRange = (
+  file: string
+): { contentVar: string; start: number; end: number } | null => {
+  const sig = file.match(FORMATTER_SIGNATURE);
+  if (!sig || sig.index === undefined) return null;
+  const start = sig.index + sig[0].length;
+  const end = file.slice(start).match(FORMATTER_END);
+  if (!end || end.index === undefined) return null;
+  return { contentVar: sig[1], start, end: start + end.index };
 };
 
 /**
@@ -49,52 +71,36 @@ export const writeSuppressLineNumbers = (oldFile: string): string | null => {
   // if(VAR.length>=N)return`...→...`;return`...→...`
 
   // Find the function by its unique signature.
-  // CC 2.1.140+ adds an optional `tabAwareSeparator:VAR=!1` param and replaces
-  // the `split(/\r?\n/)` body with an indexOf-based loop, so we only anchor on
-  // the destructured-params + empty-guard prefix (which is still unique).
-  const funcSig =
-    /\{content:([$\w]+),startLine:[$\w]+(?:,tabAwareSeparator:[$\w]+=!1)?\}\)\{if\(!\1\)return"";/;
-  const sigMatch = oldFile.match(funcSig);
+  const range = formatterRange(oldFile);
 
-  if (sigMatch && sigMatch.index !== undefined) {
-    const contentVar = sigMatch[1];
-    const replaceStart = sigMatch.index + sigMatch[0].length;
+  if (range) {
+    const { contentVar, start: replaceStart, end: replaceEnd } = range;
+    const newCode = `return ${contentVar}`;
+    let newFile =
+      oldFile.slice(0, replaceStart) + newCode + oldFile.slice(replaceEnd);
+    showDiff(oldFile, newFile, newCode, replaceStart, replaceEnd);
 
-    // Find the next `}function ` or `}var ` or similar — the end of this function
-    // Use a simple approach: find `}` that's followed by a top-level keyword
-    const afterSplit = oldFile.slice(replaceStart);
-    const endPattern = /\}(?=function |var |let |const |[$\w]+=[$\w]+\()/;
-    const endMatch = afterSplit.match(endPattern);
-
-    if (endMatch && endMatch.index !== undefined) {
-      const replaceEnd = replaceStart + endMatch.index;
-      const newCode = `return ${contentVar}`;
-      let newFile =
-        oldFile.slice(0, replaceStart) + newCode + oldFile.slice(replaceEnd);
-      showDiff(oldFile, newFile, newCode, replaceStart, replaceEnd);
-
-      const helperPattern =
-        /function ([$\w]+)\(([$\w]+),[$\w]+,[$\w]+\)\{let [$\w]+=\2\.endsWith\("\\r"\)\?\2\.slice\(0,-1\):\2;return`\$\{[$\w]+\}\$\{[$\w]+\}\$\{[$\w]+\}`\}/;
-      const helperMatch = newFile.match(helperPattern);
-      if (helperMatch && helperMatch.index !== undefined) {
-        const replacement = `function ${helperMatch[1]}(${helperMatch[2]}){return ${helperMatch[2]}.endsWith("\\r")?${helperMatch[2]}.slice(0,-1):${helperMatch[2]}}`;
-        const beforeHelper = newFile;
-        newFile =
-          newFile.slice(0, helperMatch.index) +
-          replacement +
-          newFile.slice(helperMatch.index + helperMatch[0].length);
-        showDiff(
-          beforeHelper,
-          newFile,
-          replacement,
-          helperMatch.index,
-          helperMatch.index + helperMatch[0].length
-        );
-      }
-
-      newFile = patchReadToolPrompt(newFile);
-      return newFile;
+    const helperPattern =
+      /function ([$\w]+)\(([$\w]+),[$\w]+,[$\w]+\)\{let [$\w]+=\2\.endsWith\("\\r"\)\?\2\.slice\(0,-1\):\2;return`\$\{[$\w]+\}\$\{[$\w]+\}\$\{[$\w]+\}`\}/;
+    const helperMatch = newFile.match(helperPattern);
+    if (helperMatch && helperMatch.index !== undefined) {
+      const replacement = `function ${helperMatch[1]}(${helperMatch[2]}){return ${helperMatch[2]}.endsWith("\\r")?${helperMatch[2]}.slice(0,-1):${helperMatch[2]}}`;
+      const beforeHelper = newFile;
+      newFile =
+        newFile.slice(0, helperMatch.index) +
+        replacement +
+        newFile.slice(helperMatch.index + helperMatch[0].length);
+      showDiff(
+        beforeHelper,
+        newFile,
+        replacement,
+        helperMatch.index,
+        helperMatch.index + helperMatch[0].length
+      );
     }
+
+    newFile = patchReadToolPrompt(newFile);
+    return newFile;
   }
 
   // Fallback: old pattern (CC <2.1.88, arrow only)
@@ -119,8 +125,26 @@ export const writeSuppressLineNumbers = (oldFile: string): string | null => {
     return newFile;
   }
 
+  // Code-split builds (CC 2.1.2xx) keep the Read tool prompt in a different
+  // module from the formatter; patch it there, but only when the formatter
+  // itself exists somewhere in the graph.
+  if (isGraphContextActive() && graphCanRewriteFormatter()) {
+    const newFile = patchReadToolPrompt(oldFile);
+    if (newFile !== oldFile) return newFile;
+  }
+
   console.error(
     'patch: suppressLineNumbers: failed to find line number formatter pattern'
   );
   return null;
 };
+
+// Only rewrite the Read tool prompt when the formatter itself can be
+// rewritten; otherwise the model would be told there are no line numbers
+// while the output still has them.
+const graphCanRewriteFormatter = (): boolean =>
+  !!graphMemo('suppressLineNumbers:formatter', () =>
+    [...(graphSources()?.values() ?? [])].some(
+      source => formatterRange(source) !== null
+    )
+  );

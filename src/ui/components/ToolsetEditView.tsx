@@ -39,6 +39,8 @@ const AVAILABLE_TOOLS = [
   'WebFetch',
   'WebSearch',
   'Write',
+  // Every MCP tool (entries ending in `*` match by prefix)
+  'mcp__*',
 ];
 
 export function ToolsetEditView({

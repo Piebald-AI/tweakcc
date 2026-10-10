@@ -4,19 +4,25 @@ import { Theme } from '../types';
 import { isGraphContextActive } from './graphContext';
 import { LocationResult, showDiff } from './index';
 
+type SwitchLocation = LocationResult & {
+  // Built-in palette variable per theme id (CC >=2.1.83 switch form only).
+  palettes?: Record<string, string>;
+};
+
 type ThemesLocation = {
-  switchStatement: LocationResult | null;
+  switchStatement: SwitchLocation | null;
   objArr: LocationResult | null;
   obj: LocationResult | null;
 };
 
-function findSwitchStatement(oldFile: string): LocationResult | null {
+function findSwitchStatement(oldFile: string): SwitchLocation | null {
   // === Switch Statement ===
   // CC >=2.1.83: switch(A){case"light":return LX9;...default:return CX9}
   // CC <2.1.83: switch(A){case"light":return{...};...}
   let switchStart = -1;
   let switchEnd = -1;
   let switchIdent = '';
+  let palettes: Record<string, string> | undefined;
 
   // Try new format first (variable references)
   const newSwitchPat =
@@ -27,6 +33,13 @@ function findSwitchStatement(oldFile: string): LocationResult | null {
     switchStart = newSwitchMatch.index;
     switchEnd = switchStart + newSwitchMatch[0].length;
     switchIdent = newSwitchMatch[1];
+    palettes = Object.fromEntries(
+      [
+        ...newSwitchMatch[0].matchAll(
+          /(?:case"([^"]+)"|(default)):return ([$\w]+)/g
+        ),
+      ].map(m => [m[1] ?? m[2], m[3]])
+    );
   } else {
     // Try old format (inline objects) — use brace counting
     const oldAnchor = oldFile.indexOf('case"dark":return{"autoAccept"');
@@ -76,6 +89,7 @@ function findSwitchStatement(oldFile: string): LocationResult | null {
     startIndex: switchStart,
     endIndex: switchEnd,
     identifiers: [switchIdent],
+    palettes,
   };
 }
 
@@ -179,8 +193,6 @@ function patchThemeSchema(
 ): string {
   if (themes.length === 0) return file;
 
-  const customStr = themes.map(t => `"${t.id}"`).join(',');
-
   const anchor = '"dark","light","light-daltonized","dark-daltonized"';
   const anchorIdx = file.indexOf(anchor);
   if (anchorIdx === -1) {
@@ -198,6 +210,13 @@ function patchThemeSchema(
   if (closeBracket === -1) return file;
 
   const original = file.slice(openBracket, closeBracket + 1);
+  // The enum also feeds the /config theme options, so built-in ids that are
+  // already listed must not be appended again.
+  const customStr = themes
+    .map(t => `"${t.id}"`)
+    .filter(id => !original.includes(id))
+    .join(',');
+  if (!customStr) return file;
   const extended = original.slice(0, -1) + ',' + customStr + ']';
 
   return file.slice(0, openBracket) + extended + file.slice(closeBracket + 1);
@@ -271,13 +290,21 @@ export const writeThemes = (
 
   // Update switch statement
   if (locations.switchStatement) {
+    // CC adds colour keys over time and crashes on a missing one, so when the
+    // built-in palettes are variables, each theme is layered over its built-in
+    // namesake (or the default palette) instead of replacing it.
+    const palettes = locations.switchStatement.palettes;
+    const themeColors = (theme: Theme) => {
+      const colors = JSON.stringify(theme.colors);
+      if (!palettes) return colors;
+      const base = palettes[theme.id] ?? palettes.default;
+      return `{...${base},${colors.slice(1)}`;
+    };
     let switchStatement = `switch(${locations.switchStatement.identifiers?.[0]}){\n`;
     themes.forEach(theme => {
-      switchStatement += `case"${theme.id}":return${JSON.stringify(
-        theme.colors
-      )};\n`;
+      switchStatement += `case"${theme.id}":return${themeColors(theme)};\n`;
     });
-    switchStatement += `default:return${JSON.stringify(themes[0].colors)};\n}`;
+    switchStatement += `default:return${themeColors(themes[0])};\n}`;
 
     newFile =
       newFile.slice(0, locations.switchStatement.startIndex) +

@@ -1461,6 +1461,8 @@ const writeToolsetsCodeSplit = (
         planModeToolset
       );
       const filter =
+        // Entries ending in `*` match by prefix, e.g. `mcp__*` for every MCP tool.
+        `function tweakccToolAllowed(tweakccAllowed,tweakccTool){return tweakccAllowed==="*"||tweakccAllowed.some(tweakccEntry=>tweakccEntry===tweakccTool||tweakccEntry.endsWith("*")&&tweakccTool.startsWith(tweakccEntry.slice(0,-1)))}` +
         `const tweakccFilterMemo=new WeakMap;function tweakccFilterTools(tweakccTools,tweakccContext){` +
         `let tweakccState={toolset:globalThis.__tweakccToolset,toolsetAutoMode:null,toolPermissionContext:tweakccContext},` +
         `tweakccName=${fallback},tweakccSets=${toolsetsJSON};` +
@@ -1469,13 +1471,21 @@ const writeToolsetsCodeSplit = (
         // lists by identity and refresh when they differ.
         `let tweakccCached=tweakccFilterMemo.get(tweakccTools);if(tweakccCached&&tweakccCached.name===tweakccName)return tweakccCached.out;` +
         `let tweakccAllowed=tweakccSets[tweakccName],` +
-        `tweakccOut=tweakccAllowed==="*"?tweakccTools:tweakccTools.filter(tweakccTool=>tweakccAllowed.includes(tweakccTool.name));` +
+        `tweakccOut=tweakccAllowed==="*"?tweakccTools:tweakccTools.filter(tweakccTool=>tweakccToolAllowed(tweakccAllowed,tweakccTool.name));` +
         `tweakccFilterMemo.set(tweakccTools,{name:tweakccName,out:tweakccOut});return tweakccOut}` +
         `globalThis.__tweakccFilterTools=tweakccFilterTools;` +
         // Effective toolset for a permission context (explicit choice, else
         // the mode binding) and the status-line suffix built from it.
         `globalThis.__tweakccToolsetName=(tweakccContext)=>{let tweakccState={toolset:globalThis.__tweakccToolset,toolsetAutoMode:null,toolPermissionContext:tweakccContext??{}};let tweakccName=${fallback};return typeof tweakccName==="string"&&tweakccName?tweakccName:void 0};` +
-        `globalThis.__tweakccToolsetLabel=(tweakccMode)=>{let tweakccName=globalThis.__tweakccToolsetName({mode:tweakccMode});return tweakccName?" ["+tweakccName+"]":""};`;
+        `globalThis.__tweakccToolsetLabel=(tweakccMode)=>{let tweakccName=globalThis.__tweakccToolsetName({mode:tweakccMode});return tweakccName?" ["+tweakccName+"]":""};` +
+        // Whether the main session's active toolset allows a tool, for the
+        // declared-tool hold below (computeToolPool records the context).
+        `globalThis.__tweakccToolsetAllows=(tweakccTool)=>{let tweakccAllowed=${toolsetsJSON}[globalThis.__tweakccToolsetName(globalThis.__tweakccMainToolContext)];return tweakccAllowed===void 0||tweakccToolAllowed(tweakccAllowed,tweakccTool)};` +
+        // "No such tool available" text naming the active toolset and its
+        // tools (sub-patch 2d); undefined when no restricted toolset applies.
+        `globalThis.__tweakcc_toolErrorMsg=(tweakccTool,tweakccHint)=>{let tweakccName=globalThis.__tweakccToolsetName(globalThis.__tweakccMainToolContext),tweakccAllowed=${toolsetsJSON}[tweakccName];if(!Array.isArray(tweakccAllowed))return;` +
+        `let tweakccLead="Error: No such tool available: "+tweakccTool+(tweakccHint??"");` +
+        `return tweakccLead+(tweakccLead.endsWith(".")?" ":". ")+"The active toolset is '"+tweakccName+"' which only includes: "+(tweakccAllowed.join(", ")||"no tools")+". Do not attempt to use "+tweakccTool+" again \\u2014 it will fail. If the user switches toolsets via /toolset, you may retry."};`;
       const [aHead, a1, a2, a3] = assembleDef;
       const newAssemble = `${filter}function ${assemble}(${a1},${a2},${a3}){return tweakccFilterTools(tweakccAssembleToolPool(${a1},${a2},${a3}),${a1})}function tweakccAssembleToolPool(${a1},${a2},${a3}){`;
       file =
@@ -1505,7 +1515,7 @@ const writeToolsetsCodeSplit = (
     const [, s, t, u] = storePool;
     const head = `computeToolPool(${s},${t},${u}){`;
     const wrapper =
-      `computeToolPool(${s},${t},${u}){let tweakccPool=this.tweakccComputeToolPool(${s},${t},${u}),tweakccFiltered=globalThis.__tweakccFilterTools?.(tweakccPool?.tools,${s}.toolPermissionContext);` +
+      `computeToolPool(${s},${t},${u}){globalThis.__tweakccMainToolContext=${s}.toolPermissionContext;let tweakccPool=this.tweakccComputeToolPool(${s},${t},${u}),tweakccFiltered=globalThis.__tweakccFilterTools?.(tweakccPool?.tools,${s}.toolPermissionContext);` +
       `if(!tweakccPool||!Array.isArray(tweakccFiltered)||tweakccFiltered===tweakccPool.tools)return tweakccPool;` +
       `if(this.tweakccPoolMemo?.src===tweakccPool&&this.tweakccPoolMemo.tools===tweakccFiltered)return this.tweakccPoolMemo.out;` +
       `let tweakccOut={...tweakccPool,tools:tweakccFiltered};this.tweakccPoolMemo={src:tweakccPool,tools:tweakccFiltered,out:tweakccOut};return tweakccOut}` +
@@ -1516,6 +1526,38 @@ const writeToolsetsCodeSplit = (
       wrapper +
       file.slice(storePool.index + head.length);
     showDiff(before, file, wrapper, storePool.index, storePool.index);
+  }
+
+  // CC 2.1.29x keeps every tool it has declared in a conversation on the
+  // wire (prompt-cache stability) and re-declares tools that left the pool,
+  // so a narrower toolset would keep sending the old tools. The held set asks
+  // `keeps(name)` before re-declaring; let it drop tools the toolset excludes:
+  //   keeps(e){return this.has(e)&&e!==ha}
+  const heldKeeps = file.match(
+    /keeps\(([$\w]+)\)\{return this\.has\(\1\)&&\1!==[$\w]+\}/
+  );
+  if (heldKeeps?.index !== undefined) {
+    const end = heldKeeps.index + heldKeeps[0].length - 1;
+    const addition = `&&(globalThis.__tweakccToolsetAllows?.(${heldKeeps[1]})??!0)`;
+    const previous = file;
+    file = file.slice(0, end) + addition + file.slice(end);
+    showDiff(previous, file, addition, end, end);
+  }
+
+  // Unknown-tool results list the active toolset's tools:
+  //   content:`<tool_use_error>Error: No such tool available: ${w}${Ge}</tool_use_error>`,…,toolUseResult:`Error: No such tool available: ${w}${Ge}`
+  const toolErrors = file.replace(
+    /`(<tool_use_error>)?Error: No such tool available: \$\{([$\w.]+)\}(?:\$\{([$\w.]+)\})?(?:<\/tool_use_error>)?`/g,
+    (original, open, name, hint) => {
+      const message = `globalThis.__tweakcc_toolErrorMsg?.(${name},${hint ?? '""'})`;
+      return open
+        ? `((tweakccMessage)=>tweakccMessage?"<tool_use_error>"+tweakccMessage+"</tool_use_error>":${original})(${message})`
+        : `(${message}??${original})`;
+    }
+  );
+  if (toolErrors !== file) {
+    showDiff(file, toolErrors, '__tweakcc_toolErrorMsg', 0, 0);
+    file = toolErrors;
   }
 
   // Mode status line: `⏸ plan mode on` → `⏸ plan mode on [readonly]`.
@@ -1540,6 +1582,24 @@ const writeToolsetsCodeSplit = (
         onLabel.index,
         onLabel.index + onLabel[0].length
       );
+    }
+  }
+
+  // Shift+Tab re-applies the mode bindings, as the classic patch does on a
+  // mode change: drop the explicit /toolset choice so the toolset bound to the
+  // new mode takes effect. The main-session cycle is the one inside `if(`:
+  //   OV(`[${IF(dy)} on]`);if(i("tengu_mode_cycle",{to:d(dy),trigger:d("shift_tab")}),…
+  // (the teammate branch's call is a plain statement).
+  if (defaultToolset && (acceptEditsToolset || planModeToolset)) {
+    const modeCycle = file.match(
+      /if\([$\w]+\("tengu_mode_cycle",\{to:[$\w]+\([$\w]+\),trigger:[$\w]+\("shift_tab"\)\}\)/
+    );
+    if (modeCycle?.index !== undefined) {
+      const reset = 'globalThis.__tweakccToolset=void 0;';
+      const previous = file;
+      file =
+        file.slice(0, modeCycle.index) + reset + file.slice(modeCycle.index);
+      showDiff(previous, file, reset, modeCycle.index, modeCycle.index);
     }
   }
 
@@ -1595,9 +1655,14 @@ const buildToolsetPickerCommand = (
     `load:()=>Promise.resolve({call:async(tweakccDone,tweakccContext,tweakccArgs)=>{` +
     `const tweakccNames=${JSON.stringify(names)},tweakccWanted=String(tweakccArgs??"").trim(),` +
     `tweakccSay=(message)=>tweakccDone(message,{display:"system"}),` +
-    `tweakccSet=(name)=>{if(name==="__tweakcc_default"||name==="default"||name==="none"){globalThis.__tweakccToolset=void 0;tweakccSay("Toolset cleared; using the mode default.");return}` +
+    // The session store memoizes its tool pool on the permission context's
+    // identity, so a pool filtered under the previous toolset would be reused;
+    // a fresh context object makes the next query rebuild it.
+    `tweakccRefresh=()=>tweakccContext?.setAppState?.(tweakccState=>({...tweakccState,toolPermissionContext:{...tweakccState.toolPermissionContext}})),` +
+    // A configured toolset named `default`/`none` wins over the reset aliases.
+    `tweakccSet=(name)=>{if(name==="__tweakcc_default"||!tweakccNames.includes(name)&&(name==="default"||name==="none")){globalThis.__tweakccToolset=void 0;tweakccRefresh();tweakccSay("Toolset cleared; using the mode default.");return}` +
     `if(!tweakccNames.includes(name)){tweakccSay("Unknown toolset: "+name+". Available: "+tweakccNames.join(", "));return}` +
-    `globalThis.__tweakccToolset=name;tweakccSay("Toolset changed to "+name+".")};` +
+    `globalThis.__tweakccToolset=name;tweakccRefresh();tweakccSay("Toolset changed to "+name+".")};` +
     `if(tweakccWanted){tweakccSet(tweakccWanted);return null}` +
     `const tweakccCurrent=globalThis.__tweakccToolsetName?.(tweakccContext?.getAppState?.()?.toolPermissionContext);` +
     `return ${h}(${box},{flexDirection:"column",paddingX:1},` +

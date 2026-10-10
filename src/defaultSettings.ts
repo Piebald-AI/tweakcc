@@ -688,6 +688,7 @@ export const DEFAULT_SETTINGS: Settings = {
   inputBox: {
     removeBorder: false,
     chevronIdleThemeColor: 'success',
+    cursorColor: null,
   },
   misc: {
     showTweakccVersion: true,
@@ -711,6 +712,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableRememberSkill: false,
     tokenCountRounding: null,
     autoAcceptPlanMode: false,
+    autoAcceptPlanModeEnv: false,
     allowBypassPermissionsInSudo: false,
     suppressNativeInstallerWarning: false,
     filterScrollEscapeSequences: false,
@@ -721,7 +723,11 @@ export const DEFAULT_SETTINGS: Settings = {
     enableVoiceMode: false,
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
+    disableCtrlZSuspend: false,
+    skipSkillShellValidation: false,
     preventUpdateToUnsupportedVersions: false,
+    webFetchUserAgent: null,
+    shimmer: { enabled: true, stepMs: null, width: null },
   },
   toolsets: [],
   defaultToolset: null,

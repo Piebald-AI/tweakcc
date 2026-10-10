@@ -110,4 +110,20 @@ describe('tableFormat patch', () => {
       expect(result).not.toContain('\\u2502');
     });
   });
+
+  // Real CC 2.1.295 excerpt (chunk-6eyyxvtm.js): the rows array is hoisted
+  // into `d`, borders are \u escapes, and the bottom push ends a statement.
+  describe('ascii format — CC 2.1.295 renderer', () => {
+    const cc295 = String.raw`function ee(H,M){let B=H.map((Q,se)=>{let oe=g(Q.tokens),xe=W[se];return fe(oe,xe,{hard:_})}),j=Math.max(...B.map((Q)=>Q.length),1),X=B.map((Q)=>Math.floor((j-Q.length)/2)),re=[];for(let Q=0;Q<j;Q++){let se="\u2502";for(let oe=0;oe<H.length;oe++){let xe=B[oe],G=X[oe],z=Q-G,ne=z>=0&&z<xe.length?xe[z]:"",ye=W[oe],pe=M?"center":o.align?.[oe]??"left";se+=" "+S4n(ne,ae(ne),ye,pe)+" \u2502"}re.push(se)}return re}function Z(H){let[M,B,j,X]={top:["\u250C","\u2500","\u252C","\u2510"],middle:["\u251C","\u2500","\u253C","\u2524"],bottom:["\u2514","\u2500","\u2534","\u2518"]}[H],re=M;return W.forEach((Q,se)=>{re+=B.repeat(Q+2),re+=se<W.length-1?j:X}),re}if(q)return Y();let V=[];V.push(Z("top")),V.push(...ee(o.header,!0)),V.push(Z("middle")),d.forEach((H,M)=>{if(V.push(...ee(H,!1)),M<d.length-1)V.push(Z("middle"))}),V.push(Z("bottom"));let ie=0;for(let H of V){let M=ae(dn(H));if(M>ie)ie=M}if(ie>i-Pe)return Y();`;
+
+    it('drops the top and bottom border rows instead of rendering empty lines', () => {
+      const result = writeTableFormat(cc295, 'ascii');
+      expect(result).not.toBeNull();
+      expect(result).toContain(
+        'let V=[];V.push(...ee(o.header,!0)),V.push(Z("middle")),d.forEach((H,M)=>{V.push(...ee(H,!1))});let ie=0;'
+      );
+      expect(result).toContain('let se="|"');
+      expect(result).toContain('+S4n(ne,ae(ne),ye,pe)+" |"');
+    });
+  });
 });

@@ -14,7 +14,14 @@ import {
   writeTaskAgentFrontmatterToolsFix,
   writeToolFetchingUseMemo,
   writeModeChangeUpdateToolset,
+  writeToolsets,
 } from './toolsets';
+import {
+  beginGraphContext,
+  endGraphContext,
+  enterGraphModule,
+  leaveGraphModule,
+} from './graphContext';
 import { findTextComponent } from './helpers';
 import { Toolset } from '../types';
 
@@ -577,5 +584,30 @@ describe('findSelectComponentName', () => {
       'jsxRT.jsx(GenericSelect,{options:selectOptions,onChange:onSelect,onCancel:onCancel});';
 
     expect(findSelectComponentName(input)).toBe('GenericSelect');
+  });
+});
+
+describe('code-split toolset-aware unknown-tool errors', () => {
+  // chunk-av8jaejs.js (CC 2.1.295), StreamingToolExecutor's unknown-tool result.
+  const excerpt =
+    'results:[xe({content:[{type:"tool_result",content:`<tool_use_error>Error: No such tool available: ${e.name}${s}</tool_use_error>`,is_error:!0,tool_use_id:e.id}],toolUseResult:`Error: No such tool available: ${e.name}${s}`,sourceToolAssistantUUID:o.uuid,now:this.now})]}),';
+
+  it('routes both error strings through __tweakcc_toolErrorMsg with the native text as fallback', () => {
+    const chunk = '/$bunfs/root/chunk-av8jaejs.js';
+    beginGraphContext(new Map([[chunk, excerpt]]));
+    enterGraphModule(chunk);
+    let result: string | null;
+    try {
+      result = writeToolsets(excerpt, toolsets, 'default');
+    } finally {
+      leaveGraphModule();
+      endGraphContext();
+    }
+    expect(result).toContain(
+      'content:((tweakccMessage)=>tweakccMessage?"<tool_use_error>"+tweakccMessage+"</tool_use_error>":`<tool_use_error>Error: No such tool available: ${e.name}${s}</tool_use_error>`)(globalThis.__tweakcc_toolErrorMsg?.(e.name,s))'
+    );
+    expect(result).toContain(
+      'toolUseResult:(globalThis.__tweakcc_toolErrorMsg?.(e.name,s)??`Error: No such tool available: ${e.name}${s}`)'
+    );
   });
 });

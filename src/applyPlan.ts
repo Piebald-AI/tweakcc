@@ -14,6 +14,8 @@ import {
   PatchGroup,
   PatchId,
 } from './patches/index';
+import { isUserMessageDisplayCustomized } from './patches/userMessageDisplay';
+import { isShimmerCustomized } from './patches/shimmerStyle';
 import { TweakccConfig } from './types';
 import { compareVersions } from './systemPromptSync';
 
@@ -123,6 +125,8 @@ export function isPatchEnabledByConfig(
       );
     case 'input-chevron-color':
       return !!config.settings.inputBox?.chevronIdleThemeColor;
+    case 'input-cursor-color':
+      return !!config.settings.inputBox?.cursorColor;
     case 'subagent-models':
       return (
         !!config.settings.subagentModels &&
@@ -156,6 +160,8 @@ export function isPatchEnabledByConfig(
       );
     case 'auto-accept-plan-mode':
       return !!misc?.autoAcceptPlanMode;
+    case 'auto-accept-plan-env':
+      return !misc?.autoAcceptPlanMode && !!misc?.autoAcceptPlanModeEnv;
     case 'allow-sudo-bypass-permissions':
       return !!misc?.allowBypassPermissionsInSudo;
     case 'suppress-native-installer-warning':
@@ -177,7 +183,7 @@ export function isPatchEnabledByConfig(
     case 'mcp-batch-size':
       return !!misc?.mcpServerBatchSize;
     case 'user-message-display':
-      return !!config.settings.userMessageDisplay;
+      return isUserMessageDisplayCustomized(config.settings.userMessageDisplay);
     case 'input-pattern-highlighters':
       return !!(
         config.settings.inputPatternHighlighters &&
@@ -192,8 +198,16 @@ export function isPatchEnabledByConfig(
       return !!misc?.enableVoiceMode;
     case 'channels-mode':
       return !!misc?.enableChannelsMode;
+    case 'disable-ctrl-z':
+      return !!misc?.disableCtrlZSuspend;
+    case 'skip-skill-shell-validation':
+      return !!misc?.skipSkillShellValidation;
+    case 'shimmer-style':
+      return isShimmerCustomized(misc?.shimmer);
     case 'prevent-unsupported-updates':
       return !!misc?.preventUpdateToUnsupportedVersions;
+    case 'webfetch-user-agent':
+      return !!misc?.webFetchUserAgent;
     default:
       // New PatchIds should get an explicit case above.
       return true;

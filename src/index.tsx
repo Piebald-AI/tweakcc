@@ -23,6 +23,7 @@ import {
   getAllPatchDefinitions,
 } from './patches/index';
 import { PatchedBundleParseError } from './patches/parseGate';
+import { PatchedModuleParseError } from './patches/moduleParseGate';
 import {
   preloadStringsFile,
   getSystemPromptDefinitions,
@@ -511,6 +512,10 @@ async function handleApplyMode(
         )
       );
       console.error(chalk.dim(error.message));
+      process.exit(1);
+    }
+    if (error instanceof PatchedModuleParseError) {
+      console.error(chalk.red(`\n✖ ${error.message}`));
       process.exit(1);
     }
     throw error;

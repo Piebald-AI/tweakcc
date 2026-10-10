@@ -295,27 +295,38 @@ Content only.`;
       expect(result).toContain(String.raw`a\\"b`);
     });
 
-    it('should NOT decode quotes in a prompt that has interpolations (#921)', () => {
-      // Inside `${...}` the text is JavaScript, where \' escapes a nested
-      // string literal. Decoding it leaves escapeDepthZeroBackticks with an
-      // unclosed string, which makes it report the prompt incomplete and
-      // applySystemPrompts skip it outright.
+    it('should decode quotes in template text but not in interpolation code (#922)', () => {
+      // Shapes from 2.1.295: prose in a nested string literal is JavaScript
+      // (`you\'ll` there must stay escaped), prose in a nested template literal
+      // and at the top level is template text.
       const prompt: StringsPrompt = {
         id: 'test-id',
         name: 'Interpolated',
-        description: 'Has an interpolation',
+        description: 'Has interpolations',
         version: '1.0.0',
         pieces: [
-          String.raw`Run ${'${'}x.replaceAll(\'a\', \'b\')} then say \"hi\"`,
+          String.raw`Don\'t poll. ${'${'}`,
+          String.raw`()?'\n- you\'ll be notified':""}${'${'}`,
+          String.raw`?` + '`' + String.raw`it\'s ${'${'}`,
+          '}`:""} Say \\"done\\".',
         ],
-        identifiers: [],
-        identifierMap: {},
+        identifiers: [0, 1, 2],
+        identifierMap: { '0': 'REMOTE_FN', '1': 'FLAG', '2': 'NAME' },
       };
 
-      const result = promptSync.generateMarkdownFromPrompt(prompt);
+      const body = promptSync.reconstructContentFromPieces(
+        prompt.pieces,
+        prompt.identifiers,
+        prompt.identifierMap
+      );
 
-      expect(result).toContain(String.raw`\'a\'`);
-      expect(result).toContain(String.raw`\"hi\"`);
+      expect(body).toBe(
+        String.raw`Don't poll. ${'${'}REMOTE_FN()?'\n- you\'ll be notified':""}${'${'}FLAG?` +
+          '`' +
+          `it's \${NAME}` +
+          '`:""} Say "done".'
+      );
+      expect(promptSync.escapeDepthZeroBackticks(body).incomplete).toBe(false);
     });
 
     it('should deduplicate variables in frontmatter', () => {
@@ -1722,5 +1733,28 @@ World`;
       expect(result.content).toBe(input);
       expect(result.incomplete).toBe(false);
     });
+  });
+});
+
+describe('interpolationReferences', () => {
+  const refs = (body: string) =>
+    [...promptSync.interpolationReferences(body)].sort();
+
+  it('keeps every operand of a ternary', () => {
+    expect(refs('A ${a ? b : c} Z')).toEqual(['a', 'b', 'c']);
+  });
+
+  it('does not treat object-literal keys as references', () => {
+    expect(refs('A ${f({key: v, other: w})} Z')).toEqual(['f', 'v', 'w']);
+  });
+
+  it('keeps shorthand object properties, which are references', () => {
+    expect(refs('A ${f({a, key: v})} Z')).toEqual(['a', 'f', 'v']);
+  });
+
+  it('treats names bound by a destructured arrow parameter as locals', () => {
+    expect(refs('A ${xs.map(({a}) => a).join(SEP)} Z')).toEqual(['SEP', 'xs']);
+    expect(refs('A ${xs.map(({a, b: c}) => c)} Z')).toEqual(['xs']);
+    expect(refs('A ${xs.map(([x, y]) => x + y)} Z')).toEqual(['xs']);
   });
 });
