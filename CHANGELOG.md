@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Preserve build-specific hook worker paths and capture the directory-sync formatter in 2.1.282 prompts (#1012) - @mike1858
 - Support code-split native builds (Claude Code 2.1.2xx) and fix patches for Claude Code 2.1.281-2.1.292 (#1034) - @basekevin
 - Make all patches work on Claude Code 2.1.295 (#1035) - @coleleavitt
+- Add `misc.webFetchUserAgent` to set the User-Agent WebFetch sends (#1019) - @coleleavitt
+- Add `misc.disableCtrlZSuspend` so Ctrl-Z no longer suspends Claude Code (#309) - @coleleavitt
+- Add `misc.skipSkillShellValidation` to run `` !`...` `` commands in your own skills and commands without the permission prompt; explicit deny rules still apply (#960) - @coleleavitt
+- Add `misc.shimmer` to turn the spinner shimmer off or change its speed and width (#24) - @coleleavitt
+- Add `inputBox.cursorColor` for the input cursor color (#698) - @coleleavitt
+- Add `/plan exit` to open the plan approval dialog without a model turn (#777) - @coleleavitt
+- Toolsets: entries ending in `*` match by prefix (`mcp__*` for MCP tools), `/toolset default` and `/toolset none` clear the choice, and the unknown-tool error lists the active toolset's tools (#779, #337) - @coleleavitt
+- Thinking block visibility now also turns on thinking summaries, which Claude Code 2.1.295 omits by default; an explicit `showThinkingSummaries: false` still wins (#967) - @coleleavitt
+- Fix the increase-file-read-limit patch on Claude Code 2.1.296 - @coleleavitt
 
 ## [v4.3.3](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.3.3) - 2026-08-13
 

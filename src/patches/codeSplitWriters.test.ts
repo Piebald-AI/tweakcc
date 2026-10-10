@@ -229,6 +229,21 @@ describe('code-split (CC 2.1.2xx) writer forms', () => {
     );
   });
 
+  it('file read limit: finds the defaultFileReadingLimits fallback (CC 2.1.296)', () => {
+    // CC 2.1.296 chunk-qsxrphgj.js, hint strings trimmed
+    const src =
+      'var Ugo=25000,Aws=` To read it anyway, call ${rt} again with ${hue}: true.`,jgo=128;class $de extends Error{tokenCount;constructor(e,t,r=""){super(`File content (${e} tokens) exceeds maximum allowed tokens (${t}).${r}`)}}function i(){let e=a.CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS;if(e!==void 0&&e>0)return e;return}function qW(){let e=wo();return e.defaultFileReadingLimits??={maxSizeBytes:Y5e,maxTokens:i()??Ugo},e.defaultFileReadingLimits}';
+    const out = writeIncreaseFileReadLimit(src)!;
+    expect(out).toContain('var Ugo=1000000,Aws=');
+    expect(out).toContain('jgo=128;');
+  });
+
+  it('file read limit: handles a $-prefixed default name', () => {
+    const src =
+      'var $go=25000,x=1;function q(){return e.defaultFileReadingLimits??={maxSizeBytes:Y,maxTokens:i()??$go},e.defaultFileReadingLimits}';
+    expect(writeIncreaseFileReadLimit(src)).toContain('var $go=1000000,x=1;');
+  });
+
   it('opusplan[1m]: reports native support as already satisfied', () => {
     const src =
       'function yie(e){if(e==="opusplan"||e==="opusplan[1m]")return"opus";return null}';

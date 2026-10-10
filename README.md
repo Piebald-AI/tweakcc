@@ -148,6 +148,12 @@ $ pnpm dlx tweakcc
   - [Auto-accept plan mode](#feature-auto-accept-plan-mode)
   - [Suppress native installer warning](#feature-suppress-native-installer-warning)
   - [Scroll escape sequence filter](#feature-scroll-escape-sequence-filter)
+  - [WebFetch User-Agent](#feature-webfetch-user-agent)
+  - [Disable Ctrl-Z suspend](#feature-disable-ctrl-z-suspend)
+  - [Skip shell permission check in your skills/commands](#feature-skip-shell-permission-check-in-your-skillscommands)
+  - [Shimmer style](#feature-shimmer-style)
+  - [Input cursor color](#feature-input-cursor-color)
+  - [`/plan exit`](#feature-plan-exit)
   - _Missing documentation for above features coming soon_
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
@@ -699,6 +705,12 @@ Toolsets can be helpful both for using Claude in different modes, e.g. a researc
 
 To create a toolset, run `npx tweakcc`, go to `Toolsets`, and hit `n` to create a new toolset. Set a name and enable/disable some tools, run `tweakcc --apply` to apply your customizations, and then run `claude`. If you marked a toolset as the default in tweakcc, it will be automatically selected.
 
+- **Mode bindings.** In the `Toolsets` menu, `d`, `a` and `p` bind a toolset to the default, accept-edits and plan modes. The toolset for the mode Claude Code starts in applies at startup. Shift+Tab switches to the toolset bound to the new mode.
+- **Override at startup.** Set `TWEAKCC_TOOLSET_DEFAULT`, `TWEAKCC_TOOLSET_ALLOW_EDITS`, `TWEAKCC_TOOLSET_PLAN` or `TWEAKCC_TOOLSET_AUTO` to a toolset name. These override the bindings from the menu for that run. No re-apply is needed.
+- **Switch in a session.** `/toolset <name>` switches toolsets. `/toolset default` or `/toolset none` clears the choice and goes back to the mode binding (unless you have a toolset with that name).
+- **MCP tools.** An entry ending in `*` matches by prefix. Pick `mcp__*` in the toolset editor to allow every MCP tool. For one server, add an entry such as `mcp__github__*` to the toolset's `allowedTools` in `config.json`.
+- If Claude calls a tool that is not in the active toolset, the error names the toolset and lists the tools it allows.
+
 ## Feature: Thinking verbs customization
 
 Customize the thinking verbs that appear while Claude is generating responses, along with the format string. You can change from the default `"Thinking… "` format to something more fun like `"Claude is {verb}ing..."` or anything else you prefer.
@@ -1181,6 +1193,79 @@ Some terminals may experience unwanted scrolling behavior caused by certain curs
   }
 }
 ```
+
+## Feature: WebFetch User-Agent
+
+WebFetch sends `Claude-User (...)` as its `User-Agent`. Some sites block it. Set your own string:
+
+```json
+{
+  "settings": {
+    "misc": {
+      "webFetchUserAgent": "Mozilla/5.0 (X11; Linux x86_64) MyAgent/1.0"
+    }
+  }
+}
+```
+
+`null` (the default) keeps Claude Code's value.
+
+## Feature: Disable Ctrl-Z suspend
+
+Ctrl-Z normally suspends Claude Code to the background. With this on, Ctrl-Z does not suspend. It reaches keybindings like any other key, so you can bind it in `~/.claude/keybindings.json`.
+
+**Via the UI:** Run `npx tweakcc`, go to **Misc**, and toggle **Disable Ctrl-Z suspend**.
+
+**Via `config.json`:** set `settings.misc.disableCtrlZSuspend` to `true`.
+
+## Feature: Skip shell permission check in your skills/commands
+
+Skills and slash commands can embed shell commands as `` !`command` ``. Claude Code runs each one through the Bash permission check first. If the check would ask (for example, any command that uses `$HOME`), the whole skill fails with "Shell command permission check failed for pattern ...". With this on, those commands run without asking. Explicit deny rules still apply. Plugin, built-in and MCP skills keep the normal check.
+
+> [!WARNING]
+> This also covers `.claude/skills` and `.claude/commands` in the project you open. A cloned repository can then run shell commands as soon as you or Claude invoke one of its skills. Only turn this on if you trust every project you open.
+
+**Via the UI:** Run `npx tweakcc`, go to **Misc**, and toggle **Skip shell permission check in your skills/commands**.
+
+**Via `config.json`:** set `settings.misc.skipSkillShellValidation` to `true`.
+
+## Feature: Shimmer style
+
+Controls the highlight that sweeps across the spinner message ("Thinking…") while Claude works.
+
+- `enabled`: `false` shows the message in a static color.
+- `stepMs`: milliseconds per step (10–1000). `null` keeps Claude Code's speed (50 ms while requesting, 200 ms otherwise).
+- `width`: number of highlighted cells (1–30). `null` keeps the default (3).
+
+```json
+{
+  "settings": {
+    "misc": {
+      "shimmer": { "enabled": true, "stepMs": 100, "width": 5 }
+    }
+  }
+}
+```
+
+**Via the UI:** Run `npx tweakcc`, go to **Misc**, and adjust **Spinner shimmer**, **Shimmer speed** and **Shimmer width**.
+
+## Feature: Input cursor color
+
+Claude Code draws the input cursor in inverse video. Set `settings.inputBox.cursorColor` to `rgb(r,g,b)` or to a color key of your first theme (for example `"claude"`):
+
+```json
+{
+  "settings": {
+    "inputBox": { "cursorColor": "rgb(255,0,255)" }
+  }
+}
+```
+
+This has no effect when `CLAUDE_CODE_NATIVE_CURSOR=1` is set, because the terminal then draws the cursor.
+
+## Feature: `/plan exit`
+
+`/plan exit` opens the plan approval dialog ("Ready to code?") right away, without a model turn. It is always applied. Outside plan mode it prints "Not in plan mode."
 
 ## Configuration directory
 
