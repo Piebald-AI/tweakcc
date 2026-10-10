@@ -22,6 +22,24 @@ const getFileReadLimitLocation = (oldFile: string): LocationResult | null => {
     }
   }
 
+  // CC 2.1.29x: the default is the fallback in defaultFileReadingLimits;
+  // 2.1.296 put the allow_large hint strings between it and the error class:
+  //   var Ugo=25000,Aws=` To read it anyway, …`,…,jgo=128;class $de extends Error{…
+  //   …defaultFileReadingLimits??={maxSizeBytes:Y5e,maxTokens:i()??Ugo}
+  const limitsDefault = oldFile.match(
+    /defaultFileReadingLimits\?\?=\{maxSizeBytes:[$\w]+,maxTokens:[$\w]+\(\)\?\?([$\w]+)\}/
+  );
+  if (limitsDefault) {
+    const name = limitsDefault[1].replace(/\$/g, '\\$');
+    const declaration = oldFile.match(
+      new RegExp(`(?:var |,)${name}=25000[,;]`)
+    );
+    if (declaration?.index !== undefined) {
+      const startIndex = declaration.index + declaration[0].length - 6;
+      return { startIndex, endIndex: startIndex + 5 };
+    }
+  }
+
   // CC 2.1.2xx: the default lives beside the MaxFileReadTokenExceededError
   // class and the CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS reader:
   //   var kTr=25000,TTr=128;class bEe extends Error{…File content (${e} tokens) exceeds maximum allowed tokens…

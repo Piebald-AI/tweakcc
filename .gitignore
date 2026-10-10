@@ -9,6 +9,8 @@ pnpm-debug.log*
 dist/
 build/
 *.tgz
+# Temporary files from `bun build --compile` (e.g. a timed-out native round-trip test)
+*.bun-build
 
 # Environment variables
 .env
