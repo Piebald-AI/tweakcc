@@ -24,10 +24,11 @@ const PARSE_CHECK_TIMEOUT_MS = 60_000;
  * Explicit resource management (`using x = …`, `await using x = …`) is valid
  * for Bun, which runs Claude Code, but `node --check` only accepts it from
  * Node 24. On an older host Node the declarations are checked as `const`
- * (same scoping), so the rest of the module is still verified.
+ * (same scoping), so the rest of the module is still verified. Comments may
+ * separate `using` from the binding, as whitespace can.
  */
 const USING_DECLARATION =
-  /(?<![\w$.])(?:await\s+)?using(\s+)(?=[A-Za-z_$][\w$]*\s*(?:=|of\b))/g;
+  /(?<![\w$.])(?:await\s+)?using((?:\s|\/\*[\s\S]*?\*\/|\/\/[^\r\n]*(?:\r?\n|$))+)(?=[A-Za-z_$][\w$]*\s*(?:=|of\b))/g;
 
 let hostParsesUsing: boolean | undefined;
 

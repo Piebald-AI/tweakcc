@@ -19,6 +19,17 @@ describe('assertPatchedModuleParses', () => {
     ).not.toThrow();
   });
 
+  it('accepts comments between `using` and the binding', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const commented =
+      'async function f(g){using /* a */ r = g();await using// b\n s=g();using/*c*/q=g();return[r,s,q]}export{f};';
+    expect(() =>
+      assertPatchedModuleParses('/m.js', commented, () => commented)
+    ).not.toThrow();
+    // Really checked, not skipped as unparseable on this Node.
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('still rejects a real syntax error next to `using` declarations', () => {
     expect(() =>
       assertPatchedModuleParses(
