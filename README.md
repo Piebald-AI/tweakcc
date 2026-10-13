@@ -203,6 +203,53 @@ your installed TweakCC release supports that Claude Code version. A successful
 update replaces the patched executable, so **reapply TweakCC after updating** to
 restore this guard and your other customizations.
 
+## Keep customizations across Claude Code updates
+
+A native Claude Code install keeps every version under
+`~/.local/share/claude/versions/` and re-checks an already-installed version
+whenever it switches to it: `claude update`, `claude install <version>`, and the
+auto-updater of any Claude Code session still running an older version all hash
+the retained file and compare it with the checksum in Anthropic's signed release
+manifest. A tweakcc-patched binary never matches, so it is silently replaced by
+the stock build of the same version. `autoUpdates: false` in `~/.claude.json`
+does not prevent this on a native install (the native installer sets
+`autoUpdatesProtectedForNative`, which makes Claude Code ignore that setting);
+only `DISABLE_AUTOUPDATER=1` / `DISABLE_UPDATES=1` in the environment or in the
+`env` block of `settings.json` stop the automatic checks.
+
+tweakcc handles this in two parts:
+
+- **Keep patched binary on update** (`settings.misc.keepPatchedBinaryOnUpdate`,
+  default `true`, native installs only). Each `--apply` records the SHA-256 of the
+  binary it wrote in `applied.json` in the tweakcc config directory. The patched
+  installer still fetches and verifies the signed manifest, but treats a retained
+  binary as valid when its SHA-256 equals the value recorded for that path and
+  version. Any other modification is still repaired by a re-download, and new
+  downloads are verified exactly as before. The trade-off: Claude Code no longer
+  repairs that one file, and anything that can write both the binary and
+  `applied.json` (both are owned by your user) can make a modified binary persist.
+  Only binaries that already contain this patch apply the rule, so the first
+  update from a Claude Code process started before you applied it can still
+  replace the binary.
+- **Re-apply after Claude Code replaces the binary**: `tweakcc --install-hook`
+  adds a `SessionStart` hook (matcher `startup|resume`) to Claude Code's `settings.json`
+  (`$CLAUDE_CONFIG_DIR` or `~/.claude`). On each session start it checks, in about
+  0.2 s, whether the active binary is the one recorded in `applied.json`. If not
+  (a new version, or the same version downloaded again), it starts
+  `tweakcc --apply` **detached**, logs to `auto-apply.log`, shows a one-line
+  message, and returns immediately. The new customizations take effect the next
+  time Claude Code starts. A new version's binary becomes the backup only after
+  its SHA-256 is found in Anthropic's release manifest for that version, and
+  nothing is applied when tweakcc has no prompt data for the version yet. A failed
+  run is retried at most once an hour. The hook runs tweakcc with the Node and
+  script path that installed it, so install tweakcc globally rather than via
+  `npx`. Remove it with `tweakcc --remove-hook`. Restoring Claude Code
+  (`--restore`) clears `applied.json`, which also stops the hook from re-applying.
+
+On Linux, a systemd user path unit watching
+`~/.local/share/claude/versions/` that runs `tweakcc --apply --yes` is an
+alternative to the hook that also covers updates made while no session starts.
+
 ## CLI Commands
 
 In addition to the interactive TUI (`npx tweakcc`) and the `--apply` flag, tweakcc provides three subcommands for advanced use: `unpack`, `repack`, and `adhoc-patch`.

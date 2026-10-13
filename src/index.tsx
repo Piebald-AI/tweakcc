@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { render } from 'ink';
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import chalk from 'chalk';
 
 import App from './ui/App';
@@ -53,6 +53,13 @@ import {
   restoreNativeBinaryFromBackup,
 } from './installationBackup';
 import { clearAllAppliedHashes } from './systemPromptHashIndex';
+import { clearAppliedRecord } from './appliedRecord';
+import {
+  installSessionStartHook,
+  removeSessionStartHook,
+  runAutoApply,
+  runSessionStartCheck,
+} from './autoReapply';
 
 // =============================================================================
 // Invocation Command Detection
@@ -193,6 +200,13 @@ const main = async () => {
       '--config-url <url>',
       'fetch configuration from a URL instead of local config.json'
     )
+    .option(
+      '--install-hook',
+      'add a Claude Code SessionStart hook that re-applies tweakcc in the background after Claude Code replaces the patched binary'
+    )
+    .option('--remove-hook', 'remove the tweakcc SessionStart hook')
+    .addOption(new Option('--session-start-check').hideHelp())
+    .addOption(new Option('--auto-apply').hideHelp())
     .action(async () => {
       // This action handles the default case (no subcommand).
       // All the --flag handling lives here so that Commander's subcommand
@@ -207,6 +221,21 @@ const main = async () => {
 
       if (options.showUnchanged) {
         enableShowUnchanged();
+      }
+
+      // Runs on every Claude Code session start: keep it to the cheap check.
+      if (options.sessionStartCheck) {
+        await runSessionStartCheck();
+        return;
+      }
+
+      if (options.installHook || options.removeHook) {
+        console.log(
+          options.installHook
+            ? await installSessionStartHook()
+            : await removeSessionStartHook()
+        );
+        return;
       }
 
       // Migrate old ccInstallationDir config to ccInstallationPath if needed
@@ -233,6 +262,12 @@ const main = async () => {
         await handleListSystemPrompts(
           options.listSystemPrompts as string | true
         );
+        return;
+      }
+
+      if (options.autoApply) {
+        runAutoApply();
+        await handleApplyMode(null, undefined, true, true);
         return;
       }
 
@@ -352,11 +387,13 @@ const main = async () => {
  * @param patchFilter - Optional list of patch IDs to apply (if null, apply all)
  * @param configUrl - Optional URL to fetch configuration from
  * @param skipConfirmation - When true (--yes), skip the pre-apply consent prompt
+ * @param requireSystemPrompts - Abort instead of applying without prompts
  */
 async function handleApplyMode(
   patchFilter: string[] | null,
   configUrl?: string,
-  skipConfirmation = false
+  skipConfirmation = false,
+  requireSystemPrompts = false
 ): Promise<void> {
   console.log('Applying saved customizations to Claude Code...');
 
@@ -409,7 +446,12 @@ async function handleApplyMode(
     console.log(`Version: ${ccInstInfo.version}`);
 
     // Pre-apply summary + consent (adhoc-patch already confirms; --apply should too)
-    const planned = getPlannedPatches(config, ccInstInfo.version, patchFilter);
+    const planned = getPlannedPatches(
+      config,
+      ccInstInfo.version,
+      patchFilter,
+      !!ccInstInfo.nativeInstallationPath
+    );
     printApplyPlan(planned, {
       configSource,
       patchFilter,
@@ -448,6 +490,12 @@ async function handleApplyMode(
     if (!preloadResult.success) {
       console.log(chalk.red('\n✖ Error downloading system prompts:'));
       console.log(chalk.red(`  ${preloadResult.errorMessage}`));
+      if (requireSystemPrompts) {
+        console.log(
+          `tweakcc has no system prompt data for Claude Code ${ccInstInfo.version} yet; not applying.`
+        );
+        process.exit(1);
+      }
       console.log(
         chalk.yellow(
           '\n⚠ System prompts not available - skipping system prompt customizations'
@@ -574,6 +622,8 @@ async function handleRestoreMode(): Promise<void> {
 
     // Clear all applied hashes since we're restoring to defaults
     await clearAllAppliedHashes();
+    // The restored binary is stock; nothing tweakcc wrote is left to keep.
+    await clearAppliedRecord();
 
     // Update config to mark changes as not applied
     await updateConfigFile(config => {

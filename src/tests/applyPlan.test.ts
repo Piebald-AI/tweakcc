@@ -20,6 +20,15 @@ function configWithDefaults(
 }
 
 describe('applyPlan', () => {
+  it('plans keep-patched-binary only for native installs', () => {
+    const config = configWithDefaults();
+    const id = 'keep-patched-binary';
+    const ids = (native: boolean) =>
+      getPlannedPatches(config, '2.1.296', null, native).map(patch => patch.id);
+    expect(ids(true)).toContain(id);
+    expect(ids(false)).not.toContain(id);
+  });
+
   it('plans the update guard only when explicitly enabled and selected', () => {
     const config = configWithDefaults();
     const id = 'prevent-unsupported-updates';

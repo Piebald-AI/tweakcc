@@ -27,6 +27,7 @@ vi.mock('node:fs', async importActual => ({
 vi.mock('../config', () => ({
   CONFIG_DIR: '/test/config',
   NATIVE_BINARY_BACKUP_FILE: '/test/config/native.backup',
+  APPLIED_RECORD_FILE: '/test/config/applied.json',
   updateConfigFile: vi.fn(async update => {
     const config = { changesApplied: false } as TweakccConfig;
     update(config);
@@ -36,6 +37,9 @@ vi.mock('../config', () => ({
 vi.mock('../utils', () => ({
   debug: vi.fn(),
   replaceFileBreakingHardLinks: vi.fn(),
+}));
+vi.mock('../appliedRecord', () => ({
+  recordAppliedBinary: vi.fn(),
 }));
 vi.mock('../installationBackup', () => ({
   restoreNativeBinaryFromBackup: vi.fn(),

@@ -78,6 +78,8 @@ export const getConfigDir = (): string => {
 export const CONFIG_DIR = getConfigDir();
 export const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 export const CLIJS_BACKUP_FILE = path.join(CONFIG_DIR, 'cli.js.backup');
+/** SHA-256 of every native binary tweakcc wrote, keyed by real path. */
+export const APPLIED_RECORD_FILE = path.join(CONFIG_DIR, 'applied.json');
 export const NATIVE_BINARY_BACKUP_FILE = path.join(
   CONFIG_DIR,
   'native-binary.backup'

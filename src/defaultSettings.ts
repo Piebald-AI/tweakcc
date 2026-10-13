@@ -726,6 +726,7 @@ export const DEFAULT_SETTINGS: Settings = {
     disableCtrlZSuspend: false,
     skipSkillShellValidation: false,
     preventUpdateToUnsupportedVersions: false,
+    keepPatchedBinaryOnUpdate: true,
     webFetchUserAgent: null,
     shimmer: { enabled: true, stepMs: null, width: null },
   },

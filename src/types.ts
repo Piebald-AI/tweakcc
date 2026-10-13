@@ -150,6 +150,7 @@ export interface MiscConfig {
   disableCtrlZSuspend: boolean;
   skipSkillShellValidation: boolean;
   preventUpdateToUnsupportedVersions: boolean;
+  keepPatchedBinaryOnUpdate: boolean;
   webFetchUserAgent: string | null;
   shimmer: ShimmerConfig;
 }

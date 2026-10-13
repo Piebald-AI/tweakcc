@@ -100,6 +100,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     disableCtrlZSuspend: false,
     skipSkillShellValidation: false,
     preventUpdateToUnsupportedVersions: false,
+    keepPatchedBinaryOnUpdate: true,
     webFetchUserAgent: null as string | null,
     shimmer: { ...DEFAULT_SETTINGS.misc.shimmer },
   };
@@ -829,6 +830,21 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.preventUpdateToUnsupportedVersions =
               !settings.misc!.preventUpdateToUnsupportedVersions;
+          });
+        },
+      },
+      {
+        id: 'keepPatchedBinaryOnUpdate',
+        title: 'Keep patched binary on update',
+        description:
+          "Native installs only. Claude Code's installer keeps the exact binary tweakcc wrote (SHA-256 recorded in applied.json) instead of re-downloading it. Any other change to the binary is still repaired.",
+        getValue: () => settings.misc?.keepPatchedBinaryOnUpdate ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.keepPatchedBinaryOnUpdate = !(
+              settings.misc!.keepPatchedBinaryOnUpdate ?? true
+            );
           });
         },
       },

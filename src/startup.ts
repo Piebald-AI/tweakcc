@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 
 import {
+  extractVersion,
   findClaudeCodeInstallation,
   getPendingCandidates,
 } from './installationDetection';
@@ -21,7 +22,11 @@ import {
   StartupCheckInfo,
   TweakccConfig,
 } from './types';
-import { backupClijs, backupNativeBinary } from './installationBackup';
+import {
+  backupClijs,
+  backupNativeBinary,
+  isOfficialReleaseBinary,
+} from './installationBackup';
 
 export interface StartupCheckResult {
   startupCheckInfo: StartupCheckInfo | null;
@@ -122,7 +127,23 @@ export async function completeStartupCheck(
     // Never replace an existing native backup based only on config.ccVersion.
     // A patched binary reports the same Claude version as its clean source, and
     // stale config metadata must not turn that patched binary into the backup.
-    // Missing native backups are created above before this branch.
+    // Missing native backups are created above before this branch. A genuine
+    // upgrade is the exception: the new version's binary is backed up once
+    // its SHA-256 is found in Anthropic's release manifest for that version.
+    if (
+      ccInstInfo.nativeInstallationPath &&
+      (await extractVersion(NATIVE_BINARY_BACKUP_FILE, 'native-binary')) !==
+        realVersion &&
+      (await isOfficialReleaseBinary(
+        ccInstInfo.nativeInstallationPath,
+        realVersion
+      ))
+    ) {
+      debug(
+        `startupCheck: ${ccInstInfo.nativeInstallationPath} is the official ${realVersion} build; replacing the older native backup`
+      );
+      await backupNativeBinary(ccInstInfo);
+    }
 
     return {
       wasUpdated: true,

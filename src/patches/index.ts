@@ -3,10 +3,12 @@ import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 
 import {
+  APPLIED_RECORD_FILE,
   CONFIG_DIR,
   NATIVE_BINARY_BACKUP_FILE,
   updateConfigFile,
 } from '../config';
+import { recordAppliedBinary } from '../appliedRecord';
 import { ClaudeCodeInstallationInfo, TweakccConfig } from '../types';
 import type { NativeBunGraph } from '../nativeInstallation';
 import { debug, replaceFileBreakingHardLinks } from '../utils';
@@ -113,6 +115,7 @@ import {
   writePreventUnsupportedUpdates,
   writePreventUnsupportedUpdatesModules,
 } from './preventUnsupportedUpdates';
+import { writeKeepPatchedBinary } from './keepPatchedBinary';
 
 export { showDiff, showPositionalDiff, globalReplace } from './patchDiffing';
 export {
@@ -545,6 +548,13 @@ const PATCH_DEFINITIONS = [
     name: 'Prevent unsupported updates',
     group: PatchGroup.MISC_CONFIGURABLE,
     description: 'Native/npm auto-updates require a published prompt snapshot',
+  },
+  {
+    id: 'keep-patched-binary',
+    name: 'Keep patched binary on update',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'The native installer keeps the binary tweakcc wrote instead of re-downloading it',
   },
   {
     id: 'webfetch-user-agent',
@@ -1014,6 +1024,12 @@ export const buildPatchImplementations = (
           : writePreventUnsupportedUpdates(c),
       condition: !!config.settings.misc?.preventUpdateToUnsupportedVersions,
     },
+    'keep-patched-binary': {
+      fn: c => writeKeepPatchedBinary(c, APPLIED_RECORD_FILE),
+      condition:
+        !!ccInstInfo.nativeInstallationPath &&
+        (config.settings.misc?.keepPatchedBinaryOnUpdate ?? true),
+    },
     'webfetch-user-agent': {
       fn: c =>
         writeWebFetchUserAgent(c, config.settings.misc!.webFetchUserAgent!),
@@ -1257,6 +1273,10 @@ export const applyCustomization = async (
         ccInstInfo.nativeInstallationPath!
       );
     }
+    await recordAppliedBinary(
+      ccInstInfo.nativeInstallationPath!,
+      ccInstInfo.version
+    );
     const updatedConfig = await updateConfigFile(cfg => {
       cfg.changesApplied = !allResults.some(result => result.failed);
       cfg.ccVersion = ccInstInfo.version;
@@ -1321,6 +1341,12 @@ export const applyCustomization = async (
     }
 
     await replaceFileBreakingHardLinks(ccInstInfo.cliPath, content, 'patch');
+  }
+  if (ccInstInfo.nativeInstallationPath) {
+    await recordAppliedBinary(
+      ccInstInfo.nativeInstallationPath,
+      ccInstInfo.version
+    );
   }
 
   const updatedConfig = await updateConfigFile(cfg => {
