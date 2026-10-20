@@ -353,7 +353,14 @@
       "identifierMap": {
         "0": "AGENT_TOOL_NAME"
       },
-      "version": "2.1.286"
+      "version": "2.1.286",
+      "agentMetadata": {
+        "whenToUse": "Catch-all for any task that doesn't fit a more specific agent. FleetView's default when no agent name is typed.",
+        "tools": [
+          "*"
+        ],
+        "agentType": "claude"
+      }
     },
     {
       "name": "Agent Prompt: /batch slash command",
