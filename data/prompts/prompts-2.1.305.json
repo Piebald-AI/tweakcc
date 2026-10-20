@@ -5971,22 +5971,6 @@
       "version": "2.1.300"
     },
     {
-      "name": "Skill: Mod organization library sharing",
-      "id": "skill-mod-organization-library-sharing",
-      "description": "Tells Claude that in a session with the PublishPlugin tool the normal way to share a mod is the person's organization's library on claude.ai, publishing with that tool (which shows every file and sends nothing before their yes) once they ask, and keeping a GitHub repository for people outside the organization or an explicit request",
-      "pieces": [
-        " This session has the \\`${",
-        "}\\` tool, so the normal way to share a mod here is the person's organization's library on claude.ai: when they ask to share or publish one, publish it with that tool, which shows them every file and sends nothing before their yes. A GitHub repository, by Sharing a mod in reference.md, is the other road: for people outside the organization, or when the person asks for a repository."
-      ],
-      "identifiers": [
-        0
-      ],
-      "identifierMap": {
-        "0": "PUBLISH_PLUGIN_TOOL_NAME"
-      },
-      "version": "2.1.305"
-    },
-    {
       "name": "Skill: Mod plugin packaging (any plan)",
       "id": "skill-mod-plugin-packaging-any-plan",
       "description": "Comes after the mod packaging offer when the plan is unknown or not Team, Enterprise, Pro or Max: after saving, the person presses Share where it appears on the file's card, or sends the file for the recipient to add under Customize or Plugins with Add, then Upload plugin",
