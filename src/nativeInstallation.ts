@@ -162,6 +162,10 @@ const SIZEOF_STRING_POINTER = 8;
 // - New format (ESM bytecode, Bun ~1.3.7+): 6 StringPointers + 4 u8s = 52 bytes
 const SIZEOF_MODULE_OLD: NativeBunModuleRecordSize = 36;
 const SIZEOF_MODULE_NEW: NativeBunModuleRecordSize = 52;
+// Offsets flag 1 << 13 (Bun HAS_LINKED_BYTECODE_PAYLOAD): every module's bytecode
+// is a cache entry in one linked payload and runs from that entry to the payload's
+// end; entries refer to the ones before them (oven-sh/bun StandaloneModuleGraph).
+const LINKED_BYTECODE_PAYLOAD = 1 << 13;
 
 // Types
 interface StringPointer {
@@ -732,6 +736,9 @@ function serializePreservingNativeBunGraphPayload(
       record.bytecodeOriginPath,
     ];
     live.push(record.name);
+    // A linked payload's cache entries refer to the entries before them, so
+    // none of its bytes are free, whatever retained pointers cover.
+    if (bunOffsets.flags & LINKED_BYTECODE_PAYLOAD) live.push(record.bytecode);
     if (!replacement) {
       live.push(...payloads);
       return;
@@ -854,6 +861,12 @@ export const serializeNativeBunGraphPayload = (
   }
   if (graph.originalPayload) {
     return serializePreservingNativeBunGraphPayload(graph, replacements);
+  }
+  if (graph.flags & LINKED_BYTECODE_PAYLOAD) {
+    // Re-laying out a linked payload would also need its region table rebuilt.
+    throw new Error(
+      'A linked Bun bytecode payload can only be rewritten in place'
+    );
   }
   const chunks: Buffer[] = [];
   const currentLength = { value: 0 };
