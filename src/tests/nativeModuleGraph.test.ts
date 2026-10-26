@@ -302,6 +302,51 @@ describe('native Bun module graphs', () => {
         bytecodeOf(payload)[1]
       );
     });
+
+    it('never reuses bytes of a linked bytecode payload, even below every retained entry', () => {
+      // With Bun's HAS_LINKED_BYTECODE_PAYLOAD flag (1 << 13) a cache entry may
+      // refer to entries before it, so bytes no retained pointer covers are
+      // still live. chunk-a owns the lowest entry, the case pointer coverage misses.
+      const payload = makeSlabPayload();
+      const offsetsStart = payload.length - 16 - 32;
+      payload.writeUInt32LE(
+        payload.readUInt32LE(offsetsStart + 28) | (1 << 13),
+        offsetsStart + 28
+      );
+      const graph = parseNativeBunGraphPayload(payload);
+      const start = Math.min(...graph.modules.map(m => m.bytecodeOffset!));
+      const end = start + graph.modules[0].bytecode.length;
+      const output = serializeNativeBunGraphPayload(
+        graph,
+        new Map([
+          [
+            '/$bunfs/root/chunk-a.js',
+            Buffer.from(`export const a="${'a'.repeat(24)}";`),
+          ],
+        ])
+      );
+
+      expect(
+        output.subarray(start, end).equals(payload.subarray(start, end))
+      ).toBe(true);
+      expect(
+        parseNativeBunGraphPayload(output).modules[0].bytecode
+      ).toHaveLength(0);
+    });
+
+    it('refuses to re-lay out a linked bytecode payload', () => {
+      const graph = parseNativeBunGraphPayload(makeSlabPayload());
+      expect(() =>
+        serializeNativeBunGraphPayload(
+          {
+            ...graph,
+            flags: graph.flags | (1 << 13),
+            originalPayload: undefined,
+          },
+          new Map()
+        )
+      ).toThrow('linked Bun bytecode payload');
+    });
   });
 
   it('rejects replacements for unknown modules', () => {
