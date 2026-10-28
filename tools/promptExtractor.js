@@ -550,6 +550,60 @@ function collectLiterals(sources) {
   return candidates;
 }
 
+/**
+ * The seed's variable names for a candidate's labels. When the variables no
+ * longer repeat in the same pattern, a variable was added or removed and the
+ * later labels are renumbered, so a name follows the text around its slot
+ * instead. A slot whose surroundings are not found (or are ambiguous) in the
+ * seed gets no name.
+ */
+function carryNames(seedPrompt, c) {
+  // Same pattern of variables: the labels mean the same slots.
+  if (JSON.stringify(c.identifiers) === JSON.stringify(seedPrompt.identifiers))
+    return Object.fromEntries(
+      Object.keys(c.identifierMap).map(label => [
+        label,
+        seedPrompt.identifierMap?.[label] ?? '',
+      ])
+    );
+  const CONTEXT = 30;
+  const norm = text => promptKey([cookEscapes(text)]);
+  const around = (pieces, slot) => [
+    norm(pieces[slot]).slice(-CONTEXT),
+    norm(pieces[slot + 1]).slice(0, CONTEXT),
+  ];
+  // Context -> seed name, dropping contexts that point to different names.
+  const index = new Map();
+  const add = (key, name) =>
+    index.set(key, index.has(key) && index.get(key) !== name ? null : name);
+  seedPrompt.identifiers.forEach((label, slot) => {
+    const name = seedPrompt.identifierMap?.[label];
+    if (!name) return;
+    const [before, after] = around(seedPrompt.pieces, slot);
+    add(`b\0${before}\0a\0${after}`, name);
+    // One side alone only counts when it is distinctive text.
+    if (before.length >= 10) add(`b\0${before}`, name);
+    if (after.length >= 10) add(`a\0${after}`, name);
+  });
+
+  const names = Object.fromEntries(
+    Object.keys(c.identifierMap).map(label => [label, ''])
+  );
+  const taken = new Set();
+  c.identifiers.forEach((label, slot) => {
+    if (names[label]) return;
+    const [before, after] = around(c.pieces, slot);
+    const name = [`b\0${before}\0a\0${after}`, `b\0${before}`, `a\0${after}`]
+      .map(key => index.get(key))
+      .find(found => found && !taken.has(found));
+    if (name) {
+      names[label] = name;
+      taken.add(name);
+    }
+  });
+  return names;
+}
+
 // Length of the opening/closing text that identifies an edited prompt.
 const ANCHOR = 60;
 
@@ -585,12 +639,7 @@ function seededExtract(
       description: seedPrompt.description,
       pieces: c.pieces,
       identifiers: c.identifiers,
-      identifierMap: Object.fromEntries(
-        Object.keys(c.identifierMap).map(k => [
-          k,
-          seedPrompt.identifierMap?.[k] ?? '',
-        ])
-      ),
+      identifierMap: carryNames(seedPrompt, c),
       _how: how,
     };
   };
@@ -610,7 +659,11 @@ function seededExtract(
           /<<CCVERSION>>|<<BUILD_TIME>>|\d+\.\d+\.\d+/g,
           ''
         );
-      const same = plain(c.pieces) === plain(p.pieces);
+      // Positions bind names to variables, so the seed's names only carry
+      // over unchanged when the variables repeat in the same pattern.
+      const same =
+        plain(c.pieces) === plain(p.pieces) &&
+        JSON.stringify(c.identifiers) === JSON.stringify(p.identifiers);
       const t = take(p, c, 'exact');
       out.push(
         same
@@ -697,9 +750,29 @@ function seededExtract(
     promptModules.has(c.module)
       ? validateInput(c.pieces.join(''), minLength)
       : validateInput(c.pieces.join(''), Math.max(minLength, 2000));
+  // Another copy of a known prompt is not a new one.
+  const known = new Set([...seedKey.values(), ...[...used].map(c => c.key)]);
   const fresh = candidates
-    .filter(c => !used.has(c) && !existedBefore.has(c.key) && isNew(c))
+    .filter(
+      c =>
+        !used.has(c) &&
+        !known.has(c.key) &&
+        !existedBefore.has(c.key) &&
+        isNew(c)
+    )
     .sort((a, b) => b.end - b.start - (a.end - a.start));
+  const ids = new Set([
+    ...(seed?.prompts ?? []).map(p => p.id),
+    ...out.map(p => p.id),
+  ]);
+  // Prompts with the same opening words get (2), (3), ... in source order.
+  // The id is the slug of the name (mergeWithExisting derives it that way).
+  const uniqueName = base => {
+    let name = base;
+    for (let n = 2; ids.has(slugify(name)); n++) name = `${base} (${n})`;
+    ids.add(slugify(name));
+    return name;
+  };
   const seen = new Set();
   for (const c of fresh) {
     const inside = [...used].some(
@@ -715,9 +788,10 @@ function seededExtract(
       .split(/\s+/)
       .slice(0, 8)
       .join(' ');
+    const name = uniqueName(`New prompt: ${words}`);
     out.push({
-      name: `New prompt: ${words}`,
-      id: `new-prompt-${slugify(words)}`,
+      name,
+      id: slugify(name),
       description: '',
       pieces: c.pieces,
       identifiers: c.identifiers,
@@ -750,8 +824,13 @@ if (require.main === module) {
   // are passed as `var __t = <JSON string>;`. tools/dumpModules.mts writes it.
   const flag = name => {
     const at = process.argv.indexOf(name);
-    const value = at === -1 ? undefined : process.argv[at + 1];
-    return value?.startsWith('--') ? undefined : value;
+    if (at === -1) return undefined;
+    const value = process.argv[at + 1];
+    if (value === undefined || value.startsWith('--')) {
+      console.error(`${name} needs a value`);
+      process.exit(1);
+    }
+    return value;
   };
   const modulesFile = flag('--modules');
   const positional = process.argv

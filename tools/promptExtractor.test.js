@@ -116,3 +116,80 @@ test('an edited prompt in a text module takes the text as the file holds it', ()
   assert.equal(stats.edited, 1);
   assert.equal(prompts[0].pieces.join(''), after);
 });
+
+// A seed prompt from a template literal, with its variables named in order.
+const namedSeed = (template, varNames) => {
+  const seed = seedFrom(`const a = \`${template}\`;`, ['p']);
+  seed.prompts[0].identifierMap = Object.fromEntries(
+    varNames.map((name, label) => [String(label), name])
+  );
+  return seed;
+};
+// Variable name at each slot of an extracted prompt.
+const slotNames = p => p.identifiers.map(label => p.identifierMap[label]);
+
+test('the seed names are not reused when the variables repeat differently', () => {
+  const seed = namedSeed(
+    'Use ${A} for reading files, then ${B} for writing them, and ${A} once more at the end.',
+    ['READ_TOOL', 'WRITE_TOOL']
+  );
+  const { prompts } = seededExtract(
+    modules({
+      'chunk.js':
+        'const a = `Use ${x} for reading files, then ${y} for writing them, and ${y} once more at the end.`;',
+    }),
+    seed
+  );
+  assert.deepEqual(prompts[0].identifiers, [0, 1, 1]);
+  assert.deepEqual(slotNames(prompts[0]), [
+    'READ_TOOL',
+    'WRITE_TOOL',
+    'WRITE_TOOL',
+  ]);
+});
+
+test('names follow their text when a variable is added earlier in the prompt', () => {
+  const tail = prose('variables');
+  const seed = namedSeed(
+    `Open the file with \${A} before anything else. Save every change through \${B} when done. ${tail}`,
+    ['OPEN_TOOL', 'SAVE_TOOL']
+  );
+  const { prompts, stats } = seededExtract(
+    modules({
+      'chunk.js': `const a = \`Open the file with \${x} before anything else. Check access with \${n} first. Save every change through \${y} when done. ${tail}\`;`,
+    }),
+    seed
+  );
+  assert.equal(stats.edited, 1);
+  assert.deepEqual(slotNames(prompts[0]), ['OPEN_TOOL', '', 'SAVE_TOOL']);
+});
+
+test('another copy of a known prompt is not reported as new', () => {
+  const text = prose('copies');
+  const seed = seedFrom(`const a = ${JSON.stringify(text)};`, ['copies']);
+  const { stats } = seededExtract(
+    modules({
+      'chunk.js': `const a = ${JSON.stringify(text)}; const b = ${JSON.stringify(text)};`,
+    }),
+    seed
+  );
+  assert.equal(stats.new, 0);
+});
+
+test('new prompts with the same opening words get distinct ids', () => {
+  const known = `const k = ${JSON.stringify(prose('tests'))};`;
+  const a = prose('builds');
+  const b = a.replace(/what you found\.$/, 'what went wrong.');
+  const { prompts } = seededExtract(
+    modules({
+      'chunk.js': `${known} const a = ${JSON.stringify(a)}; const b = ${JSON.stringify(b)};`,
+    }),
+    seedFrom(known, ['tests'])
+  );
+  const ids = prompts
+    .filter(p => p.id.startsWith('new-prompt-'))
+    .map(p => p.id)
+    .sort();
+  assert.equal(ids.length, 2);
+  assert.equal(ids[1], `${ids[0]}-2`);
+});
