@@ -26,6 +26,14 @@ const publish = (...versions: string[]) =>
     throw new PromptsNotPublishedError(version);
   });
 
+/** Cached prompt files on disk; any other cache read fails. */
+const cache = (files: Record<string, string>) =>
+  vi.mocked(fs.readFile).mockImplementation((async (filePath: string) => {
+    const name = String(filePath).split('/').pop()!;
+    if (name in files) return files[name];
+    throw new Error(`ENOENT: ${name}`);
+  }) as unknown as typeof fs.readFile);
+
 describe('loadStringsFile', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -48,9 +56,9 @@ describe('loadStringsFile', () => {
   it('falls back to the newest earlier cached file when offline', async () => {
     vi.mocked(downloadStringsFile).mockImplementation(async version => {
       if (version === '2.1.312') throw new PromptsNotPublishedError(version);
-      if (version === '2.1.300') return file(version); // cached
       throw new Error('Failed to download prompts: fetch failed');
     });
+    cache({ 'prompts-2.1.300.json': JSON.stringify(file('2.1.300')) });
     vi.mocked(fs.readdir).mockResolvedValue([
       'prompts-2.1.290.json',
       'prompts-2.1.300.json',
@@ -64,9 +72,12 @@ describe('loadStringsFile', () => {
 
   it('skips a cached file that cannot be read', async () => {
     vi.mocked(downloadStringsFile).mockImplementation(async version => {
-      if (version === '2.1.300') return file(version);
       if (version === '2.1.312') throw new PromptsNotPublishedError(version);
       throw new Error('Failed to download prompts: fetch failed');
+    });
+    cache({
+      'prompts-2.1.300.json': JSON.stringify(file('2.1.300')),
+      'prompts-2.1.305.json': '{"version": "2.1.3', // truncated
     });
     vi.mocked(fs.readdir).mockResolvedValue([
       'prompts-2.1.300.json',
@@ -75,6 +86,8 @@ describe('loadStringsFile', () => {
 
     const { dataVersion } = await loadStringsFile('2.1.312');
     expect(dataVersion).toBe('2.1.300');
+    // Cached files are read from disk, not downloaded again.
+    expect(downloadStringsFile).not.toHaveBeenCalledWith('2.1.305');
   });
 
   it('fails as before when no earlier file exists', async () => {

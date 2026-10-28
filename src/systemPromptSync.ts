@@ -1180,7 +1180,9 @@ const findEarlierStringsFile = async (
     .sort((a, b) => compareVersions(b, a));
   for (const earlier of earlierCached) {
     try {
-      return { version: earlier, file: await downloadStringsFile(earlier) };
+      const cachedFile = path.join(PROMPT_CACHE_DIR, `prompts-${earlier}.json`);
+      const file = JSON.parse(await fs.readFile(cachedFile, 'utf-8'));
+      return { version: earlier, file: file as StringsFile };
     } catch {
       // Unreadable cache file: try the next one.
     }
