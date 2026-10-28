@@ -8,6 +8,8 @@ vi.mock('../systemPromptSync', async () => {
   return {
     ...actual,
     loadSystemPromptsWithRegex: vi.fn(),
+    getPromptDataVersion: vi.fn(() => null),
+    isPromptEdited: vi.fn(),
   };
 });
 
@@ -1242,6 +1244,41 @@ describe('systemPrompts.ts', () => {
 
       expect(result.newContents[1]).toBe(content);
       expect(result.newContents[0]).toBe('var a="\\u2014";');
+    });
+  });
+  describe('prompt data from an earlier Claude Code version', () => {
+    const missing = () =>
+      buildMockPromptData({
+        prompt: { name: 'Changed Prompt' },
+        content: 'text that is no longer in this build',
+      });
+
+    beforeEach(() => {
+      vi.mocked(promptSync.getPromptDataVersion).mockReturnValue('2.1.311');
+    });
+
+    it('reports a missing prompt the user edited', async () => {
+      setupMocks(missing());
+      vi.mocked(promptSync.isPromptEdited).mockResolvedValue(true);
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      await applySystemPrompts('const a = "other";', '2.1.312', false);
+
+      expect(log.mock.calls.flat().join('\n')).toContain(
+        'Your edit to "Changed Prompt" is not applied yet'
+      );
+      log.mockRestore();
+    });
+
+    it('says nothing about a missing prompt the user did not edit', async () => {
+      setupMocks(missing());
+      vi.mocked(promptSync.isPromptEdited).mockResolvedValue(false);
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      await applySystemPrompts('const a = "other";', '2.1.312', false);
+
+      expect(log.mock.calls.flat().join('\n')).not.toContain('Changed Prompt');
+      log.mockRestore();
     });
   });
 });
