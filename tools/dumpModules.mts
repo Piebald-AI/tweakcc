@@ -19,6 +19,10 @@ if (!binary || !output) {
 }
 
 const graph = extractClaudeJsModulesFromNativeInstallation(binary);
+if (!graph) {
+  console.error(`Could not read the JavaScript modules of ${binary}`);
+  process.exit(1);
+}
 const modules: Record<string, string> = {};
 for (const [name, source] of javaScriptModuleSources(graph))
   modules[name] = source;

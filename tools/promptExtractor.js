@@ -844,6 +844,10 @@ if (require.main === module) {
 
   let result;
   if (modulesFile) {
+    if (!version) {
+      console.error('--version <x.y.z> is required with --modules');
+      process.exit(1);
+    }
     const readModules = file =>
       new Map(Object.entries(JSON.parse(fs.readFileSync(file, 'utf-8'))));
     const seedFile = flag('--seed');
