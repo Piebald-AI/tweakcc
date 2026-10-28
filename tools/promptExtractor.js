@@ -750,7 +750,8 @@ if (require.main === module) {
   // are passed as `var __t = <JSON string>;`. tools/dumpModules.mts writes it.
   const flag = name => {
     const at = process.argv.indexOf(name);
-    return at === -1 ? undefined : process.argv[at + 1];
+    const value = at === -1 ? undefined : process.argv[at + 1];
+    return value?.startsWith('--') ? undefined : value;
   };
   const modulesFile = flag('--modules');
   const positional = process.argv
@@ -793,7 +794,7 @@ if (require.main === module) {
   const packageJsonPath = path.join(inputDir, 'package.json');
 
   let version = flag('--version') ?? null;
-  if (modulesFile && !version) {
+  if (modulesFile && !/^\d+\.\d+\.\d+$/.test(version ?? '')) {
     console.error('--version <x.y.z> is required with --modules');
     process.exit(1);
   }
