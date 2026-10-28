@@ -105,25 +105,14 @@ test('source escapes stay as written; non-ASCII escapes become characters', () =
   assert.ok(text.includes('as \\"done\\" \u2014 or write \\\\u2014 for'));
 });
 
-test('text modules are matched as their own text', () => {
-  const doc = `# Guide\n\nYou are an AI assistant. Say "hi".\n\n${prose('docs')}`;
-  const seed = {
-    prompts: [
-      {
-        name: 'docs',
-        id: 'docs',
-        description: '',
-        pieces: [doc],
-        identifiers: [],
-        identifierMap: {},
-        version: '1.0.0',
-      },
-    ],
-  };
+test('an edited prompt in a text module takes the text as the file holds it', () => {
+  const before = `# Guide\n\nYou are an AI assistant. Say "hi".\n\n${prose('docs')}`;
+  const after = before.replace(/what you found\.$/, 'what you found, briefly.');
+  const seed = seedFrom(`const a = ${JSON.stringify(before)};`, ['docs']);
   const { prompts, stats } = seededExtract(
-    modules({ 'docs/guide.md': `var __t = ${JSON.stringify(doc)};` }),
+    modules({ 'docs/guide.md': `var __t = ${JSON.stringify(after)};` }),
     seed
   );
-  assert.equal(stats.exact, 1);
-  assert.equal(prompts[0].pieces.join(''), doc);
+  assert.equal(stats.edited, 1);
+  assert.equal(prompts[0].pieces.join(''), after);
 });

@@ -793,6 +793,10 @@ if (require.main === module) {
   const packageJsonPath = path.join(inputDir, 'package.json');
 
   let version = flag('--version') ?? null;
+  if (modulesFile && !version) {
+    console.error('--version <x.y.z> is required with --modules');
+    process.exit(1);
+  }
   if (!version && fs.existsSync(packageJsonPath)) {
     try {
       const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
@@ -844,10 +848,6 @@ if (require.main === module) {
 
   let result;
   if (modulesFile) {
-    if (!version) {
-      console.error('--version <x.y.z> is required with --modules');
-      process.exit(1);
-    }
     const readModules = file =>
       new Map(Object.entries(JSON.parse(fs.readFileSync(file, 'utf-8'))));
     const seedFile = flag('--seed');
