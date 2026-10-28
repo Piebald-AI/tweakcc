@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add tmux graphics passthrough patch (#1023) - @gergesh
 - Fix memory blowup when patching Claude Code 2.1.310 native binaries (#1053) - @gergesh
 - Never reuse bytes of a linked Bun bytecode payload when patching native binaries (Claude Code 2.1.310+) (#1056) - @coleleavitt
+- Generate prompt data for a new Claude Code version from the previous version's prompts file (`tools/promptExtractor.js --modules --seed --previous`) (#1059) - @coleleavitt
 
 ## [v4.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.4.0) - 2026-10-10
 

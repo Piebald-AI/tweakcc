@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "description": "Extract AI system prompts from minified JavaScript",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test"
   },
   "keywords": [],
   "author": "",
