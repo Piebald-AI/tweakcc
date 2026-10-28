@@ -62,6 +62,21 @@ describe('loadStringsFile', () => {
     expect(dataVersion).toBe('2.1.300');
   });
 
+  it('skips a cached file that cannot be read', async () => {
+    vi.mocked(downloadStringsFile).mockImplementation(async version => {
+      if (version === '2.1.300') return file(version);
+      if (version === '2.1.312') throw new PromptsNotPublishedError(version);
+      throw new Error('Failed to download prompts: fetch failed');
+    });
+    vi.mocked(fs.readdir).mockResolvedValue([
+      'prompts-2.1.300.json',
+      'prompts-2.1.305.json', // corrupt, and offline
+    ] as unknown as Awaited<ReturnType<typeof fs.readdir>>);
+
+    const { dataVersion } = await loadStringsFile('2.1.312');
+    expect(dataVersion).toBe('2.1.300');
+  });
+
   it('fails as before when no earlier file exists', async () => {
     publish();
     await expect(loadStringsFile('2.1.312')).rejects.toBeInstanceOf(

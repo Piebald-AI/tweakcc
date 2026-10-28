@@ -1172,19 +1172,20 @@ const findEarlierStringsFile = async (
   } catch {
     return null;
   }
-  const newest = cached
+  const earlierCached = cached
     .map(name => /^prompts-(\d+\.\d+\.\d+)\.json$/.exec(name)?.[1])
     .filter(
       (v): v is string => v !== undefined && compareVersions(v, version) < 0
     )
-    .sort(compareVersions)
-    .pop();
-  if (!newest) return null;
-  try {
-    return { version: newest, file: await downloadStringsFile(newest) };
-  } catch {
-    return null;
+    .sort((a, b) => compareVersions(b, a));
+  for (const earlier of earlierCached) {
+    try {
+      return { version: earlier, file: await downloadStringsFile(earlier) };
+    } catch {
+      // Unreadable cache file: try the next one.
+    }
   }
+  return null;
 };
 
 /**
