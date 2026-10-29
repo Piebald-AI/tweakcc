@@ -207,6 +207,10 @@ export function isPatchEnabledByConfig(
       return !!misc?.skipSkillShellValidation;
     case 'shimmer-style':
       return isShimmerCustomized(misc?.shimmer);
+    case 'skip-dev-channels-dialog':
+      return !!misc?.skipDevChannelsDialog;
+    case 'skip-trust-dialog':
+      return !!misc?.skipTrustDialog;
     case 'prevent-unsupported-updates':
       return !!misc?.preventUpdateToUnsupportedVersions;
     case 'keep-patched-binary':

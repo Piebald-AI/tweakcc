@@ -150,6 +150,8 @@ export interface MiscConfig {
   enableChannelsMode: boolean;
   disableCtrlZSuspend: boolean;
   skipSkillShellValidation: boolean;
+  skipTrustDialog: boolean;
+  skipDevChannelsDialog: boolean;
   preventUpdateToUnsupportedVersions: boolean;
   keepPatchedBinaryOnUpdate: boolean;
   webFetchUserAgent: string | null;

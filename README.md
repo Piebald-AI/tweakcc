@@ -155,6 +155,7 @@ $ pnpm dlx tweakcc
   - [Input cursor color](#feature-input-cursor-color)
   - [`/plan exit`](#feature-plan-exit)
   - [tmux graphics passthrough](#feature-tmux-graphics-passthrough)
+  - [Skip startup dialogs](#feature-skip-startup-dialogs)
   - _Missing documentation for above features coming soon_
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
@@ -1336,6 +1337,28 @@ Claude Code also turns images off inside tmux by default, so set `CLAUDE_CODE_FO
   "settings": {
     "misc": {
       "tmuxGraphicsPassthrough": true
+    }
+  }
+}
+```
+
+## Feature: Skip startup dialogs
+
+Two patches remove confirmation dialogs Claude Code shows before a session starts:
+
+- **Skip workspace trust dialog** answers the "Accessing workspace" dialog with "Yes, I trust this folder", so every folder you start Claude Code in is trusted and saved as trusted, just as if you had picked that option. That includes folders whose settings run hooks, MCP servers, or helper commands, so only enable this if you never open code you don't trust.
+- **Skip development channels warning** answers the "Loading development channels" warning shown by `--dangerously-load-development-channels` with "I am using this for local development".
+
+**Via the UI:** Run `npx tweakcc`, go to **Misc**, and toggle **Skip workspace trust dialog** and/or **Skip development channels warning**.
+
+**Via `config.json`:**
+
+```json
+{
+  "settings": {
+    "misc": {
+      "skipTrustDialog": true,
+      "skipDevChannelsDialog": true
     }
   }
 }

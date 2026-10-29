@@ -100,6 +100,8 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableChannelsMode: false,
     disableCtrlZSuspend: false,
     skipSkillShellValidation: false,
+    skipTrustDialog: false,
+    skipDevChannelsDialog: false,
     preventUpdateToUnsupportedVersions: false,
     keepPatchedBinaryOnUpdate: true,
     webFetchUserAgent: null as string | null,
@@ -579,6 +581,33 @@ export function MiscView({ onSubmit }: MiscViewProps) {
               SHIMMER_WIDTH_MIN,
               (shimmer.width ?? SHIMMER_WIDTH_DEFAULT) - 1
             );
+          });
+        },
+      },
+      {
+        id: 'skipDevChannelsDialog',
+        title: 'Skip development channels warning',
+        description:
+          'Accept the "Loading development channels" warning shown by --dangerously-load-development-channels automatically.',
+        getValue: () => settings.misc?.skipDevChannelsDialog ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.skipDevChannelsDialog =
+              !settings.misc!.skipDevChannelsDialog;
+          });
+        },
+      },
+      {
+        id: 'skipTrustDialog',
+        title: 'Skip workspace trust dialog',
+        description:
+          'Trust every folder Claude Code starts in without asking, as if you chose "Yes, I trust this folder". Only enable this if you never open untrusted code.',
+        getValue: () => settings.misc?.skipTrustDialog ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.skipTrustDialog = !settings.misc!.skipTrustDialog;
           });
         },
       },
