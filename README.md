@@ -1329,7 +1329,7 @@ set -g allow-passthrough on
 Claude Code also turns images off inside tmux by default, so set `CLAUDE_CODE_FORCE_TERMINAL_IMAGES=1` in your environment.
 
 **Via the UI:** Run `npx tweakcc`, go to **Misc**, and toggle **tmux graphics passthrough**.
-  
+
 **Via `config.json`:**
 
 ```json
