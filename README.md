@@ -154,6 +154,7 @@ $ pnpm dlx tweakcc
   - [Shimmer style](#feature-shimmer-style)
   - [Input cursor color](#feature-input-cursor-color)
   - [`/plan exit`](#feature-plan-exit)
+  - [tmux graphics passthrough](#feature-tmux-graphics-passthrough)
   - [Skip startup dialogs](#feature-skip-startup-dialogs)
   - _Missing documentation for above features coming soon_
 - [Configuration directory](#configuration-directory)
@@ -1315,6 +1316,32 @@ This has no effect when `CLAUDE_CODE_NATIVE_CURSOR=1` is set, because the termin
 
 `/plan exit` opens the plan approval dialog ("Ready to code?") right away, without a model turn. It is always applied. Outside plan mode it prints "Not in plan mode."
 
+## Feature: tmux graphics passthrough
+
+Claude Code draws images with the kitty graphics protocol, which works in kitty and Ghostty. Inside tmux, the images show as blank boxes: tmux drops the escape sequence that carries the picture and only lets the placeholder characters through. This patch wraps that sequence in tmux's passthrough, so the image reaches the outer terminal.
+
+It needs tmux 3.3 or later with passthrough enabled in `~/.tmux.conf`:
+
+```
+set -g allow-passthrough on
+```
+
+Claude Code also turns images off inside tmux by default, so set `CLAUDE_CODE_FORCE_TERMINAL_IMAGES=1` in your environment.
+
+**Via the UI:** Run `npx tweakcc`, go to **Misc**, and toggle **tmux graphics passthrough**.
+  
+**Via `config.json`:**
+
+```json
+{
+  "settings": {
+    "misc": {
+      "tmuxGraphicsPassthrough": true
+    }
+  }
+}
+```
+
 ## Feature: Skip startup dialogs
 
 Two patches remove confirmation dialogs Claude Code shows before a session starts:
@@ -1482,6 +1509,7 @@ Other tools for customizing Claude Code or adding functionality to it:
 - [**ccstatusline**](https://github.com/sirmalloc/ccstatusline) - Highly customizable status line formatter for Claude Code CLI that displays model info, git branch, token usage, and other metrics in your terminal.
 - [**claude-powerline**](https://github.com/Owloops/claude-powerline) - Vim-style powerline statusline for Claude Code with real-time usage tracking, git integration, and custom themes.
 - [**CCometixLine**](https://github.com/Haleclipse/CCometixLine) - A high-performance Claude Code statusline tool written in Rust with Git integration, usage tracking, interactive TUI configuration, and Claude Code enhancement utilities.
+- [**statuslin.es**](https://statuslin.es) - Community gallery of Claude Code status lines and mods with previews recorded from their real output. Mods are reviewed and their installs are pinned to the reviewed commit.
 
 Forks:
 

@@ -162,6 +162,10 @@ const SIZEOF_STRING_POINTER = 8;
 // - New format (ESM bytecode, Bun ~1.3.7+): 6 StringPointers + 4 u8s = 52 bytes
 const SIZEOF_MODULE_OLD: NativeBunModuleRecordSize = 36;
 const SIZEOF_MODULE_NEW: NativeBunModuleRecordSize = 52;
+// Offsets flag 1 << 13 (Bun HAS_LINKED_BYTECODE_PAYLOAD): every module's bytecode
+// is a cache entry in one linked payload and runs from that entry to the payload's
+// end; entries refer to the ones before them (oven-sh/bun StandaloneModuleGraph).
+const LINKED_BYTECODE_PAYLOAD = 1 << 13;
 
 // Types
 interface StringPointer {
@@ -528,7 +532,12 @@ const assertPointerInBounds = (
 };
 
 export const parseNativeBunGraphPayload = (payload: Buffer): NativeBunGraph => {
-  const { bunOffsets, bunData, moduleStructSize } = parseBunDataBlob(payload);
+  // Module fields are views into one private copy of the payload. Since Claude
+  // Code 2.1.310, every module's bytecode pointer runs to the end of a shared
+  // bytecode slab, so copying each field would allocate ~220GB.
+  const originalPayload = Buffer.from(payload);
+  const { bunOffsets, bunData, moduleStructSize } =
+    parseBunDataBlob(originalPayload);
   assertPointerInBounds(bunOffsets.modulesPtr, bunData.length, 'Modules');
   assertPointerInBounds(
     bunOffsets.compileExecArgvPtr,
@@ -573,17 +582,14 @@ export const parseNativeBunGraphPayload = (payload: Buffer): NativeBunGraph => {
     modules.push({
       index,
       name,
-      contents: Buffer.from(getStringPointerContent(bunData, module.contents)),
-      sourcemap: Buffer.from(
-        getStringPointerContent(bunData, module.sourcemap)
-      ),
-      bytecode: Buffer.from(getStringPointerContent(bunData, module.bytecode)),
+      contents: getStringPointerContent(bunData, module.contents),
+      sourcemap: getStringPointerContent(bunData, module.sourcemap),
+      bytecode: getStringPointerContent(bunData, module.bytecode),
       bytecodeOffset: module.bytecode.offset,
-      moduleInfo: Buffer.from(
-        getStringPointerContent(bunData, module.moduleInfo)
-      ),
-      bytecodeOriginPath: Buffer.from(
-        getStringPointerContent(bunData, module.bytecodeOriginPath)
+      moduleInfo: getStringPointerContent(bunData, module.moduleInfo),
+      bytecodeOriginPath: getStringPointerContent(
+        bunData,
+        module.bytecodeOriginPath
       ),
       encoding: module.encoding,
       loader: module.loader,
@@ -597,9 +603,10 @@ export const parseNativeBunGraphPayload = (payload: Buffer): NativeBunGraph => {
     entryPointIndex: bunOffsets.entryPointId,
     flags: bunOffsets.flags,
     moduleRecordSize: moduleStructSize,
-    originalPayload: Buffer.from(payload),
-    compileExecArgv: Buffer.from(
-      getStringPointerContent(bunData, bunOffsets.compileExecArgvPtr)
+    originalPayload,
+    compileExecArgv: getStringPointerContent(
+      bunData,
+      bunOffsets.compileExecArgvPtr
     ),
   };
 };
@@ -623,6 +630,45 @@ const appendGraphField = (
   chunks.push(value, Buffer.from([0]));
   currentLength.value += value.length + 1;
   return pointer;
+};
+
+/**
+ * Returns the bytes covered by `regions` but by none of `excluded`, as sorted,
+ * disjoint, merged regions.
+ */
+const subtractRegions = (
+  regions: readonly StringPointer[],
+  excluded: readonly StringPointer[]
+): StringPointer[] => {
+  const merge = (input: readonly StringPointer[]) => {
+    const merged: Array<{ start: number; end: number }> = [];
+    for (const { offset, length } of [...input]
+      .filter(region => region.length > 0)
+      .sort((a, b) => a.offset - b.offset)) {
+      const last = merged[merged.length - 1];
+      if (last && offset <= last.end) {
+        last.end = Math.max(last.end, offset + length);
+      } else {
+        merged.push({ start: offset, end: offset + length });
+      }
+    }
+    return merged;
+  };
+  const holes = merge(excluded);
+  const result: StringPointer[] = [];
+  let h = 0;
+  for (const { start, end } of merge(regions)) {
+    let cursor = start;
+    while (h < holes.length && holes[h].end <= cursor) h++;
+    for (let i = h; i < holes.length && holes[i].start < end; i++) {
+      if (holes[i].start > cursor) {
+        result.push({ offset: cursor, length: holes[i].start - cursor });
+      }
+      cursor = Math.max(cursor, holes[i].end);
+    }
+    if (cursor < end) result.push({ offset: cursor, length: end - cursor });
+  }
+  return result;
 };
 
 function serializePreservingNativeBunGraphPayload(
@@ -668,28 +714,39 @@ function serializePreservingNativeBunGraphPayload(
   // largest first. This keeps the payload size (and so the section layout)
   // unchanged even when one module grows past every region it owned, as long
   // as the modules being replaced freed enough space between them.
-  const free: StringPointer[] = [];
+  //
+  // Regions may overlap: since Claude Code 2.1.310 each bytecode pointer runs
+  // to the end of a shared slab that holds later modules' bytecode too. Only
+  // bytes no retained module (or name) points into are free.
+  const freed: StringPointer[] = [];
+  const live: StringPointer[] = [];
   const pending: Array<{ index: number; replacement: Buffer }> = [];
   graph.modules.forEach((module, index) => {
     const replacement = replacements.get(module.name);
-    if (!replacement) return;
-    const tableRecordOffset = tableOffset + index * moduleStructSize;
-    const originalRecord = parseCompiledModuleGraphFile(
+    const record = parseCompiledModuleGraphFile(
       bunData,
-      tableRecordOffset,
+      tableOffset + index * moduleStructSize,
       moduleStructSize
     );
-    free.push(
-      ...[
-        originalRecord.contents,
-        originalRecord.sourcemap,
-        originalRecord.bytecode,
-        originalRecord.moduleInfo,
-        originalRecord.bytecodeOriginPath,
-      ].filter(pointer => pointer.length > 0)
-    );
+    const payloads = [
+      record.contents,
+      record.sourcemap,
+      record.bytecode,
+      record.moduleInfo,
+      record.bytecodeOriginPath,
+    ];
+    live.push(record.name);
+    // A linked payload's cache entries refer to the entries before them, so
+    // none of its bytes are free, whatever retained pointers cover.
+    if (bunOffsets.flags & LINKED_BYTECODE_PAYLOAD) live.push(record.bytecode);
+    if (!replacement) {
+      live.push(...payloads);
+      return;
+    }
+    freed.push(...payloads);
     pending.push({ index, replacement });
   });
+  const free = subtractRegions(freed, live);
   pending.sort((a, b) => b.replacement.length - a.replacement.length);
 
   for (const { index, replacement } of pending) {
@@ -699,45 +756,48 @@ function serializePreservingNativeBunGraphPayload(
       tableRecordOffset,
       moduleStructSize
     ).contents;
-    // Prefer the module's own source region when it still fits (keeps the
+    // Prefer the module's own source offset when it still fits (keeps the
     // contiguous source run intact); otherwise the smallest region that fits.
+    // Freed regions are merged, so the own offset may sit inside a region.
     let slot = free.findIndex(
       region =>
-        region.offset === originalContents.offset &&
-        region.length >= replacement.length
+        region.offset <= originalContents.offset &&
+        originalContents.offset + replacement.length <=
+          region.offset + region.length
     );
+    let start = slot < 0 ? -1 : originalContents.offset;
     if (slot < 0) {
-      let best = -1;
       free.forEach((region, i) => {
         if (
           region.length >= replacement.length &&
-          (best < 0 || region.length < free[best].length)
+          (slot < 0 || region.length < free[slot].length)
         )
-          best = i;
+          slot = i;
       });
-      slot = best;
+      if (slot >= 0) start = free[slot].offset;
     }
     if (slot < 0) {
       overflow.push({ index, replacement });
       continue;
     }
     const target = free[slot];
-    if (target.offset !== originalContents.offset) flags &= ~CONTIGUOUS_SOURCES;
-    output.fill(0, target.offset, target.offset + target.length);
-    replacement.copy(output, target.offset);
-    output.writeUInt32LE(target.offset, tableRecordOffset + 8);
+    const targetEnd = target.offset + target.length;
+    if (start !== originalContents.offset) flags &= ~CONTIGUOUS_SOURCES;
+    output.fill(0, target.offset, targetEnd);
+    replacement.copy(output, start);
+    output.writeUInt32LE(start, tableRecordOffset + 8);
     output.writeUInt32LE(replacement.length, tableRecordOffset + 12);
     invalidateDerived(output, index);
-    // Keep the unused tail (after a NUL terminator) available.
-    const used = replacement.length + 1;
-    if (target.length > used) {
-      free[slot] = {
-        offset: target.offset + used,
-        length: target.length - used,
-      };
-    } else {
-      free.splice(slot, 1);
-    }
+    // Keep the unused head and tail (after a NUL terminator) available.
+    const usedEnd = Math.min(start + replacement.length + 1, targetEnd);
+    free.splice(
+      slot,
+      1,
+      ...[
+        { offset: target.offset, length: start - target.offset },
+        { offset: usedEnd, length: targetEnd - usedEnd },
+      ].filter(region => region.length > 0)
+    );
   }
 
   if (overflow.length > 0) {
@@ -801,6 +861,12 @@ export const serializeNativeBunGraphPayload = (
   }
   if (graph.originalPayload) {
     return serializePreservingNativeBunGraphPayload(graph, replacements);
+  }
+  if (graph.flags & LINKED_BYTECODE_PAYLOAD) {
+    // Re-laying out a linked payload would also need its region table rebuilt.
+    throw new Error(
+      'A linked Bun bytecode payload can only be rewritten in place'
+    );
   }
   const chunks: Buffer[] = [];
   const currentLength = { value: 0 };

@@ -87,6 +87,7 @@ import { writeAutoAcceptPlanMode } from './autoAcceptPlanMode';
 import { writeAllowBypassPermsInSudo } from './allowBypassPermsInSudo';
 import { writeSuppressNativeInstallerWarning } from './suppressNativeInstallerWarning';
 import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
+import { writeTmuxGraphicsPassthrough } from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
@@ -453,6 +454,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.MISC_CONFIGURABLE,
     description:
       'Filter out terminal escape sequences that cause unwanted scrolling',
+  },
+  {
+    id: 'tmux-graphics-passthrough',
+    name: 'tmux graphics passthrough',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Images show inside tmux (needs allow-passthrough on and CLAUDE_CODE_FORCE_TERMINAL_IMAGES=1)',
   },
   // Features
   {
@@ -946,6 +954,10 @@ export const buildPatchImplementations = (
     'filter-scroll-escape-sequences': {
       fn: c => writeScrollEscapeSequenceFilter(c),
       condition: !!config.settings.misc?.filterScrollEscapeSequences,
+    },
+    'tmux-graphics-passthrough': {
+      fn: c => writeTmuxGraphicsPassthrough(c),
+      condition: !!config.settings.misc?.tmuxGraphicsPassthrough,
     },
     // Features
     'allow-custom-agent-models': {
