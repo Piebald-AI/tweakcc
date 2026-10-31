@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  findLoginCommandRefs,
   findSlashCommandListBounds,
   findSlashCommandListEndPosition,
   writeSlashCommandDefinition,
@@ -8,6 +9,8 @@ import {
 
 const anchor =
   'var Cmd0={type:"local",name:"clear",description:"Clear the conversation"};';
+const login =
+  'var LoginCmd=()=>({type:"local-jsx",name:"login",description:"Sign in"});';
 const items = Array.from({ length: 31 }, (_, i) => `c${i}`).join(',');
 
 const arrowForm = `${anchor}Cmds=memo9(()=>[${items},...Fa?[Fa]:[]])`;
@@ -42,14 +45,55 @@ describe('findSlashCommandListEndPosition', () => {
     ).toBeNull();
   });
 
-  it('picks the largest candidate when several arrays qualify', () => {
+  it('refuses to guess when several arrays qualify and nothing tells them apart', () => {
     const smaller = Array.from({ length: 30 }, (_, i) => `s${i}`).join(',');
     const file = `${anchor}function a(){return[${smaller}]}function b(){return[${items}]}`;
+
+    expect(findSlashCommandListEndPosition(file)).toBeNull();
+  });
+
+  it('picks the candidate that references the /login command', () => {
+    const other = Array.from({ length: 40 }, (_, i) => `o${i}`).join(',');
+    const file =
+      `${login}${anchor}` +
+      `function a(){return[${other}]}` +
+      `function b(){return[${items},LoginCmd()]}`;
     const end = findSlashCommandListEndPosition(file);
 
     expect(end).not.toBeNull();
-    expect(file.slice(end as number)).toBe(']}');
-    expect(file.slice(0, end as number)).toContain('c30');
+    expect(file.slice(0, end as number).endsWith('LoginCmd()')).toBe(true);
+  });
+
+  it('accepts a list that references /login through an alias', () => {
+    const file =
+      `${login}var loginInstance=LoginCmd();${anchor}` +
+      `function b(){return[${items},loginInstance]}`;
+
+    expect(findSlashCommandListEndPosition(file)).not.toBeNull();
+  });
+
+  it('rejects a lone candidate that does not reference a defined /login', () => {
+    const file = `${login}${anchor}function b(){return[${items}]}`;
+
+    expect(findSlashCommandListEndPosition(file)).toBeNull();
+  });
+});
+
+describe('findLoginCommandRefs', () => {
+  it('returns the login factory and variables holding its result', () => {
+    expect(
+      findLoginCommandRefs(`${login}var a=LoginCmd(),$b=LoginCmd();`)
+    ).toEqual(['LoginCmd', 'a', '$b']);
+  });
+
+  it('finds aliases assigned inside parentheses or a block', () => {
+    expect(
+      findLoginCommandRefs(`${login}(a=LoginCmd());function f(){b=LoginCmd()}`)
+    ).toEqual(['LoginCmd', 'a', 'b']);
+  });
+
+  it('returns null when the bundle has no login factory', () => {
+    expect(findLoginCommandRefs(anchor)).toBeNull();
   });
 });
 
