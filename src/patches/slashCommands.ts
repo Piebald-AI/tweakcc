@@ -135,13 +135,16 @@ export const findLoginCommandRefs = (fileContents: string): string[] | null => {
   return refs;
 };
 
+const STRING_LITERAL = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g;
+
+/** True if `code` references one of `identifiers` outside string literals. */
 const containsIdentifier = (
-  text: string,
+  code: string,
   identifiers: readonly string[]
 ): boolean =>
   new RegExp(
     `(?<![$\\w])(?:${identifiers.map(escapeIdentifier).join('|')})(?![$\\w])`
-  ).test(text);
+  ).test(code.replace(STRING_LITERAL, '""'));
 
 export const findSlashCommandListBounds = (
   fileContents: string

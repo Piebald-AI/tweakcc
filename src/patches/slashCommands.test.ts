@@ -72,6 +72,18 @@ describe('findSlashCommandListEndPosition', () => {
     expect(findSlashCommandListEndPosition(file)).not.toBeNull();
   });
 
+  it('ignores /login names that only appear inside string literals', () => {
+    const other = Array.from({ length: 40 }, (_, i) => `o${i}`).join(',');
+    const file =
+      `${login}${anchor}` +
+      `function a(){return[${other},"LoginCmd",'LoginCmd',\`LoginCmd\`]}` +
+      `function b(){return[${items},LoginCmd()]}`;
+    const end = findSlashCommandListEndPosition(file);
+
+    expect(end).not.toBeNull();
+    expect(file.slice(0, end as number).endsWith('LoginCmd()')).toBe(true);
+  });
+
   it('rejects a lone candidate that does not reference a defined /login', () => {
     const file = `${login}${anchor}function b(){return[${items}]}`;
 
