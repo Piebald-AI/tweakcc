@@ -525,8 +525,9 @@ function collectLiterals(sources) {
         subsetFilter: false,
         rawStrings: true,
       }).prompts;
-    } catch {
-      continue; // unparseable module: nothing to extract
+    } catch (error) {
+      // Its prompts would be reported as removed; the output can't be trusted.
+      throw new Error(`Could not parse module ${module}: ${error.message}`);
     }
     for (const c of found) {
       // JS literals keep their source escapes, which the prompt matcher needs,
@@ -935,9 +936,16 @@ if (require.main === module) {
       ? JSON.parse(fs.readFileSync(seedFile, 'utf-8'))
       : existingData;
     const previousFile = flag('--previous');
-    const { prompts, stats } = seededExtract(readModules(modulesFile), seed, {
-      previousSources: previousFile ? readModules(previousFile) : undefined,
-    });
+    let extracted;
+    try {
+      extracted = seededExtract(readModules(modulesFile), seed, {
+        previousSources: previousFile ? readModules(previousFile) : undefined,
+      });
+    } catch (error) {
+      console.error(error.message);
+      process.exit(1);
+    }
+    const { prompts, stats } = extracted;
     console.log(
       `Seeded extraction: ${stats.exact} unchanged, ${stats.edited} edited, ${stats.new} new, ${stats.removed} no longer present`
     );

@@ -193,3 +193,13 @@ test('new prompts with the same opening words get distinct ids', () => {
   assert.equal(ids.length, 2);
   assert.equal(ids[1], `${ids[0]}-2`);
 });
+
+test('a module that does not parse is an error, not removed prompts', () => {
+  const seed = seedFrom(`const a = ${JSON.stringify(prose('parsing'))};`, [
+    'parsing',
+  ]);
+  assert.throws(
+    () => seededExtract(modules({ 'chunk.js': 'const a = ("' }), seed),
+    /Could not parse module chunk\.js/
+  );
+});
