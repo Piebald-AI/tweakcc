@@ -726,6 +726,8 @@ export const DEFAULT_SETTINGS: Settings = {
     enableChannelsMode: false,
     disableCtrlZSuspend: false,
     skipSkillShellValidation: false,
+    skipTrustDialog: false,
+    skipDevChannelsDialog: false,
     preventUpdateToUnsupportedVersions: false,
     keepPatchedBinaryOnUpdate: true,
     webFetchUserAgent: null,
