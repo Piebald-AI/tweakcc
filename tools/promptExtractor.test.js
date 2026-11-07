@@ -203,3 +203,27 @@ test('a module that does not parse is an error, not removed prompts', () => {
     /Could not parse module chunk\.js/
   );
 });
+
+test('with the previous build, a new prompt in a new module is found', () => {
+  const known = `const k = ${JSON.stringify(prose('tests'))};`;
+  const fresh = prose('connectors'); // a normal length, well under 2000
+  const sources = modules({
+    'chunk.js': known,
+    'new-chunk.js': `const n = ${JSON.stringify(fresh)};`,
+  });
+  const seed = seedFrom(known, ['tests']);
+  const newTexts = result =>
+    result.prompts
+      .filter(p => p.id.startsWith('new-prompt-'))
+      .map(p => p.pieces.join(''));
+
+  assert.deepEqual(newTexts(seededExtract(sources, seed)), []);
+  assert.deepEqual(
+    newTexts(
+      seededExtract(sources, seed, {
+        previousSources: modules({ 'chunk.js': known }),
+      })
+    ),
+    [fresh]
+  );
+});

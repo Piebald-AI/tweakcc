@@ -742,15 +742,18 @@ function seededExtract(
 
   // New prompts: unclaimed literals that pass the heuristic, largest first,
   // skipping any nested in a literal already taken.
-  // Prompts cluster: a new prompt almost always sits in a module (or text
-  // asset) that already holds known ones. Elsewhere only clear-cut prompts
-  // (the heuristic at its default length) count, which keeps UI and doc
-  // strings out.
+  // Without the previous build, a new prompt is only trusted in a module that
+  // already holds known prompts; elsewhere it must be long (2000+), which
+  // keeps UI and doc strings out. With it, old text is already excluded, and
+  // new prompts often arrive in new modules, so the normal length applies.
   const promptModules = new Set([...used].map(t => t.module));
   const isNew = c =>
     promptModules.has(c.module)
       ? validateInput(c.pieces.join(''), minLength)
-      : validateInput(c.pieces.join(''), Math.max(minLength, 2000));
+      : validateInput(
+          c.pieces.join(''),
+          previousSources ? minLength : Math.max(minLength, 2000)
+        );
   // Another copy of a known prompt is not a new one.
   const known = new Set([...seedKey.values(), ...[...used].map(c => c.key)]);
   const fresh = candidates
