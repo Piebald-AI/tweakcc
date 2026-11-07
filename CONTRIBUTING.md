@@ -149,6 +149,22 @@ Follow these conventions for clear, meaningful commit messages:
 - `Prompts for 2.1.34`
 - `Add auto-accept plan mode patch`
 
+### Prompt data for a new Claude Code version
+
+For code-split native builds, generate the prompts file from the previous version's file:
+
+```bash
+cd tools && npm install && cd ..
+pnpm tsx tools/dumpModules.mts ~/.local/share/claude/versions/2.1.311 /tmp/modules-2.1.311.json
+pnpm tsx tools/dumpModules.mts ~/.local/share/claude/versions/2.1.312 /tmp/modules-2.1.312.json
+node tools/promptExtractor.js --modules /tmp/modules-2.1.312.json \
+  --seed data/prompts/prompts-2.1.311.json \
+  --previous /tmp/modules-2.1.311.json \
+  --version 2.1.312 data/prompts/prompts-2.1.312.json
+```
+
+Every prompt in the seed is looked up in the new build: unchanged prompts keep their id, text and version, and edited prompts keep their id and get the new version. Prompts that are new in this build are named `New prompt: <opening words>`; give them a real name, id and description before committing. `--previous` keeps text that was in the previous build, but left out of the seed, from being reported as new.
+
 ## Submitting Pull Requests
 
 ### Before Submitting
