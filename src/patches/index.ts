@@ -109,6 +109,7 @@ import { writeClearScreen } from './clearScreen';
 import { writeSessionColor } from './sessionColor';
 import { writeKeybindingCustomization } from './keybindingCustomization';
 import { writePlanExitCommand } from './planExitCommand';
+import { writeFixInputTaskListOverflow } from './fixInputTaskListOverflow';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -242,6 +243,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.ALWAYS_APPLIED,
     description:
       'Add /plan exit to open the plan approval dialog without a model turn',
+  },
+  {
+    id: 'fix-input-task-list-overflow',
+    name: 'Fix input overflow with task list',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description:
+      'Keep the fullscreen prompt input on screen while the task list is expanded',
   },
   // Misc Configurable
   {
@@ -761,6 +769,9 @@ export const buildPatchImplementations = (
     },
     'plan-exit-command': {
       fn: c => writePlanExitCommand(c),
+    },
+    'fix-input-task-list-overflow': {
+      fn: c => writeFixInputTaskListOverflow(c),
     },
     // Misc Configurable
     'patches-applied-indication': {
