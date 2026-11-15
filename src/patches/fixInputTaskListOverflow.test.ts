@@ -96,6 +96,18 @@ describe('writeFixInputTaskListOverflow', () => {
     );
   });
 
+  it('finds the has-tasks hook right after an adjacent lookalike', () => {
+    const input =
+      ';function Abc(){return Fe(u(),z)??!1}function Kvi(){return Fe(u(),y)??!1}' +
+      'function z(s){return s!==void 0}function y(s){return s!==void 0&&s.length>0}' +
+      'function abc(){let Yo=G((yi)=>yi.expandedView);return Yo}' +
+      'function d9e(h){let x=1,ob=Ri()?Math.max(l6e,Math.floor(wr/2)-a6e):void 0}';
+
+    expect(writeFixInputTaskListOverflow(input)).toContain(
+      '(G((tls)=>tls.expandedView),Kvi())'
+    );
+  });
+
   it('returns null when a captured identifier collides with a parameter', () => {
     const input =
       hooks +

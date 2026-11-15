@@ -6,7 +6,7 @@ import { resolveAcrossGraph } from './graphContext';
 
 const findHasTasksHook = (source: string): string | undefined => {
   const hooks = source.matchAll(
-    /[,;{}]function ([$\w]+)\(\)\{return [$\w]+\([$\w]+\(\),([$\w]+)\)\?\?!1\}/g
+    /[,;{}]function ([$\w]+)\(\)\{return [$\w]+\([$\w]+\(\),([$\w]+)\)\?\?!1(?=\})/g
   );
   for (const hook of hooks) {
     const predicate = new RegExp(
