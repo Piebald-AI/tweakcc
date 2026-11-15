@@ -84,6 +84,27 @@ describe('writeFixInputTaskListOverflow', () => {
     expect(writeFixInputTaskListOverflow(input)).toBeNull();
   });
 
+  it('finds the has-tasks hook after a lookalike', () => {
+    const input =
+      ';function Abc(){return Fe(u(),z)??!1}function z(s){return s!==void 0}' +
+      hooks +
+      'function abc(){let Yo=G((yi)=>yi.expandedView);return Yo}' +
+      'function d9e(h){let x=1,ob=Ri()?Math.max(l6e,Math.floor(wr/2)-a6e):void 0}';
+
+    expect(writeFixInputTaskListOverflow(input)).toContain(
+      '(G((tls)=>tls.expandedView),Kvi())'
+    );
+  });
+
+  it('returns null when a captured identifier collides with a parameter', () => {
+    const input =
+      hooks +
+      'function abc(){let Yo=G((yi)=>yi.expandedView);return Yo}' +
+      'function d9e(h){let x=1,ob=tlv()?Math.max(l6e,Math.floor(wr/2)-a6e):void 0}';
+
+    expect(writeFixInputTaskListOverflow(input)).toBeNull();
+  });
+
   it('returns the file unchanged when already patched', () => {
     const patched = writeFixInputTaskListOverflow(makeInput())!;
 

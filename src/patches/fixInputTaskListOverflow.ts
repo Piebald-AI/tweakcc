@@ -5,14 +5,16 @@ import { debug } from '../utils';
 import { resolveAcrossGraph } from './graphContext';
 
 const findHasTasksHook = (source: string): string | undefined => {
-  const hook = source.match(
-    /[,;{}]function ([$\w]+)\(\)\{return [$\w]+\([$\w]+\(\),([$\w]+)\)\?\?!1\}/
+  const hooks = source.matchAll(
+    /[,;{}]function ([$\w]+)\(\)\{return [$\w]+\([$\w]+\(\),([$\w]+)\)\?\?!1\}/g
   );
-  if (!hook) return undefined;
-  const predicate = new RegExp(
-    `[,;{}]function ${hook[2].replace(/\$/g, '\\$')}\\(([$\\w]+)\\)\\{return \\1!==void 0&&\\1\\.length>0\\}`
-  );
-  return predicate.test(source) ? hook[1] : undefined;
+  for (const hook of hooks) {
+    const predicate = new RegExp(
+      `[,;{}]function ${hook[2].replace(/\$/g, '\\$')}\\(([$\\w]+)\\)\\{return \\1!==void 0&&\\1\\.length>0\\}`
+    );
+    if (predicate.test(source)) return hook[1];
+  }
+  return undefined;
 };
 
 export const writeFixInputTaskListOverflow = (file: string): string | null => {
@@ -55,6 +57,16 @@ export const writeFixInputTaskListOverflow = (file: string): string | null => {
   }
 
   const [, prefix, isFullscreen, minLines, rows, footerLines] = match;
+  if (
+    [isFullscreen, minLines, rows, footerLines].some(
+      id => id === 'tlv' || id === 'tlh'
+    )
+  ) {
+    debug(
+      'patch: fixInputTaskListOverflow: captured identifier collides with generated parameter'
+    );
+    return null;
+  }
   const reserve = `(${rows}<=10?0:Math.min(10,Math.max(3,${rows}-14))+2)`;
   const replacement =
     `${prefix}((tlv,tlh)=>${isFullscreen}()?` +
