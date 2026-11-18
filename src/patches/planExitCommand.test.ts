@@ -86,6 +86,27 @@ describe('writePlanExitCommand', () => {
     );
   });
 
+  it('ignores unrelated cloud-like branches before the /plan cloud check', () => {
+    const decoy = 'if(Early()){if(!Ready())return r("unrelated"),null;}';
+    const sources = new Map([
+      [
+        '/$bunfs/root/chunk-v7jd5y9q.js',
+        HANDLER_327.replace('if(Et())', decoy + 'if(Et())'),
+      ],
+      ['/$bunfs/root/chunk-cfxefa64.js', DIALOG],
+      ['/$bunfs/root/chunk-m14bt1pz.js', COMMAND_327],
+    ]);
+
+    expect(onGraph(sources)).toMatchObject({ applied: true, failed: false });
+    const handler = sources.get('/$bunfs/root/chunk-v7jd5y9q.js')!;
+    expect(handler).toContain(
+      'if(Et())return r("/plan exit is not available in cloud sessions.'
+    );
+    expect(handler).not.toContain(
+      'if(Early())return r("/plan exit is not available in cloud sessions.'
+    );
+  });
+
   it('leaves an already patched graph unchanged', () => {
     const sources = modules();
     onGraph(sources);

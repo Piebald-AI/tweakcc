@@ -27,7 +27,7 @@ import {
   isGraphContextActive,
   requestImport,
 } from './graphContext';
-import { showDiff } from './index';
+import { escapeIdent, showDiff } from './index';
 
 /** The ExitPlanMode dialog: function Bot({payload:h,answer:A,wouldTakeAnswer:L}){…showClearContextOnPlanAccept */
 const DIALOG_PATTERN =
@@ -47,9 +47,6 @@ const USER_MESSAGE_PATTERN =
 
 /** JSX factory: e(b,{planContent:… */
 const JSX_PATTERN = /([$\w]+)\([$\w]+,\{planContent:/;
-
-/** Cloud-session branch: if(Ht()){if(!Ka())return … */
-const CLOUD_PATTERN = /if\(([$\w]+)\(\)\)\{if\(![$\w]+\(\)\)return /;
 
 const PATCHED_MARKER = '.trim()==="exit"){if(';
 
@@ -88,6 +85,7 @@ const patchHandler = (file: string): string | null => {
     !handler ||
     handler.index === undefined ||
     !plan ||
+    plan.index === undefined ||
     !userMessage ||
     !jsx
   ) {
@@ -106,8 +104,12 @@ const patchHandler = (file: string): string | null => {
   const [, , planPath, , readPlan] = plan;
   // Cloud sessions keep the plan in the cloud workspace, and the dialog's
   // answer queues a local message, so decline there instead of reading a
-  // stale or missing local plan.
-  const cloud = file.match(CLOUD_PATTERN)?.[1];
+  // stale or missing local plan. Accept the newer holdMode return prefix
+  // without confusing an earlier cloud-like branch for the /plan check.
+  const cloudPattern = new RegExp(
+    `if\\(([$\\w]+)\\(\\)\\)\\{if\\(![$\\w]+\\(\\)\\)return [^};]{0,500}?${escapeIdent(done)}\\(${escapeIdent(notPlan)}\\?"(?:Enabled plan mode|Turned on plan mode)":"Already in plan mode\\."\\),null;`
+  );
+  const cloud = file.slice(handler.index, plan.index).match(cloudPattern)?.[1];
   const insertion =
     `if(${args}.trim()==="exit"){` +
     `if(${notPlan})return ${done}("Not in plan mode."),null;` +
