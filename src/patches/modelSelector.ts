@@ -74,8 +74,8 @@ const findCustomModelListInsertionPoint = (
 
 /**
  * CC 2.1.2xx builds the /model options from a served catalog, then appends
- * env/settings extras and finally sorts disabled entries last before
- * resolving the current selection:
+ * env/settings extras and finally sorts disabled entries last with two or three
+ * arguments before resolving the current selection:
  *   …s.push({…ml(N)…,sessionTail:!0})}s=i2(s,n);let E=null,T=oh(),A=y0();…
  *   …return s.push({...ml(E)??{value:E,label:E,description:"Custom model"},sessionTail:!0}),xo(s,n)}}
  * Append the extra models (skipping any already offered) just before that
@@ -85,7 +85,7 @@ const writeModelCustomizationsServedCatalog = (
   oldFile: string
 ): string | null => {
   const sortPattern =
-    /([;}])([$\w]+)=[$\w]+\(\2,[$\w]+\);let [$\w]+=null,[$\w]+=[$\w]+\(\),[$\w]+=[$\w]+\(\);/g;
+    /([;}])([$\w]+)=[$\w]+\(\2(?:,[$\w]+){1,2}\);let [$\w]+=null,[$\w]+=[$\w]+\(\),[$\w]+=[$\w]+\(\);/g;
   const candidates = [...oldFile.matchAll(sortPattern)].filter(match =>
     oldFile
       .slice(match.index!, match.index! + 2500)

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix memory blowup when patching Claude Code 2.1.310 native binaries (#1053) - @gergesh
 - Never reuse bytes of a linked Bun bytecode payload when patching native binaries (Claude Code 2.1.310+) (#1056) - @coleleavitt
 - Fix the module parse gate rejecting Bun `using` declarations on Node < 24 (#1041)
+- Support model customizations on Claude Code 2.1.327
 
 ## [v4.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.4.0) - 2026-10-10
 
