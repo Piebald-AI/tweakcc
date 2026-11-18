@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fix memory blowup when patching Claude Code 2.1.310 native binaries (#1053) - @gergesh
+- Never reuse bytes of a linked Bun bytecode payload when patching native binaries (Claude Code 2.1.310+) (#1056) - @coleleavitt
+
 ## [v4.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.4.0) - 2026-10-10
 
 - Replace the existing `.bun` payload for ELF binaries instead of appending a new one (#952) - @signadou

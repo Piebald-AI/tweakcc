@@ -214,6 +214,141 @@ describe('native Bun module graphs', () => {
     }
   });
 
+  describe('shared bytecode slab (Claude Code 2.1.310+)', () => {
+    // Bun now points each module's bytecode at the rest of one shared slab:
+    // every pointer ends where the last module's bytecode ends.
+    const makeSlabPayload = () => {
+      const base = makeGraph();
+      base.modules.push({
+        ...base.modules[0],
+        index: 2,
+        name: '/$bunfs/root/chunk-b.js',
+        bytecode: Buffer.from('bytecode-b'),
+      });
+      const payload = serializeNativeBunGraphPayload(base, new Map());
+      const graph = parseNativeBunGraphPayload(payload);
+      const slabEnd = Math.max(
+        ...graph.modules.map(m => m.bytecodeOffset! + m.bytecode.length)
+      );
+      const offsetsStart = payload.length - 16 - 32;
+      const tableOffset = payload.readUInt32LE(offsetsStart + 8);
+      graph.modules.forEach((module, index) => {
+        payload.writeUInt32LE(
+          slabEnd - module.bytecodeOffset!,
+          tableOffset + index * 52 + 28
+        );
+      });
+      return payload;
+    };
+    const bytecodeOf = (payload: Buffer) =>
+      parseNativeBunGraphPayload(payload).modules.map(m =>
+        m.bytecode.toString('latin1')
+      );
+
+    it('parses overlapping fields as views instead of copies', () => {
+      const graph = parseNativeBunGraphPayload(makeSlabPayload());
+
+      expect(graph.modules[0].bytecode.length).toBeGreaterThan(
+        graph.modules[2].bytecode.length
+      );
+      // A write through the payload shows up in every field aliasing it.
+      graph.originalPayload![graph.modules[2].bytecodeOffset!] = 0x21;
+      for (const module of graph.modules) {
+        expect(module.bytecode.at(-'bytecode-b'.length)).toBe(0x21);
+      }
+    });
+
+    it.each([
+      ['/$bunfs/root/chunk-a.js', 0],
+      ['/$bunfs/root/cli', 1],
+    ])(
+      'keeps bytecode of retained modules intact when replacing %s',
+      (name, replacedIndex) => {
+        const payload = makeSlabPayload();
+        const before = bytecodeOf(payload);
+        const grown = Buffer.from(`${'x'.repeat(64)};`);
+        const output = serializeNativeBunGraphPayload(
+          parseNativeBunGraphPayload(payload),
+          new Map([[name, grown]])
+        );
+        const parsed = parseNativeBunGraphPayload(output);
+        const after = bytecodeOf(output);
+
+        expect(parsed.modules[replacedIndex].contents.equals(grown)).toBe(true);
+        expect(after[replacedIndex]).toBe('');
+        before.forEach((bytecode, index) => {
+          if (index !== replacedIndex) expect(after[index]).toBe(bytecode);
+        });
+      }
+    );
+
+    it('never hands the same freed bytes to two replacements', () => {
+      const payload = makeSlabPayload();
+      const a = Buffer.from(`export const a="${'a'.repeat(24)}";`);
+      const b = Buffer.from(`export const b="${'b'.repeat(24)}";`);
+      const parsed = parseNativeBunGraphPayload(
+        serializeNativeBunGraphPayload(
+          parseNativeBunGraphPayload(payload),
+          new Map([
+            ['/$bunfs/root/chunk-a.js', a],
+            ['/$bunfs/root/chunk-b.js', b],
+          ])
+        )
+      );
+
+      expect(parsed.modules[0].contents.equals(a)).toBe(true);
+      expect(parsed.modules[2].contents.equals(b)).toBe(true);
+      expect(parsed.modules[1].bytecode.toString('latin1')).toBe(
+        bytecodeOf(payload)[1]
+      );
+    });
+
+    it('never reuses bytes of a linked bytecode payload, even below every retained entry', () => {
+      // With Bun's HAS_LINKED_BYTECODE_PAYLOAD flag (1 << 13) a cache entry may
+      // refer to entries before it, so bytes no retained pointer covers are
+      // still live. chunk-a owns the lowest entry, the case pointer coverage misses.
+      const payload = makeSlabPayload();
+      const offsetsStart = payload.length - 16 - 32;
+      payload.writeUInt32LE(
+        payload.readUInt32LE(offsetsStart + 28) | (1 << 13),
+        offsetsStart + 28
+      );
+      const graph = parseNativeBunGraphPayload(payload);
+      const start = Math.min(...graph.modules.map(m => m.bytecodeOffset!));
+      const end = start + graph.modules[0].bytecode.length;
+      const output = serializeNativeBunGraphPayload(
+        graph,
+        new Map([
+          [
+            '/$bunfs/root/chunk-a.js',
+            Buffer.from(`export const a="${'a'.repeat(24)}";`),
+          ],
+        ])
+      );
+
+      expect(
+        output.subarray(start, end).equals(payload.subarray(start, end))
+      ).toBe(true);
+      expect(
+        parseNativeBunGraphPayload(output).modules[0].bytecode
+      ).toHaveLength(0);
+    });
+
+    it('refuses to re-lay out a linked bytecode payload', () => {
+      const graph = parseNativeBunGraphPayload(makeSlabPayload());
+      expect(() =>
+        serializeNativeBunGraphPayload(
+          {
+            ...graph,
+            flags: graph.flags | (1 << 13),
+            originalPayload: undefined,
+          },
+          new Map()
+        )
+      ).toThrow('linked Bun bytecode payload');
+    });
+  });
+
   it('rejects replacements for unknown modules', () => {
     expect(() =>
       serializeNativeBunGraphPayload(
