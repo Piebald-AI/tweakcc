@@ -87,13 +87,64 @@ export const analyzeArrayFromOpenBracket = (
  *
  * The candidate must also sit in slash-command-specific code. The bundle keeps
  * slash-command definitions near command metadata such as name/userFacingName,
- * so this rejects unrelated large arrays.
+ * so this rejects unrelated large arrays. When the bundle defines the `/login`
+ * command, the candidate must also reference it, and if more than one
+ * candidate still qualifies we refuse to guess and fall through to the
+ * semantic lookup below.
  */
 export interface SlashCommandArrayBounds {
   openBracket: number;
   closingBracket: number;
   assignmentStart?: number;
 }
+
+const escapeIdentifier = (identifier: string): string =>
+  identifier.replace(/\$/g, '\\$');
+
+const isIdentifierChar = (c: string | undefined): boolean =>
+  c !== undefined && /[$\w]/.test(c);
+
+/** Read the identifier that ends right before `end`. */
+const identifierBefore = (fileContents: string, end: number): string | null => {
+  let start = end;
+  while (start > 0 && isIdentifierChar(fileContents[start - 1])) start--;
+  return start < end ? fileContents.slice(start, end) : null;
+};
+
+/**
+ * Identifiers that stand for the `/login` command: its factory
+ * (`var L7t=()=>({type:"local-jsx",name:"login",…})`) plus any variable that
+ * holds the factory's result (`ytn=L7t()`, seen in 2.1.312 code-split
+ * builds). Returns null when the bundle doesn't define the login factory.
+ * Only the first login factory is used; one module defines it once.
+ */
+export const findLoginCommandRefs = (fileContents: string): string[] | null => {
+  const definition = fileContents.indexOf(
+    '=()=>({type:"local-jsx",name:"login",'
+  );
+  if (definition === -1) return null;
+  const factory = identifierBefore(fileContents, definition);
+  if (!factory) return null;
+
+  const refs = [factory];
+  const call = new RegExp(`=${escapeIdentifier(factory)}\\(\\)(?=[,;)}])`, 'g');
+  for (const match of fileContents.matchAll(call)) {
+    const alias = identifierBefore(fileContents, match.index!);
+    if (alias && !refs.includes(alias)) refs.push(alias);
+  }
+  return refs;
+};
+
+const STRING_LITERAL = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g;
+
+/** True if `code` references one of `identifiers` outside string literals. */
+const containsIdentifier = (
+  code: string,
+  identifiers: readonly string[]
+): boolean =>
+  new RegExp(
+    `(?<![$\\w])(?:${identifiers.map(escapeIdentifier).join('|')})(?![$\\w])`
+  ).test(code.replace(STRING_LITERAL, '""'));
 
 export const findSlashCommandListBounds = (
   fileContents: string
@@ -102,7 +153,7 @@ export const findSlashCommandListBounds = (
   // (only) array returned from a function that contains >= 30 top-level items.
   const candidatePattern = /(?:=>|return)\s*\[/g;
   let m: RegExpExecArray | null;
-  let best: { open: number; closing: number; items: number } | null = null;
+  const candidates: { open: number; closing: number }[] = [];
   while ((m = candidatePattern.exec(fileContents)) !== null) {
     const bracketIndex = m.index + m[0].length - 1; // position of '['
     const anchorWindow = fileContents.slice(
@@ -114,18 +165,30 @@ export const findSlashCommandListBounds = (
     }
     const info = analyzeArrayFromOpenBracket(fileContents, bracketIndex);
     if (info && info.itemCount >= 30) {
-      if (!best || info.itemCount > best.items) {
-        best = {
-          open: bracketIndex,
-          closing: info.closingBracket,
-          items: info.itemCount,
-        };
-      }
+      candidates.push({ open: bracketIndex, closing: info.closingBracket });
     }
   }
 
-  if (best) {
-    return { openBracket: best.open, closingBracket: best.closing };
+  // Proof that a candidate is the command list: it references `/login`.
+  const loginRefs = findLoginCommandRefs(fileContents);
+  const verified = loginRefs
+    ? candidates.filter(c =>
+        containsIdentifier(fileContents.slice(c.open, c.closing + 1), loginRefs)
+      )
+    : candidates;
+
+  if (verified.length === 1) {
+    return {
+      openBracket: verified[0].open,
+      closingBracket: verified[0].closing,
+    };
+  }
+  if (verified.length > 1) {
+    console.error(
+      `patch: findSlashCommandListBounds: ${verified.length} arrays look like ` +
+        `the slash command list (at offsets ${verified.map(c => c.open).join(', ')}); ` +
+        'refusing to guess'
+    );
   }
 
   // Current Claude Code builds may store command objects in distant module
