@@ -13,6 +13,15 @@ const DIALOG =
 const COMMAND =
   'var wSo={type:"local-jsx",name:"plan",description:"Enable plan mode or view the current session plan",argumentHint:"[open|<description>]",requires:{ink:!0}},LUe=wSo;';
 
+const HANDLER_327 =
+  'async function me(r,s,w){let{getAppState:c,setAppState:f}=s,h=c(),y=h.toolPermissionContext.mode,a=y!=="plan";' +
+  'if(Et()){if(!bl())return PN(s.session.host)?.holdMode(()=>c().toolPermissionContext.mode),r(a?"Turned on plan mode":"Already in plan mode."),null;}' +
+  'let C=QT();FR(C);let R=await JIt(void 0,s.storageV5);' +
+  'let d=Me({content:l,origin:{kind:"human"}});' +
+  'let N=(i)=>e(T,{planContent:R});return r(N),null}';
+const COMMAND_327 =
+  'var Bls={type:"local-jsx",name:"plan",description:"Turn on plan mode or view the plan",argumentHint:"[open|<description>]",requires:{ink:!0}},jHe=Bls;';
+
 const modules = () =>
   new Map([
     ['/$bunfs/root/chunk-0ta1k7h1.js', HANDLER],
@@ -51,6 +60,28 @@ describe('writePlanExitCommand', () => {
       '"chunk_tjhhhqzz_js__Bot",{get:()=>Bot,'
     );
     expect(sources.get('/$bunfs/root/chunk-53bsrq2x.js')).toContain(
+      'argumentHint:"[open|exit|<description>]"'
+    );
+  });
+
+  it('supports the handler and command wording in CC 2.1.327', () => {
+    const sources = new Map([
+      ['/$bunfs/root/chunk-v7jd5y9q.js', HANDLER_327],
+      ['/$bunfs/root/chunk-cfxefa64.js', DIALOG],
+      ['/$bunfs/root/chunk-m14bt1pz.js', COMMAND_327],
+    ]);
+
+    expect(onGraph(sources)).toMatchObject({ applied: true, failed: false });
+    const handler = sources.get('/$bunfs/root/chunk-v7jd5y9q.js')!;
+    expect(handler).toContain(
+      'a=y!=="plan";if(w.trim()==="exit"){if(a)return r("Not in plan mode."),null;' +
+        'if(Et())return r("/plan exit is not available in cloud sessions. Ask Claude to exit plan mode."),null;' +
+        'let tccPath=QT(),tccPlan=await JIt(void 0,s.storageV5);'
+    );
+    expect(handler).toContain(
+      'initialMessage:{message:Me({content:"Implement the following plan:\\n\\n"'
+    );
+    expect(sources.get('/$bunfs/root/chunk-m14bt1pz.js')).toContain(
       'argumentHint:"[open|exit|<description>]"'
     );
   });

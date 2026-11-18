@@ -35,7 +35,7 @@ const DIALOG_PATTERN =
 
 /** Start of the /plan handler, up to "already in plan mode?". */
 const HANDLER_PATTERN =
-  /async function [$\w]+\(([$\w]+),([$\w]+),([$\w]+)\)\{let\{getAppState:[$\w]+,setAppState:([$\w]+)\}=\2,([$\w]+)=[$\w]+\(\)\.toolPermissionContext\.mode,([$\w]+)=\5!=="plan";/;
+  /async function [$\w]+\(([$\w]+),([$\w]+),([$\w]+)\)\{let\{getAppState:[$\w]+,setAppState:([$\w]+)\}=\2,(?:[$\w]+=[$\w]+\(\)\.toolPermissionContext\.mode|[$\w]+=[$\w]+\(\),[$\w]+=[$\w]+\.toolPermissionContext\.mode),([$\w]+)=[$\w]+!=="plan";/;
 
 /** Plan path and contents: let c=gv();Wh(c);let C=await YKe(void 0,o.storageV5); */
 const PLAN_PATTERN =
@@ -48,9 +48,8 @@ const USER_MESSAGE_PATTERN =
 /** JSX factory: e(b,{planContent:… */
 const JSX_PATTERN = /([$\w]+)\([$\w]+,\{planContent:/;
 
-/** Cloud-session branch: if(Ht()){if(!Ka())return i(d?"Enabled plan mode":"Already in plan mode."),null; */
-const CLOUD_PATTERN =
-  /if\(([$\w]+)\(\)\)\{if\(![$\w]+\(\)\)return [$\w]+\([$\w]+\?"Enabled plan mode":"Already in plan mode\."\),null;/;
+/** Cloud-session branch: if(Ht()){if(!Ka())return … */
+const CLOUD_PATTERN = /if\(([$\w]+)\(\)\)\{if\(![$\w]+\(\)\)return /;
 
 const PATCHED_MARKER = '.trim()==="exit"){if(';
 
@@ -61,8 +60,8 @@ const handlerReady = (file: string): boolean =>
   USER_MESSAGE_PATTERN.test(file) &&
   JSX_PATTERN.test(file);
 
-const ARGUMENT_HINT =
-  'name:"plan",description:"Enable plan mode or view the current session plan",argumentHint:"[open|';
+const ARGUMENT_HINT_PATTERN =
+  /name:"plan",description:"(?:Enable plan mode or view the current session plan|Turn on plan mode or view the plan)",argumentHint:"\[open\|/;
 
 const dialogReference = (file: string): string | null => {
   const local = file.match(DIALOG_PATTERN)?.[1];
@@ -103,7 +102,7 @@ const patchHandler = (file: string): string | null => {
     return null;
   }
 
-  const [, done, ctx, args, setAppState, , notPlan] = handler;
+  const [, done, ctx, args, setAppState, notPlan] = handler;
   const [, , planPath, , readPlan] = plan;
   // Cloud sessions keep the plan in the cloud workspace, and the dialog's
   // answer queues a local message, so decline there instead of reading a
@@ -136,9 +135,9 @@ const patchHandler = (file: string): string | null => {
 
 /** Advertise the new argument: argumentHint:"[open|<description>]" */
 const patchArgumentHint = (file: string): string | null => {
-  const index = file.indexOf(ARGUMENT_HINT);
-  if (index === -1) return null;
-  const insertIndex = index + ARGUMENT_HINT.length;
+  const match = file.match(ARGUMENT_HINT_PATTERN);
+  if (!match || match.index === undefined) return null;
+  const insertIndex = match.index + match[0].length;
   if (file.startsWith('exit|', insertIndex)) return file;
   const newFile =
     file.slice(0, insertIndex) + 'exit|' + file.slice(insertIndex);
