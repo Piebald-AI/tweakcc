@@ -3,6 +3,16 @@ import * as path from 'path';
 import type { StringsFile } from './systemPromptSync';
 import { PROMPT_CACHE_DIR } from './config';
 
+/** tweakcc has not published prompt data for this Claude Code version (yet). */
+export class PromptsNotPublishedError extends Error {
+  constructor(version: string) {
+    super(
+      `Prompts file not found for Claude Code v${version}. This version was released within the past day or so and will be supported within a few hours.`
+    );
+    this.name = 'PromptsNotPublishedError';
+  }
+}
+
 /**
  * Downloads the strings file for a given CC version from GitHub
  * Checks cache first before downloading
@@ -29,14 +39,15 @@ export async function downloadStringsFile(
     // Fetch the file from GitHub
     const response = await fetch(url);
 
+    if (response.status === 404) {
+      throw new PromptsNotPublishedError(version);
+    }
     if (!response.ok) {
       // Provide specific error messages for common HTTP errors
       let errorMessage: string;
       if (response.status === 429) {
         errorMessage =
           'Rate limit exceeded. GitHub has temporarily blocked requests. Please wait a few minutes and try again.';
-      } else if (response.status === 404) {
-        errorMessage = `Prompts file not found for Claude Code v${version}. This version was released within the past day or so and will be supported within a few hours.`;
       } else if (response.status >= 500) {
         errorMessage = `GitHub server error (${response.status}). Please try again later.`;
       } else {

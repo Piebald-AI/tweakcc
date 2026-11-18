@@ -90,6 +90,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     allowBypassPermissionsInSudo: false,
     suppressNativeInstallerWarning: false,
     filterScrollEscapeSequences: false,
+    tmuxGraphicsPassthrough: false,
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
     enableContextLimitOverride: false,
@@ -99,7 +100,10 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableChannelsMode: false,
     disableCtrlZSuspend: false,
     skipSkillShellValidation: false,
+    skipTrustDialog: false,
+    skipDevChannelsDialog: false,
     preventUpdateToUnsupportedVersions: false,
+    keepPatchedBinaryOnUpdate: true,
     webFetchUserAgent: null as string | null,
     shimmer: { ...DEFAULT_SETTINGS.misc.shimmer },
   };
@@ -581,6 +585,33 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         },
       },
       {
+        id: 'skipDevChannelsDialog',
+        title: 'Skip development channels warning',
+        description:
+          'Accept the "Loading development channels" warning shown by --dangerously-load-development-channels automatically.',
+        getValue: () => settings.misc?.skipDevChannelsDialog ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.skipDevChannelsDialog =
+              !settings.misc!.skipDevChannelsDialog;
+          });
+        },
+      },
+      {
+        id: 'skipTrustDialog',
+        title: 'Skip workspace trust dialog',
+        description:
+          'Trust every folder Claude Code starts in without asking, as if you chose "Yes, I trust this folder". Only enable this if you never open untrusted code.',
+        getValue: () => settings.misc?.skipTrustDialog ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.skipTrustDialog = !settings.misc!.skipTrustDialog;
+          });
+        },
+      },
+      {
         id: 'enableContextLimitOverride',
         title: 'Override context limit',
         description:
@@ -790,6 +821,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         },
       },
       {
+        id: 'tmuxGraphicsPassthrough',
+        title: 'tmux graphics passthrough',
+        description:
+          'Show images inside tmux by wrapping kitty graphics in tmux passthrough. Needs `set -g allow-passthrough on` in tmux and CLAUDE_CODE_FORCE_TERMINAL_IMAGES=1.',
+        getValue: () => settings.misc?.tmuxGraphicsPassthrough ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.tmuxGraphicsPassthrough =
+              !settings.misc!.tmuxGraphicsPassthrough;
+          });
+        },
+      },
+      {
         id: 'allowCustomAgentModels',
         title: 'Allow custom agent models',
         description:
@@ -829,6 +874,21 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.preventUpdateToUnsupportedVersions =
               !settings.misc!.preventUpdateToUnsupportedVersions;
+          });
+        },
+      },
+      {
+        id: 'keepPatchedBinaryOnUpdate',
+        title: 'Keep patched binary on update',
+        description:
+          "Native installs only. Claude Code's installer keeps the exact binary tweakcc wrote (SHA-256 recorded in applied.json) instead of re-downloading it. Any other change to the binary is still repaired.",
+        getValue: () => settings.misc?.keepPatchedBinaryOnUpdate ?? true,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.keepPatchedBinaryOnUpdate = !(
+              settings.misc!.keepPatchedBinaryOnUpdate ?? true
+            );
           });
         },
       },

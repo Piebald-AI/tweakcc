@@ -55,7 +55,8 @@ const DEFAULT_ON_WITHOUT_VERSION_GATE = new Set<PatchId>([
 export function isPatchEnabledByConfig(
   id: PatchId,
   config: TweakccConfig,
-  version: string | null | undefined
+  version: string | null | undefined,
+  nativeInstall = true
 ): boolean {
   const misc = config.settings.misc;
   const modelCustomizationsEnabled = misc?.enableModelCustomizations ?? true;
@@ -168,6 +169,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.suppressNativeInstallerWarning;
     case 'filter-scroll-escape-sequences':
       return !!misc?.filterScrollEscapeSequences;
+    case 'tmux-graphics-passthrough':
+      return !!misc?.tmuxGraphicsPassthrough;
     case 'allow-custom-agent-models':
       return !!misc?.allowCustomAgentModels;
     case 'worktree-mode':
@@ -204,8 +207,14 @@ export function isPatchEnabledByConfig(
       return !!misc?.skipSkillShellValidation;
     case 'shimmer-style':
       return isShimmerCustomized(misc?.shimmer);
+    case 'skip-dev-channels-dialog':
+      return !!misc?.skipDevChannelsDialog;
+    case 'skip-trust-dialog':
+      return !!misc?.skipTrustDialog;
     case 'prevent-unsupported-updates':
       return !!misc?.preventUpdateToUnsupportedVersions;
+    case 'keep-patched-binary':
+      return nativeInstall && (misc?.keepPatchedBinaryOnUpdate ?? true);
     case 'webfetch-user-agent':
       return !!misc?.webFetchUserAgent;
     default:
@@ -217,7 +226,8 @@ export function isPatchEnabledByConfig(
 export function getPlannedPatches(
   config: TweakccConfig,
   version: string | null | undefined,
-  patchFilter?: string[] | null
+  patchFilter?: string[] | null,
+  nativeInstall = true
 ): PlannedPatch[] {
   const planned: PlannedPatch[] = [];
 
@@ -225,7 +235,7 @@ export function getPlannedPatches(
     if (patchFilter && !patchFilter.includes(def.id)) {
       continue;
     }
-    if (!isPatchEnabledByConfig(def.id, config, version)) {
+    if (!isPatchEnabledByConfig(def.id, config, version, nativeInstall)) {
       continue;
     }
     planned.push({

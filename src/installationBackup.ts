@@ -10,6 +10,7 @@ import { clearAllAppliedHashes } from './systemPromptHashIndex';
 import { debug, replaceFileBreakingHardLinks, doesFileExist } from './utils';
 import { extractVersion } from './installationDetection';
 import { ClaudeCodeInstallationInfo } from './types';
+import { sha256File } from './appliedRecord';
 
 export const backupClijs = async (ccInstInfo: ClaudeCodeInstallationInfo) => {
   // Only backup cli.js for NPM installs (when cliPath is set)
@@ -25,6 +26,38 @@ export const backupClijs = async (ccInstInfo: ClaudeCodeInstallationInfo) => {
     config.changesApplied = false;
     config.ccVersion = ccInstInfo.version;
   });
+};
+
+const RELEASES_URL = 'https://downloads.claude.ai/claude-code-releases';
+
+/**
+ * Whether `binaryPath` is byte-for-byte an official Claude Code `version`
+ * build: its SHA-256 is one of the platform checksums in that version's
+ * release manifest. Network or format errors mean "not proven".
+ */
+export const isOfficialReleaseBinary = async (
+  binaryPath: string,
+  version: string
+): Promise<boolean> => {
+  try {
+    const response = await fetch(
+      `${RELEASES_URL}/${encodeURIComponent(version)}/manifest.json`,
+      { signal: AbortSignal.timeout(15000) }
+    );
+    if (!response.ok) return false;
+    const manifest = (await response.json()) as {
+      version?: string;
+      platforms?: Record<string, { checksum?: string }>;
+    };
+    if (manifest.version !== version) return false;
+    const checksums = new Set(
+      Object.values(manifest.platforms ?? {}).map(p => p.checksum)
+    );
+    return checksums.has(await sha256File(binaryPath));
+  } catch (error) {
+    debug(`isOfficialReleaseBinary: ${error}`);
+    return false;
+  }
 };
 
 /**

@@ -3,10 +3,12 @@ import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 
 import {
+  APPLIED_RECORD_FILE,
   CONFIG_DIR,
   NATIVE_BINARY_BACKUP_FILE,
   updateConfigFile,
 } from '../config';
+import { recordAppliedBinary } from '../appliedRecord';
 import { ClaudeCodeInstallationInfo, TweakccConfig } from '../types';
 import type { NativeBunGraph } from '../nativeInstallation';
 import { debug, replaceFileBreakingHardLinks } from '../utils';
@@ -85,10 +87,13 @@ import { writeAutoAcceptPlanMode } from './autoAcceptPlanMode';
 import { writeAllowBypassPermsInSudo } from './allowBypassPermsInSudo';
 import { writeSuppressNativeInstallerWarning } from './suppressNativeInstallerWarning';
 import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
+import { writeTmuxGraphicsPassthrough } from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
+import { writeSkipDevChannelsDialog } from './skipDevChannelsDialog';
+import { writeSkipTrustDialog } from './skipTrustDialog';
 import { writeDisableCtrlZSuspend } from './disableCtrlZSuspend';
 import { writeWebFetchUserAgent } from './webFetchUserAgent';
 import { writeSkipSkillShellValidation } from './skipSkillShellValidation';
@@ -104,6 +109,7 @@ import { writeClearScreen } from './clearScreen';
 import { writeSessionColor } from './sessionColor';
 import { writeKeybindingCustomization } from './keybindingCustomization';
 import { writePlanExitCommand } from './planExitCommand';
+import { writeFixInputTaskListOverflow } from './fixInputTaskListOverflow';
 import {
   restoreNativeBinaryFromBackup,
   restoreClijsFromBackup,
@@ -113,6 +119,7 @@ import {
   writePreventUnsupportedUpdates,
   writePreventUnsupportedUpdatesModules,
 } from './preventUnsupportedUpdates';
+import { writeKeepPatchedBinary } from './keepPatchedBinary';
 
 export { showDiff, showPositionalDiff, globalReplace } from './patchDiffing';
 export {
@@ -236,6 +243,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.ALWAYS_APPLIED,
     description:
       'Add /plan exit to open the plan approval dialog without a model turn',
+  },
+  {
+    id: 'fix-input-task-list-overflow',
+    name: 'Fix input overflow with task list',
+    group: PatchGroup.ALWAYS_APPLIED,
+    description:
+      'Keep the fullscreen prompt input on screen while the task list is expanded',
   },
   // Misc Configurable
   {
@@ -449,6 +463,13 @@ const PATCH_DEFINITIONS = [
     description:
       'Filter out terminal escape sequences that cause unwanted scrolling',
   },
+  {
+    id: 'tmux-graphics-passthrough',
+    name: 'tmux graphics passthrough',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'Images show inside tmux (needs allow-passthrough on and CLAUDE_CODE_FORCE_TERMINAL_IMAGES=1)',
+  },
   // Features
   {
     id: 'allow-custom-agent-models',
@@ -541,10 +562,31 @@ const PATCH_DEFINITIONS = [
     description: 'Spinner message shimmer will be toggled, sped up, or widened',
   },
   {
+    id: 'skip-dev-channels-dialog',
+    name: 'Skip development channels warning',
+    group: PatchGroup.FEATURES,
+    description:
+      'Accept the --dangerously-load-development-channels warning automatically',
+  },
+  {
+    id: 'skip-trust-dialog',
+    name: 'Skip workspace trust dialog',
+    group: PatchGroup.FEATURES,
+    description:
+      'Trust every folder without asking, as if you chose "Yes, I trust this folder"',
+  },
+  {
     id: 'prevent-unsupported-updates',
     name: 'Prevent unsupported updates',
     group: PatchGroup.MISC_CONFIGURABLE,
     description: 'Native/npm auto-updates require a published prompt snapshot',
+  },
+  {
+    id: 'keep-patched-binary',
+    name: 'Keep patched binary on update',
+    group: PatchGroup.MISC_CONFIGURABLE,
+    description:
+      'The native installer keeps the binary tweakcc wrote instead of re-downloading it',
   },
   {
     id: 'webfetch-user-agent',
@@ -727,6 +769,9 @@ export const buildPatchImplementations = (
     },
     'plan-exit-command': {
       fn: c => writePlanExitCommand(c),
+    },
+    'fix-input-task-list-overflow': {
+      fn: c => writeFixInputTaskListOverflow(c),
     },
     // Misc Configurable
     'patches-applied-indication': {
@@ -921,6 +966,10 @@ export const buildPatchImplementations = (
       fn: c => writeScrollEscapeSequenceFilter(c),
       condition: !!config.settings.misc?.filterScrollEscapeSequences,
     },
+    'tmux-graphics-passthrough': {
+      fn: c => writeTmuxGraphicsPassthrough(c),
+      condition: !!config.settings.misc?.tmuxGraphicsPassthrough,
+    },
     // Features
     'allow-custom-agent-models': {
       fn: c => writeAllowCustomAgentModels(c),
@@ -1005,6 +1054,14 @@ export const buildPatchImplementations = (
       fn: c => writeShimmerStyle(c, config.settings.misc!.shimmer),
       condition: isShimmerCustomized(config.settings.misc?.shimmer),
     },
+    'skip-dev-channels-dialog': {
+      fn: c => writeSkipDevChannelsDialog(c),
+      condition: !!config.settings.misc?.skipDevChannelsDialog,
+    },
+    'skip-trust-dialog': {
+      fn: c => writeSkipTrustDialog(c),
+      condition: !!config.settings.misc?.skipTrustDialog,
+    },
     // npm monolith only. Native builds spread the updater over several
     // modules; applyCustomization patches the whole module graph at once.
     'prevent-unsupported-updates': {
@@ -1013,6 +1070,12 @@ export const buildPatchImplementations = (
           ? null
           : writePreventUnsupportedUpdates(c),
       condition: !!config.settings.misc?.preventUpdateToUnsupportedVersions,
+    },
+    'keep-patched-binary': {
+      fn: c => writeKeepPatchedBinary(c, APPLIED_RECORD_FILE),
+      condition:
+        !!ccInstInfo.nativeInstallationPath &&
+        (config.settings.misc?.keepPatchedBinaryOnUpdate ?? true),
     },
     'webfetch-user-agent': {
       fn: c =>
@@ -1257,6 +1320,10 @@ export const applyCustomization = async (
         ccInstInfo.nativeInstallationPath!
       );
     }
+    await recordAppliedBinary(
+      ccInstInfo.nativeInstallationPath!,
+      ccInstInfo.version
+    );
     const updatedConfig = await updateConfigFile(cfg => {
       cfg.changesApplied = !allResults.some(result => result.failed);
       cfg.ccVersion = ccInstInfo.version;
@@ -1321,6 +1388,12 @@ export const applyCustomization = async (
     }
 
     await replaceFileBreakingHardLinks(ccInstInfo.cliPath, content, 'patch');
+  }
+  if (ccInstInfo.nativeInstallationPath) {
+    await recordAppliedBinary(
+      ccInstInfo.nativeInstallationPath,
+      ccInstInfo.version
+    );
   }
 
   const updatedConfig = await updateConfigFile(cfg => {

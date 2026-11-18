@@ -154,6 +154,8 @@ $ pnpm dlx tweakcc
   - [Shimmer style](#feature-shimmer-style)
   - [Input cursor color](#feature-input-cursor-color)
   - [`/plan exit`](#feature-plan-exit)
+  - [tmux graphics passthrough](#feature-tmux-graphics-passthrough)
+  - [Skip startup dialogs](#feature-skip-startup-dialogs)
   - _Missing documentation for above features coming soon_
 - [Configuration directory](#configuration-directory)
 - [Building from source](#building-from-source)
@@ -202,6 +204,53 @@ A published snapshot means prompt data is available, **not** that every patch in
 your installed TweakCC release supports that Claude Code version. A successful
 update replaces the patched executable, so **reapply TweakCC after updating** to
 restore this guard and your other customizations.
+
+## Keep customizations across Claude Code updates
+
+A native Claude Code install keeps every version under
+`~/.local/share/claude/versions/` and re-checks an already-installed version
+whenever it switches to it: `claude update`, `claude install <version>`, and the
+auto-updater of any Claude Code session still running an older version all hash
+the retained file and compare it with the checksum in Anthropic's signed release
+manifest. A tweakcc-patched binary never matches, so it is silently replaced by
+the stock build of the same version. `autoUpdates: false` in `~/.claude.json`
+does not prevent this on a native install (the native installer sets
+`autoUpdatesProtectedForNative`, which makes Claude Code ignore that setting);
+only `DISABLE_AUTOUPDATER=1` / `DISABLE_UPDATES=1` in the environment or in the
+`env` block of `settings.json` stop the automatic checks.
+
+tweakcc handles this in two parts:
+
+- **Keep patched binary on update** (`settings.misc.keepPatchedBinaryOnUpdate`,
+  default `true`, native installs only). Each `--apply` records the SHA-256 of the
+  binary it wrote in `applied.json` in the tweakcc config directory. The patched
+  installer still fetches and verifies the signed manifest, but treats a retained
+  binary as valid when its SHA-256 equals the value recorded for that path and
+  version. Any other modification is still repaired by a re-download, and new
+  downloads are verified exactly as before. The trade-off: Claude Code no longer
+  repairs that one file, and anything that can write both the binary and
+  `applied.json` (both are owned by your user) can make a modified binary persist.
+  Only binaries that already contain this patch apply the rule, so the first
+  update from a Claude Code process started before you applied it can still
+  replace the binary.
+- **Re-apply after Claude Code replaces the binary**: `tweakcc --install-hook`
+  adds a `SessionStart` hook (matcher `startup|resume`) to Claude Code's `settings.json`
+  (`$CLAUDE_CONFIG_DIR` or `~/.claude`). On each session start it checks, in about
+  0.2 s, whether the active binary is the one recorded in `applied.json`. If not
+  (a new version, or the same version downloaded again), it starts
+  `tweakcc --apply` **detached**, logs to `auto-apply.log`, shows a one-line
+  message, and returns immediately. The new customizations take effect the next
+  time Claude Code starts. A new version's binary becomes the backup only after
+  its SHA-256 is found in Anthropic's release manifest for that version, and
+  nothing is applied when tweakcc has no prompt data for the version yet. A failed
+  run is retried at most once an hour. The hook runs tweakcc with the Node and
+  script path that installed it, so install tweakcc globally rather than via
+  `npx`. Remove it with `tweakcc --remove-hook`. Restoring Claude Code
+  (`--restore`) clears `applied.json`, which also stops the hook from re-applying.
+
+On Linux, a systemd user path unit watching
+`~/.local/share/claude/versions/` that runs `tweakcc --apply --yes` is an
+alternative to the hook that also covers updates made while no session starts.
 
 ## CLI Commands
 
@@ -1267,6 +1316,54 @@ This has no effect when `CLAUDE_CODE_NATIVE_CURSOR=1` is set, because the termin
 
 `/plan exit` opens the plan approval dialog ("Ready to code?") right away, without a model turn. It is always applied. Outside plan mode it prints "Not in plan mode."
 
+## Feature: tmux graphics passthrough
+
+Claude Code draws images with the kitty graphics protocol, which works in kitty and Ghostty. Inside tmux, the images show as blank boxes: tmux drops the escape sequence that carries the picture and only lets the placeholder characters through. This patch wraps that sequence in tmux's passthrough, so the image reaches the outer terminal.
+
+It needs tmux 3.3 or later with passthrough enabled in `~/.tmux.conf`:
+
+```
+set -g allow-passthrough on
+```
+
+Claude Code also turns images off inside tmux by default, so set `CLAUDE_CODE_FORCE_TERMINAL_IMAGES=1` in your environment.
+
+**Via the UI:** Run `npx tweakcc`, go to **Misc**, and toggle **tmux graphics passthrough**.
+
+**Via `config.json`:**
+
+```json
+{
+  "settings": {
+    "misc": {
+      "tmuxGraphicsPassthrough": true
+    }
+  }
+}
+```
+
+## Feature: Skip startup dialogs
+
+Two patches remove confirmation dialogs Claude Code shows before a session starts:
+
+- **Skip workspace trust dialog** answers the "Accessing workspace" dialog with "Yes, I trust this folder", so every folder you start Claude Code in is trusted and saved as trusted, just as if you had picked that option. That includes folders whose settings run hooks, MCP servers, or helper commands, so only enable this if you never open code you don't trust.
+- **Skip development channels warning** answers the "Loading development channels" warning shown by `--dangerously-load-development-channels` with "I am using this for local development".
+
+**Via the UI:** Run `npx tweakcc`, go to **Misc**, and toggle **Skip workspace trust dialog** and/or **Skip development channels warning**.
+
+**Via `config.json`:**
+
+```json
+{
+  "settings": {
+    "misc": {
+      "skipTrustDialog": true,
+      "skipDevChannelsDialog": true
+    }
+  }
+}
+```
+
 ## Configuration directory
 
 tweakcc stores its configuration files in one of the following locations, in order of priority:
@@ -1412,6 +1509,7 @@ Other tools for customizing Claude Code or adding functionality to it:
 - [**ccstatusline**](https://github.com/sirmalloc/ccstatusline) - Highly customizable status line formatter for Claude Code CLI that displays model info, git branch, token usage, and other metrics in your terminal.
 - [**claude-powerline**](https://github.com/Owloops/claude-powerline) - Vim-style powerline statusline for Claude Code with real-time usage tracking, git integration, and custom themes.
 - [**CCometixLine**](https://github.com/Haleclipse/CCometixLine) - A high-performance Claude Code statusline tool written in Rust with Git integration, usage tracking, interactive TUI configuration, and Claude Code enhancement utilities.
+- [**statuslin.es**](https://statuslin.es) - Community gallery of Claude Code status lines and mods with previews recorded from their real output. Mods are reviewed and their installs are pinned to the reviewed commit.
 
 Forks:
 

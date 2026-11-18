@@ -7,6 +7,8 @@ import {
   escapeDepthZeroBackticks,
   escapeNonAsciiChars,
   interpolationReferences,
+  getPromptDataVersion,
+  isPromptEdited,
 } from '../systemPromptSync';
 import { setAppliedHash, computeMD5Hash } from '../systemPromptHashIndex';
 
@@ -168,6 +170,8 @@ export const applySystemPrompts = async (
 
   // Track per-prompt results
   const results: PatchResult[] = [];
+  const dataVersion = getPromptDataVersion();
+  const fromEarlierVersion = dataVersion !== null && dataVersion !== version;
 
   // Search for and replace each prompt in cli.js
   for (const {
@@ -462,6 +466,17 @@ export const applySystemPrompts = async (
         ...(hashFailed && { failed: true }),
         details,
       });
+    } else if (fromEarlierVersion) {
+      // The prompt data is from an earlier Claude Code version, so prompts
+      // that changed since then are expected to be missing. Patching an
+      // unedited prompt would change nothing; only an edited one is reported.
+      if (await isPromptEdited(promptId, prompt)) {
+        console.log(
+          chalk.yellow(
+            `Your edit to "${prompt.name}" is not applied yet: the prompt changed in Claude Code ${version}, and tweakcc has no prompt data for ${version} yet.`
+          )
+        );
+      }
     } else {
       // Temporarily skip patching these prompts because they're markdown in the npm install but HTML in the native.
       if (

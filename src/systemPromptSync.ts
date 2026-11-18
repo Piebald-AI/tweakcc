@@ -1,14 +1,17 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'path';
 import matter from 'gray-matter';
-import { downloadStringsFile } from './systemPromptDownload';
+import {
+  downloadStringsFile,
+  PromptsNotPublishedError,
+} from './systemPromptDownload';
 import {
   storeHashes,
   getPromptHash,
   computeMD5Hash,
 } from './systemPromptHashIndex';
 import chalk from 'chalk';
-import { SYSTEM_PROMPTS_DIR } from './config';
+import { PROMPT_CACHE_DIR, SYSTEM_PROMPTS_DIR } from './config';
 import { debug } from './utils';
 
 /**
@@ -975,6 +978,18 @@ export const hasIdentifierDrift = (
 };
 
 /**
+ * Whether the user edited a prompt file: its content no longer hashes to the
+ * text tweakcc wrote for its version.
+ */
+export const isPromptEdited = async (
+  promptId: string,
+  file: MarkdownPrompt
+): Promise<boolean> => {
+  const writtenHash = await getPromptHash(promptId, file.ccVersion);
+  return !writtenHash || writtenHash !== computeMD5Hash(file.content);
+};
+
+/**
  * Syncs a single prompt file with the current CC version
  * Similar to ensurePromptFile in config.ts but with version tracking
  */
@@ -1031,9 +1046,7 @@ export const syncPrompt = async (
     {
       // The file is out of date: based on an older version, or on the same
       // version but with drifted identifiers. Check if the user has modified it.
-      const oldHash = await getPromptHash(prompt.id, existingFile.ccVersion);
-      const currentHash = computeMD5Hash(existingFile.content);
-      const isModified = !oldHash || oldHash !== currentHash;
+      const isModified = await isPromptEdited(prompt.id, existingFile);
 
       if (isModified) {
         // User has modified the file
@@ -1110,7 +1123,7 @@ export const syncSystemPrompts = async (
   };
 
   // Download strings file for current CC version
-  const stringsFile = await downloadStringsFile(ccVersion);
+  const stringsFile = (await loadStringsFile(ccVersion)).file;
 
   // Store hashes for all prompts in this version
   await storeHashes(stringsFile);
@@ -1132,10 +1145,78 @@ export const syncSystemPrompts = async (
   return summary;
 };
 
+/** Earlier patch versions tried when looking for prompt data to fall back on. */
+const EARLIER_PATCH_VERSIONS = 10;
+
+/**
+ * The prompts file of the newest earlier Claude Code version: one of the
+ * previous patch versions (cached or published), else the newest cached file.
+ */
+const findEarlierStringsFile = async (
+  version: string
+): Promise<{ version: string; file: StringsFile } | null> => {
+  const [major, minor, patch] = version.split('.').map(Number);
+  for (let p = patch - 1; p >= 0 && p >= patch - EARLIER_PATCH_VERSIONS; p--) {
+    const earlier = `${major}.${minor}.${p}`;
+    try {
+      return { version: earlier, file: await downloadStringsFile(earlier) };
+    } catch (error) {
+      // Offline or rate-limited: only the cache can help.
+      if (!(error instanceof PromptsNotPublishedError)) break;
+    }
+  }
+
+  let cached: string[];
+  try {
+    cached = await fs.readdir(PROMPT_CACHE_DIR);
+  } catch {
+    return null;
+  }
+  const earlierCached = cached
+    .map(name => /^prompts-(\d+\.\d+\.\d+)\.json$/.exec(name)?.[1])
+    .filter(
+      (v): v is string => v !== undefined && compareVersions(v, version) < 0
+    )
+    .sort((a, b) => compareVersions(b, a));
+  for (const earlier of earlierCached) {
+    try {
+      const cachedFile = path.join(PROMPT_CACHE_DIR, `prompts-${earlier}.json`);
+      const file = JSON.parse(await fs.readFile(cachedFile, 'utf-8'));
+      return { version: earlier, file: file as StringsFile };
+    } catch {
+      // Unreadable cache file: try the next one.
+    }
+  }
+  return null;
+};
+
+/**
+ * The prompts file for a Claude Code version. Until tweakcc publishes one,
+ * the newest earlier file is used instead: every prompt whose text did not
+ * change is still found and patched. `dataVersion` is the version the file
+ * belongs to.
+ */
+export const loadStringsFile = async (
+  version: string
+): Promise<{ file: StringsFile; dataVersion: string }> => {
+  try {
+    return { file: await downloadStringsFile(version), dataVersion: version };
+  } catch (error) {
+    if (!(error instanceof PromptsNotPublishedError)) throw error;
+    const earlier = await findEarlierStringsFile(version);
+    if (!earlier) throw error;
+    return { file: earlier.file, dataVersion: earlier.version };
+  }
+};
+
 // Global cache for downloaded strings file to avoid multiple downloads
 // This is loaded once at app startup and reused throughout the session
 let globalStringsFile: StringsFile | null = null;
 let globalCachedVersion: string | null = null;
+let globalDataVersion: string | null = null;
+
+/** The Claude Code version of the preloaded prompt data. */
+export const getPromptDataVersion = (): string | null => globalDataVersion;
 
 /**
  * Preloads the strings file for a given version into global cache
@@ -1147,14 +1228,23 @@ export const preloadStringsFile = async (
   version: string
 ): Promise<{ success: boolean; errorMessage?: string }> => {
   try {
-    const stringsFile = await downloadStringsFile(version);
-    globalStringsFile = stringsFile;
+    const { file, dataVersion } = await loadStringsFile(version);
+    globalStringsFile = file;
     globalCachedVersion = version;
+    globalDataVersion = dataVersion;
+    if (dataVersion !== version) {
+      console.log(
+        chalk.yellow(
+          `tweakcc has no prompt data for Claude Code ${version} yet; using the ${dataVersion} data, so prompts that changed in ${version} are left as they are.`
+        )
+      );
+    }
     return { success: true };
   } catch (error) {
     // If download fails, just leave global cache as null
     globalStringsFile = null;
     globalCachedVersion = null;
+    globalDataVersion = null;
 
     // Return the error message for display
     if (error instanceof Error) {

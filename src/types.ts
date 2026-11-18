@@ -140,6 +140,7 @@ export interface MiscConfig {
   allowBypassPermissionsInSudo: boolean | null;
   suppressNativeInstallerWarning: boolean;
   filterScrollEscapeSequences: boolean;
+  tmuxGraphicsPassthrough: boolean;
   enableWorktreeMode: boolean;
   allowCustomAgentModels: boolean;
   enableContextLimitOverride: boolean;
@@ -149,7 +150,10 @@ export interface MiscConfig {
   enableChannelsMode: boolean;
   disableCtrlZSuspend: boolean;
   skipSkillShellValidation: boolean;
+  skipTrustDialog: boolean;
+  skipDevChannelsDialog: boolean;
   preventUpdateToUnsupportedVersions: boolean;
+  keepPatchedBinaryOnUpdate: boolean;
   webFetchUserAgent: string | null;
   shimmer: ShimmerConfig;
 }
