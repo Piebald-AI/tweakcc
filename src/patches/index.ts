@@ -1239,7 +1239,12 @@ export const applyCustomization = async (
 
     const replacements = changedModuleSources(nativeGraph, graphSources);
     for (const [name, contents] of replacements)
-      assertPatchedModuleParses(name, contents.toString('utf8'));
+      assertPatchedModuleParses(name, contents.toString('utf8'), () =>
+        javaScriptModuleSources({
+          ...nativeGraph,
+          modules: nativeGraph.modules.filter(module => module.name === name),
+        }).get(name)
+      );
     for (const [name, contents] of changedModuleSources(
       nativeGraph,
       textPromptSources
