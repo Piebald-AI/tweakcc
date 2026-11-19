@@ -31,11 +31,11 @@ import { escapeIdent, showDiff } from './index';
 
 /** The ExitPlanMode dialog: function Bot({payload:h,answer:A,wouldTakeAnswer:L}){…showClearContextOnPlanAccept */
 const DIALOG_PATTERN =
-  /function ([$\w]+)\(\{payload:[$\w]+,answer:[$\w]+,wouldTakeAnswer:[$\w]+\}\)\{[^]{0,800}?\.showClearContextOnPlanAccept\)/;
+  /(?:^|[,;{}])function ([$\w]+)\(\{payload:[$\w]+,answer:[$\w]+,wouldTakeAnswer:[$\w]+\}\)\{[^]{0,800}?\.showClearContextOnPlanAccept\)/;
 
 /** Start of the /plan handler, up to "already in plan mode?". */
 const HANDLER_PATTERN =
-  /async function [$\w]+\(([$\w]+),([$\w]+),([$\w]+)\)\{let\{getAppState:[$\w]+,setAppState:([$\w]+)\}=\2,(?:[$\w]+=[$\w]+\(\)\.toolPermissionContext\.mode|[$\w]+=[$\w]+\(\),[$\w]+=[$\w]+\.toolPermissionContext\.mode),([$\w]+)=[$\w]+!=="plan";/;
+  /(?:^|[,;{}])async function [$\w]+\(([$\w]+),([$\w]+),([$\w]+)\)\{let\{getAppState:[$\w]+,setAppState:([$\w]+)\}=\2,(?:[$\w]+=[$\w]+\(\)\.toolPermissionContext\.mode|[$\w]+=[$\w]+\(\),[$\w]+=[$\w]+\.toolPermissionContext\.mode),([$\w]+)=[$\w]+!=="plan";/;
 
 /** Plan path and contents: let c=gv();Wh(c);let C=await YKe(void 0,o.storageV5); */
 const PLAN_PATTERN =
@@ -50,15 +50,29 @@ const JSX_PATTERN = /([$\w]+)\([$\w]+,\{planContent:/;
 
 const PATCHED_MARKER = '.trim()==="exit"){if(';
 
+const findPlanAfterHandler = (
+  file: string,
+  handler: RegExpMatchArray
+): RegExpMatchArray | null => {
+  if (handler.index === undefined) return null;
+  const pattern = new RegExp(PLAN_PATTERN.source, `${PLAN_PATTERN.flags}g`);
+  pattern.lastIndex = handler.index + handler[0].length;
+  return pattern.exec(file);
+};
+
 /** Everything patchHandler needs from the module that holds the handler. */
-const handlerReady = (file: string): boolean =>
-  HANDLER_PATTERN.test(file) &&
-  PLAN_PATTERN.test(file) &&
-  USER_MESSAGE_PATTERN.test(file) &&
-  JSX_PATTERN.test(file);
+const handlerReady = (file: string): boolean => {
+  const handler = file.match(HANDLER_PATTERN);
+  return (
+    handler !== null &&
+    findPlanAfterHandler(file, handler) !== null &&
+    USER_MESSAGE_PATTERN.test(file) &&
+    JSX_PATTERN.test(file)
+  );
+};
 
 const ARGUMENT_HINT_PATTERN =
-  /name:"plan",description:"(?:Enable plan mode or view the current session plan|Turn on plan mode or view the plan)",argumentHint:"\[open\|/;
+  /(?:^|[,;{}])name:"plan",description:"(?:Enable plan mode or view the current session plan|Turn on plan mode or view the plan)",argumentHint:"\[open\|/;
 
 const dialogReference = (file: string): string | null => {
   const local = file.match(DIALOG_PATTERN)?.[1];
@@ -78,7 +92,7 @@ const dialogReference = (file: string): string | null => {
 const patchHandler = (file: string): string | null => {
   if (file.includes(PATCHED_MARKER)) return file;
   const handler = file.match(HANDLER_PATTERN);
-  const plan = file.match(PLAN_PATTERN);
+  const plan = handler ? findPlanAfterHandler(file, handler) : null;
   const userMessage = file.match(USER_MESSAGE_PATTERN)?.[1];
   const jsx = file.match(JSX_PATTERN)?.[1];
   if (
@@ -107,7 +121,7 @@ const patchHandler = (file: string): string | null => {
   // stale or missing local plan. Accept the newer holdMode return prefix
   // without confusing an earlier cloud-like branch for the /plan check.
   const cloudPattern = new RegExp(
-    `if\\(([$\\w]+)\\(\\)\\)\\{if\\(![$\\w]+\\(\\)\\)return [^};]{0,500}?${escapeIdent(done)}\\(${escapeIdent(notPlan)}\\?"(?:Enabled plan mode|Turned on plan mode)":"Already in plan mode\\."\\),null;`
+    `(?:^|[,;{}])if\\(([$\\w]+)\\(\\)\\)\\{if\\(![$\\w]+\\(\\)\\)return [^};]{0,500}?${escapeIdent(done)}\\(${escapeIdent(notPlan)}\\?"(?:Enabled plan mode|Turned on plan mode)":"Already in plan mode\\."\\),null;`
   );
   const cloud = file.slice(handler.index, plan.index).match(cloudPattern)?.[1];
   const insertion =

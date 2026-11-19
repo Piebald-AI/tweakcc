@@ -107,6 +107,28 @@ describe('writePlanExitCommand', () => {
     );
   });
 
+  it('uses the plan read inside the handler when an earlier match exists', () => {
+    const decoy =
+      'let X=DecoyPath();DecoyEnsure(X);let Y=await DecoyRead(void 0,s.storageV5);';
+    const sources = new Map([
+      ['/$bunfs/root/chunk-v7jd5y9q.js', decoy + HANDLER_327],
+      ['/$bunfs/root/chunk-cfxefa64.js', DIALOG],
+      ['/$bunfs/root/chunk-m14bt1pz.js', COMMAND_327],
+    ]);
+
+    expect(onGraph(sources)).toMatchObject({ applied: true, failed: false });
+    const handler = sources.get('/$bunfs/root/chunk-v7jd5y9q.js')!;
+    expect(handler).toContain(
+      'let tccPath=QT(),tccPlan=await JIt(void 0,s.storageV5);'
+    );
+    expect(handler).not.toContain(
+      'let tccPath=DecoyPath(),tccPlan=await DecoyRead'
+    );
+    expect(handler).toContain(
+      'if(Et())return r("/plan exit is not available in cloud sessions.'
+    );
+  });
+
   it('leaves an already patched graph unchanged', () => {
     const sources = modules();
     onGraph(sources);
