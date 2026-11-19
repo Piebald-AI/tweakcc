@@ -76,6 +76,7 @@ const findBlockEnd = (file: string, open: number): number => {
   let regexClass = false;
   let previousSignificant = '';
   let currentWord = '';
+  let wordStart = -1;
 
   for (let index = open; index < file.length; index++) {
     const char = file[index];
@@ -99,6 +100,7 @@ const findBlockEnd = (file: string, open: number): number => {
         state = 'code';
         previousSignificant = 'x';
         currentWord = '';
+        wordStart = -1;
       }
       continue;
     }
@@ -111,6 +113,7 @@ const findBlockEnd = (file: string, open: number): number => {
         state = 'code';
         previousSignificant = 'x';
         currentWord = '';
+        wordStart = -1;
       }
       continue;
     }
@@ -132,7 +135,9 @@ const findBlockEnd = (file: string, open: number): number => {
       continue;
     }
     if (char === '/') {
-      const beforeWord = file.slice(0, index - currentWord.length).trimEnd();
+      const beforeWord = file
+        .slice(0, currentWord ? wordStart : index)
+        .trimEnd();
       const propertyAccess =
         beforeWord.endsWith('.') && !beforeWord.endsWith('...');
       if (
@@ -144,6 +149,7 @@ const findBlockEnd = (file: string, open: number): number => {
         regexClass = false;
         escape = false;
         currentWord = '';
+        wordStart = -1;
         continue;
       }
     }
@@ -151,8 +157,13 @@ const findBlockEnd = (file: string, open: number): number => {
     else if (char === '}' && --depth === 0) return index + 1;
 
     if (/\s/.test(char)) continue;
-    if (/[A-Za-z0-9_$]/.test(char)) currentWord += char;
-    else currentWord = '';
+    if (/[A-Za-z0-9_$]/.test(char)) {
+      if (!currentWord) wordStart = index;
+      currentWord += char;
+    } else {
+      currentWord = '';
+      wordStart = -1;
+    }
     previousSignificant = char;
   }
   return -1;
