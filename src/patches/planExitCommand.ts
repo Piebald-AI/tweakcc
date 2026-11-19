@@ -27,15 +27,15 @@ import {
   isGraphContextActive,
   requestImport,
 } from './graphContext';
-import { showDiff } from './index';
+import { escapeIdent, showDiff } from './index';
 
 /** The ExitPlanMode dialog: function Bot({payload:h,answer:A,wouldTakeAnswer:L}){…showClearContextOnPlanAccept */
 const DIALOG_PATTERN =
-  /function ([$\w]+)\(\{payload:[$\w]+,answer:[$\w]+,wouldTakeAnswer:[$\w]+\}\)\{[^]{0,800}?\.showClearContextOnPlanAccept\)/;
+  /(?:^|[,;{}])function ([$\w]+)\(\{payload:[$\w]+,answer:[$\w]+,wouldTakeAnswer:[$\w]+\}\)\{[^]{0,800}?\.showClearContextOnPlanAccept\)/;
 
 /** Start of the /plan handler, up to "already in plan mode?". */
 const HANDLER_PATTERN =
-  /async function [$\w]+\(([$\w]+),([$\w]+),([$\w]+)\)\{let\{getAppState:[$\w]+,setAppState:([$\w]+)\}=\2,([$\w]+)=[$\w]+\(\)\.toolPermissionContext\.mode,([$\w]+)=\5!=="plan";/;
+  /(?:^|[,;{}])async function [$\w]+\(([$\w]+),([$\w]+),([$\w]+)\)\{let\{getAppState:[$\w]+,setAppState:([$\w]+)\}=\2,(?:[$\w]+=[$\w]+\(\)\.toolPermissionContext\.mode|[$\w]+=[$\w]+\(\),[$\w]+=[$\w]+\.toolPermissionContext\.mode),([$\w]+)=[$\w]+!=="plan";/;
 
 /** Plan path and contents: let c=gv();Wh(c);let C=await YKe(void 0,o.storageV5); */
 const PLAN_PATTERN =
@@ -48,21 +48,157 @@ const USER_MESSAGE_PATTERN =
 /** JSX factory: e(b,{planContent:… */
 const JSX_PATTERN = /([$\w]+)\([$\w]+,\{planContent:/;
 
-/** Cloud-session branch: if(Ht()){if(!Ka())return i(d?"Enabled plan mode":"Already in plan mode."),null; */
-const CLOUD_PATTERN =
-  /if\(([$\w]+)\(\)\)\{if\(![$\w]+\(\)\)return [$\w]+\([$\w]+\?"Enabled plan mode":"Already in plan mode\."\),null;/;
-
 const PATCHED_MARKER = '.trim()==="exit"){if(';
 
-/** Everything patchHandler needs from the module that holds the handler. */
-const handlerReady = (file: string): boolean =>
-  HANDLER_PATTERN.test(file) &&
-  PLAN_PATTERN.test(file) &&
-  USER_MESSAGE_PATTERN.test(file) &&
-  JSX_PATTERN.test(file);
+const REGEX_KEYWORDS = new Set([
+  'await',
+  'case',
+  'delete',
+  'do',
+  'else',
+  'in',
+  'instanceof',
+  'of',
+  'return',
+  'throw',
+  'typeof',
+  'void',
+  'yield',
+]);
 
-const ARGUMENT_HINT =
-  'name:"plan",description:"Enable plan mode or view the current session plan",argumentHint:"[open|';
+/** Index just past the `}` closing the block that opens at `open`. */
+const findBlockEnd = (file: string, open: number): number => {
+  let depth = 0;
+  let state: 'code' | 'string' | 'regex' | 'lineComment' | 'blockComment' =
+    'code';
+  let quote = '';
+  let escape = false;
+  let regexClass = false;
+  let previousSignificant = '';
+  let currentWord = '';
+  let wordStart = -1;
+
+  for (let index = open; index < file.length; index++) {
+    const char = file[index];
+    const next = file[index + 1];
+
+    if (state === 'lineComment') {
+      if (char === '\n' || char === '\r') state = 'code';
+      continue;
+    }
+    if (state === 'blockComment') {
+      if (char === '*' && next === '/') {
+        state = 'code';
+        index++;
+      }
+      continue;
+    }
+    if (state === 'string') {
+      if (escape) escape = false;
+      else if (char === '\\') escape = true;
+      else if (char === quote) {
+        state = 'code';
+        previousSignificant = 'x';
+        currentWord = '';
+        wordStart = -1;
+      }
+      continue;
+    }
+    if (state === 'regex') {
+      if (escape) escape = false;
+      else if (char === '\\') escape = true;
+      else if (char === '[') regexClass = true;
+      else if (char === ']') regexClass = false;
+      else if (char === '/' && !regexClass) {
+        state = 'code';
+        previousSignificant = 'x';
+        currentWord = '';
+        wordStart = -1;
+      }
+      continue;
+    }
+
+    if (char === '/' && next === '/') {
+      state = 'lineComment';
+      index++;
+      continue;
+    }
+    if (char === '/' && next === '*') {
+      state = 'blockComment';
+      index++;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      state = 'string';
+      quote = char;
+      escape = false;
+      continue;
+    }
+    if (char === '/') {
+      const beforeWord = file
+        .slice(0, currentWord ? wordStart : index)
+        .trimEnd();
+      const propertyAccess =
+        beforeWord.endsWith('.') && !beforeWord.endsWith('...');
+      if (
+        !previousSignificant ||
+        '([{=,:;!?&|+-*%^~<>'.includes(previousSignificant) ||
+        (REGEX_KEYWORDS.has(currentWord) && !propertyAccess)
+      ) {
+        state = 'regex';
+        regexClass = false;
+        escape = false;
+        currentWord = '';
+        wordStart = -1;
+        continue;
+      }
+    }
+    if (char === '{') depth++;
+    else if (char === '}' && --depth === 0) return index + 1;
+
+    if (/\s/.test(char)) continue;
+    if (/[A-Za-z0-9_$]/.test(char)) {
+      if (!currentWord) wordStart = index;
+      currentWord += char;
+    } else {
+      currentWord = '';
+      wordStart = -1;
+    }
+    previousSignificant = char;
+  }
+  return -1;
+};
+
+const findPlanAfterHandler = (
+  file: string,
+  handler: RegExpMatchArray
+): RegExpMatchArray | null => {
+  if (handler.index === undefined) return null;
+  const bodyOpen =
+    handler.index +
+    handler[0].indexOf('{', handler[0].indexOf('async function'));
+  const handlerEnd = findBlockEnd(file, bodyOpen);
+  if (handlerEnd === -1) return null;
+  const searchStart = handler.index + handler[0].length;
+  const match = file.slice(searchStart, handlerEnd).match(PLAN_PATTERN);
+  if (!match || match.index === undefined) return null;
+  match.index += searchStart;
+  return match;
+};
+
+/** Everything patchHandler needs from the module that holds the handler. */
+const handlerReady = (file: string): boolean => {
+  const handler = file.match(HANDLER_PATTERN);
+  return (
+    handler !== null &&
+    findPlanAfterHandler(file, handler) !== null &&
+    USER_MESSAGE_PATTERN.test(file) &&
+    JSX_PATTERN.test(file)
+  );
+};
+
+const ARGUMENT_HINT_PATTERN =
+  /(?:^|[,;{}])name:"plan",description:"(?:Enable plan mode or view the current session plan|Turn on plan mode or view the plan)",argumentHint:"\[open\|/;
 
 const dialogReference = (file: string): string | null => {
   const local = file.match(DIALOG_PATTERN)?.[1];
@@ -82,13 +218,14 @@ const dialogReference = (file: string): string | null => {
 const patchHandler = (file: string): string | null => {
   if (file.includes(PATCHED_MARKER)) return file;
   const handler = file.match(HANDLER_PATTERN);
-  const plan = file.match(PLAN_PATTERN);
+  const plan = handler ? findPlanAfterHandler(file, handler) : null;
   const userMessage = file.match(USER_MESSAGE_PATTERN)?.[1];
   const jsx = file.match(JSX_PATTERN)?.[1];
   if (
     !handler ||
     handler.index === undefined ||
     !plan ||
+    plan.index === undefined ||
     !userMessage ||
     !jsx
   ) {
@@ -103,12 +240,16 @@ const patchHandler = (file: string): string | null => {
     return null;
   }
 
-  const [, done, ctx, args, setAppState, , notPlan] = handler;
+  const [, done, ctx, args, setAppState, notPlan] = handler;
   const [, , planPath, , readPlan] = plan;
   // Cloud sessions keep the plan in the cloud workspace, and the dialog's
   // answer queues a local message, so decline there instead of reading a
-  // stale or missing local plan.
-  const cloud = file.match(CLOUD_PATTERN)?.[1];
+  // stale or missing local plan. Accept the newer holdMode return prefix
+  // without confusing an earlier cloud-like branch for the /plan check.
+  const cloudPattern = new RegExp(
+    `(?:^|[,;{}])if\\(([$\\w]+)\\(\\)\\)\\{if\\(![$\\w]+\\(\\)\\)return [^};]{0,500}?${escapeIdent(done)}\\(${escapeIdent(notPlan)}\\?"(?:Enabled plan mode|Turned on plan mode)":"Already in plan mode\\."\\),null;`
+  );
+  const cloud = file.slice(handler.index, plan.index).match(cloudPattern)?.[1];
   const insertion =
     `if(${args}.trim()==="exit"){` +
     `if(${notPlan})return ${done}("Not in plan mode."),null;` +
@@ -136,9 +277,9 @@ const patchHandler = (file: string): string | null => {
 
 /** Advertise the new argument: argumentHint:"[open|<description>]" */
 const patchArgumentHint = (file: string): string | null => {
-  const index = file.indexOf(ARGUMENT_HINT);
-  if (index === -1) return null;
-  const insertIndex = index + ARGUMENT_HINT.length;
+  const match = file.match(ARGUMENT_HINT_PATTERN);
+  if (!match || match.index === undefined) return null;
+  const insertIndex = match.index + match[0].length;
   if (file.startsWith('exit|', insertIndex)) return file;
   const newFile =
     file.slice(0, insertIndex) + 'exit|' + file.slice(insertIndex);

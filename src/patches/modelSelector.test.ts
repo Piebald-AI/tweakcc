@@ -49,4 +49,17 @@ describe('writeModelCustomizations', () => {
     );
     expect(out).toContain(')s.push(tweakccModel);s=dg(s,r);let R=null');
   });
+
+  it('appends custom models before the three-argument sort on CC 2.1.327', () => {
+    const chunk327 =
+      '}u=OE(u,n,h);let P=null,q=Ul(),X=gG();if(q!==void 0&&q!==null)P=q;else if(X!==void 0&&X!==null)P=X;' +
+      'if(P===null||j!==-1)return Tn(u,n);return u.push({...Ss(P)??{value:P,label:P,description:"Custom model"},sessionTail:!0}),Tn(u,n)';
+
+    const out = writeModelCustomizations(chunk327);
+
+    expect(out).not.toBeNull();
+    expect(out).toContain(
+      ')u.push(tweakccModel);u=OE(u,n,h);let P=null,q=Ul(),X=gG();'
+    );
+  });
 });
