@@ -147,6 +147,25 @@ describe('writePlanExitCommand', () => {
     expect(sources).toEqual(original);
   });
 
+  it('finds the plan read after regex and comment braces', () => {
+    const sources = new Map([
+      [
+        '/$bunfs/root/chunk-v7jd5y9q.js',
+        HANDLER_327.replace(
+          'let C=QT()',
+          'let re=/[}]/;/* } */\n// }\nlet C=QT()'
+        ),
+      ],
+      ['/$bunfs/root/chunk-cfxefa64.js', DIALOG],
+      ['/$bunfs/root/chunk-m14bt1pz.js', COMMAND_327],
+    ]);
+
+    expect(onGraph(sources)).toMatchObject({ applied: true, failed: false });
+    expect(sources.get('/$bunfs/root/chunk-v7jd5y9q.js')).toContain(
+      'let tccPath=QT(),tccPlan=await JIt(void 0,s.storageV5);'
+    );
+  });
+
   it('leaves an already patched graph unchanged', () => {
     const sources = modules();
     onGraph(sources);

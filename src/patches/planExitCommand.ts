@@ -50,22 +50,107 @@ const JSX_PATTERN = /([$\w]+)\([$\w]+,\{planContent:/;
 
 const PATCHED_MARKER = '.trim()==="exit"){if(';
 
+const REGEX_KEYWORDS = new Set([
+  'await',
+  'case',
+  'delete',
+  'do',
+  'else',
+  'in',
+  'instanceof',
+  'of',
+  'return',
+  'throw',
+  'typeof',
+  'void',
+  'yield',
+]);
+
 /** Index just past the `}` closing the block that opens at `open`. */
 const findBlockEnd = (file: string, open: number): number => {
   let depth = 0;
-  let inString: string | null = null;
+  let state: 'code' | 'string' | 'regex' | 'lineComment' | 'blockComment' =
+    'code';
+  let quote = '';
   let escape = false;
+  let regexClass = false;
+  let previousSignificant = '';
+  let currentWord = '';
+
   for (let index = open; index < file.length; index++) {
     const char = file[index];
-    if (inString) {
-      if (escape) escape = false;
-      else if (char === '\\') escape = true;
-      else if (char === inString) inString = null;
+    const next = file[index + 1];
+
+    if (state === 'lineComment') {
+      if (char === '\n' || char === '\r') state = 'code';
       continue;
     }
-    if (char === '"' || char === "'" || char === '`') inString = char;
-    else if (char === '{') depth++;
+    if (state === 'blockComment') {
+      if (char === '*' && next === '/') {
+        state = 'code';
+        index++;
+      }
+      continue;
+    }
+    if (state === 'string') {
+      if (escape) escape = false;
+      else if (char === '\\') escape = true;
+      else if (char === quote) {
+        state = 'code';
+        previousSignificant = 'x';
+        currentWord = '';
+      }
+      continue;
+    }
+    if (state === 'regex') {
+      if (escape) escape = false;
+      else if (char === '\\') escape = true;
+      else if (char === '[') regexClass = true;
+      else if (char === ']') regexClass = false;
+      else if (char === '/' && !regexClass) {
+        state = 'code';
+        previousSignificant = 'x';
+        currentWord = '';
+      }
+      continue;
+    }
+
+    if (char === '/' && next === '/') {
+      state = 'lineComment';
+      index++;
+      continue;
+    }
+    if (char === '/' && next === '*') {
+      state = 'blockComment';
+      index++;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      state = 'string';
+      quote = char;
+      escape = false;
+      continue;
+    }
+    if (char === '/') {
+      if (
+        !previousSignificant ||
+        '([{=,:;!?&|+-*%^~<>'.includes(previousSignificant) ||
+        REGEX_KEYWORDS.has(currentWord)
+      ) {
+        state = 'regex';
+        regexClass = false;
+        escape = false;
+        currentWord = '';
+        continue;
+      }
+    }
+    if (char === '{') depth++;
     else if (char === '}' && --depth === 0) return index + 1;
+
+    if (/\s/.test(char)) continue;
+    if (/[A-Za-z0-9_$]/.test(char)) currentWord += char;
+    else currentWord = '';
+    previousSignificant = char;
   }
   return -1;
 };
