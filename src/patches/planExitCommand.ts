@@ -76,7 +76,6 @@ const findBlockEnd = (file: string, open: number): number => {
   let regexClass = false;
   let previousSignificant = '';
   let currentWord = '';
-  let wordBoundary = '';
 
   for (let index = open; index < file.length; index++) {
     const char = file[index];
@@ -100,7 +99,6 @@ const findBlockEnd = (file: string, open: number): number => {
         state = 'code';
         previousSignificant = 'x';
         currentWord = '';
-        wordBoundary = '';
       }
       continue;
     }
@@ -113,7 +111,6 @@ const findBlockEnd = (file: string, open: number): number => {
         state = 'code';
         previousSignificant = 'x';
         currentWord = '';
-        wordBoundary = '';
       }
       continue;
     }
@@ -135,16 +132,18 @@ const findBlockEnd = (file: string, open: number): number => {
       continue;
     }
     if (char === '/') {
+      const beforeWord = file.slice(0, index - currentWord.length).trimEnd();
+      const propertyAccess =
+        beforeWord.endsWith('.') && !beforeWord.endsWith('...');
       if (
         !previousSignificant ||
         '([{=,:;!?&|+-*%^~<>'.includes(previousSignificant) ||
-        (REGEX_KEYWORDS.has(currentWord) && wordBoundary !== '.')
+        (REGEX_KEYWORDS.has(currentWord) && !propertyAccess)
       ) {
         state = 'regex';
         regexClass = false;
         escape = false;
         currentWord = '';
-        wordBoundary = '';
         continue;
       }
     }
@@ -152,13 +151,8 @@ const findBlockEnd = (file: string, open: number): number => {
     else if (char === '}' && --depth === 0) return index + 1;
 
     if (/\s/.test(char)) continue;
-    if (/[A-Za-z0-9_$]/.test(char)) {
-      if (!currentWord) wordBoundary = previousSignificant;
-      currentWord += char;
-    } else {
-      currentWord = '';
-      wordBoundary = '';
-    }
+    if (/[A-Za-z0-9_$]/.test(char)) currentWord += char;
+    else currentWord = '';
     previousSignificant = char;
   }
   return -1;
@@ -169,7 +163,9 @@ const findPlanAfterHandler = (
   handler: RegExpMatchArray
 ): RegExpMatchArray | null => {
   if (handler.index === undefined) return null;
-  const bodyOpen = handler.index + handler[0].indexOf('{');
+  const bodyOpen =
+    handler.index +
+    handler[0].indexOf('{', handler[0].indexOf('async function'));
   const handlerEnd = findBlockEnd(file, bodyOpen);
   if (handlerEnd === -1) return null;
   const searchStart = handler.index + handler[0].length;

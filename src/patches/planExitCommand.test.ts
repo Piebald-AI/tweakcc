@@ -166,11 +166,51 @@ describe('writePlanExitCommand', () => {
     );
   });
 
+  it('ignores a sibling plan read with a block-prefixed handler', () => {
+    const decoy =
+      'let X=DecoyPath();DecoyEnsure(X);let Y=await DecoyRead(void 0,s.storageV5);';
+    const handlerWithoutPlan = HANDLER_327.replace(
+      'let C=QT();FR(C);let R=await JIt(void 0,s.storageV5);',
+      ''
+    );
+    const sources = new Map([
+      [
+        '/$bunfs/root/chunk-v7jd5y9q.js',
+        '{' + handlerWithoutPlan + decoy + '}',
+      ],
+      ['/$bunfs/root/chunk-cfxefa64.js', DIALOG],
+      ['/$bunfs/root/chunk-m14bt1pz.js', COMMAND_327],
+    ]);
+    const original = new Map(sources);
+
+    expect(onGraph(sources)).toMatchObject({ applied: false, failed: true });
+    expect(sources).toEqual(original);
+  });
+
   it('treats a slash after a property keyword as division', () => {
     const sources = new Map([
       [
         '/$bunfs/root/chunk-v7jd5y9q.js',
         HANDLER_327.replace('let C=QT()', 'let n=obj.of/2;let C=QT()'),
+      ],
+      ['/$bunfs/root/chunk-cfxefa64.js', DIALOG],
+      ['/$bunfs/root/chunk-m14bt1pz.js', COMMAND_327],
+    ]);
+
+    expect(onGraph(sources)).toMatchObject({ applied: true, failed: false });
+    expect(sources.get('/$bunfs/root/chunk-v7jd5y9q.js')).toContain(
+      'let tccPath=QT(),tccPlan=await JIt(void 0,s.storageV5);'
+    );
+  });
+
+  it('allows a regex after spread syntax and a keyword', () => {
+    const sources = new Map([
+      [
+        '/$bunfs/root/chunk-v7jd5y9q.js',
+        HANDLER_327.replace(
+          'let C=QT()',
+          'let n=[...await /[}]/.exec(w)];let C=QT()'
+        ),
       ],
       ['/$bunfs/root/chunk-cfxefa64.js', DIALOG],
       ['/$bunfs/root/chunk-m14bt1pz.js', COMMAND_327],
