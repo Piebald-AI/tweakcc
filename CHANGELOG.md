@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix the module parse gate rejecting Bun `using` declarations on Node < 24 (#1041)
 - Support model customizations on Claude Code 2.1.327
 - Support `/plan exit` on Claude Code 2.1.327 while preserving its cloud-session guard
-- Harden `/plan exit` matching against unrelated plan and cloud snippets
+- Bound `/plan exit` plan reads and cloud detection to the handler body
 
 ## [v4.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.4.0) - 2026-10-10
 

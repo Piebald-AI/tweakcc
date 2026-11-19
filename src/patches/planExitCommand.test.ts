@@ -129,6 +129,24 @@ describe('writePlanExitCommand', () => {
     );
   });
 
+  it('rejects a plan read belonging to a later function', () => {
+    const decoy =
+      'let X=DecoyPath();DecoyEnsure(X);let Y=await DecoyRead(void 0,s.storageV5);';
+    const handlerWithoutPlan = HANDLER_327.replace(
+      'let C=QT();FR(C);let R=await JIt(void 0,s.storageV5);',
+      ''
+    );
+    const sources = new Map([
+      ['/$bunfs/root/chunk-v7jd5y9q.js', handlerWithoutPlan + decoy],
+      ['/$bunfs/root/chunk-cfxefa64.js', DIALOG],
+      ['/$bunfs/root/chunk-m14bt1pz.js', COMMAND_327],
+    ]);
+    const original = new Map(sources);
+
+    expect(onGraph(sources)).toMatchObject({ applied: false, failed: true });
+    expect(sources).toEqual(original);
+  });
+
   it('leaves an already patched graph unchanged', () => {
     const sources = modules();
     onGraph(sources);

@@ -50,14 +50,39 @@ const JSX_PATTERN = /([$\w]+)\([$\w]+,\{planContent:/;
 
 const PATCHED_MARKER = '.trim()==="exit"){if(';
 
+/** Index just past the `}` closing the block that opens at `open`. */
+const findBlockEnd = (file: string, open: number): number => {
+  let depth = 0;
+  let inString: string | null = null;
+  let escape = false;
+  for (let index = open; index < file.length; index++) {
+    const char = file[index];
+    if (inString) {
+      if (escape) escape = false;
+      else if (char === '\\') escape = true;
+      else if (char === inString) inString = null;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') inString = char;
+    else if (char === '{') depth++;
+    else if (char === '}' && --depth === 0) return index + 1;
+  }
+  return -1;
+};
+
 const findPlanAfterHandler = (
   file: string,
   handler: RegExpMatchArray
 ): RegExpMatchArray | null => {
   if (handler.index === undefined) return null;
-  const pattern = new RegExp(PLAN_PATTERN.source, `${PLAN_PATTERN.flags}g`);
-  pattern.lastIndex = handler.index + handler[0].length;
-  return pattern.exec(file);
+  const bodyOpen = handler.index + handler[0].indexOf('{');
+  const handlerEnd = findBlockEnd(file, bodyOpen);
+  if (handlerEnd === -1) return null;
+  const searchStart = handler.index + handler[0].length;
+  const match = file.slice(searchStart, handlerEnd).match(PLAN_PATTERN);
+  if (!match || match.index === undefined) return null;
+  match.index += searchStart;
+  return match;
 };
 
 /** Everything patchHandler needs from the module that holds the handler. */
