@@ -13,10 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix memory blowup when patching Claude Code 2.1.310 native binaries (#1053) - @gergesh
 - Never reuse bytes of a linked Bun bytecode payload when patching native binaries (Claude Code 2.1.310+) (#1056) - @coleleavitt
 - Fall back to the previous version's prompt data until prompts for a new Claude Code version are published, instead of skipping all prompt customizations (#1060) - @coleleavitt
-- Fix the module parse gate rejecting Bun `using` declarations on Node < 24 (#1041)
-- Support model customizations on Claude Code 2.1.327
-- Support `/plan exit` on Claude Code 2.1.327 while preserving its cloud-session guard
-- Bound `/plan exit` plan reads and cloud detection to the handler body, with token-aware handling of comments, spread syntax, whitespace and division
+- Fix native patching for Claude Code 2.1.327 (#1077) - @gtkpad
 
 ## [v4.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.4.0) - 2026-10-10
 
