@@ -1071,6 +1071,14 @@ describe('systemPrompts.ts', () => {
           fs.readFileSync(path.join(dir, file), 'utf8')
         );
         for (const p of parsed.prompts ?? []) {
+          // Bun ships these declarations as plain text. Their backticks and
+          // `${` examples explain shell syntax and aren't JS template escapes.
+          if (
+            p.id === 'data-repl-bash-helper-declarations' ||
+            p.id === 'data-repl-powershell-helper-declarations'
+          ) {
+            continue;
+          }
           const recon = promptSync.reconstructContentFromPieces(
             p.pieces,
             p.identifiers,
