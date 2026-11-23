@@ -718,6 +718,7 @@ export const DEFAULT_SETTINGS: Settings = {
     filterScrollEscapeSequences: false,
     tmuxGraphicsPassthrough: false,
     enableWorktreeMode: true,
+    enableFeatureFlagOverrides: false,
     allowCustomAgentModels: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,

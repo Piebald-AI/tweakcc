@@ -89,6 +89,7 @@ import { writeSuppressNativeInstallerWarning } from './suppressNativeInstallerWa
 import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeTmuxGraphicsPassthrough } from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
+import { writeFeatureFlagOverrides } from './featureFlagOverrides';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
@@ -484,6 +485,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Enable the EnterWorktree tool for isolated git worktree sessions',
+  },
+  {
+    id: 'feature-flag-overrides',
+    name: 'Feature flag overrides',
+    group: PatchGroup.FEATURES,
+    description:
+      'Let the CLAUDE_INTERNAL_FC_OVERRIDES env var (a JSON object) set GrowthBook feature flags',
   },
   {
     id: 'session-memory',
@@ -978,6 +986,10 @@ export const buildPatchImplementations = (
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),
       condition: !!config.settings.misc?.enableWorktreeMode,
+    },
+    'feature-flag-overrides': {
+      fn: c => writeFeatureFlagOverrides(c),
+      condition: !!config.settings.misc?.enableFeatureFlagOverrides,
     },
     'session-memory': {
       fn: c => writeSessionMemory(c),

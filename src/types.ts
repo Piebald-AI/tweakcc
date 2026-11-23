@@ -142,6 +142,7 @@ export interface MiscConfig {
   filterScrollEscapeSequences: boolean;
   tmuxGraphicsPassthrough: boolean;
   enableWorktreeMode: boolean;
+  enableFeatureFlagOverrides: boolean;
   allowCustomAgentModels: boolean;
   enableContextLimitOverride: boolean;
   enableModelCustomizations: boolean;

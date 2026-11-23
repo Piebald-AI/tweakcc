@@ -175,6 +175,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.allowCustomAgentModels;
     case 'worktree-mode':
       return !!misc?.enableWorktreeMode;
+    case 'feature-flag-overrides':
+      return !!misc?.enableFeatureFlagOverrides;
     case 'session-memory':
       return !!misc?.enableSessionMemory;
     case 'toolsets':

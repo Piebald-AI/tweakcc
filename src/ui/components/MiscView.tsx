@@ -92,6 +92,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     filterScrollEscapeSequences: false,
     tmuxGraphicsPassthrough: false,
     enableWorktreeMode: true,
+    enableFeatureFlagOverrides: false,
     allowCustomAgentModels: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
@@ -445,6 +446,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.enableWorktreeMode =
               !settings.misc!.enableWorktreeMode;
+          });
+        },
+      },
+      {
+        id: 'enableFeatureFlagOverrides',
+        title: 'Enable feature flag overrides (CLAUDE_INTERNAL_FC_OVERRIDES)',
+        description:
+          'Let the CLAUDE_INTERNAL_FC_OVERRIDES env var set GrowthBook feature flags, e.g. {"tengu_fizzy_grove":true}. Public builds ignore it.',
+        getValue: () => settings.misc?.enableFeatureFlagOverrides ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableFeatureFlagOverrides =
+              !settings.misc!.enableFeatureFlagOverrides;
           });
         },
       },
