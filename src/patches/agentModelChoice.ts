@@ -15,7 +15,7 @@
 import { showDiff } from './index';
 
 const GUIDANCE =
-  ' Choose it yourself when the work clearly fits another model: "haiku" for a mechanical brief that can be checked against itself (a bounded search, grep-and-report, an edit pattern you spelled out), "sonnet" for routine, well-specified implementation, "opus" when one piece needs deeper reasoning than the work around it. Otherwise omit it.';
+  ' Pick it yourself, on your own judgment, whenever the brief clearly fits a different model than yours: "haiku" for a mechanical brief that can be checked against itself (a bounded search, counting or listing files, grep-and-report, an edit pattern you spelled out); "sonnet" for routine, well-specified implementation; "opus" when one piece needs deeper reasoning than the work around it. This is separate from effort: set both when both apply. Otherwise omit it.';
 
 const PATTERN =
   /(\+\([$\w]+\(\)\?[$\w]+\.CLAUDE_CODE_COORDINATOR_FORCE_WORKER_INHERIT_MODEL\?"[^"]*":"[^"]*":)""\)/;

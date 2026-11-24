@@ -28,7 +28,7 @@ describe('writeAgentModelChoice', () => {
     expect(describeModel(MODEL_FIELD, false)).not.toContain('"haiku" for');
     const text = describeModel(patched, false);
     expect(text).toMatch(/^Optional model override for this agent\./);
-    expect(text).toContain('Choose it yourself when the work clearly fits');
+    expect(text).toContain('Pick it yourself, on your own judgment');
   });
 
   it('leaves the coordinator-mode text alone', () => {
