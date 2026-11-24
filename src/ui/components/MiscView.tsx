@@ -93,6 +93,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     tmuxGraphicsPassthrough: false,
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
+    enableNestedTeammates: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,
@@ -845,6 +846,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.allowCustomAgentModels =
               !settings.misc!.allowCustomAgentModels;
+          });
+        },
+      },
+      {
+        id: 'enableNestedTeammates',
+        title: 'Allow nested teammates',
+        description:
+          'With agent teams on, let a teammate start teammates of its own. They join the same team and report to the team lead.',
+        getValue: () => settings.misc?.enableNestedTeammates ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableNestedTeammates =
+              !settings.misc!.enableNestedTeammates;
           });
         },
       },

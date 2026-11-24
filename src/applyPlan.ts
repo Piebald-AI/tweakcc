@@ -173,6 +173,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.tmuxGraphicsPassthrough;
     case 'allow-custom-agent-models':
       return !!misc?.allowCustomAgentModels;
+    case 'nested-teammates':
+      return !!misc?.enableNestedTeammates;
     case 'worktree-mode':
       return !!misc?.enableWorktreeMode;
     case 'session-memory':
