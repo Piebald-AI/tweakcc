@@ -90,6 +90,7 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeTmuxGraphicsPassthrough } from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
+import { writeAgentModelChoice } from './agentModelChoice';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
 import { writeSkipDevChannelsDialog } from './skipDevChannelsDialog';
@@ -477,6 +478,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Allow arbitrary model names in custom agent frontmatter (e.g. gemini-2.5-flash)',
+  },
+  {
+    id: 'agent-model-choice',
+    name: 'Agent model choice',
+    group: PatchGroup.FEATURES,
+    description:
+      "Tell the model when to set the Agent tool's model (haiku, sonnet, opus) itself",
   },
   {
     id: 'worktree-mode',
@@ -974,6 +982,10 @@ export const buildPatchImplementations = (
     'allow-custom-agent-models': {
       fn: c => writeAllowCustomAgentModels(c),
       condition: !!config.settings.misc?.allowCustomAgentModels,
+    },
+    'agent-model-choice': {
+      fn: c => writeAgentModelChoice(c),
+      condition: !!config.settings.misc?.enableAgentModelChoice,
     },
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),

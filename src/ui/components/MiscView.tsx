@@ -93,6 +93,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     tmuxGraphicsPassthrough: false,
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
+    enableAgentModelChoice: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,
@@ -845,6 +846,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.allowCustomAgentModels =
               !settings.misc!.allowCustomAgentModels;
+          });
+        },
+      },
+      {
+        id: 'enableAgentModelChoice',
+        title: 'Let the model pick subagent models',
+        description:
+          "Add guidance to the Agent tool's model parameter on when to use haiku, sonnet or opus for a subagent.",
+        getValue: () => settings.misc?.enableAgentModelChoice ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableAgentModelChoice =
+              !settings.misc!.enableAgentModelChoice;
           });
         },
       },

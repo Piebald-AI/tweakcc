@@ -143,6 +143,7 @@ export interface MiscConfig {
   tmuxGraphicsPassthrough: boolean;
   enableWorktreeMode: boolean;
   allowCustomAgentModels: boolean;
+  enableAgentModelChoice: boolean;
   enableContextLimitOverride: boolean;
   enableModelCustomizations: boolean;
   enableVoiceMode: boolean;
