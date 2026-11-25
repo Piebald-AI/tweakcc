@@ -177,6 +177,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.warnIgnoredCodeModeEnv;
     case 'keep-cut-repl-result':
       return !!misc?.keepCutReplResult;
+    case 'hooks-see-whole-script-shell-output':
+      return !!misc?.hooksSeeWholeScriptShellOutput;
     case 'worktree-mode':
       return !!misc?.enableWorktreeMode;
     case 'session-memory':

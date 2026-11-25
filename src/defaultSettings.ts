@@ -721,6 +721,7 @@ export const DEFAULT_SETTINGS: Settings = {
     allowCustomAgentModels: false,
     warnIgnoredCodeModeEnv: false,
     keepCutReplResult: false,
+    hooksSeeWholeScriptShellOutput: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,

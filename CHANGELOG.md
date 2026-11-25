@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix native patching for Claude Code 2.1.327 (#1077) - @gtkpad
 - Add a patch that lists CLAUDE_CODE_EXPERIMENTAL_CODE_MODE in /doctor and /status when a project or local settings file sets it, since Claude Code ignores it there - @coleleavitt
 - Add a patch that keeps the whole text of a cut Code Mode script result in the REPL global `$0` and names it in the result - @coleleavitt
+- Add a patch that gives PostToolUse hooks the whole saved output of a shell call made by a Code Mode script, so a hook's rewrite no longer cuts the script's data to the preview - @coleleavitt
 
 ## [v4.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.4.0) - 2026-10-10
 

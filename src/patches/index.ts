@@ -92,6 +92,7 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeWarnIgnoredCodeModeEnv } from './warnIgnoredCodeModeEnv';
 import { writeKeepCutReplResult } from './keepCutReplResult';
+import { writeHooksSeeWholeScriptShellOutput } from './hooksSeeWholeScriptShellOutput';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
 import { writeSkipDevChannelsDialog } from './skipDevChannelsDialog';
@@ -493,6 +494,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Keep the whole text of a Code Mode script result that was cut for the model in the REPL global $0, and say so in the result',
+  },
+  {
+    id: 'hooks-see-whole-script-shell-output',
+    name: 'Hooks see whole script shell output',
+    group: PatchGroup.FEATURES,
+    description:
+      'Give PostToolUse hooks the whole saved output of a shell call made by a Code Mode script, which is what the script gets, instead of the preview',
   },
   {
     id: 'worktree-mode',
@@ -998,6 +1006,10 @@ export const buildPatchImplementations = (
     'keep-cut-repl-result': {
       fn: c => writeKeepCutReplResult(c),
       condition: !!config.settings.misc?.keepCutReplResult,
+    },
+    'hooks-see-whole-script-shell-output': {
+      fn: c => writeHooksSeeWholeScriptShellOutput(c),
+      condition: !!config.settings.misc?.hooksSeeWholeScriptShellOutput,
     },
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),

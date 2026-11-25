@@ -145,6 +145,7 @@ export interface MiscConfig {
   allowCustomAgentModels: boolean;
   warnIgnoredCodeModeEnv: boolean;
   keepCutReplResult: boolean;
+  hooksSeeWholeScriptShellOutput: boolean;
   enableContextLimitOverride: boolean;
   enableModelCustomizations: boolean;
   enableVoiceMode: boolean;

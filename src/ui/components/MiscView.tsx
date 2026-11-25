@@ -95,6 +95,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     allowCustomAgentModels: false,
     warnIgnoredCodeModeEnv: false,
     keepCutReplResult: false,
+    hooksSeeWholeScriptShellOutput: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,
@@ -875,6 +876,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.keepCutReplResult =
               !settings.misc!.keepCutReplResult;
+          });
+        },
+      },
+      {
+        id: 'hooksSeeWholeScriptShellOutput',
+        title: 'Hooks see whole Code Mode shell output',
+        description:
+          "Give PostToolUse hooks the whole output of a Bash or PowerShell call made by a Code Mode script (what the script reads), not the 30,000-char preview, so a hook's rewrite no longer cuts the script's data and a secret past the preview is not missed.",
+        getValue: () => settings.misc?.hooksSeeWholeScriptShellOutput ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.hooksSeeWholeScriptShellOutput =
+              !settings.misc!.hooksSeeWholeScriptShellOutput;
           });
         },
       },
