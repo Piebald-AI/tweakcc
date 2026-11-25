@@ -90,6 +90,7 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeTmuxGraphicsPassthrough } from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
+import { writeWarnIgnoredCodeModeEnv } from './warnIgnoredCodeModeEnv';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
 import { writeSkipDevChannelsDialog } from './skipDevChannelsDialog';
@@ -477,6 +478,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Allow arbitrary model names in custom agent frontmatter (e.g. gemini-2.5-flash)',
+  },
+  {
+    id: 'warn-ignored-code-mode-env',
+    name: 'Warn about ignored Code Mode env',
+    group: PatchGroup.FEATURES,
+    description:
+      'List CLAUDE_CODE_EXPERIMENTAL_CODE_MODE in /doctor and /status when a project or local settings file sets it, since those files cannot turn Code Mode on',
   },
   {
     id: 'worktree-mode',
@@ -974,6 +982,10 @@ export const buildPatchImplementations = (
     'allow-custom-agent-models': {
       fn: c => writeAllowCustomAgentModels(c),
       condition: !!config.settings.misc?.allowCustomAgentModels,
+    },
+    'warn-ignored-code-mode-env': {
+      fn: c => writeWarnIgnoredCodeModeEnv(c),
+      condition: !!config.settings.misc?.warnIgnoredCodeModeEnv,
     },
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),

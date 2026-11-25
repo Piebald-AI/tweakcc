@@ -173,6 +173,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.tmuxGraphicsPassthrough;
     case 'allow-custom-agent-models':
       return !!misc?.allowCustomAgentModels;
+    case 'warn-ignored-code-mode-env':
+      return !!misc?.warnIgnoredCodeModeEnv;
     case 'worktree-mode':
       return !!misc?.enableWorktreeMode;
     case 'session-memory':

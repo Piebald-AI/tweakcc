@@ -93,6 +93,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     tmuxGraphicsPassthrough: false,
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
+    warnIgnoredCodeModeEnv: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,
@@ -845,6 +846,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.allowCustomAgentModels =
               !settings.misc!.allowCustomAgentModels;
+          });
+        },
+      },
+      {
+        id: 'warnIgnoredCodeModeEnv',
+        title: 'Warn about ignored Code Mode env',
+        description:
+          'Show a /doctor and /status notice when .claude/settings.json or .claude/settings.local.json sets CLAUDE_CODE_EXPERIMENTAL_CODE_MODE, which Claude Code ignores there.',
+        getValue: () => settings.misc?.warnIgnoredCodeModeEnv ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.warnIgnoredCodeModeEnv =
+              !settings.misc!.warnIgnoredCodeModeEnv;
           });
         },
       },
