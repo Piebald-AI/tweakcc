@@ -720,6 +720,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
     warnIgnoredCodeModeEnv: false,
+    keepCutReplResult: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,

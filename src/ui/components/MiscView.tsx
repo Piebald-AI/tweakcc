@@ -94,6 +94,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
     warnIgnoredCodeModeEnv: false,
+    keepCutReplResult: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,
@@ -860,6 +861,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.warnIgnoredCodeModeEnv =
               !settings.misc!.warnIgnoredCodeModeEnv;
+          });
+        },
+      },
+      {
+        id: 'keepCutReplResult',
+        title: 'Keep cut Code Mode result in $0',
+        description:
+          'When a Code Mode script result is too long and reaches Claude cut, keep its whole text in the REPL global $0 and tell Claude, so the next script can slice it instead of getting the value again.',
+        getValue: () => settings.misc?.keepCutReplResult ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.keepCutReplResult =
+              !settings.misc!.keepCutReplResult;
           });
         },
       },

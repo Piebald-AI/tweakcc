@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fall back to the previous version's prompt data until prompts for a new Claude Code version are published, instead of skipping all prompt customizations (#1060) - @coleleavitt
 - Fix native patching for Claude Code 2.1.327 (#1077) - @gtkpad
 - Add a patch that lists CLAUDE_CODE_EXPERIMENTAL_CODE_MODE in /doctor and /status when a project or local settings file sets it, since Claude Code ignores it there - @coleleavitt
+- Add a patch that keeps the whole text of a cut Code Mode script result in the REPL global `$0` and names it in the result - @coleleavitt
 
 ## [v4.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.4.0) - 2026-10-10
 

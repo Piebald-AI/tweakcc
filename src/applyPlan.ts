@@ -175,6 +175,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.allowCustomAgentModels;
     case 'warn-ignored-code-mode-env':
       return !!misc?.warnIgnoredCodeModeEnv;
+    case 'keep-cut-repl-result':
+      return !!misc?.keepCutReplResult;
     case 'worktree-mode':
       return !!misc?.enableWorktreeMode;
     case 'session-memory':
