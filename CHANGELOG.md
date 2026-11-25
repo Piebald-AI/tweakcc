@@ -14,11 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Never reuse bytes of a linked Bun bytecode payload when patching native binaries (Claude Code 2.1.310+) (#1056) - @coleleavitt
 - Fall back to the previous version's prompt data until prompts for a new Claude Code version are published, instead of skipping all prompt customizations (#1060) - @coleleavitt
 - Fix native patching for Claude Code 2.1.327 (#1077) - @gtkpad
-- Add a Code Mode in -p and SDK hosts patch: stream-json hosts that set their own entrypoint (T3 Code, Orca) can start Code Mode, and headless launches take the opt-in from the environment or user settings once Code Mode was accepted in a terminal (anthropics/claude-code#109679) - @coleleavitt
-- Add a Code Mode in the Desktop app patch: the Desktop app's Code tab can start Code Mode (anthropics/claude-code#110673) - @coleleavitt
-- Add a Code Mode with Remote Control patch: a Code Mode session can use Remote Control, which already gets each script call as its own tool call (anthropics/claude-code#109847) - @coleleavitt
-- Add a Code Mode in background sessions patch: `claude --bg` sessions can start Code Mode once it was accepted in a terminal (anthropics/claude-code#111183) - @coleleavitt
-- Add a team file lock wait patch: in-process teammates started in parallel wait up to about 13 s for the team file lock instead of failing with "Lock file is already being held" - @coleleavitt
+- Add a Code Mode in -p and SDK hosts patch: stream-json hosts that set their own entrypoint (T3 Code, Orca) can start Code Mode, and headless launches take the opt-in from the environment or user settings once Code Mode was accepted in a terminal (anthropics/claude-code#109679) (#1090) - @coleleavitt
+- Add a Code Mode in the Desktop app patch: the Desktop app's Code tab can start Code Mode (anthropics/claude-code#110673) (#1090) - @coleleavitt
+- Add a Code Mode with Remote Control patch: a Code Mode session can use Remote Control, which already gets each script call as its own tool call (anthropics/claude-code#109847) (#1090) - @coleleavitt
+- Add a Code Mode in background sessions patch: `claude --bg` sessions can start Code Mode once it was accepted in a terminal (anthropics/claude-code#111183) (#1090) - @coleleavitt
+- Add a team file lock wait patch: in-process teammates started in parallel wait up to about 13 s for the team file lock instead of failing with "Lock file is already being held" (#1090) - @coleleavitt
 
 ## [v4.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.4.0) - 2026-10-10
 
