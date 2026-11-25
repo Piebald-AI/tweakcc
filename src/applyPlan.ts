@@ -173,6 +173,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.tmuxGraphicsPassthrough;
     case 'allow-custom-agent-models':
       return !!misc?.allowCustomAgentModels;
+    case 'code-mode-remote-control':
+      return !!misc?.codeModeWithRemoteControl;
     case 'code-mode-desktop':
       return !!misc?.codeModeInDesktop;
     case 'code-mode-headless-hosts':

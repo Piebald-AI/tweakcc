@@ -93,6 +93,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     tmuxGraphicsPassthrough: false,
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
+    codeModeWithRemoteControl: false,
     codeModeInDesktop: false,
     codeModeInHeadlessHosts: false,
     enableContextLimitOverride: false,
@@ -875,6 +876,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.codeModeInDesktop =
               !settings.misc!.codeModeInDesktop;
+          });
+        },
+      },
+      {
+        id: 'codeModeWithRemoteControl',
+        title: 'Code Mode with Remote Control',
+        description:
+          'Let a Code Mode session use Remote Control: starting with --remote-control or remoteControlAtStartup no longer keeps Code Mode off, and Code Mode no longer keeps Remote Control off.',
+        getValue: () => settings.misc?.codeModeWithRemoteControl ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.codeModeWithRemoteControl =
+              !settings.misc!.codeModeWithRemoteControl;
           });
         },
       },

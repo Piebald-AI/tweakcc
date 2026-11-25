@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix native patching for Claude Code 2.1.327 (#1077) - @gtkpad
 - Add a Code Mode in -p and SDK hosts patch: stream-json hosts that set their own entrypoint (T3 Code, Orca) can start Code Mode, and headless launches take the opt-in from the environment or user settings once Code Mode was accepted in a terminal (anthropics/claude-code#109679) - @coleleavitt
 - Add a Code Mode in the Desktop app patch: the Desktop app's Code tab can start Code Mode (anthropics/claude-code#110673) - @coleleavitt
+- Add a Code Mode with Remote Control patch: a Code Mode session can use Remote Control, which already gets each script call as its own tool call (anthropics/claude-code#109847) - @coleleavitt
 
 ## [v4.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.4.0) - 2026-10-10
 

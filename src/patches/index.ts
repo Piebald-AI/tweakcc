@@ -90,6 +90,7 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeTmuxGraphicsPassthrough } from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
+import { writeCodeModeRemoteControl } from './codeModeRemoteControl';
 import { writeCodeModeDesktop } from './codeModeDesktop';
 import { writeCodeModeHeadlessHosts } from './codeModeHeadlessHosts';
 import { writeVoiceMode } from './voiceMode';
@@ -479,6 +480,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Allow arbitrary model names in custom agent frontmatter (e.g. gemini-2.5-flash)',
+  },
+  {
+    id: 'code-mode-remote-control',
+    name: 'Code Mode with Remote Control',
+    group: PatchGroup.FEATURES,
+    description:
+      'Let a Code Mode session use Remote Control: --remote-control no longer keeps Code Mode off, and Code Mode no longer keeps the bridge off',
   },
   {
     id: 'code-mode-desktop',
@@ -990,6 +998,10 @@ export const buildPatchImplementations = (
     'allow-custom-agent-models': {
       fn: c => writeAllowCustomAgentModels(c),
       condition: !!config.settings.misc?.allowCustomAgentModels,
+    },
+    'code-mode-remote-control': {
+      fn: c => writeCodeModeRemoteControl(c),
+      condition: !!config.settings.misc?.codeModeWithRemoteControl,
     },
     'code-mode-desktop': {
       fn: c => writeCodeModeDesktop(c),

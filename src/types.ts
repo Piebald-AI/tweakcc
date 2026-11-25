@@ -143,6 +143,7 @@ export interface MiscConfig {
   tmuxGraphicsPassthrough: boolean;
   enableWorktreeMode: boolean;
   allowCustomAgentModels: boolean;
+  codeModeWithRemoteControl: boolean;
   codeModeInDesktop: boolean;
   codeModeInHeadlessHosts: boolean;
   enableContextLimitOverride: boolean;
