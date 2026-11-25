@@ -90,6 +90,7 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeTmuxGraphicsPassthrough } from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
+import { writeTeamFileLockWait } from './teamFileLockWait';
 import { writeCodeModeBackgroundSessions } from './codeModeBackgroundSessions';
 import { writeCodeModeRemoteControl } from './codeModeRemoteControl';
 import { writeCodeModeDesktop } from './codeModeDesktop';
@@ -481,6 +482,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Allow arbitrary model names in custom agent frontmatter (e.g. gemini-2.5-flash)',
+  },
+  {
+    id: 'team-file-lock-wait',
+    name: 'Team file lock wait',
+    group: PatchGroup.FEATURES,
+    description:
+      'Wait up to about 13 s for the team file lock, so parallel teammate spawns don\'t fail with "Lock file is already being held"',
   },
   {
     id: 'code-mode-background-sessions',
@@ -1006,6 +1014,10 @@ export const buildPatchImplementations = (
     'allow-custom-agent-models': {
       fn: c => writeAllowCustomAgentModels(c),
       condition: !!config.settings.misc?.allowCustomAgentModels,
+    },
+    'team-file-lock-wait': {
+      fn: c => writeTeamFileLockWait(c),
+      condition: !!config.settings.misc?.teamFileLockWait,
     },
     'code-mode-background-sessions': {
       fn: c => writeCodeModeBackgroundSessions(c),

@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add a Code Mode in the Desktop app patch: the Desktop app's Code tab can start Code Mode (anthropics/claude-code#110673) - @coleleavitt
 - Add a Code Mode with Remote Control patch: a Code Mode session can use Remote Control, which already gets each script call as its own tool call (anthropics/claude-code#109847) - @coleleavitt
 - Add a Code Mode in background sessions patch: `claude --bg` sessions can start Code Mode once it was accepted in a terminal (anthropics/claude-code#111183) - @coleleavitt
+- Add a team file lock wait patch: in-process teammates started in parallel wait up to about 13 s for the team file lock instead of failing with "Lock file is already being held" - @coleleavitt
 
 ## [v4.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.4.0) - 2026-10-10
 

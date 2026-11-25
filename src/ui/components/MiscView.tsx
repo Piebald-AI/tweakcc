@@ -93,6 +93,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     tmuxGraphicsPassthrough: false,
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
+    teamFileLockWait: false,
     codeModeInBackgroundSessions: false,
     codeModeWithRemoteControl: false,
     codeModeInDesktop: false,
@@ -905,6 +906,19 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.codeModeInBackgroundSessions =
               !settings.misc!.codeModeInBackgroundSessions;
+          });
+        },
+      },
+      {
+        id: 'teamFileLockWait',
+        title: 'Wait longer for the team file lock',
+        description:
+          'Let Agent calls with a name wait up to about 13 s for the team file lock instead of 0.65 s, so starting many in-process teammates at once doesn\'t fail with "Lock file is already being held".',
+        getValue: () => settings.misc?.teamFileLockWait ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.teamFileLockWait = !settings.misc!.teamFileLockWait;
           });
         },
       },

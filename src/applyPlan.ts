@@ -173,6 +173,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.tmuxGraphicsPassthrough;
     case 'allow-custom-agent-models':
       return !!misc?.allowCustomAgentModels;
+    case 'team-file-lock-wait':
+      return !!misc?.teamFileLockWait;
     case 'code-mode-background-sessions':
       return !!misc?.codeModeInBackgroundSessions;
     case 'code-mode-remote-control':
