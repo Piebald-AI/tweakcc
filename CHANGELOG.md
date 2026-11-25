@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fall back to the previous version's prompt data until prompts for a new Claude Code version are published, instead of skipping all prompt customizations (#1060) - @coleleavitt
 - Fix native patching for Claude Code 2.1.327 (#1077) - @gtkpad
 - Add a Code Mode chained calls patch: steps a script chains on a command it left running (`.then(r => write(...))`) run when the command ends instead of being refused, so Claude no longer reruns the command - @coleleavitt
-- Add a Code Mode wait guidance patch: the REPL prompt tells Claude to wait for CI runs and other outside events with a background shell command (`run_in_background`) and end its turn, instead of holding the session with sleep() and poll loops - @coleleavitt
+- Add a Code Mode wait guidance patch: the REPL prompt tells Claude to wait for CI runs and other outside events with a shell command left running in the background (a short timeout in the async REPL, `run_in_background` elsewhere) and end its turn, instead of holding the session with sleep() and poll loops - @coleleavitt
 - Add a Code Mode scan guidance patch: the REPL prompt tells Claude to scan many files with one shell command instead of one `Read` call per file, which runs permission checks and hooks for every file - @coleleavitt
 
 ## [v4.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.4.0) - 2026-10-10
