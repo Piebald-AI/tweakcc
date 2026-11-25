@@ -96,6 +96,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     removeCodeModeUnavailableHelpers: false,
     enableCodeModeSchemaDefaults: false,
     enableCodeModeGuideRepl: false,
+    enableCodeModeBackgroundShell: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,
@@ -891,6 +892,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.enableCodeModeGuideRepl =
               !settings.misc!.enableCodeModeGuideRepl;
+          });
+        },
+      },
+      {
+        id: 'enableCodeModeBackgroundShell',
+        title: 'Code Mode: $`cmd`.background()',
+        description:
+          'In Code Mode scripts, $`cmd`.background() (or a timeout of 0) starts the command as a background task and resolves at once with running.taskId and running.outputPath, instead of waiting out a timeout.',
+        getValue: () => settings.misc?.enableCodeModeBackgroundShell ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableCodeModeBackgroundShell =
+              !settings.misc!.enableCodeModeBackgroundShell;
           });
         },
       },

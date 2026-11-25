@@ -93,6 +93,7 @@ import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeCodeModeUnavailableHelpers } from './codeModeUnavailableHelpers';
 import { writeCodeModeSchemaDefaults } from './codeModeSchemaDefaults';
 import { writeCodeModeGuideRepl } from './codeModeGuideRepl';
+import { writeCodeModeBackgroundShell } from './codeModeBackgroundShell';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
 import { writeSkipDevChannelsDialog } from './skipDevChannelsDialog';
@@ -501,6 +502,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Give the built-in claude-code-guide agent the REPL tool, so it runs in Code Mode when the session does',
+  },
+  {
+    id: 'code-mode-background-shell',
+    name: 'Code Mode: $`cmd`.background()',
+    group: PatchGroup.FEATURES,
+    description:
+      "Add .background() to Code Mode's $, which starts the command as a background task and resolves at once with its task id and output file",
   },
   {
     id: 'worktree-mode',
@@ -1010,6 +1018,10 @@ export const buildPatchImplementations = (
     'code-mode-guide-repl': {
       fn: c => writeCodeModeGuideRepl(c),
       condition: !!config.settings.misc?.enableCodeModeGuideRepl,
+    },
+    'code-mode-background-shell': {
+      fn: c => writeCodeModeBackgroundShell(c),
+      condition: !!config.settings.misc?.enableCodeModeBackgroundShell,
     },
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),

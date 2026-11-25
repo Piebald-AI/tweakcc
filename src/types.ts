@@ -146,6 +146,7 @@ export interface MiscConfig {
   removeCodeModeUnavailableHelpers: boolean;
   enableCodeModeSchemaDefaults: boolean;
   enableCodeModeGuideRepl: boolean;
+  enableCodeModeBackgroundShell: boolean;
   enableContextLimitOverride: boolean;
   enableModelCustomizations: boolean;
   enableVoiceMode: boolean;

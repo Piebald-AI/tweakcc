@@ -179,6 +179,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.enableCodeModeSchemaDefaults;
     case 'code-mode-guide-repl':
       return !!misc?.enableCodeModeGuideRepl;
+    case 'code-mode-background-shell':
+      return !!misc?.enableCodeModeBackgroundShell;
     case 'worktree-mode':
       return !!misc?.enableWorktreeMode;
     case 'session-memory':
