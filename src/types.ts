@@ -143,6 +143,7 @@ export interface MiscConfig {
   tmuxGraphicsPassthrough: boolean;
   enableWorktreeMode: boolean;
   allowCustomAgentModels: boolean;
+  enableCodeModeReplPostToolUseForMods: boolean;
   enableCodeModeStableNoteOrder: boolean;
   enableContextLimitOverride: boolean;
   enableModelCustomizations: boolean;

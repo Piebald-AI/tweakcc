@@ -90,6 +90,7 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeTmuxGraphicsPassthrough } from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
+import { writeCodeModeReplPostToolUseForMods } from './codeModeReplPostToolUseForMods';
 import { writeCodeModeStableNoteOrder } from './codeModeStableNoteOrder';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
@@ -478,6 +479,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Allow arbitrary model names in custom agent frontmatter (e.g. gemini-2.5-flash)',
+  },
+  {
+    id: 'code-mode-repl-post-tool-use-for-mods',
+    name: 'Code Mode REPL PostToolUse for mods',
+    group: PatchGroup.FEATURES,
+    description:
+      "Let a mod's catch-all classic.PostToolUse hook see REPL and Poll results, so it can redact a script's output",
   },
   {
     id: 'code-mode-stable-note-order',
@@ -982,6 +990,10 @@ export const buildPatchImplementations = (
     'allow-custom-agent-models': {
       fn: c => writeAllowCustomAgentModels(c),
       condition: !!config.settings.misc?.allowCustomAgentModels,
+    },
+    'code-mode-repl-post-tool-use-for-mods': {
+      fn: c => writeCodeModeReplPostToolUseForMods(c),
+      condition: !!config.settings.misc?.enableCodeModeReplPostToolUseForMods,
     },
     'code-mode-stable-note-order': {
       fn: c => writeCodeModeStableNoteOrder(c),

@@ -93,6 +93,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     tmuxGraphicsPassthrough: false,
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
+    enableCodeModeReplPostToolUseForMods: false,
     enableCodeModeStableNoteOrder: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
@@ -846,6 +847,21 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.allowCustomAgentModels =
               !settings.misc!.allowCustomAgentModels;
+          });
+        },
+      },
+      {
+        id: 'enableCodeModeReplPostToolUseForMods',
+        title: 'Code Mode REPL output to mod PostToolUse',
+        description:
+          "Run a mod's catch-all classic.PostToolUse hook on REPL and Poll results too, so a redaction mod can rewrite a script's output with updatedToolOutput. Other tool hooks still see only the inner calls.",
+        getValue: () =>
+          settings.misc?.enableCodeModeReplPostToolUseForMods ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableCodeModeReplPostToolUseForMods =
+              !settings.misc!.enableCodeModeReplPostToolUseForMods;
           });
         },
       },

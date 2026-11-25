@@ -173,6 +173,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.tmuxGraphicsPassthrough;
     case 'allow-custom-agent-models':
       return !!misc?.allowCustomAgentModels;
+    case 'code-mode-repl-post-tool-use-for-mods':
+      return !!misc?.enableCodeModeReplPostToolUseForMods;
     case 'code-mode-stable-note-order':
       return !!misc?.enableCodeModeStableNoteOrder;
     case 'worktree-mode':
