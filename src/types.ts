@@ -148,6 +148,7 @@ export interface MiscConfig {
   enableVoiceMode: boolean;
   enableVoiceConciseOutput: boolean;
   enableChannelsMode: boolean;
+  fixCodeModeChainedCalls: boolean;
   disableCtrlZSuspend: boolean;
   skipSkillShellValidation: boolean;
   skipTrustDialog: boolean;

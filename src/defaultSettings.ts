@@ -724,6 +724,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableVoiceMode: false,
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
+    fixCodeModeChainedCalls: false,
     disableCtrlZSuspend: false,
     skipSkillShellValidation: false,
     skipTrustDialog: false,

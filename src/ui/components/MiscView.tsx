@@ -98,6 +98,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableVoiceMode: false,
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
+    fixCodeModeChainedCalls: false,
     disableCtrlZSuspend: false,
     skipSkillShellValidation: false,
     skipTrustDialog: false,
@@ -845,6 +846,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.allowCustomAgentModels =
               !settings.misc!.allowCustomAgentModels;
+          });
+        },
+      },
+      {
+        id: 'fixCodeModeChainedCalls',
+        title: 'Code Mode: run chained steps after a script returns',
+        description:
+          'Steps a script chains on a command it did not await (e.g. writing a result file when a test suite ends) can make tool calls; without this they are refused and Claude reruns the command.',
+        getValue: () => settings.misc?.fixCodeModeChainedCalls ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.fixCodeModeChainedCalls =
+              !settings.misc!.fixCodeModeChainedCalls;
           });
         },
       },

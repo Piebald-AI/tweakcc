@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Never reuse bytes of a linked Bun bytecode payload when patching native binaries (Claude Code 2.1.310+) (#1056) - @coleleavitt
 - Fall back to the previous version's prompt data until prompts for a new Claude Code version are published, instead of skipping all prompt customizations (#1060) - @coleleavitt
 - Fix native patching for Claude Code 2.1.327 (#1077) - @gtkpad
+- Add a Code Mode chained calls patch: steps a script chains on a command it left running (`.then(r => write(...))`) run when the command ends instead of being refused, so Claude no longer reruns the command - @coleleavitt
 
 ## [v4.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.4.0) - 2026-10-10
 
