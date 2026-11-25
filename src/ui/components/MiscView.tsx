@@ -94,6 +94,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
     removeCodeModeUnavailableHelpers: false,
+    enableCodeModeSchemaDefaults: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,
@@ -861,6 +862,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.removeCodeModeUnavailableHelpers =
               !settings.misc!.removeCodeModeUnavailableHelpers;
+          });
+        },
+      },
+      {
+        id: 'enableCodeModeSchemaDefaults',
+        title: 'Code Mode: schema defaults in tool types',
+        description:
+          'Show a field\'s JSON Schema default, as "(default 5000)", in the TypeScript types of Code Mode\'s tool declarations and searchTools results.',
+        getValue: () => settings.misc?.enableCodeModeSchemaDefaults ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableCodeModeSchemaDefaults =
+              !settings.misc!.enableCodeModeSchemaDefaults;
           });
         },
       },

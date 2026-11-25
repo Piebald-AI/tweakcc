@@ -175,6 +175,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.allowCustomAgentModels;
     case 'code-mode-unavailable-helpers':
       return !!misc?.removeCodeModeUnavailableHelpers;
+    case 'code-mode-schema-defaults':
+      return !!misc?.enableCodeModeSchemaDefaults;
     case 'worktree-mode':
       return !!misc?.enableWorktreeMode;
     case 'session-memory':

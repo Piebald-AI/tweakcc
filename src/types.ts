@@ -144,6 +144,7 @@ export interface MiscConfig {
   enableWorktreeMode: boolean;
   allowCustomAgentModels: boolean;
   removeCodeModeUnavailableHelpers: boolean;
+  enableCodeModeSchemaDefaults: boolean;
   enableContextLimitOverride: boolean;
   enableModelCustomizations: boolean;
   enableVoiceMode: boolean;

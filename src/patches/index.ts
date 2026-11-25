@@ -91,6 +91,7 @@ import { writeTmuxGraphicsPassthrough } from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeCodeModeUnavailableHelpers } from './codeModeUnavailableHelpers';
+import { writeCodeModeSchemaDefaults } from './codeModeSchemaDefaults';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
 import { writeSkipDevChannelsDialog } from './skipDevChannelsDialog';
@@ -485,6 +486,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Leave write(), edit() and file() out of a Code Mode script when the agent lacks the Write, Edit or Read tool',
+  },
+  {
+    id: 'code-mode-schema-defaults',
+    name: 'Code Mode: schema defaults in tool types',
+    group: PatchGroup.FEATURES,
+    description:
+      "Keep each field's JSON Schema default in the TypeScript tool types Code Mode shows the model",
   },
   {
     id: 'worktree-mode',
@@ -986,6 +994,10 @@ export const buildPatchImplementations = (
     'code-mode-unavailable-helpers': {
       fn: c => writeCodeModeUnavailableHelpers(c),
       condition: !!config.settings.misc?.removeCodeModeUnavailableHelpers,
+    },
+    'code-mode-schema-defaults': {
+      fn: c => writeCodeModeSchemaDefaults(c),
+      condition: !!config.settings.misc?.enableCodeModeSchemaDefaults,
     },
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),
