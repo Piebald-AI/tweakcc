@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix native patching for Claude Code 2.1.327 (#1077) - @gtkpad
 - Add a Code Mode patch that leaves `write()`, `edit()` and `file()` out of the scripts of an agent without the Write, Edit or Read tool, instead of defining helpers that always throw (anthropics/claude-code#110715) - @coleleavitt
 - Add a Code Mode patch that keeps each field's JSON Schema `default` in the TypeScript tool types shown to the model (anthropics/claude-code#111592) - @coleleavitt
+- Add a Code Mode patch that gives the built-in `claude-code-guide` agent the REPL tool, so it runs in Code Mode when the session does (anthropics/claude-code#111386) - @coleleavitt
 
 ## [v4.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.4.0) - 2026-10-10
 

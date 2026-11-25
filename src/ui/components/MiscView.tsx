@@ -95,6 +95,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     allowCustomAgentModels: false,
     removeCodeModeUnavailableHelpers: false,
     enableCodeModeSchemaDefaults: false,
+    enableCodeModeGuideRepl: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,
@@ -876,6 +877,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.enableCodeModeSchemaDefaults =
               !settings.misc!.enableCodeModeSchemaDefaults;
+          });
+        },
+      },
+      {
+        id: 'enableCodeModeGuideRepl',
+        title: 'Code Mode: REPL for claude-code-guide',
+        description:
+          "Add REPL to the built-in claude-code-guide agent's tools, so in a Code Mode session it searches and fetches docs from scripts instead of one tool call per page.",
+        getValue: () => settings.misc?.enableCodeModeGuideRepl ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableCodeModeGuideRepl =
+              !settings.misc!.enableCodeModeGuideRepl;
           });
         },
       },

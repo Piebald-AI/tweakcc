@@ -721,6 +721,7 @@ export const DEFAULT_SETTINGS: Settings = {
     allowCustomAgentModels: false,
     removeCodeModeUnavailableHelpers: false,
     enableCodeModeSchemaDefaults: false,
+    enableCodeModeGuideRepl: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,

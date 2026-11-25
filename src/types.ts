@@ -145,6 +145,7 @@ export interface MiscConfig {
   allowCustomAgentModels: boolean;
   removeCodeModeUnavailableHelpers: boolean;
   enableCodeModeSchemaDefaults: boolean;
+  enableCodeModeGuideRepl: boolean;
   enableContextLimitOverride: boolean;
   enableModelCustomizations: boolean;
   enableVoiceMode: boolean;

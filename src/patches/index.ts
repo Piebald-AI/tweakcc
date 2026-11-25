@@ -92,6 +92,7 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeCodeModeUnavailableHelpers } from './codeModeUnavailableHelpers';
 import { writeCodeModeSchemaDefaults } from './codeModeSchemaDefaults';
+import { writeCodeModeGuideRepl } from './codeModeGuideRepl';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
 import { writeSkipDevChannelsDialog } from './skipDevChannelsDialog';
@@ -493,6 +494,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       "Keep each field's JSON Schema default in the TypeScript tool types Code Mode shows the model",
+  },
+  {
+    id: 'code-mode-guide-repl',
+    name: 'Code Mode: REPL for claude-code-guide',
+    group: PatchGroup.FEATURES,
+    description:
+      'Give the built-in claude-code-guide agent the REPL tool, so it runs in Code Mode when the session does',
   },
   {
     id: 'worktree-mode',
@@ -998,6 +1006,10 @@ export const buildPatchImplementations = (
     'code-mode-schema-defaults': {
       fn: c => writeCodeModeSchemaDefaults(c),
       condition: !!config.settings.misc?.enableCodeModeSchemaDefaults,
+    },
+    'code-mode-guide-repl': {
+      fn: c => writeCodeModeGuideRepl(c),
+      condition: !!config.settings.misc?.enableCodeModeGuideRepl,
     },
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),
