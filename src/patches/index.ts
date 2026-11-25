@@ -90,6 +90,7 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeTmuxGraphicsPassthrough } from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
+import { writeCodeModeWaitGuidance } from './codeModeWaitGuidance';
 import { writeCodeModeChainedCalls } from './codeModeChainedCalls';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
@@ -485,6 +486,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Let steps a Code Mode script chains on a command it left running make tool calls when the command ends, instead of being refused',
+  },
+  {
+    id: 'code-mode-wait-guidance',
+    name: 'Code Mode wait guidance',
+    group: PatchGroup.FEATURES,
+    description:
+      'Tell Claude in the Code Mode REPL prompt to wait for CI and other outside events with a background command, not with sleep() or poll loops in a script',
   },
   {
     id: 'worktree-mode',
@@ -986,6 +994,10 @@ export const buildPatchImplementations = (
     'code-mode-chained-calls': {
       fn: c => writeCodeModeChainedCalls(c),
       condition: !!config.settings.misc?.fixCodeModeChainedCalls,
+    },
+    'code-mode-wait-guidance': {
+      fn: c => writeCodeModeWaitGuidance(c),
+      condition: !!config.settings.misc?.codeModeWaitGuidance,
     },
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),

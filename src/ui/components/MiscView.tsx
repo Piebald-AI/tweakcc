@@ -99,6 +99,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
     fixCodeModeChainedCalls: false,
+    codeModeWaitGuidance: false,
     disableCtrlZSuspend: false,
     skipSkillShellValidation: false,
     skipTrustDialog: false,
@@ -860,6 +861,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.fixCodeModeChainedCalls =
               !settings.misc!.fixCodeModeChainedCalls;
+          });
+        },
+      },
+      {
+        id: 'codeModeWaitGuidance',
+        title: 'Code Mode: wait for CI in the background',
+        description:
+          'Tell Claude to wait for CI runs, deploys and reviews with a background shell command and end its turn, instead of sleep() and poll loops that freeze the session.',
+        getValue: () => settings.misc?.codeModeWaitGuidance ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.codeModeWaitGuidance =
+              !settings.misc!.codeModeWaitGuidance;
           });
         },
       },

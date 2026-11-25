@@ -175,6 +175,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.allowCustomAgentModels;
     case 'code-mode-chained-calls':
       return !!misc?.fixCodeModeChainedCalls;
+    case 'code-mode-wait-guidance':
+      return !!misc?.codeModeWaitGuidance;
     case 'worktree-mode':
       return !!misc?.enableWorktreeMode;
     case 'session-memory':
