@@ -14,11 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Never reuse bytes of a linked Bun bytecode payload when patching native binaries (Claude Code 2.1.310+) (#1056) - @coleleavitt
 - Fall back to the previous version's prompt data until prompts for a new Claude Code version are published, instead of skipping all prompt customizations (#1060) - @coleleavitt
 - Fix native patching for Claude Code 2.1.327 (#1077) - @gtkpad
-- Add a Code Mode patch that leaves `write()`, `edit()` and `file()` out of the scripts of an agent without the Write, Edit or Read tool, instead of defining helpers that always throw (anthropics/claude-code#110715) - @coleleavitt
-- Add a Code Mode patch that keeps each field's JSON Schema `default` in the TypeScript tool types shown to the model (anthropics/claude-code#111592) - @coleleavitt
-- Add a Code Mode patch that gives the built-in `claude-code-guide` agent the REPL tool, so it runs in Code Mode when the session does (anthropics/claude-code#111386) - @coleleavitt
-- Add a Code Mode patch that adds `$`cmd`.background()`, which starts a shell command as a background task and resolves at once with its task id and output file (anthropics/claude-code#110717) - @coleleavitt
-- Add a Code Mode patch that makes `$(command)` refuse a command string with the word `undefined`, which an untagged template literal writes for an undefined value - @coleleavitt
+- Add a Code Mode patch that leaves `write()`, `edit()` and `file()` out of the scripts of an agent without the Write, Edit or Read tool, instead of defining helpers that always throw (anthropics/claude-code#110715) (#1091) - @coleleavitt
+- Add a Code Mode patch that keeps each field's JSON Schema `default` in the TypeScript tool types shown to the model (anthropics/claude-code#111592) (#1091) - @coleleavitt
+- Add a Code Mode patch that gives the built-in `claude-code-guide` agent the REPL tool, so it runs in Code Mode when the session does (anthropics/claude-code#111386) (#1091) - @coleleavitt
+- Add a Code Mode patch that adds `$`cmd`.background()`, which starts a shell command as a background task and resolves at once with its task id and output file (anthropics/claude-code#110717) (#1091) - @coleleavitt
+- Add a Code Mode patch that makes `$(command)` refuse a command string with the word `undefined`, which an untagged template literal writes for an undefined value (#1091) - @coleleavitt
 
 ## [v4.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.4.0) - 2026-10-10
 
