@@ -90,6 +90,7 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeTmuxGraphicsPassthrough } from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
+import { writeCodeModeHeadlessHosts } from './codeModeHeadlessHosts';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
 import { writeSkipDevChannelsDialog } from './skipDevChannelsDialog';
@@ -477,6 +478,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Allow arbitrary model names in custom agent frontmatter (e.g. gemini-2.5-flash)',
+  },
+  {
+    id: 'code-mode-headless-hosts',
+    name: 'Code Mode in -p and SDK hosts',
+    group: PatchGroup.FEATURES,
+    description:
+      'Let stream-json hosts with their own entrypoint (T3 Code, Orca) start Code Mode, and take the opt-in from the environment or user settings once it was accepted in a terminal',
   },
   {
     id: 'worktree-mode',
@@ -974,6 +982,10 @@ export const buildPatchImplementations = (
     'allow-custom-agent-models': {
       fn: c => writeAllowCustomAgentModels(c),
       condition: !!config.settings.misc?.allowCustomAgentModels,
+    },
+    'code-mode-headless-hosts': {
+      fn: c => writeCodeModeHeadlessHosts(c),
+      condition: !!config.settings.misc?.codeModeInHeadlessHosts,
     },
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),

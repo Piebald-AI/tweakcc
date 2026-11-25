@@ -93,6 +93,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     tmuxGraphicsPassthrough: false,
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
+    codeModeInHeadlessHosts: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,
@@ -845,6 +846,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.allowCustomAgentModels =
               !settings.misc!.allowCustomAgentModels;
+          });
+        },
+      },
+      {
+        id: 'codeModeInHeadlessHosts',
+        title: 'Code Mode in -p and SDK hosts',
+        description:
+          'Start Code Mode in claude -p and stream-json hosts that set their own entrypoint (T3 Code, Orca), and take CLAUDE_CODE_EXPERIMENTAL_CODE_MODE from the environment or ~/.claude/settings.json, not only --settings, once Code Mode was accepted in a terminal.',
+        getValue: () => settings.misc?.codeModeInHeadlessHosts ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.codeModeInHeadlessHosts =
+              !settings.misc!.codeModeInHeadlessHosts;
           });
         },
       },
