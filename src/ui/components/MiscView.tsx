@@ -868,7 +868,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
         id: 'showCodeModeScriptOutput',
         title: 'Show Code Mode script output',
         description:
-          'In the Ctrl+O transcript, an expanded Code(...) row also shows what the script logged and returned. Display only: what the model sees does not change.',
+          'In the Ctrl+O transcript, an expanded Code(...) row also shows what the script logged and returned (for an async script, once it has settled). Display only: what the model sees does not change.',
         getValue: () => settings.misc?.showCodeModeScriptOutput ?? false,
         toggle: () => {
           updateSettings(settings => {

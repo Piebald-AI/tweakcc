@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix native patching for Claude Code 2.1.327 (#1077) - @gtkpad
 - Add a Code Mode script output patch: an expanded `Code(...)` row in the Ctrl+O transcript shows the script's log and return value below its source (anthropics/claude-code#111539) - @coleleavitt
 - Add a Read result content patch: in the Ctrl+O transcript and in verbose mode, a Read row shows the text it returned, also for Read calls inside a Code Mode script (anthropics/claude-code#111539) - @coleleavitt
+- Add a Code Mode async script output patch: an async script's output is kept when it settles, so its expanded `Code(...)` row shows it too (with the script output toggle) - @coleleavitt
 
 ## [v4.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.4.0) - 2026-10-10
 

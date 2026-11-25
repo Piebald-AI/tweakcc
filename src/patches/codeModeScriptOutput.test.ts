@@ -108,6 +108,26 @@ describe('writeCodeModeScriptOutput', () => {
     ).not.toContain('result');
   });
 
+  it('shows the recorded output for a settled async receipt', () => {
+    const receipt = {
+      code: OUTPUT.code,
+      result: '(dispatched #1)',
+      stdout: '',
+      stderr: '',
+      evalId: 1,
+      asyncDispatched: true,
+    };
+    const store = globalThis as {
+      __tweakccSettledReplOutputs?: Map<string, unknown>;
+    };
+    store.__tweakccSettledReplOutputs = new Map([['toolu_1', OUTPUT]]);
+    try {
+      expect(shownText(render(patched, receipt))).toContain('result: { n: 1 }');
+    } finally {
+      delete store.__tweakccSettledReplOutputs;
+    }
+  });
+
   it('returns null when the script source block is not there', () => {
     expect(writeCodeModeScriptOutput('let x=1;')).toBeNull();
     expect(

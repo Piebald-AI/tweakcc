@@ -92,6 +92,7 @@ import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
 import { writeReadResultContent } from './readResultContent';
 import { writeCodeModeScriptOutput } from './codeModeScriptOutput';
+import { writeCodeModeAsyncScriptOutput } from './codeModeAsyncScriptOutput';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
 import { writeSkipDevChannelsDialog } from './skipDevChannelsDialog';
@@ -493,6 +494,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       "Show a Code Mode script's log and return value below its source in the expanded transcript row",
+  },
+  {
+    id: 'code-mode-async-script-output',
+    name: 'Code Mode async script output',
+    group: PatchGroup.FEATURES,
+    description:
+      'Keep the output of an async Code Mode script when it settles, so its expanded transcript row can show it',
   },
   {
     id: 'worktree-mode',
@@ -997,6 +1005,10 @@ export const buildPatchImplementations = (
     },
     'code-mode-script-output': {
       fn: c => writeCodeModeScriptOutput(c),
+      condition: !!config.settings.misc?.showCodeModeScriptOutput,
+    },
+    'code-mode-async-script-output': {
+      fn: c => writeCodeModeAsyncScriptOutput(c),
       condition: !!config.settings.misc?.showCodeModeScriptOutput,
     },
     'worktree-mode': {

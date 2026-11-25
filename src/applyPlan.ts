@@ -176,6 +176,7 @@ export function isPatchEnabledByConfig(
     case 'read-result-content':
       return !!misc?.showReadResultContent;
     case 'code-mode-script-output':
+    case 'code-mode-async-script-output':
       return !!misc?.showCodeModeScriptOutput;
     case 'worktree-mode':
       return !!misc?.enableWorktreeMode;

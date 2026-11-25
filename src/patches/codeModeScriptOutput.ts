@@ -20,9 +20,14 @@
 // patch adds its log, stderr and result below the source when the row is
 // expanded, each passed through the row's own display sanitizer. Display only:
 // the tool_result sent to the model is built elsewhere and does not change.
-// An async receipt (`asyncDispatched`) has no output yet, so it shows nothing.
+// An async receipt (`asyncDispatched`) carries no output; for it the row shows
+// the output codeModeAsyncScriptOutput recorded when the script settled, if
+// any.
 
 import { showDiff } from './index';
+
+/** Settled async REPL outputs by REPL tool use id, for display only. */
+export const SETTLED_OUTPUTS = 'globalThis.__tweakccSettledReplOutputs';
 
 const ANCHOR =
   /([$\w]+)=([$\w]+)&&([$\w]+)\(([$\w]+),\{children:\3\([$\w]+,\{code:([$\w]+),filePath:"script\.js",[^}]*\}\)\}\),[^;]*;else \1=[$\w]+\[\d+\];/g;
@@ -42,6 +47,7 @@ export const writeCodeModeScriptOutput = (oldFile: string): string | null => {
   // The rest of the names come from the same function, before the anchor.
   const fnStart = oldFile.lastIndexOf('function ', anchor.index!);
   const body = oldFile.slice(fnStart, anchor.index!);
+  const toolUseId = body.match(/,toolUseId:([$\w]+),input:/)?.[1];
   const output = body.match(/,output:([$\w]+),shouldAnimate:/)?.[1];
   const box = body.match(/\(([$\w]+),\{flexShrink:0,children:/)?.[1];
   const text = body.match(/\(([$\w]+),\{dimColor:!0,children:\[/)?.[1];
@@ -50,16 +56,17 @@ export const writeCodeModeScriptOutput = (oldFile: string): string | null => {
       `[;,]${code.replace(/\$/g, '\\$')}=([$\\w]+)\\([$\\w]+\\.replace\\(`
     )
   )?.[1];
-  if (!output || !box || !text || !sanitize) {
+  if (!toolUseId || !output || !box || !text || !sanitize) {
     console.error(
-      'patch: codeModeScriptOutput: could not find the output prop, Box, Text or sanitizer'
+      'patch: codeModeScriptOutput: could not find the props, Box, Text or sanitizer'
     );
     return null;
   }
 
   const insertion =
-    `if(${expanded}&&${output}&&${output}.asyncDispatched!==!0){` +
-    `let $tccParts=[["log",${output}.stdout],["stderr",${output}.stderr],["result",${output}.result]]` +
+    `let $tccOut=${output}?.asyncDispatched===!0?${SETTLED_OUTPUTS}?.get(${toolUseId}):${output};` +
+    `if(${expanded}&&$tccOut){` +
+    `let $tccParts=[["log",$tccOut.stdout],["stderr",$tccOut.stderr],["result",$tccOut.result]]` +
     `.filter(([,$tccV])=>$tccV!==void 0&&$tccV!=="");` +
     `if($tccParts.length>0)${block}=${jsx}(${box},{flexDirection:"column",children:[${block},` +
     `${jsx}(${gutter},{children:${jsx}(${box},{flexDirection:"column",children:$tccParts.map(([$tccK,$tccV])=>` +
