@@ -726,6 +726,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableChannelsMode: false,
     fixCodeModeChainedCalls: false,
     codeModeWaitGuidance: false,
+    codeModeScanGuidance: false,
     disableCtrlZSuspend: false,
     skipSkillShellValidation: false,
     skipTrustDialog: false,

@@ -177,6 +177,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.fixCodeModeChainedCalls;
     case 'code-mode-wait-guidance':
       return !!misc?.codeModeWaitGuidance;
+    case 'code-mode-scan-guidance':
+      return !!misc?.codeModeScanGuidance;
     case 'worktree-mode':
       return !!misc?.enableWorktreeMode;
     case 'session-memory':

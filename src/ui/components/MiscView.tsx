@@ -100,6 +100,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableChannelsMode: false,
     fixCodeModeChainedCalls: false,
     codeModeWaitGuidance: false,
+    codeModeScanGuidance: false,
     disableCtrlZSuspend: false,
     skipSkillShellValidation: false,
     skipTrustDialog: false,
@@ -875,6 +876,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.codeModeWaitGuidance =
               !settings.misc!.codeModeWaitGuidance;
+          });
+        },
+      },
+      {
+        id: 'codeModeScanGuidance',
+        title: 'Code Mode: scan files with one command',
+        description:
+          'Tell Claude to scan many files with one command (rg, python3 -c) inside a script instead of reading each file with its own Read call, each of which runs permission checks and hooks.',
+        getValue: () => settings.misc?.codeModeScanGuidance ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.codeModeScanGuidance =
+              !settings.misc!.codeModeScanGuidance;
           });
         },
       },

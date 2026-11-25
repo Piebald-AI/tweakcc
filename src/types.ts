@@ -150,6 +150,7 @@ export interface MiscConfig {
   enableChannelsMode: boolean;
   fixCodeModeChainedCalls: boolean;
   codeModeWaitGuidance: boolean;
+  codeModeScanGuidance: boolean;
   disableCtrlZSuspend: boolean;
   skipSkillShellValidation: boolean;
   skipTrustDialog: boolean;

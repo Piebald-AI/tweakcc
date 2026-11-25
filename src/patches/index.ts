@@ -90,6 +90,7 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeTmuxGraphicsPassthrough } from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
+import { writeCodeModeScanGuidance } from './codeModeScanGuidance';
 import { writeCodeModeWaitGuidance } from './codeModeWaitGuidance';
 import { writeCodeModeChainedCalls } from './codeModeChainedCalls';
 import { writeVoiceMode } from './voiceMode';
@@ -493,6 +494,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Tell Claude in the Code Mode REPL prompt to wait for CI and other outside events with a background command, not with sleep() or poll loops in a script',
+  },
+  {
+    id: 'code-mode-scan-guidance',
+    name: 'Code Mode scan guidance',
+    group: PatchGroup.FEATURES,
+    description:
+      'Tell Claude in the Code Mode REPL prompt to scan many files with one shell command instead of one Read call per file',
   },
   {
     id: 'worktree-mode',
@@ -998,6 +1006,10 @@ export const buildPatchImplementations = (
     'code-mode-wait-guidance': {
       fn: c => writeCodeModeWaitGuidance(c),
       condition: !!config.settings.misc?.codeModeWaitGuidance,
+    },
+    'code-mode-scan-guidance': {
+      fn: c => writeCodeModeScanGuidance(c),
+      condition: !!config.settings.misc?.codeModeScanGuidance,
     },
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),
