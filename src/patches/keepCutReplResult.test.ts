@@ -109,7 +109,7 @@ describe('writeKeepCutReplResult', () => {
     expect(vm.runInContext('$0', session.context)).toBe('a:\nx\n\nb:\ny');
   });
 
-  it('leaves results that were not cut, and sessions without a VM global, alone', () => {
+  it('leaves results that were not cut, and sessions with neither engine, alone', () => {
     const session = newSession();
     const short = { shown: 'short' };
     expect(
@@ -124,6 +124,56 @@ describe('writeKeepCutReplResult', () => {
         cut
       ).Gn
     ).toBe(cut);
+  });
+
+  it('queues $0 as a string literal on the engine with a script queue', () => {
+    // The flag-gated engine (chunk-8tabekkf.js): its VM is private, and work
+    // reaches it through messages.post({tag, send: engine => engine.run(...)}).
+    const context = vm.createContext({});
+    const posted: { tag: number; send: (engine: unknown) => unknown }[] = [];
+    const runs: { tag: number; source?: object; timeoutMs: number }[] = [];
+    const engine = {
+      run: (
+        code: string,
+        opts: { tag: number; source?: object; timeoutMs: number }
+      ) => {
+        runs.push(opts);
+        return {
+          ok: true,
+          value: new vm.Script(code).runInContext(context, {
+            timeout: opts.timeoutMs,
+          }),
+        };
+      },
+    };
+    const session = {
+      carriedMarkers: new Set(),
+      messages: { post: (m: (typeof posted)[number]) => posted.push(m) },
+    };
+    const patched = writeKeepCutReplResult(RESULT)!;
+
+    const { Gn } = run(patched, session, whole, cut);
+    expect(Gn.shown).toMatch(/^\[The result below is cut\. .* is in \$0 /);
+    expect(posted).toHaveLength(1);
+    expect(vm.runInContext('typeof $0', context)).toBe('undefined');
+    posted[0].send(engine);
+    expect(
+      vm.runInContext('$0 === globalThis.$0 && $0.indexOf("MIDDLE")', context)
+    ).toBe(20000);
+    expect(vm.runInContext('$0.length', context)).toBe(whole.length);
+    expect(posted[0].tag).toBe(0);
+    expect(runs[0].tag).toBe(0);
+    expect(runs[0].source).toBeDefined();
+
+    const tricky = 'a\u2028b\u2029c"\\`${x}</script>'.repeat(3000);
+    run(patched, session, tricky, { shown: 'cut', uncut: [{ text: tricky }] });
+    posted[1].send(engine);
+    expect(vm.runInContext('$0', context)).toBe(tricky);
+
+    expect(run(patched, session, 'short', { shown: 'short' }).Gn.shown).toBe(
+      'short'
+    );
+    expect(posted).toHaveLength(2);
   });
 
   it('does not name $0 when it cannot be set', () => {

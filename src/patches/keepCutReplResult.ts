@@ -12,14 +12,25 @@
 //   Yn=[...me.carriedMarkers],Gn=se===void 0?void 0:Ho(se),en={code:Q,result:Gn?.shown,...}
 // `se` is the script's value, `Ho` renders it as `{shown, uncut}`, where `uncut`
 // (set only when the text was cut) lists the whole text in parts, and `me` is the
-// REPL session; for the in-process VM it holds the VM's global object in
-// `vmGlobal`.
+// REPL session. Code Mode has two script engines, and `me` differs between them:
+//   - the default one (chunk-r1b3qc87.js) holds the VM's global object in
+//     `me.vmGlobal`;
+//   - the one behind the tengu_breezy_cupcake flag (chunk-8tabekkf.js) keeps its
+//     VM private and runs everything through a queue, `me.messages`:
+//       this.messages.post({tag:$oe,send:(r)=>r.run(n,{timeoutMs:R_e(),tag:$oe}),...})
+//       run(e,{timeoutMs:t,tag:n,input:r,source:o}){if(o!==void 0&&this.#s.areBuiltinsFrozen()!==!0)
+//         return{ok:!1,cause:"lost",...};...if(o===void 0)this.#T(e,i);else this.#u.delete(e);...}
+//     where `$oe` is 0, the tag of work that belongs to no script.
 //
 // This patch puts the uncut text in the VM global `$0` (one string, laid out like
 // the uncut file: labelled parts separated by a blank line; for a string result it
 // is the string itself), and starts the shown result with a line that names it.
-// Only strings cross into the VM, so no host object becomes reachable from
-// scripts. A session without `vmGlobal` (the turn-worker REPL) is left as it is.
+// With `vmGlobal` it defines the property directly. With `messages` it queues a
+// one-line script that assigns the text as a string literal; the queue runs it
+// before the next script. It passes `source`, as every script run does, so the
+// engine doesn't keep the compiled script (with the text in it) in its cache;
+// built-ins are frozen by then, since a script just ended. Only a string reaches
+// the VM, so no host object becomes reachable from scripts.
 
 import { showDiff } from './index';
 
@@ -27,9 +38,12 @@ const NOTICE =
   '[The result below is cut. The whole of it, ${t.length} chars, is in $0 (a string) until another cut result replaces it: slice or search $0 in the next script instead of getting the value again.]';
 
 const keepUncut =
-  '((r,s)=>{if(r.uncut===void 0||s.vmGlobal===void 0)return r;' +
+  '((r,s)=>{if(r.uncut===void 0)return r;' +
   'let t=r.uncut.map((p)=>p.label===void 0?p.text:`${p.label}:\\n${p.text}`).join("\\n\\n");' +
-  'try{Object.defineProperty(s.vmGlobal,"$0",{value:t,writable:!0,enumerable:!0,configurable:!0})}catch{return r}' +
+  'if(s.vmGlobal!==void 0)try{Object.defineProperty(s.vmGlobal,"$0",{value:t,writable:!0,enumerable:!0,configurable:!0})}catch{return r}' +
+  'else if(s.messages?.post!==void 0){let c=`globalThis.$0=${JSON.stringify(t)};`;' +
+  's.messages.post({tag:0,send:(e)=>e.run(c,{timeoutMs:5e3,tag:0,source:{name:"repl-cut-result.js",lineOffset:0}})})}' +
+  'else return r;' +
   `return{...r,shown:\`${NOTICE}\\n\${r.shown}\`}})`;
 
 export const writeKeepCutReplResult = (oldFile: string): string | null => {
