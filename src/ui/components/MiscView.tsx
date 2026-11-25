@@ -97,6 +97,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableCodeModeSchemaDefaults: false,
     enableCodeModeGuideRepl: false,
     enableCodeModeBackgroundShell: false,
+    enableCodeModeShellUndefinedCheck: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,
@@ -906,6 +907,21 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.enableCodeModeBackgroundShell =
               !settings.misc!.enableCodeModeBackgroundShell;
+          });
+        },
+      },
+      {
+        id: 'enableCodeModeShellUndefinedCheck',
+        title: 'Code Mode: $(string) refuses undefined',
+        description:
+          "In Code Mode scripts, $(command) with a plain string throws before running when the string has the word undefined (an untagged template literal's undefined value); the tagged form $`...` already checks its values.",
+        getValue: () =>
+          settings.misc?.enableCodeModeShellUndefinedCheck ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableCodeModeShellUndefinedCheck =
+              !settings.misc!.enableCodeModeShellUndefinedCheck;
           });
         },
       },

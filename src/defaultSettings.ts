@@ -723,6 +723,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableCodeModeSchemaDefaults: false,
     enableCodeModeGuideRepl: false,
     enableCodeModeBackgroundShell: false,
+    enableCodeModeShellUndefinedCheck: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,

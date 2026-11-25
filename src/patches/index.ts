@@ -94,6 +94,7 @@ import { writeCodeModeUnavailableHelpers } from './codeModeUnavailableHelpers';
 import { writeCodeModeSchemaDefaults } from './codeModeSchemaDefaults';
 import { writeCodeModeGuideRepl } from './codeModeGuideRepl';
 import { writeCodeModeBackgroundShell } from './codeModeBackgroundShell';
+import { writeCodeModeShellUndefinedCheck } from './codeModeShellUndefinedCheck';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
 import { writeSkipDevChannelsDialog } from './skipDevChannelsDialog';
@@ -509,6 +510,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       "Add .background() to Code Mode's $, which starts the command as a background task and resolves at once with its task id and output file",
+  },
+  {
+    id: 'code-mode-shell-undefined-check',
+    name: 'Code Mode: $(string) refuses undefined',
+    group: PatchGroup.FEATURES,
+    description:
+      "Make Code Mode's $(command) refuse a command string with the word undefined, which an untagged template literal writes for an undefined value",
   },
   {
     id: 'worktree-mode',
@@ -1022,6 +1030,10 @@ export const buildPatchImplementations = (
     'code-mode-background-shell': {
       fn: c => writeCodeModeBackgroundShell(c),
       condition: !!config.settings.misc?.enableCodeModeBackgroundShell,
+    },
+    'code-mode-shell-undefined-check': {
+      fn: c => writeCodeModeShellUndefinedCheck(c),
+      condition: !!config.settings.misc?.enableCodeModeShellUndefinedCheck,
     },
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),

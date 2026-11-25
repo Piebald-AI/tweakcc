@@ -181,6 +181,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.enableCodeModeGuideRepl;
     case 'code-mode-background-shell':
       return !!misc?.enableCodeModeBackgroundShell;
+    case 'code-mode-shell-undefined-check':
+      return !!misc?.enableCodeModeShellUndefinedCheck;
     case 'worktree-mode':
       return !!misc?.enableWorktreeMode;
     case 'session-memory':
