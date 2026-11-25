@@ -93,6 +93,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     tmuxGraphicsPassthrough: false,
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
+    codeModeInBackgroundSessions: false,
     codeModeWithRemoteControl: false,
     codeModeInDesktop: false,
     codeModeInHeadlessHosts: false,
@@ -890,6 +891,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.codeModeWithRemoteControl =
               !settings.misc!.codeModeWithRemoteControl;
+          });
+        },
+      },
+      {
+        id: 'codeModeInBackgroundSessions',
+        title: 'Code Mode in background sessions',
+        description:
+          'Start Code Mode in claude --bg sessions, in claude respawn and from the agent view, once Code Mode was accepted in a terminal. Moving or copying a Code Mode session to the background stays refused.',
+        getValue: () => settings.misc?.codeModeInBackgroundSessions ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.codeModeInBackgroundSessions =
+              !settings.misc!.codeModeInBackgroundSessions;
           });
         },
       },

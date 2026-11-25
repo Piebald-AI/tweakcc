@@ -56,6 +56,7 @@ export interface Launch {
   headless?: boolean;
   remoteControl?: boolean;
   bgSession?: boolean;
+  teammate?: boolean;
   entrypoint?: string;
   source?: string;
   caveatsAccepted?: boolean;
@@ -70,6 +71,7 @@ export const settle = async (code: string, launch: Launch = {}) => {
     caveatsAccepted = true,
     remoteControl = false,
     bgSession = false,
+    teammate = false,
   } = launch;
   const states: { state: string; why?: string }[] = [];
   const stubs: Record<string, unknown> = {
@@ -116,6 +118,6 @@ export const settle = async (code: string, launch: Launch = {}) => {
     $Hl: () => states.push({ state: 'dialog' }),
   };
   const run = new Function(...NAMES, 'launch', `${code};return T_d(launch);`);
-  await run(...NAMES.map(name => stubs[name]), { remoteControl });
+  await run(...NAMES.map(name => stubs[name]), { remoteControl, teammate });
   return states.at(-1);
 };
