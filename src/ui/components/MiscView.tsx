@@ -93,6 +93,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     tmuxGraphicsPassthrough: false,
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
+    removeCodeModeUnavailableHelpers: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,
@@ -845,6 +846,21 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.allowCustomAgentModels =
               !settings.misc!.allowCustomAgentModels;
+          });
+        },
+      },
+      {
+        id: 'removeCodeModeUnavailableHelpers',
+        title: 'Code Mode: leave out unavailable helpers',
+        description:
+          'In Code Mode, a subagent without Write, Edit or Read (Explore, Plan) gets no write(), edit() or file() in its scripts, instead of functions that always throw.',
+        getValue: () =>
+          settings.misc?.removeCodeModeUnavailableHelpers ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.removeCodeModeUnavailableHelpers =
+              !settings.misc!.removeCodeModeUnavailableHelpers;
           });
         },
       },

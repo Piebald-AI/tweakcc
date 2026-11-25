@@ -90,6 +90,7 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeTmuxGraphicsPassthrough } from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
+import { writeCodeModeUnavailableHelpers } from './codeModeUnavailableHelpers';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
 import { writeSkipDevChannelsDialog } from './skipDevChannelsDialog';
@@ -477,6 +478,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Allow arbitrary model names in custom agent frontmatter (e.g. gemini-2.5-flash)',
+  },
+  {
+    id: 'code-mode-unavailable-helpers',
+    name: 'Code Mode: leave out unavailable helpers',
+    group: PatchGroup.FEATURES,
+    description:
+      'Leave write(), edit() and file() out of a Code Mode script when the agent lacks the Write, Edit or Read tool',
   },
   {
     id: 'worktree-mode',
@@ -974,6 +982,10 @@ export const buildPatchImplementations = (
     'allow-custom-agent-models': {
       fn: c => writeAllowCustomAgentModels(c),
       condition: !!config.settings.misc?.allowCustomAgentModels,
+    },
+    'code-mode-unavailable-helpers': {
+      fn: c => writeCodeModeUnavailableHelpers(c),
+      condition: !!config.settings.misc?.removeCodeModeUnavailableHelpers,
     },
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),
