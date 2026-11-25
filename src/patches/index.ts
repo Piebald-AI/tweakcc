@@ -90,6 +90,7 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeTmuxGraphicsPassthrough } from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
+import { writeCodeModeScriptOutput } from './codeModeScriptOutput';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
 import { writeSkipDevChannelsDialog } from './skipDevChannelsDialog';
@@ -477,6 +478,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Allow arbitrary model names in custom agent frontmatter (e.g. gemini-2.5-flash)',
+  },
+  {
+    id: 'code-mode-script-output',
+    name: 'Code Mode script output',
+    group: PatchGroup.FEATURES,
+    description:
+      "Show a Code Mode script's log and return value below its source in the expanded transcript row",
   },
   {
     id: 'worktree-mode',
@@ -974,6 +982,10 @@ export const buildPatchImplementations = (
     'allow-custom-agent-models': {
       fn: c => writeAllowCustomAgentModels(c),
       condition: !!config.settings.misc?.allowCustomAgentModels,
+    },
+    'code-mode-script-output': {
+      fn: c => writeCodeModeScriptOutput(c),
+      condition: !!config.settings.misc?.showCodeModeScriptOutput,
     },
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),

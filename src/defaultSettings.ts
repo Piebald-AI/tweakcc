@@ -719,6 +719,7 @@ export const DEFAULT_SETTINGS: Settings = {
     tmuxGraphicsPassthrough: false,
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
+    showCodeModeScriptOutput: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,

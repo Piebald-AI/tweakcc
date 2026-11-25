@@ -93,6 +93,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     tmuxGraphicsPassthrough: false,
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
+    showCodeModeScriptOutput: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,
@@ -845,6 +846,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.allowCustomAgentModels =
               !settings.misc!.allowCustomAgentModels;
+          });
+        },
+      },
+      {
+        id: 'showCodeModeScriptOutput',
+        title: 'Show Code Mode script output',
+        description:
+          'In the Ctrl+O transcript, an expanded Code(...) row also shows what the script logged and returned. Display only: what the model sees does not change.',
+        getValue: () => settings.misc?.showCodeModeScriptOutput ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.showCodeModeScriptOutput =
+              !settings.misc!.showCodeModeScriptOutput;
           });
         },
       },
