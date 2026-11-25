@@ -90,6 +90,7 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeTmuxGraphicsPassthrough } from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
+import { writeCodeModeStableNoteOrder } from './codeModeStableNoteOrder';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
 import { writeSkipDevChannelsDialog } from './skipDevChannelsDialog';
@@ -477,6 +478,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Allow arbitrary model names in custom agent frontmatter (e.g. gemini-2.5-flash)',
+  },
+  {
+    id: 'code-mode-stable-note-order',
+    name: 'Code Mode stable note order',
+    group: PatchGroup.FEATURES,
+    description:
+      "Keep a REPL script's inner tool-call rows from moving notes after a skill body, so a resent message matches the prompt cache",
   },
   {
     id: 'worktree-mode',
@@ -974,6 +982,10 @@ export const buildPatchImplementations = (
     'allow-custom-agent-models': {
       fn: c => writeAllowCustomAgentModels(c),
       condition: !!config.settings.misc?.allowCustomAgentModels,
+    },
+    'code-mode-stable-note-order': {
+      fn: c => writeCodeModeStableNoteOrder(c),
+      condition: !!config.settings.misc?.enableCodeModeStableNoteOrder,
     },
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),

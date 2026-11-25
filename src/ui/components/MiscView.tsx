@@ -93,6 +93,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     tmuxGraphicsPassthrough: false,
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
+    enableCodeModeStableNoteOrder: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
     enableVoiceMode: false,
@@ -845,6 +846,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.allowCustomAgentModels =
               !settings.misc!.allowCustomAgentModels;
+          });
+        },
+      },
+      {
+        id: 'enableCodeModeStableNoteOrder',
+        title: 'Stable Code Mode note order',
+        description:
+          "Keep a REPL script's inner tool-call rows from moving plugin notes and reminders inside a tool-result message, so the next request does not drop thinking and rewrite the prompt cache.",
+        getValue: () => settings.misc?.enableCodeModeStableNoteOrder ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.enableCodeModeStableNoteOrder =
+              !settings.misc!.enableCodeModeStableNoteOrder;
           });
         },
       },
