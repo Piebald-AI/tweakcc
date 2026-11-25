@@ -90,6 +90,7 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeTmuxGraphicsPassthrough } from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
+import { writeStableEventNonces } from './stableEventNonces';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
 import { writeSkipDevChannelsDialog } from './skipDevChannelsDialog';
@@ -477,6 +478,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Allow arbitrary model names in custom agent frontmatter (e.g. gemini-2.5-flash)',
+  },
+  {
+    id: 'stable-event-nonces',
+    name: 'Stable event nonces',
+    group: PatchGroup.FEATURES,
+    description:
+      'Keep Code Mode event nonces the same across restarts, so resuming a session does not rewrite its prompt cache',
   },
   {
     id: 'worktree-mode',
@@ -974,6 +982,10 @@ export const buildPatchImplementations = (
     'allow-custom-agent-models': {
       fn: c => writeAllowCustomAgentModels(c),
       condition: !!config.settings.misc?.allowCustomAgentModels,
+    },
+    'stable-event-nonces': {
+      fn: c => writeStableEventNonces(c),
+      condition: !!config.settings.misc?.enableStableEventNonces,
     },
     'worktree-mode': {
       fn: c => writeWorktreeMode(c),
