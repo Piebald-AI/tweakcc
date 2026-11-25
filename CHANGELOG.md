@@ -14,9 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Never reuse bytes of a linked Bun bytecode payload when patching native binaries (Claude Code 2.1.310+) (#1056) - @coleleavitt
 - Fall back to the previous version's prompt data until prompts for a new Claude Code version are published, instead of skipping all prompt customizations (#1060) - @coleleavitt
 - Fix native patching for Claude Code 2.1.327 (#1077) - @gtkpad
-- Add a Code Mode script output patch: an expanded `Code(...)` row in the Ctrl+O transcript shows the script's log and return value below its source (anthropics/claude-code#111539) - @coleleavitt
-- Add a Read result content patch: in the Ctrl+O transcript and in verbose mode, a Read row shows the text it returned, also for Read calls inside a Code Mode script (anthropics/claude-code#111539) - @coleleavitt
-- Add a Code Mode async script output patch: an async script's output is kept when it settles, so its expanded `Code(...)` row shows it too (with the script output toggle) - @coleleavitt
+- Add a Code Mode script output patch: an expanded `Code(...)` row in the Ctrl+O transcript shows the script's log and return value below its source (anthropics/claude-code#111539) (#1087) - @coleleavitt
+- Add a Read result content patch: in the Ctrl+O transcript and in verbose mode, a Read row shows the text it returned, also for Read calls inside a Code Mode script (anthropics/claude-code#111539) (#1087) - @coleleavitt
+- Add a Code Mode async script output patch: an async script's output is kept when it settles, so its expanded `Code(...)` row shows it too (with the script output toggle) (#1087) - @coleleavitt
 
 ## [v4.4.0](https://github.com/Piebald-AI/tweakcc/releases/tag/v4.4.0) - 2026-10-10
 
