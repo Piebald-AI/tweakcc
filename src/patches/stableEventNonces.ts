@@ -25,21 +25,27 @@ import { showDiff } from './index';
 
 const KEY_FILE = '.event-nonce-key';
 
+// The key is written to a private temporary file and published with a hard
+// link, which fails if the file already exists, so other processes see either
+// no file or all 32 bytes. A process that loses the race reads the published
+// key. Without process.getBuiltinModule (Node 22.0-22.2) or when the file
+// cannot be read or written, the per-process key is used, as unpatched.
 const keyLoader = (randomBytes: string) =>
-  '(()=>{try{' +
+  '(r=>{try{' +
   'const fs=process.getBuiltinModule("fs"),path=process.getBuiltinModule("path");' +
   'const dir=process.env.CLAUDE_CONFIG_DIR||path.join(process.getBuiltinModule("os").homedir(),".claude");' +
   `const file=path.join(dir,${JSON.stringify(KEY_FILE)});` +
-  'const read=()=>{try{const k=fs.readFileSync(file);return k.length===32?k:null}catch{return null}};' +
-  'let k=read();if(k)return k;' +
-  `k=${randomBytes}(32);` +
+  'const read=()=>{try{const b=fs.readFileSync(file);return b.length===32?b:null}catch{return null}};' +
+  'const found=read();if(found)return found;' +
+  'const key=r(32),tmp=`${file}.${process.pid}.${r(4).toString("hex")}`;' +
   'fs.mkdirSync(dir,{recursive:!0});' +
-  'try{fs.writeFileSync(file,k,{mode:384,flag:"wx"});return k}catch{return read()??k}' +
-  `}catch{return ${randomBytes}(32)}})()`;
+  'try{fs.writeFileSync(tmp,key,{mode:384});try{fs.linkSync(tmp,file)}catch{}}finally{try{fs.unlinkSync(tmp)}catch{}}' +
+  'return read()??key' +
+  `}catch{return r(32)}})(${randomBytes})`;
 
 export const writeStableEventNonces = (oldFile: string): string | null => {
   const pattern =
-    /([$\w]+)\?\?=([$\w]+)\(32\),([$\w]+)\("sha256",\1\)\.update\(/g;
+    /\breturn ([$\w]+)\?\?=([$\w]+)\(32\),([$\w]+)\("sha256",\1\)\.update\(/g;
   const matches = oldFile.includes('remint:')
     ? [...oldFile.matchAll(pattern)]
     : [];
@@ -51,7 +57,7 @@ export const writeStableEventNonces = (oldFile: string): string | null => {
   }
 
   const [whole, keyVar, randomBytes, hmac] = matches[0];
-  const replacement = `${keyVar}??=${keyLoader(randomBytes)},${hmac}("sha256",${keyVar}).update(`;
+  const replacement = `return ${keyVar}??=${keyLoader(randomBytes)},${hmac}("sha256",${keyVar}).update(`;
   const start = matches[0].index!;
   const end = start + whole.length;
   const newFile = oldFile.slice(0, start) + replacement + oldFile.slice(end);
