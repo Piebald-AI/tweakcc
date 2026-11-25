@@ -93,6 +93,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     tmuxGraphicsPassthrough: false,
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
+    showReadResultContent: false,
     showCodeModeScriptOutput: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
@@ -846,6 +847,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.allowCustomAgentModels =
               !settings.misc!.allowCustomAgentModels;
+          });
+        },
+      },
+      {
+        id: 'showReadResultContent',
+        title: 'Show Read result content',
+        description:
+          'In the Ctrl+O transcript and in verbose mode, a Read row (also one inside a Code Mode script) shows the file text it returned, not only the line count. Display only: what the model sees does not change.',
+        getValue: () => settings.misc?.showReadResultContent ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.showReadResultContent =
+              !settings.misc!.showReadResultContent;
           });
         },
       },

@@ -90,6 +90,7 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeTmuxGraphicsPassthrough } from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
+import { writeReadResultContent } from './readResultContent';
 import { writeCodeModeScriptOutput } from './codeModeScriptOutput';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
@@ -478,6 +479,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Allow arbitrary model names in custom agent frontmatter (e.g. gemini-2.5-flash)',
+  },
+  {
+    id: 'read-result-content',
+    name: 'Read result content',
+    group: PatchGroup.FEATURES,
+    description:
+      'Show the text a Read call returned in the Ctrl+O transcript and in verbose mode',
   },
   {
     id: 'code-mode-script-output',
@@ -982,6 +990,10 @@ export const buildPatchImplementations = (
     'allow-custom-agent-models': {
       fn: c => writeAllowCustomAgentModels(c),
       condition: !!config.settings.misc?.allowCustomAgentModels,
+    },
+    'read-result-content': {
+      fn: c => writeReadResultContent(c),
+      condition: !!config.settings.misc?.showReadResultContent,
     },
     'code-mode-script-output': {
       fn: c => writeCodeModeScriptOutput(c),

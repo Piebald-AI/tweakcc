@@ -173,6 +173,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.tmuxGraphicsPassthrough;
     case 'allow-custom-agent-models':
       return !!misc?.allowCustomAgentModels;
+    case 'read-result-content':
+      return !!misc?.showReadResultContent;
     case 'code-mode-script-output':
       return !!misc?.showCodeModeScriptOutput;
     case 'worktree-mode':
