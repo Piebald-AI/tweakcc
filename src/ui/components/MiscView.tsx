@@ -93,6 +93,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     tmuxGraphicsPassthrough: false,
     enableWorktreeMode: true,
     allowCustomAgentModels: false,
+    codeModeInDesktop: false,
     codeModeInHeadlessHosts: false,
     enableContextLimitOverride: false,
     enableModelCustomizations: true,
@@ -860,6 +861,20 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.codeModeInHeadlessHosts =
               !settings.misc!.codeModeInHeadlessHosts;
+          });
+        },
+      },
+      {
+        id: 'codeModeInDesktop',
+        title: 'Code Mode in the Desktop app',
+        description:
+          "Start Code Mode in the Desktop app's Code tab. The Code tab can't pass --settings, so turn on 'Code Mode in -p and SDK hosts' too and set CLAUDE_CODE_EXPERIMENTAL_CODE_MODE in ~/.claude/settings.json.",
+        getValue: () => settings.misc?.codeModeInDesktop ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.codeModeInDesktop =
+              !settings.misc!.codeModeInDesktop;
           });
         },
       },

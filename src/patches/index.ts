@@ -90,6 +90,7 @@ import { writeScrollEscapeSequenceFilter } from './scrollEscapeSequenceFilter';
 import { writeTmuxGraphicsPassthrough } from './tmuxGraphicsPassthrough';
 import { writeWorktreeMode } from './worktreeMode';
 import { writeAllowCustomAgentModels } from './allowCustomAgentModels';
+import { writeCodeModeDesktop } from './codeModeDesktop';
 import { writeCodeModeHeadlessHosts } from './codeModeHeadlessHosts';
 import { writeVoiceMode } from './voiceMode';
 import { writeChannelsMode } from './channelsMode';
@@ -478,6 +479,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.FEATURES,
     description:
       'Allow arbitrary model names in custom agent frontmatter (e.g. gemini-2.5-flash)',
+  },
+  {
+    id: 'code-mode-desktop',
+    name: 'Code Mode in the Desktop app',
+    group: PatchGroup.FEATURES,
+    description:
+      "Let the Desktop app's Code tab start Code Mode; with the Code Mode in -p and SDK hosts patch, the opt-in comes from ~/.claude/settings.json",
   },
   {
     id: 'code-mode-headless-hosts',
@@ -982,6 +990,10 @@ export const buildPatchImplementations = (
     'allow-custom-agent-models': {
       fn: c => writeAllowCustomAgentModels(c),
       condition: !!config.settings.misc?.allowCustomAgentModels,
+    },
+    'code-mode-desktop': {
+      fn: c => writeCodeModeDesktop(c),
+      condition: !!config.settings.misc?.codeModeInDesktop,
     },
     'code-mode-headless-hosts': {
       fn: c => writeCodeModeHeadlessHosts(c),
