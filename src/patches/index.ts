@@ -95,6 +95,10 @@ import { writeChannelsMode } from './channelsMode';
 import { writeSkipDevChannelsDialog } from './skipDevChannelsDialog';
 import { writeSkipTrustDialog } from './skipTrustDialog';
 import { writeDisableCtrlZSuspend } from './disableCtrlZSuspend';
+import {
+  writeSubscriptionFeaturesWithCustomAuth,
+  writeSubscriptionFeaturesWithCustomAuthModules,
+} from './subscriptionFeaturesWithCustomAuth';
 import { writeWebFetchUserAgent } from './webFetchUserAgent';
 import { writeSkipSkillShellValidation } from './skipSkillShellValidation';
 import { isShimmerCustomized, writeShimmerStyle } from './shimmerStyle';
@@ -594,6 +598,13 @@ const PATCH_DEFINITIONS = [
     group: PatchGroup.MISC_CONFIGURABLE,
     description: 'WebFetch sends the configured User-Agent string',
   },
+  {
+    id: 'subscription-features-with-custom-auth',
+    name: 'Subscription features with custom auth',
+    group: PatchGroup.FEATURES,
+    description:
+      'Remote Control, /voice and cloud sessions stay available with a claude.ai login when ANTHROPIC_BASE_URL or ANTHROPIC_AUTH_TOKEN is set (all-or-nothing)',
+  },
 ] as const;
 
 /** Union type of all valid patch IDs */
@@ -1082,6 +1093,12 @@ export const buildPatchImplementations = (
         writeWebFetchUserAgent(c, config.settings.misc!.webFetchUserAgent!),
       condition: !!config.settings.misc?.webFetchUserAgent,
     },
+    // Single-bundle path (cli.js / one-file native). A code-split native graph
+    // is patched all at once by applySubscriptionFeaturesToGraph instead.
+    'subscription-features-with-custom-auth': {
+      fn: c => writeSubscriptionFeaturesWithCustomAuth(c),
+      condition: !!config.settings.misc?.subscriptionFeaturesWithCustomAuth,
+    },
   };
 
   return patchImplementations;
@@ -1148,6 +1165,62 @@ export const applyUpdateGuardToGraph = (
     ...base,
     applied: changed > 0,
     details: changed > 0 ? `Updated ${changed} module(s).` : undefined,
+  };
+};
+
+/**
+ * Applies subscription-features-with-custom-auth to every JavaScript module of
+ * a code-split graph at once (all-or-nothing: its points live in many modules
+ * and the leak fixes must never be skipped). Returns null when disabled or
+ * filtered out.
+ */
+export const applySubscriptionFeaturesToGraph = (
+  config: TweakccConfig,
+  graphSources: Map<string, string>,
+  patchFilter?: readonly string[] | null
+): PatchResult | null => {
+  const definition = PATCH_DEFINITIONS.find(
+    def => def.id === 'subscription-features-with-custom-auth'
+  )!;
+  const base = {
+    id: definition.id,
+    name: definition.name,
+    group: definition.group,
+    description: definition.description,
+  };
+  if (
+    (patchFilter && !patchFilter.includes(definition.id)) ||
+    !config.settings.misc?.subscriptionFeaturesWithCustomAuth
+  ) {
+    return { ...base, applied: false, skipped: true };
+  }
+  const names = [...graphSources.keys()];
+  const outcome = writeSubscriptionFeaturesWithCustomAuthModules(
+    names.map(name => graphSources.get(name)!)
+  );
+  if (!outcome.ok) {
+    return {
+      ...base,
+      applied: false,
+      failed: true,
+      details: `Nothing changed; required points not found exactly once: ${outcome.missing.join('; ')}`,
+    };
+  }
+  let changed = 0;
+  outcome.sources.forEach((source, index) => {
+    if (source === graphSources.get(names[index])) return;
+    graphSources.set(names[index], source);
+    changed++;
+  });
+  const skipped = outcome.skippedOptional.length
+    ? ` Skipped optional: ${outcome.skippedOptional.join(', ')}.`
+    : '';
+  return {
+    ...base,
+    applied: changed > 0,
+    failed: false,
+    details:
+      changed > 0 ? `Updated ${changed} module(s).${skipped}` : undefined,
   };
 };
 
@@ -1282,7 +1355,11 @@ export const applyCustomization = async (
     const { results: graphResults } = applyPatchImplementationsToGraph(
       graphSources,
       patchImplementations,
-      PATCH_DEFINITIONS.filter(def => def.id !== 'prevent-unsupported-updates'),
+      PATCH_DEFINITIONS.filter(
+        def =>
+          def.id !== 'prevent-unsupported-updates' &&
+          def.id !== 'subscription-features-with-custom-auth'
+      ),
       patchFilter,
       {
         entryModule: nativeGraph.modules[nativeGraph.entryPointIndex]?.name,
@@ -1299,6 +1376,14 @@ export const applyCustomization = async (
       patchFilter
     );
     if (guardResult) allResults.push(guardResult);
+
+    // Same for the subscription-features patch: all points or none.
+    const subscriptionResult = applySubscriptionFeaturesToGraph(
+      config,
+      graphSources,
+      patchFilter
+    );
+    if (subscriptionResult) allResults.push(subscriptionResult);
 
     const replacements = changedModuleSources(nativeGraph, graphSources);
     for (const [name, contents] of replacements)

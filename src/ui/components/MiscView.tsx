@@ -99,6 +99,7 @@ export function MiscView({ onSubmit }: MiscViewProps) {
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
     disableCtrlZSuspend: false,
+    subscriptionFeaturesWithCustomAuth: false,
     skipSkillShellValidation: false,
     skipTrustDialog: false,
     skipDevChannelsDialog: false,
@@ -859,6 +860,21 @@ export function MiscView({ onSubmit }: MiscViewProps) {
             ensureMisc();
             settings.misc!.disableCtrlZSuspend =
               !settings.misc!.disableCtrlZSuspend;
+          });
+        },
+      },
+      {
+        id: 'subscriptionFeaturesWithCustomAuth',
+        title: 'Subscription features with custom auth',
+        description:
+          'Keeps Remote Control, /voice and cloud sessions (/teleport, /schedule, /ultraplan, ...) available with a claude.ai login while ANTHROPIC_BASE_URL or ANTHROPIC_AUTH_TOKEN is set. They talk to Anthropic with the OAuth token; inference keeps using your endpoint. All-or-nothing: nothing is changed if any patch point is missing.',
+        getValue: () =>
+          settings.misc?.subscriptionFeaturesWithCustomAuth ?? false,
+        toggle: () => {
+          updateSettings(settings => {
+            ensureMisc();
+            settings.misc!.subscriptionFeaturesWithCustomAuth =
+              !settings.misc!.subscriptionFeaturesWithCustomAuth;
           });
         },
       },

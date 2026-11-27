@@ -203,6 +203,8 @@ export function isPatchEnabledByConfig(
       return !!misc?.enableChannelsMode;
     case 'disable-ctrl-z':
       return !!misc?.disableCtrlZSuspend;
+    case 'subscription-features-with-custom-auth':
+      return !!misc?.subscriptionFeaturesWithCustomAuth;
     case 'skip-skill-shell-validation':
       return !!misc?.skipSkillShellValidation;
     case 'shimmer-style':

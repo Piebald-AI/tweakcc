@@ -725,6 +725,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enableVoiceConciseOutput: true,
     enableChannelsMode: false,
     disableCtrlZSuspend: false,
+    subscriptionFeaturesWithCustomAuth: false,
     skipSkillShellValidation: false,
     skipTrustDialog: false,
     skipDevChannelsDialog: false,
